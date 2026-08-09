@@ -1,0 +1,10 @@
+{
+  "schemaVersion": 1,
+  "status": "uncalibrated",
+  "minimumIndependentProcesses": 10,
+  "warmupBatches": 5,
+  "measurementBatches": 20,
+  "noiseThresholdPercent": null,
+  "notes": "The threshold will be set after repeated Clean Baseline runs."
+}
+

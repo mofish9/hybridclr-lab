@@ -1,0 +1,18 @@
+{
+  "$schema": "../schemas/test-manifest.schema.json",
+  "schemaVersion": 1,
+  "suiteId": "managed-smoke-v1",
+  "cases": [
+    { "id": "integer_sum_of_squares", "category": "numeric", "required": true },
+    { "id": "checked_overflow", "category": "numeric", "required": true },
+    { "id": "float_bit_pattern", "category": "numeric", "required": true },
+    { "id": "struct_ref_out", "category": "value-type", "required": true },
+    { "id": "array_and_string", "category": "array", "required": true },
+    { "id": "generic_value_type", "category": "generic", "required": true },
+    { "id": "virtual_interface_call", "category": "dispatch", "required": true },
+    { "id": "delegate_call", "category": "dispatch", "required": true },
+    { "id": "boxing_unboxing", "category": "value-type", "required": true },
+    { "id": "exception_finally", "category": "exception", "required": true }
+  ]
+}
+

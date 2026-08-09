@@ -1,0 +1,75 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://github.com/mofish9/hybridclr-lab/schemas/test-result.schema.json",
+  "title": "HybridCLR Lab Test Result",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schemaVersion",
+    "suiteId",
+    "runner",
+    "runtime",
+    "platform",
+    "architecture",
+    "startedAtUtc",
+    "manifestSha256",
+    "managedAssemblySha256",
+    "summary",
+    "cases"
+  ],
+  "properties": {
+    "schemaVersion": { "const": 1 },
+    "suiteId": { "type": "string", "minLength": 1 },
+    "runner": { "type": "string", "minLength": 1 },
+    "runtime": { "type": "string", "minLength": 1 },
+    "platform": { "type": "string", "minLength": 1 },
+    "architecture": { "type": "string", "minLength": 1 },
+    "startedAtUtc": { "type": "string", "format": "date-time" },
+    "manifestSha256": { "$ref": "#/$defs/sha256" },
+    "managedAssemblySha256": { "$ref": "#/$defs/sha256" },
+    "summary": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["total", "passed", "failed"],
+      "properties": {
+        "total": { "type": "integer", "minimum": 0 },
+        "passed": { "type": "integer", "minimum": 0 },
+        "failed": { "type": "integer", "minimum": 0 }
+      }
+    },
+    "cases": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "id",
+          "category",
+          "status",
+          "returnValue",
+          "sideEffect",
+          "exceptionType",
+          "durationNanoseconds",
+          "message"
+        ],
+        "properties": {
+          "id": { "type": "string" },
+          "category": { "type": "string" },
+          "status": { "enum": ["passed", "failed"] },
+          "returnValue": { "type": ["string", "null"] },
+          "sideEffect": { "type": ["string", "null"] },
+          "exceptionType": { "type": ["string", "null"] },
+          "durationNanoseconds": { "type": "integer", "minimum": 0 },
+          "message": { "type": ["string", "null"] }
+        }
+      }
+    }
+  },
+  "$defs": {
+    "sha256": {
+      "type": "string",
+      "pattern": "^[A-F0-9]{64}$"
+    }
+  }
+}
+
