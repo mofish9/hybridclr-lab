@@ -1,0 +1,27 @@
+{
+  "schemaVersion": 1,
+  "profile": "Candidate",
+  "engine": {
+    "family": "Tuanjie",
+    "tuanjieVersion": "1.10.0",
+    "unityCompatibilityVersion": "2022.3.62t12",
+    "executablePath": "C:/Program Files/Tuanjie/Hub/Editor/2022.3.62t12/Editor/Tuanjie.exe"
+  },
+  "packageVersion": "8.13.0",
+  "repositories": {
+    "hybridclr_unity": {
+      "fork": "https://github.com/mofish9/hybridclr_unity.git",
+      "commit": "ca7f87b6a72f3739f99a5ad0c957c7aae0cbd922"
+    },
+    "hybridclr": {
+      "fork": "https://github.com/mofish9/hybridclr.git",
+      "commit": "179dcde7a0e5447f84e298d68a8bdee20e1ec899"
+    },
+    "il2cpp_plus": {
+      "fork": "https://github.com/mofish9/il2cpp_plus.git",
+      "commit": "88372a7f1f58802d16df7c146803d2cd6285d504"
+    }
+  },
+  "expectedRuntimeApiSha256": "354CBEBEA2BBC06582E9603538B00771BA13D035360B2035EE4E2A761A36D1BF",
+  "expectedStagedRuntimeSha256": "11CF487AA7886CA22342AAB69E16F0430778FB2D03D1D5185C5111ACD9625FC0"
+}

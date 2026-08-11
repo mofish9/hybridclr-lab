@@ -9,6 +9,9 @@ artifacts/
 staging/
 reports/raw/
 reports/*.tmp
+reports/*.json
+logs/
+tmp/
 
 unity-test-project/Library/
 unity-test-project/Temp/
@@ -19,4 +22,3 @@ unity-test-project/Builds/
 unity-test-project/UserSettings/
 unity-test-project/HybridCLRData/
 unity-test-project/LocalIl2CppData-*/
-
