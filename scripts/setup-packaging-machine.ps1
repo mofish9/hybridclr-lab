@@ -85,7 +85,10 @@ if (-not (Get-Command git -ErrorAction SilentlyContinue)) {
 $expectedRoot = "C:\hybridclr_optimize"
 $actualRoot = [IO.Path]::GetFullPath((Join-Path $LabRoot ".."))
 if ($actualRoot -ne $expectedRoot) {
-    throw "This packaging workflow requires '$expectedRoot'. Actual root: $actualRoot"
+    if (-not $VerifyOnly) {
+        throw "This packaging workflow requires '$expectedRoot'. Actual root: $actualRoot"
+    }
+    Write-Warning "VerifyOnly is using a non-standard root: $actualRoot"
 }
 
 $editorPath = $manifest.engine.executablePath.Replace('/', '\')
