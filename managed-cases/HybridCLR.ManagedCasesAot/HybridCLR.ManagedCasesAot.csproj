@@ -1,0 +1,14 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <TargetFramework>netstandard2.1</TargetFramework>
+    <AssemblyName>HybridCLR.ManagedCasesAot</AssemblyName>
+    <RootNamespace>HybridCLR.Lab.ManagedCasesAot</RootNamespace>
+    <DefineConstants>HYBRIDCLR_AOT_BENCHMARK</DefineConstants>
+    <AllowUnsafeBlocks>true</AllowUnsafeBlocks>
+    <LangVersion>latest</LangVersion>
+  </PropertyGroup>
+  <ItemGroup>
+    <Compile Include="../HybridCLR.ManagedCases/PerformanceWorkload.cs" Link="PerformanceWorkload.cs" />
+    <ProjectReference Include="../../managed-contracts/HybridCLR.BoundaryContracts/HybridCLR.BoundaryContracts.csproj" />
+  </ItemGroup>
+</Project>

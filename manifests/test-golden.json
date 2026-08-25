@@ -1,0 +1,2432 @@
+{
+  "schemaVersion": 1,
+  "suiteId": "managed-differential-v2",
+  "cases": [
+    {
+      "id": "array_and_string",
+      "category": "array",
+      "layer": "managed-core",
+      "features": [],
+      "returnValue": "1,2,3,4,5",
+      "sideEffect": "15"
+    },
+    {
+      "id": "array_binary_search",
+      "category": "array",
+      "layer": "managed-core",
+      "features": [
+        "array",
+        "binary-search"
+      ],
+      "returnValue": "2,-3",
+      "sideEffect": ""
+    },
+    {
+      "id": "array_clear_and_fill",
+      "category": "array",
+      "layer": "managed-core",
+      "features": [
+        "array",
+        "clear",
+        "stelem"
+      ],
+      "returnValue": "1,9,3",
+      "sideEffect": ""
+    },
+    {
+      "id": "array_copy_resize",
+      "category": "array",
+      "layer": "managed-core",
+      "features": [],
+      "returnValue": "1,2,3,0,0",
+      "sideEffect": "1,2,3,4"
+    },
+    {
+      "id": "array_covariance",
+      "category": "array",
+      "layer": "managed-core",
+      "features": [],
+      "returnValue": "alpha,gamma",
+      "sideEffect": "String[]"
+    },
+    {
+      "id": "array_covariance_type_mismatch",
+      "category": "array",
+      "layer": "managed-core",
+      "features": [
+        "array",
+        "covariance",
+        "stelem",
+        "exception"
+      ],
+      "returnValue": "mismatch",
+      "sideEffect": ""
+    },
+    {
+      "id": "array_null_reference_roundtrip",
+      "category": "array",
+      "layer": "managed-core",
+      "features": [
+        "array",
+        "reference",
+        "null"
+      ],
+      "returnValue": "True,hotfix",
+      "sideEffect": ""
+    },
+    {
+      "id": "array_reverse_segment",
+      "category": "array",
+      "layer": "managed-core",
+      "features": [
+        "array",
+        "reverse",
+        "range"
+      ],
+      "returnValue": "6,5,4,3,2,1",
+      "sideEffect": ""
+    },
+    {
+      "id": "array_segment_enumeration",
+      "category": "array",
+      "layer": "managed-core",
+      "features": [
+        "array",
+        "enumerator",
+        "struct"
+      ],
+      "returnValue": "2,4,6",
+      "sideEffect": ""
+    },
+    {
+      "id": "jagged_array",
+      "category": "array",
+      "layer": "managed-core",
+      "features": [],
+      "returnValue": "2,4;1,3,5",
+      "sideEffect": "15"
+    },
+    {
+      "id": "multidimensional_array",
+      "category": "array",
+      "layer": "managed-core",
+      "features": [],
+      "returnValue": "21",
+      "sideEffect": "6"
+    },
+    {
+      "id": "optimizer_array_backedge_bounds",
+      "category": "array",
+      "layer": "managed-core",
+      "features": [
+        "array",
+        "bounds",
+        "loop",
+        "backward-branch",
+        "exception"
+      ],
+      "returnValue": "IndexOutOfRangeException",
+      "sideEffect": ""
+    },
+    {
+      "id": "optimizer_array_branch_join",
+      "category": "array",
+      "layer": "managed-core",
+      "features": [
+        "array",
+        "branch",
+        "control-flow-join",
+        "range-analysis"
+      ],
+      "returnValue": "80",
+      "sideEffect": "0"
+    },
+    {
+      "id": "optimizer_array_conditional_store_default",
+      "category": "array",
+      "layer": "managed-core",
+      "features": [
+        "array",
+        "range",
+        "conditional-store",
+        "initlocals",
+        "exception"
+      ],
+      "returnValue": "0",
+      "sideEffect": "1"
+    },
+    {
+      "id": "optimizer_array_direct_store_load",
+      "category": "array",
+      "layer": "managed-core",
+      "features": [
+        "array",
+        "loop",
+        "range-analysis",
+        "ldelem",
+        "stelem"
+      ],
+      "returnValue": "120",
+      "sideEffect": "92"
+    },
+    {
+      "id": "optimizer_array_exception_edges",
+      "category": "array",
+      "layer": "managed-core",
+      "features": [
+        "array",
+        "null",
+        "bounds",
+        "exception"
+      ],
+      "returnValue": "null,index,negative",
+      "sideEffect": ""
+    },
+    {
+      "id": "optimizer_array_loop_range",
+      "category": "array",
+      "layer": "managed-core",
+      "features": [
+        "array",
+        "loop",
+        "range-analysis",
+        "ldelem",
+        "stelem"
+      ],
+      "returnValue": "1832",
+      "sideEffect": "63"
+    },
+    {
+      "id": "optimizer_array_repeated_store_negative",
+      "category": "array",
+      "layer": "managed-core",
+      "features": [
+        "array",
+        "range",
+        "repeated-store",
+        "negative",
+        "exception"
+      ],
+      "returnValue": "0",
+      "sideEffect": "1"
+    },
+    {
+      "id": "optimizer_array_repeated_store_range",
+      "category": "array",
+      "layer": "managed-core",
+      "features": [
+        "array",
+        "range",
+        "repeated-store",
+        "loop"
+      ],
+      "returnValue": "2016",
+      "sideEffect": "27"
+    },
+    {
+      "id": "rectangular_array_write",
+      "category": "array",
+      "layer": "managed-core",
+      "features": [
+        "array",
+        "multidimensional",
+        "write"
+      ],
+      "returnValue": "10,20,30,60",
+      "sideEffect": ""
+    },
+    {
+      "id": "struct_array_mutation",
+      "category": "array",
+      "layer": "managed-core",
+      "features": [
+        "array",
+        "struct",
+        "ldelema"
+      ],
+      "returnValue": "3,7,11",
+      "sideEffect": ""
+    },
+    {
+      "id": "async_await_yield",
+      "category": "async",
+      "layer": "managed-core",
+      "features": [
+        "async",
+        "await",
+        "yield"
+      ],
+      "returnValue": "13",
+      "sideEffect": ""
+    },
+    {
+      "id": "async_cancellation_propagation",
+      "category": "async",
+      "layer": "managed-core",
+      "features": [
+        "async",
+        "cancellation",
+        "exception"
+      ],
+      "returnValue": "canceled",
+      "sideEffect": ""
+    },
+    {
+      "id": "async_completed_task",
+      "category": "async",
+      "layer": "managed-core",
+      "features": [],
+      "returnValue": "34",
+      "sideEffect": ""
+    },
+    {
+      "id": "async_exception_unwrap",
+      "category": "async",
+      "layer": "managed-core",
+      "features": [
+        "async",
+        "exception"
+      ],
+      "returnValue": "InvalidOperationException",
+      "sideEffect": ""
+    },
+    {
+      "id": "async_multiple_awaits",
+      "category": "async",
+      "layer": "managed-core",
+      "features": [
+        "async",
+        "await",
+        "state-machine",
+        "multi-await"
+      ],
+      "returnValue": "30",
+      "sideEffect": ""
+    },
+    {
+      "id": "async_state_machine_result",
+      "category": "async",
+      "layer": "managed-core",
+      "features": [
+        "async",
+        "state-machine"
+      ],
+      "returnValue": "55",
+      "sideEffect": ""
+    },
+    {
+      "id": "async_when_any_completed",
+      "category": "async",
+      "layer": "managed-core",
+      "features": [
+        "async",
+        "task",
+        "when-any"
+      ],
+      "returnValue": "9",
+      "sideEffect": ""
+    },
+    {
+      "id": "custom_awaiter",
+      "category": "async",
+      "layer": "managed-core",
+      "features": [
+        "async",
+        "awaiter",
+        "state-machine"
+      ],
+      "returnValue": "37",
+      "sideEffect": ""
+    },
+    {
+      "id": "task_continuation_order",
+      "category": "async",
+      "layer": "managed-core",
+      "features": [
+        "task",
+        "continuation"
+      ],
+      "returnValue": "A,B,C",
+      "sideEffect": ""
+    },
+    {
+      "id": "task_when_all_order",
+      "category": "async",
+      "layer": "managed-core",
+      "features": [
+        "task",
+        "when-all"
+      ],
+      "returnValue": "3,5,7",
+      "sideEffect": ""
+    },
+    {
+      "id": "custom_sort_comparer",
+      "category": "collection",
+      "layer": "managed-core",
+      "features": [
+        "sort",
+        "comparer",
+        "delegate"
+      ],
+      "returnValue": "1,2,3,4",
+      "sideEffect": ""
+    },
+    {
+      "id": "dictionary_custom_comparer",
+      "category": "collection",
+      "layer": "managed-core",
+      "features": [
+        "dictionary",
+        "comparer",
+        "string"
+      ],
+      "returnValue": "2,Alpha",
+      "sideEffect": ""
+    },
+    {
+      "id": "dictionary_lookup",
+      "category": "collection",
+      "layer": "managed-core",
+      "features": [],
+      "returnValue": "15",
+      "sideEffect": "3"
+    },
+    {
+      "id": "dictionary_struct_values",
+      "category": "collection",
+      "layer": "managed-core",
+      "features": [
+        "dictionary",
+        "struct",
+        "generic"
+      ],
+      "returnValue": "30,2",
+      "sideEffect": ""
+    },
+    {
+      "id": "hashset_set_operations",
+      "category": "collection",
+      "layer": "managed-core",
+      "features": [
+        "hashset",
+        "set"
+      ],
+      "returnValue": "1,2,3,4,5",
+      "sideEffect": ""
+    },
+    {
+      "id": "key_value_pair_copy",
+      "category": "collection",
+      "layer": "managed-core",
+      "features": [
+        "keyvaluepair",
+        "struct"
+      ],
+      "returnValue": "alpha=9",
+      "sideEffect": ""
+    },
+    {
+      "id": "linked_list_navigation",
+      "category": "collection",
+      "layer": "managed-core",
+      "features": [
+        "linked-list",
+        "reference"
+      ],
+      "returnValue": "a,b,c",
+      "sideEffect": ""
+    },
+    {
+      "id": "list_foreach",
+      "category": "collection",
+      "layer": "managed-core",
+      "features": [],
+      "returnValue": "1,2,3,4",
+      "sideEffect": "10"
+    },
+    {
+      "id": "list_insert_remove",
+      "category": "collection",
+      "layer": "managed-core",
+      "features": [
+        "list",
+        "remove",
+        "insert"
+      ],
+      "returnValue": "1,4,3,3",
+      "sideEffect": ""
+    },
+    {
+      "id": "queue_stack_roundtrip",
+      "category": "collection",
+      "layer": "managed-core",
+      "features": [
+        "queue",
+        "stack"
+      ],
+      "returnValue": "first,last",
+      "sideEffect": "2"
+    },
+    {
+      "id": "sorted_dictionary_order",
+      "category": "collection",
+      "layer": "managed-core",
+      "features": [
+        "sorted-dictionary",
+        "enumeration"
+      ],
+      "returnValue": "1:one;2:two;3:three",
+      "sideEffect": ""
+    },
+    {
+      "id": "conditional_expression",
+      "category": "control-flow",
+      "layer": "managed-core",
+      "features": [
+        "conditional",
+        "branch"
+      ],
+      "returnValue": "odd:9",
+      "sideEffect": ""
+    },
+    {
+      "id": "dense_integer_switch",
+      "category": "control-flow",
+      "layer": "managed-core",
+      "features": [
+        "switch",
+        "dense"
+      ],
+      "returnValue": "39",
+      "sideEffect": ""
+    },
+    {
+      "id": "do_while_accumulation",
+      "category": "control-flow",
+      "layer": "managed-core",
+      "features": [
+        "loop",
+        "backward-branch"
+      ],
+      "returnValue": "55",
+      "sideEffect": ""
+    },
+    {
+      "id": "enum_switch",
+      "category": "control-flow",
+      "layer": "managed-core",
+      "features": [],
+      "returnValue": "4",
+      "sideEffect": "Screen"
+    },
+    {
+      "id": "mutual_recursion",
+      "category": "control-flow",
+      "layer": "managed-core",
+      "features": [
+        "call",
+        "recursion"
+      ],
+      "returnValue": "True,True",
+      "sideEffect": ""
+    },
+    {
+      "id": "nested_break_continue",
+      "category": "control-flow",
+      "layer": "managed-core",
+      "features": [
+        "loop",
+        "break",
+        "continue"
+      ],
+      "returnValue": "91",
+      "sideEffect": ""
+    },
+    {
+      "id": "null_coalescing_chain",
+      "category": "control-flow",
+      "layer": "managed-core",
+      "features": [
+        "null",
+        "coalesce"
+      ],
+      "returnValue": "fallback",
+      "sideEffect": ""
+    },
+    {
+      "id": "performance_arithmetic_loop_regression",
+      "category": "control-flow",
+      "layer": "managed-core",
+      "features": [
+        "loop",
+        "backward-branch",
+        "ldloc-copy-propagation"
+      ],
+      "returnValue": "1073851942304517",
+      "sideEffect": ""
+    },
+    {
+      "id": "recursive_factorial",
+      "category": "control-flow",
+      "layer": "managed-core",
+      "features": [],
+      "returnValue": "720",
+      "sideEffect": ""
+    },
+    {
+      "id": "short_circuit_side_effect",
+      "category": "control-flow",
+      "layer": "managed-core",
+      "features": [
+        "brfalse",
+        "brtrue"
+      ],
+      "returnValue": "False,True",
+      "sideEffect": "1"
+    },
+    {
+      "id": "sparse_integer_switch",
+      "category": "control-flow",
+      "layer": "managed-core",
+      "features": [
+        "branch",
+        "sparse-switch"
+      ],
+      "returnValue": "49",
+      "sideEffect": ""
+    },
+    {
+      "id": "string_switch",
+      "category": "control-flow",
+      "layer": "managed-core",
+      "features": [],
+      "returnValue": "2",
+      "sideEffect": "beta"
+    },
+    {
+      "id": "base_virtual_chain",
+      "category": "dispatch",
+      "layer": "managed-core",
+      "features": [],
+      "returnValue": "18",
+      "sideEffect": "TriplingStage"
+    },
+    {
+      "id": "delegate_call",
+      "category": "dispatch",
+      "layer": "managed-core",
+      "features": [],
+      "returnValue": "42",
+      "sideEffect": ""
+    },
+    {
+      "id": "delegate_covariant_return",
+      "category": "dispatch",
+      "layer": "managed-core",
+      "features": [],
+      "returnValue": "hybrid",
+      "sideEffect": ""
+    },
+    {
+      "id": "delegate_eval_stack_branch_join",
+      "category": "dispatch",
+      "layer": "managed-core",
+      "features": [
+        "delegate",
+        "branch",
+        "evaluation-stack"
+      ],
+      "returnValue": "16,15",
+      "sideEffect": ""
+    },
+    {
+      "id": "delegate_loop_reassignment",
+      "category": "dispatch",
+      "layer": "managed-core",
+      "features": [],
+      "returnValue": "13",
+      "sideEffect": ""
+    },
+    {
+      "id": "delegate_multicast",
+      "category": "dispatch",
+      "layer": "managed-core",
+      "features": [],
+      "returnValue": "12",
+      "sideEffect": "AB"
+    },
+    {
+      "id": "delegate_multicast_remove",
+      "category": "dispatch",
+      "layer": "managed-core",
+      "features": [
+        "delegate",
+        "multicast",
+        "remove"
+      ],
+      "returnValue": "B",
+      "sideEffect": ""
+    },
+    {
+      "id": "delegate_result_branch",
+      "category": "dispatch",
+      "layer": "managed-core",
+      "features": [],
+      "returnValue": "positive",
+      "sideEffect": ""
+    },
+    {
+      "id": "instance_delegate",
+      "category": "dispatch",
+      "layer": "managed-core",
+      "features": [],
+      "returnValue": "22",
+      "sideEffect": "Accumulator"
+    },
+    {
+      "id": "interface_branch_join_dispatch",
+      "category": "dispatch",
+      "layer": "managed-core",
+      "features": [
+        "interface",
+        "branch",
+        "control-flow-join"
+      ],
+      "returnValue": "16,15",
+      "sideEffect": ""
+    },
+    {
+      "id": "interface_eval_stack_branch_join",
+      "category": "dispatch",
+      "layer": "managed-core",
+      "features": [
+        "interface",
+        "branch",
+        "evaluation-stack"
+      ],
+      "returnValue": "16,15",
+      "sideEffect": ""
+    },
+    {
+      "id": "interface_loop_type_change",
+      "category": "dispatch",
+      "layer": "managed-core",
+      "features": [
+        "interface",
+        "loop",
+        "backward-branch"
+      ],
+      "returnValue": "14",
+      "sideEffect": ""
+    },
+    {
+      "id": "lambda_capture",
+      "category": "dispatch",
+      "layer": "managed-core",
+      "features": [],
+      "returnValue": "13,17",
+      "sideEffect": ""
+    },
+    {
+      "id": "struct_interface_dispatch",
+      "category": "dispatch",
+      "layer": "managed-core",
+      "features": [],
+      "returnValue": "20",
+      "sideEffect": "15"
+    },
+    {
+      "id": "virtual_interface_call",
+      "category": "dispatch",
+      "layer": "managed-core",
+      "features": [],
+      "returnValue": "39",
+      "sideEffect": ""
+    },
+    {
+      "id": "catch_filter",
+      "category": "exception",
+      "layer": "managed-core",
+      "features": [],
+      "returnValue": "ArgumentException",
+      "sideEffect": "filtered"
+    },
+    {
+      "id": "custom_exception_catch",
+      "category": "exception",
+      "layer": "managed-core",
+      "features": [
+        "custom-exception",
+        "catch"
+      ],
+      "returnValue": "custom:77",
+      "sideEffect": ""
+    },
+    {
+      "id": "deferred_iterator_exception",
+      "category": "exception",
+      "layer": "managed-core",
+      "features": [
+        "iterator",
+        "exception"
+      ],
+      "returnValue": "InvalidOperationException",
+      "sideEffect": ""
+    },
+    {
+      "id": "divide_by_zero_catch",
+      "category": "exception",
+      "layer": "managed-core",
+      "features": [
+        "div",
+        "exception"
+      ],
+      "returnValue": "divide",
+      "sideEffect": ""
+    },
+    {
+      "id": "exception_finally",
+      "category": "exception",
+      "layer": "managed-core",
+      "features": [],
+      "returnValue": "16",
+      "sideEffect": ""
+    },
+    {
+      "id": "filter_falls_through",
+      "category": "exception",
+      "layer": "managed-core",
+      "features": [
+        "filter",
+        "catch"
+      ],
+      "returnValue": "outer",
+      "sideEffect": ""
+    },
+    {
+      "id": "finally_continue",
+      "category": "exception",
+      "layer": "managed-core",
+      "features": [
+        "finally",
+        "continue"
+      ],
+      "returnValue": "9",
+      "sideEffect": ""
+    },
+    {
+      "id": "finally_replaces_exception",
+      "category": "exception",
+      "layer": "managed-core",
+      "features": [
+        "finally",
+        "unwind"
+      ],
+      "returnValue": "finally",
+      "sideEffect": ""
+    },
+    {
+      "id": "index_out_of_range_catch",
+      "category": "exception",
+      "layer": "managed-core",
+      "features": [
+        "array",
+        "exception"
+      ],
+      "returnValue": "index",
+      "sideEffect": ""
+    },
+    {
+      "id": "invalid_cast_catch",
+      "category": "exception",
+      "layer": "managed-core",
+      "features": [
+        "castclass",
+        "catch"
+      ],
+      "returnValue": "cast",
+      "sideEffect": ""
+    },
+    {
+      "id": "multiple_exception_catches",
+      "category": "exception",
+      "layer": "managed-core",
+      "features": [
+        "catch",
+        "type-test"
+      ],
+      "returnValue": "argument",
+      "sideEffect": ""
+    },
+    {
+      "id": "nested_finally_leave",
+      "category": "exception",
+      "layer": "managed-core",
+      "features": [
+        "exception",
+        "finally",
+        "leave",
+        "nested"
+      ],
+      "returnValue": "27,inner,outer",
+      "sideEffect": ""
+    },
+    {
+      "id": "nested_try_catch",
+      "category": "exception",
+      "layer": "managed-core",
+      "features": [],
+      "returnValue": "31",
+      "sideEffect": ""
+    },
+    {
+      "id": "nested_using_dispose_order",
+      "category": "exception",
+      "layer": "managed-core",
+      "features": [
+        "using",
+        "nested-finally"
+      ],
+      "returnValue": "inner,inner-dispose,outer-dispose",
+      "sideEffect": ""
+    },
+    {
+      "id": "null_reference_catch",
+      "category": "exception",
+      "layer": "managed-core",
+      "features": [
+        "nullref",
+        "catch"
+      ],
+      "returnValue": "null",
+      "sideEffect": ""
+    },
+    {
+      "id": "throw_rethrow",
+      "category": "exception",
+      "layer": "managed-core",
+      "features": [],
+      "returnValue": "24",
+      "sideEffect": "rethrow"
+    },
+    {
+      "id": "using_dispose_order",
+      "category": "exception",
+      "layer": "managed-core",
+      "features": [
+        "using",
+        "dispose"
+      ],
+      "returnValue": "body,resource-dispose",
+      "sideEffect": ""
+    },
+    {
+      "id": "generic_array_transform",
+      "category": "generic",
+      "layer": "managed-core",
+      "features": [
+        "array",
+        "generic-method"
+      ],
+      "returnValue": "2,4,6",
+      "sideEffect": ""
+    },
+    {
+      "id": "generic_constraint_class",
+      "category": "generic",
+      "layer": "managed-core",
+      "features": [
+        "constraint.class",
+        "interface"
+      ],
+      "returnValue": "21",
+      "sideEffect": ""
+    },
+    {
+      "id": "generic_constraint_new",
+      "category": "generic",
+      "layer": "managed-core",
+      "features": [
+        "constraint.new",
+        "constructor"
+      ],
+      "returnValue": "created",
+      "sideEffect": ""
+    },
+    {
+      "id": "generic_contravariance",
+      "category": "generic",
+      "layer": "managed-core",
+      "features": [
+        "contravariance",
+        "comparer"
+      ],
+      "returnValue": "-1",
+      "sideEffect": ""
+    },
+    {
+      "id": "generic_covariance",
+      "category": "generic",
+      "layer": "managed-core",
+      "features": [
+        "variance",
+        "interface"
+      ],
+      "returnValue": "a,b,c",
+      "sideEffect": ""
+    },
+    {
+      "id": "generic_default_value",
+      "category": "generic",
+      "layer": "managed-core",
+      "features": [
+        "default",
+        "valuetype"
+      ],
+      "returnValue": "0,False",
+      "sideEffect": ""
+    },
+    {
+      "id": "generic_delegate_factory",
+      "category": "generic",
+      "layer": "managed-core",
+      "features": [
+        "delegate",
+        "generic-method"
+      ],
+      "returnValue": "56",
+      "sideEffect": ""
+    },
+    {
+      "id": "generic_dictionary_struct",
+      "category": "generic",
+      "layer": "managed-core",
+      "features": [
+        "dictionary",
+        "generic-sharing",
+        "struct"
+      ],
+      "returnValue": "33,2",
+      "sideEffect": ""
+    },
+    {
+      "id": "generic_interface_constraint",
+      "category": "generic",
+      "layer": "managed-core",
+      "features": [],
+      "returnValue": "21",
+      "sideEffect": "15"
+    },
+    {
+      "id": "generic_interface_struct",
+      "category": "generic",
+      "layer": "managed-core",
+      "features": [
+        "generic-interface",
+        "constrained-call"
+      ],
+      "returnValue": "27,30",
+      "sideEffect": ""
+    },
+    {
+      "id": "generic_list_value_types",
+      "category": "generic",
+      "layer": "managed-core",
+      "features": [
+        "list",
+        "generic-sharing",
+        "int"
+      ],
+      "returnValue": "1,2,3",
+      "sideEffect": "9"
+    },
+    {
+      "id": "generic_method_roundtrip",
+      "category": "generic",
+      "layer": "managed-core",
+      "features": [],
+      "returnValue": "lab,41",
+      "sideEffect": "2,5"
+    },
+    {
+      "id": "generic_nested_combo",
+      "category": "generic",
+      "layer": "managed-core",
+      "features": [],
+      "returnValue": "2,5",
+      "sideEffect": "3,7"
+    },
+    {
+      "id": "generic_nullable_roundtrip",
+      "category": "generic",
+      "layer": "managed-core",
+      "features": [
+        "nullable",
+        "generic"
+      ],
+      "returnValue": "17,False",
+      "sideEffect": ""
+    },
+    {
+      "id": "generic_out_parameter",
+      "category": "generic",
+      "layer": "managed-core",
+      "features": [
+        "out",
+        "generic"
+      ],
+      "returnValue": "42",
+      "sideEffect": ""
+    },
+    {
+      "id": "generic_reference_type",
+      "category": "generic",
+      "layer": "managed-core",
+      "features": [],
+      "returnValue": "right,left",
+      "sideEffect": "9"
+    },
+    {
+      "id": "generic_static_per_type",
+      "category": "generic",
+      "layer": "managed-core",
+      "features": [
+        "generic-static",
+        "cctor"
+      ],
+      "returnValue": "2,1",
+      "sideEffect": ""
+    },
+    {
+      "id": "generic_tuple_roundtrip",
+      "category": "generic",
+      "layer": "managed-core",
+      "features": [
+        "tuple",
+        "generic"
+      ],
+      "returnValue": "3:5",
+      "sideEffect": ""
+    },
+    {
+      "id": "generic_value_type",
+      "category": "generic",
+      "layer": "managed-core",
+      "features": [],
+      "returnValue": "11,7",
+      "sideEffect": "18"
+    },
+    {
+      "id": "generic_virtual_method",
+      "category": "generic",
+      "layer": "managed-core",
+      "features": [
+        "generic-virtual",
+        "dispatch"
+      ],
+      "returnValue": "42",
+      "sideEffect": ""
+    },
+    {
+      "id": "pinvoke_process_id",
+      "category": "interop",
+      "layer": "managed-core",
+      "features": [
+        "p-invoke",
+        "native-call"
+      ],
+      "returnValue": "True",
+      "sideEffect": ""
+    },
+    {
+      "id": "reverse_pinvoke_qsort",
+      "category": "interop",
+      "layer": "managed-core",
+      "features": [
+        "reverse-p-invoke",
+        "delegate",
+        "native-call"
+      ],
+      "returnValue": "1,2,3,4",
+      "sideEffect": ""
+    },
+    {
+      "id": "iterator_enumeration",
+      "category": "iterator",
+      "layer": "managed-core",
+      "features": [],
+      "returnValue": "1,2,3,4",
+      "sideEffect": "10"
+    },
+    {
+      "id": "iterator_finally_dispose",
+      "category": "iterator",
+      "layer": "managed-core",
+      "features": [
+        "iterator",
+        "finally",
+        "dispose"
+      ],
+      "returnValue": "1,disposed",
+      "sideEffect": ""
+    },
+    {
+      "id": "iterator_yield_break_cleanup",
+      "category": "iterator",
+      "layer": "managed-core",
+      "features": [
+        "iterator",
+        "yield-break",
+        "finally",
+        "dispose"
+      ],
+      "returnValue": "1,disposed",
+      "sideEffect": ""
+    },
+    {
+      "id": "bitwise_shift",
+      "category": "numeric",
+      "layer": "managed-core",
+      "features": [],
+      "returnValue": "105",
+      "sideEffect": ""
+    },
+    {
+      "id": "character_arithmetic",
+      "category": "numeric",
+      "layer": "managed-core",
+      "features": [
+        "char",
+        "conv.u2"
+      ],
+      "returnValue": "937,939",
+      "sideEffect": ""
+    },
+    {
+      "id": "checked_multiply_overflow",
+      "category": "numeric",
+      "layer": "managed-core",
+      "features": [
+        "mul.ovf"
+      ],
+      "sideEffect": "",
+      "exceptionType": "System.OverflowException"
+    },
+    {
+      "id": "checked_overflow",
+      "category": "numeric",
+      "layer": "managed-core",
+      "features": [],
+      "exceptionType": "System.OverflowException"
+    },
+    {
+      "id": "decimal_arithmetic",
+      "category": "numeric",
+      "layer": "managed-core",
+      "features": [
+        "decimal",
+        "value-type-call"
+      ],
+      "returnValue": "37.0",
+      "sideEffect": ""
+    },
+    {
+      "id": "double_infinity",
+      "category": "numeric",
+      "layer": "managed-core",
+      "features": [
+        "float64",
+        "infinity"
+      ],
+      "returnValue": "True,True",
+      "sideEffect": ""
+    },
+    {
+      "id": "double_precision_math",
+      "category": "numeric",
+      "layer": "managed-core",
+      "features": [],
+      "returnValue": "3FE3333333333334",
+      "sideEffect": ""
+    },
+    {
+      "id": "float_bit_pattern",
+      "category": "numeric",
+      "layer": "managed-core",
+      "features": [],
+      "returnValue": "40980000",
+      "sideEffect": ""
+    },
+    {
+      "id": "float_nan_comparison",
+      "category": "numeric",
+      "layer": "managed-core",
+      "features": [
+        "float32",
+        "nan",
+        "comparison"
+      ],
+      "returnValue": "False,True,True",
+      "sideEffect": ""
+    },
+    {
+      "id": "float_negative_zero",
+      "category": "numeric",
+      "layer": "managed-core",
+      "features": [
+        "float32",
+        "bit-pattern"
+      ],
+      "returnValue": "80000000",
+      "sideEffect": ""
+    },
+    {
+      "id": "integer_sum_of_squares",
+      "category": "numeric",
+      "layer": "managed-core",
+      "features": [],
+      "returnValue": "333833500",
+      "sideEffect": ""
+    },
+    {
+      "id": "long_shift_masking",
+      "category": "numeric",
+      "layer": "managed-core",
+      "features": [
+        "shl",
+        "shr",
+        "int64"
+      ],
+      "returnValue": "2,-4",
+      "sideEffect": ""
+    },
+    {
+      "id": "math_divrem",
+      "category": "numeric",
+      "layer": "managed-core",
+      "features": [],
+      "returnValue": "184",
+      "sideEffect": "17"
+    },
+    {
+      "id": "numeric_truncating_cast",
+      "category": "numeric",
+      "layer": "managed-core",
+      "features": [
+        "conv.i4",
+        "float64"
+      ],
+      "returnValue": "3,-3",
+      "sideEffect": ""
+    },
+    {
+      "id": "signed_conversion_chain",
+      "category": "numeric",
+      "layer": "managed-core",
+      "features": [
+        "conv",
+        "sign-extension"
+      ],
+      "returnValue": "254,-2,65534",
+      "sideEffect": ""
+    },
+    {
+      "id": "signed_division_remainder",
+      "category": "numeric",
+      "layer": "managed-core",
+      "features": [
+        "div",
+        "rem",
+        "int32"
+      ],
+      "returnValue": "-3,-2",
+      "sideEffect": ""
+    },
+    {
+      "id": "unchecked_wraparound",
+      "category": "numeric",
+      "layer": "managed-core",
+      "features": [],
+      "returnValue": "-2147483647",
+      "sideEffect": ""
+    },
+    {
+      "id": "unsigned_comparison",
+      "category": "numeric",
+      "layer": "managed-core",
+      "features": [
+        "comparison.un",
+        "uint32"
+      ],
+      "returnValue": "True,True",
+      "sideEffect": ""
+    },
+    {
+      "id": "unsigned_wide_arithmetic",
+      "category": "numeric",
+      "layer": "managed-core",
+      "features": [
+        "uint64",
+        "sub",
+        "add"
+      ],
+      "returnValue": "18446744073709551612",
+      "sideEffect": ""
+    },
+    {
+      "id": "reflection_attribute_read",
+      "category": "reflection",
+      "layer": "managed-core",
+      "features": [
+        "reflection",
+        "attribute"
+      ],
+      "returnValue": "lab:7",
+      "sideEffect": ""
+    },
+    {
+      "id": "reflection_constructor_invoke",
+      "category": "reflection",
+      "layer": "managed-core",
+      "features": [
+        "reflection",
+        "constructor"
+      ],
+      "returnValue": "probe:12",
+      "sideEffect": ""
+    },
+    {
+      "id": "reflection_delegate_create",
+      "category": "reflection",
+      "layer": "managed-core",
+      "features": [
+        "reflection",
+        "delegate"
+      ],
+      "returnValue": "49",
+      "sideEffect": ""
+    },
+    {
+      "id": "reflection_enum_metadata",
+      "category": "reflection",
+      "layer": "managed-core",
+      "features": [
+        "reflection",
+        "enum"
+      ],
+      "returnValue": "MetadataByteEnum,1",
+      "sideEffect": ""
+    },
+    {
+      "id": "reflection_interface_base_chain",
+      "category": "reflection",
+      "layer": "managed-core",
+      "features": [
+        "reflection",
+        "base",
+        "interface"
+      ],
+      "returnValue": "True,True",
+      "sideEffect": ""
+    },
+    {
+      "id": "reflection_invoke",
+      "category": "reflection",
+      "layer": "managed-core",
+      "features": [],
+      "returnValue": "21",
+      "sideEffect": "ReflectionTarget"
+    },
+    {
+      "id": "reflection_invoke_exception",
+      "category": "reflection",
+      "layer": "managed-core",
+      "features": [
+        "reflection",
+        "invoke",
+        "exception"
+      ],
+      "returnValue": "InvalidOperationException",
+      "sideEffect": ""
+    },
+    {
+      "id": "reflection_make_generic_method",
+      "category": "reflection",
+      "layer": "managed-core",
+      "features": [
+        "reflection",
+        "generic-method"
+      ],
+      "returnValue": "hello:42",
+      "sideEffect": ""
+    },
+    {
+      "id": "reflection_make_generic_type",
+      "category": "reflection",
+      "layer": "managed-core",
+      "features": [
+        "reflection",
+        "generic-type"
+      ],
+      "returnValue": "Int32:17",
+      "sideEffect": ""
+    },
+    {
+      "id": "reflection_nested_type",
+      "category": "reflection",
+      "layer": "managed-core",
+      "features": [
+        "reflection",
+        "nested-type"
+      ],
+      "returnValue": "NestedProbe",
+      "sideEffect": ""
+    },
+    {
+      "id": "reflection_private_member",
+      "category": "reflection",
+      "layer": "managed-core",
+      "features": [
+        "reflection",
+        "private-field"
+      ],
+      "returnValue": "_value:31",
+      "sideEffect": ""
+    },
+    {
+      "id": "reflection_property_field_access",
+      "category": "reflection",
+      "layer": "managed-core",
+      "features": [
+        "reflection",
+        "property",
+        "field"
+      ],
+      "returnValue": "21,33",
+      "sideEffect": ""
+    },
+    {
+      "id": "delegate_instance_target_lifetime",
+      "category": "runtime",
+      "layer": "managed-core",
+      "features": [
+        "delegate",
+        "gc",
+        "target-lifetime"
+      ],
+      "returnValue": "43,True",
+      "sideEffect": ""
+    },
+    {
+      "id": "weak_reference_lifecycle",
+      "category": "runtime",
+      "layer": "managed-core",
+      "features": [
+        "gc",
+        "weak-reference"
+      ],
+      "returnValue": "True",
+      "sideEffect": ""
+    },
+    {
+      "id": "static_constructor_once",
+      "category": "static",
+      "layer": "managed-core",
+      "features": [],
+      "returnValue": "1",
+      "sideEffect": "1"
+    },
+    {
+      "id": "string_builder_editing",
+      "category": "string",
+      "layer": "managed-core",
+      "features": [
+        "stringbuilder",
+        "insert",
+        "remove"
+      ],
+      "returnValue": "hybrid-clr",
+      "sideEffect": ""
+    },
+    {
+      "id": "string_char_enumeration",
+      "category": "string",
+      "layer": "managed-core",
+      "features": [
+        "string",
+        "char",
+        "foreach"
+      ],
+      "returnValue": "ABC,198",
+      "sideEffect": ""
+    },
+    {
+      "id": "string_formatting",
+      "category": "string",
+      "layer": "managed-core",
+      "features": [],
+      "returnValue": "hybrid:07:3",
+      "sideEffect": ""
+    },
+    {
+      "id": "string_search_comparison",
+      "category": "string",
+      "layer": "managed-core",
+      "features": [
+        "string",
+        "ordinal",
+        "search"
+      ],
+      "returnValue": "6,True,False",
+      "sideEffect": ""
+    },
+    {
+      "id": "string_split_join",
+      "category": "string",
+      "layer": "managed-core",
+      "features": [
+        "string",
+        "split",
+        "join"
+      ],
+      "returnValue": "a|b|c|d",
+      "sideEffect": ""
+    },
+    {
+      "id": "concurrent_generic_reentry",
+      "category": "thread",
+      "layer": "managed-core",
+      "features": [
+        "thread",
+        "task",
+        "concurrent",
+        "generic-sharing"
+      ],
+      "returnValue": "196",
+      "sideEffect": ""
+    },
+    {
+      "id": "concurrent_interpreter_reentry",
+      "category": "thread",
+      "layer": "managed-core",
+      "features": [
+        "thread",
+        "task",
+        "concurrent",
+        "interpreter-reentry"
+      ],
+      "returnValue": "148",
+      "sideEffect": ""
+    },
+    {
+      "id": "interlocked_increment",
+      "category": "thread",
+      "layer": "managed-core",
+      "features": [
+        "interlocked",
+        "thread"
+      ],
+      "returnValue": "8",
+      "sideEffect": ""
+    },
+    {
+      "id": "monitor_lock_mutation",
+      "category": "thread",
+      "layer": "managed-core",
+      "features": [
+        "monitor",
+        "lock"
+      ],
+      "returnValue": "3",
+      "sideEffect": ""
+    },
+    {
+      "id": "thread_interlocked_exchange",
+      "category": "thread",
+      "layer": "managed-core",
+      "features": [
+        "thread",
+        "interlocked",
+        "exchange"
+      ],
+      "returnValue": "9,4",
+      "sideEffect": ""
+    },
+    {
+      "id": "thread_join",
+      "category": "thread",
+      "layer": "managed-core",
+      "features": [],
+      "returnValue": "23",
+      "sideEffect": ""
+    },
+    {
+      "id": "thread_name_and_join",
+      "category": "thread",
+      "layer": "managed-core",
+      "features": [
+        "thread",
+        "join"
+      ],
+      "returnValue": "worker:24",
+      "sideEffect": ""
+    },
+    {
+      "id": "thread_static_isolation",
+      "category": "thread",
+      "layer": "managed-core",
+      "features": [
+        "thread-static",
+        "thread"
+      ],
+      "returnValue": "0,9",
+      "sideEffect": ""
+    },
+    {
+      "id": "volatile_visibility",
+      "category": "thread",
+      "layer": "managed-core",
+      "features": [
+        "volatile",
+        "thread"
+      ],
+      "returnValue": "1",
+      "sideEffect": ""
+    },
+    {
+      "id": "boxing_unboxing",
+      "category": "value-type",
+      "layer": "managed-core",
+      "features": [],
+      "returnValue": "32",
+      "sideEffect": ""
+    },
+    {
+      "id": "boxing_unboxing_safepoint",
+      "category": "value-type",
+      "layer": "managed-core",
+      "features": [
+        "boxing",
+        "unboxing",
+        "gc-safepoint"
+      ],
+      "returnValue": "42",
+      "sideEffect": ""
+    },
+    {
+      "id": "enum_underlying_sizes",
+      "category": "value-type",
+      "layer": "managed-core",
+      "features": [
+        "enum",
+        "underlying-type"
+      ],
+      "returnValue": "255,9223372036854775807",
+      "sideEffect": ""
+    },
+    {
+      "id": "generic_boxing_unboxing",
+      "category": "value-type",
+      "layer": "managed-core",
+      "features": [
+        "boxing",
+        "generic"
+      ],
+      "returnValue": "19,19",
+      "sideEffect": ""
+    },
+    {
+      "id": "in_parameter_struct",
+      "category": "value-type",
+      "layer": "managed-core",
+      "features": [
+        "in",
+        "struct"
+      ],
+      "returnValue": "35",
+      "sideEffect": ""
+    },
+    {
+      "id": "nested_struct_layout",
+      "category": "value-type",
+      "layer": "managed-core",
+      "features": [
+        "nested-struct",
+        "layout"
+      ],
+      "returnValue": "1,2,3,6",
+      "sideEffect": ""
+    },
+    {
+      "id": "nullable_value_type",
+      "category": "value-type",
+      "layer": "managed-core",
+      "features": [],
+      "returnValue": "20",
+      "sideEffect": "True,False"
+    },
+    {
+      "id": "optimizer_explicit_struct_layout",
+      "category": "value-type",
+      "layer": "managed-core",
+      "features": [
+        "struct",
+        "explicit-layout",
+        "overlap",
+        "constructor"
+      ],
+      "returnValue": "22,22,44,44",
+      "sideEffect": ""
+    },
+    {
+      "id": "optimizer_four_scalar_struct_ctor",
+      "category": "value-type",
+      "layer": "managed-core",
+      "features": [
+        "struct",
+        "scalar-fields",
+        "sequential-layout",
+        "constructor"
+      ],
+      "returnValue": "11,22,33,44,110",
+      "sideEffect": "0B00000016000000210000002C000000"
+    },
+    {
+      "id": "optimizer_scalar_struct_layout",
+      "category": "value-type",
+      "layer": "managed-core",
+      "features": [
+        "struct",
+        "scalar-fields",
+        "layout",
+        "constructor"
+      ],
+      "returnValue": "18,72623859790382856,3.5,-7,72623859790382870|size=32|bytes=120000000000000008070605040302010000000000000C40F9FF000000000000",
+      "sideEffect": ""
+    },
+    {
+      "id": "readonly_struct_method",
+      "category": "value-type",
+      "layer": "managed-core",
+      "features": [
+        "readonly-struct",
+        "method"
+      ],
+      "returnValue": "30",
+      "sideEffect": ""
+    },
+    {
+      "id": "struct_copy_semantics",
+      "category": "value-type",
+      "layer": "managed-core",
+      "features": [
+        "struct-copy",
+        "field"
+      ],
+      "returnValue": "2,9",
+      "sideEffect": ""
+    },
+    {
+      "id": "struct_ref_out",
+      "category": "value-type",
+      "layer": "managed-core",
+      "features": [],
+      "returnValue": "8,2",
+      "sideEffect": "10"
+    },
+    {
+      "id": "struct_ref_return",
+      "category": "value-type",
+      "layer": "managed-core",
+      "features": [
+        "ref-return",
+        "ldelema"
+      ],
+      "returnValue": "18,18",
+      "sideEffect": ""
+    },
+    {
+      "id": "tuple_deconstruction",
+      "category": "value-type",
+      "layer": "managed-core",
+      "features": [
+        "valuetuple",
+        "deconstruction"
+      ],
+      "returnValue": "left:7",
+      "sideEffect": ""
+    },
+    {
+      "id": "boundary_aot_boxes_struct",
+      "category": "boundary",
+      "layer": "player-boundary",
+      "features": [
+        "aot-to-interp",
+        "boxing",
+        "struct"
+      ],
+      "returnValue": "5,12,3",
+      "sideEffect": ""
+    },
+    {
+      "id": "boundary_aot_calls_delegate",
+      "category": "boundary",
+      "layer": "player-boundary",
+      "features": [
+        "aot-to-interp",
+        "delegate"
+      ],
+      "returnValue": "42",
+      "sideEffect": ""
+    },
+    {
+      "id": "boundary_aot_calls_func",
+      "category": "boundary",
+      "layer": "player-boundary",
+      "features": [
+        "aot-to-interp",
+        "delegate",
+        "generic-delegate"
+      ],
+      "returnValue": "34",
+      "sideEffect": ""
+    },
+    {
+      "id": "boundary_aot_calls_interface",
+      "category": "boundary",
+      "layer": "player-boundary",
+      "features": [
+        "aot-to-interp",
+        "interface"
+      ],
+      "returnValue": "39",
+      "sideEffect": ""
+    },
+    {
+      "id": "boundary_aot_calls_string_interface",
+      "category": "boundary",
+      "layer": "player-boundary",
+      "features": [
+        "aot-to-interp",
+        "string"
+      ],
+      "returnValue": "prefix:hotfix-service",
+      "sideEffect": ""
+    },
+    {
+      "id": "boundary_aot_calls_struct_interface",
+      "category": "boundary",
+      "layer": "player-boundary",
+      "features": [
+        "aot-to-interp",
+        "struct",
+        "interface"
+      ],
+      "returnValue": "3,15,7",
+      "sideEffect": "25"
+    },
+    {
+      "id": "boundary_aot_calls_virtual",
+      "category": "boundary",
+      "layer": "player-boundary",
+      "features": [
+        "aot-to-interp",
+        "virtual"
+      ],
+      "returnValue": "30",
+      "sideEffect": "BoundaryDerived"
+    },
+    {
+      "id": "boundary_aot_catches_interpreter_exception",
+      "category": "boundary",
+      "layer": "player-boundary",
+      "features": [
+        "aot-to-interp",
+        "exception"
+      ],
+      "returnValue": "91",
+      "sideEffect": ""
+    },
+    {
+      "id": "boundary_aot_constrained_struct",
+      "category": "boundary",
+      "layer": "player-boundary",
+      "features": [
+        "aot-to-interp",
+        "generic",
+        "constraint"
+      ],
+      "returnValue": "27",
+      "sideEffect": ""
+    },
+    {
+      "id": "boundary_aot_generic_string_echo",
+      "category": "boundary",
+      "layer": "player-boundary",
+      "features": [
+        "aot-to-interp",
+        "generic",
+        "string"
+      ],
+      "returnValue": "boundary",
+      "sideEffect": ""
+    },
+    {
+      "id": "boundary_aot_generic_struct_echo",
+      "category": "boundary",
+      "layer": "player-boundary",
+      "features": [
+        "aot-to-interp",
+        "generic",
+        "struct"
+      ],
+      "returnValue": "4,8,7",
+      "sideEffect": ""
+    },
+    {
+      "id": "boundary_aot_reads_virtual_property",
+      "category": "boundary",
+      "layer": "player-boundary",
+      "features": [
+        "aot-to-interp",
+        "virtual",
+        "property"
+      ],
+      "returnValue": "BoundaryDerived",
+      "sideEffect": ""
+    },
+    {
+      "id": "boundary_aot_ref_out_struct",
+      "category": "boundary",
+      "layer": "player-boundary",
+      "features": [
+        "aot-to-interp",
+        "ref",
+        "out",
+        "struct"
+      ],
+      "returnValue": "3,6,7",
+      "sideEffect": "16"
+    },
+    {
+      "id": "boundary_aot_sum_array",
+      "category": "boundary",
+      "layer": "player-boundary",
+      "features": [
+        "aot-to-interp",
+        "array"
+      ],
+      "returnValue": "15",
+      "sideEffect": ""
+    },
+    {
+      "id": "boundary_enum_payload_roundtrip",
+      "category": "boundary",
+      "layer": "player-boundary",
+      "features": [
+        "aot-to-interp",
+        "enum",
+        "struct"
+      ],
+      "returnValue": "7",
+      "sideEffect": ""
+    },
+    {
+      "id": "boundary_fgs_aot_calls_hot_generic_delegate",
+      "category": "boundary",
+      "layer": "player-boundary",
+      "features": [
+        "aot-to-interp",
+        "full-generic-sharing",
+        "delegate",
+        "generic-method",
+        "struct-return"
+      ],
+      "returnValue": "131,137,13.5,139",
+      "sideEffect": ""
+    },
+    {
+      "id": "boundary_fgs_calli_large_return",
+      "category": "boundary",
+      "layer": "player-boundary",
+      "features": [
+        "interp-to-aot",
+        "full-generic-sharing",
+        "calli",
+        "struct-return"
+      ],
+      "returnValue": "113,127,12.5,131",
+      "sideEffect": ""
+    },
+    {
+      "id": "boundary_fgs_calli_small_return",
+      "category": "boundary",
+      "layer": "player-boundary",
+      "features": [
+        "interp-to-aot",
+        "full-generic-sharing",
+        "calli",
+        "small-return"
+      ],
+      "returnValue": "251",
+      "sideEffect": ""
+    },
+    {
+      "id": "boundary_fgs_calli_void",
+      "category": "boundary",
+      "layer": "player-boundary",
+      "features": [
+        "interp-to-aot",
+        "full-generic-sharing",
+        "calli",
+        "void-return"
+      ],
+      "returnValue": "1",
+      "sideEffect": ""
+    },
+    {
+      "id": "boundary_fgs_delegate_closed_instance",
+      "category": "boundary",
+      "layer": "player-boundary",
+      "features": [
+        "interp-to-aot",
+        "full-generic-sharing",
+        "delegate",
+        "closed-instance"
+      ],
+      "returnValue": "89,97,10.5,101",
+      "sideEffect": ""
+    },
+    {
+      "id": "boundary_fgs_delegate_multicast_void",
+      "category": "boundary",
+      "layer": "player-boundary",
+      "features": [
+        "interp-to-aot",
+        "full-generic-sharing",
+        "delegate",
+        "multicast",
+        "void-return"
+      ],
+      "returnValue": "2",
+      "sideEffect": ""
+    },
+    {
+      "id": "boundary_fgs_delegate_open_instance",
+      "category": "boundary",
+      "layer": "player-boundary",
+      "features": [
+        "interp-to-aot",
+        "full-generic-sharing",
+        "delegate",
+        "open-instance"
+      ],
+      "returnValue": "103,107,11.5,109",
+      "sideEffect": ""
+    },
+    {
+      "id": "boundary_fgs_delegate_static_large_return",
+      "category": "boundary",
+      "layer": "player-boundary",
+      "features": [
+        "interp-to-aot",
+        "full-generic-sharing",
+        "delegate",
+        "struct-return"
+      ],
+      "returnValue": "73,79,9.5,83",
+      "sideEffect": ""
+    },
+    {
+      "id": "boundary_fgs_delegate_static_small_return",
+      "category": "boundary",
+      "layer": "player-boundary",
+      "features": [
+        "interp-to-aot",
+        "full-generic-sharing",
+        "delegate",
+        "small-return"
+      ],
+      "returnValue": "241",
+      "sideEffect": ""
+    },
+    {
+      "id": "boundary_fgs_delegate_static_void",
+      "category": "boundary",
+      "layer": "player-boundary",
+      "features": [
+        "interp-to-aot",
+        "full-generic-sharing",
+        "delegate",
+        "void-return"
+      ],
+      "returnValue": "1",
+      "sideEffect": ""
+    },
+    {
+      "id": "boundary_fgs_direct_interface_large_return",
+      "category": "boundary",
+      "layer": "player-boundary",
+      "features": [
+        "interp-to-aot",
+        "full-generic-sharing",
+        "interface",
+        "struct-return"
+      ],
+      "returnValue": "51,53,7.5,55",
+      "sideEffect": ""
+    },
+    {
+      "id": "boundary_fgs_direct_interface_small_return",
+      "category": "boundary",
+      "layer": "player-boundary",
+      "features": [
+        "interp-to-aot",
+        "full-generic-sharing",
+        "interface",
+        "small-return"
+      ],
+      "returnValue": "231",
+      "sideEffect": ""
+    },
+    {
+      "id": "boundary_fgs_direct_interface_void",
+      "category": "boundary",
+      "layer": "player-boundary",
+      "features": [
+        "interp-to-aot",
+        "full-generic-sharing",
+        "interface",
+        "void-return"
+      ],
+      "returnValue": "1",
+      "sideEffect": ""
+    },
+    {
+      "id": "boundary_fgs_direct_virtual_large_return",
+      "category": "boundary",
+      "layer": "player-boundary",
+      "features": [
+        "interp-to-aot",
+        "full-generic-sharing",
+        "virtual",
+        "struct-return"
+      ],
+      "returnValue": "61,67,8.5,71",
+      "sideEffect": ""
+    },
+    {
+      "id": "boundary_fgs_direct_virtual_small_return",
+      "category": "boundary",
+      "layer": "player-boundary",
+      "features": [
+        "interp-to-aot",
+        "full-generic-sharing",
+        "virtual",
+        "small-return"
+      ],
+      "returnValue": "239",
+      "sideEffect": ""
+    },
+    {
+      "id": "boundary_fgs_direct_virtual_void",
+      "category": "boundary",
+      "layer": "player-boundary",
+      "features": [
+        "interp-to-aot",
+        "full-generic-sharing",
+        "virtual",
+        "void-return"
+      ],
+      "returnValue": "1",
+      "sideEffect": ""
+    },
+    {
+      "id": "boundary_fgs_generic_container",
+      "category": "boundary",
+      "layer": "player-boundary",
+      "features": [
+        "interp-to-aot",
+        "full-generic-sharing",
+        "generic-class",
+        "struct"
+      ],
+      "returnValue": "17,19,1.5,21",
+      "sideEffect": ""
+    },
+    {
+      "id": "boundary_fgs_generic_delegate",
+      "category": "boundary",
+      "layer": "player-boundary",
+      "features": [
+        "interp-to-aot",
+        "full-generic-sharing",
+        "delegate",
+        "struct"
+      ],
+      "returnValue": "7,12,4.5,15",
+      "sideEffect": ""
+    },
+    {
+      "id": "boundary_fgs_generic_interface",
+      "category": "boundary",
+      "layer": "player-boundary",
+      "features": [
+        "interp-to-aot",
+        "aot-to-interp",
+        "full-generic-sharing",
+        "interface",
+        "struct"
+      ],
+      "returnValue": "6,8,2.5,10",
+      "sideEffect": ""
+    },
+    {
+      "id": "boundary_fgs_generic_virtual",
+      "category": "boundary",
+      "layer": "player-boundary",
+      "features": [
+        "interp-to-aot",
+        "full-generic-sharing",
+        "virtual",
+        "struct"
+      ],
+      "returnValue": "23,29,3.5,31",
+      "sideEffect": ""
+    },
+    {
+      "id": "boundary_fgs_hot_enum",
+      "category": "boundary",
+      "layer": "player-boundary",
+      "features": [
+        "interp-to-aot",
+        "full-generic-sharing",
+        "enum"
+      ],
+      "returnValue": "Large",
+      "sideEffect": ""
+    },
+    {
+      "id": "boundary_fgs_large_struct",
+      "category": "boundary",
+      "layer": "player-boundary",
+      "features": [
+        "interp-to-aot",
+        "full-generic-sharing",
+        "struct"
+      ],
+      "returnValue": "3,5,7.5,11",
+      "sideEffect": ""
+    },
+    {
+      "id": "boundary_fgs_nested_array",
+      "category": "boundary",
+      "layer": "player-boundary",
+      "features": [
+        "interp-to-aot",
+        "full-generic-sharing",
+        "array",
+        "struct"
+      ],
+      "returnValue": "2:47",
+      "sideEffect": ""
+    },
+    {
+      "id": "boundary_fgs_nullable_struct",
+      "category": "boundary",
+      "layer": "player-boundary",
+      "features": [
+        "interp-to-aot",
+        "full-generic-sharing",
+        "nullable",
+        "struct"
+      ],
+      "returnValue": "13,True",
+      "sideEffect": ""
+    },
+    {
+      "id": "boundary_fgs_ref_swap",
+      "category": "boundary",
+      "layer": "player-boundary",
+      "features": [
+        "interp-to-aot",
+        "full-generic-sharing",
+        "ref",
+        "struct"
+      ],
+      "returnValue": "9,2",
+      "sideEffect": ""
+    },
+    {
+      "id": "boundary_fgs_reflection_make_generic",
+      "category": "boundary",
+      "layer": "player-boundary",
+      "features": [
+        "interp-to-aot",
+        "full-generic-sharing",
+        "reflection",
+        "struct"
+      ],
+      "returnValue": "37,41,6.5,43",
+      "sideEffect": ""
+    },
+    {
+      "id": "boundary_interpreter_calls_aot",
+      "category": "boundary",
+      "layer": "player-boundary",
+      "features": [
+        "interp-to-aot",
+        "static-call"
+      ],
+      "returnValue": "42",
+      "sideEffect": ""
+    },
+    {
+      "id": "boundary_interpreter_catches_aot_exception",
+      "category": "boundary",
+      "layer": "player-boundary",
+      "features": [
+        "interp-to-aot",
+        "exception"
+      ],
+      "returnValue": "ArgumentException",
+      "sideEffect": ""
+    },
+    {
+      "id": "boundary_null_interface_exception",
+      "category": "boundary",
+      "layer": "player-boundary",
+      "features": [
+        "aot-to-interp",
+        "null",
+        "exception"
+      ],
+      "returnValue": "NullReferenceException",
+      "sideEffect": ""
+    },
+    {
+      "id": "boundary_object_array_roundtrip",
+      "category": "boundary",
+      "layer": "player-boundary",
+      "features": [
+        "aot-to-interp",
+        "array",
+        "object"
+      ],
+      "returnValue": "1,hotfix,3",
+      "sideEffect": ""
+    },
+    {
+      "id": "boundary_repeated_aot_calls",
+      "category": "boundary",
+      "layer": "player-boundary",
+      "features": [
+        "interp-to-aot",
+        "call-frequency"
+      ],
+      "returnValue": "55",
+      "sideEffect": ""
+    }
+  ]
+}

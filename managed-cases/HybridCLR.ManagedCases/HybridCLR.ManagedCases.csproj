@@ -3,6 +3,10 @@
     <TargetFramework>netstandard2.1</TargetFramework>
     <AssemblyName>HybridCLR.ManagedCases</AssemblyName>
     <RootNamespace>HybridCLR.Lab.ManagedCases</RootNamespace>
+    <AllowUnsafeBlocks>true</AllowUnsafeBlocks>
+    <LangVersion>latest</LangVersion>
   </PropertyGroup>
+  <ItemGroup>
+    <ProjectReference Include="..\..\managed-contracts\HybridCLR.BoundaryContracts\HybridCLR.BoundaryContracts.csproj" />
+  </ItemGroup>
 </Project>
-

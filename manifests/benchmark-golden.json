@@ -1,0 +1,27 @@
+{
+  "schemaVersion": 1,
+  "suiteId": "managed-performance-v1",
+  "workloads": [
+    { "id": "interp_arithmetic", "category": "interpreter", "features": ["arithmetic", "loop"], "coldIterations": 1, "coldChecksum": "1042238153", "steadyIterations": 1000000, "steadyChecksum": "1073851942304517" },
+    { "id": "interp_branch", "category": "interpreter", "features": ["branch", "switch"], "coldIterations": 16, "coldChecksum": "-16", "steadyIterations": 1000000, "steadyChecksum": "-31251499872" },
+    { "id": "interp_array", "category": "interpreter", "features": ["array", "ldelem", "stelem"], "coldIterations": 64, "coldChecksum": "831", "steadyIterations": 1000000, "steadyChecksum": "499973500479" },
+    { "id": "interp_call", "category": "interpreter", "features": ["call", "interp-to-interp"], "coldIterations": 1, "coldChecksum": "7", "steadyIterations": 1000000, "steadyChecksum": "1500005500000" },
+    { "id": "interp_field", "category": "interpreter", "features": ["field", "instance-call"], "coldIterations": 1, "coldChecksum": "462", "steadyIterations": 1000000, "steadyChecksum": "780381628487" },
+    { "id": "interp_float", "category": "interpreter", "features": ["floating-point", "loop"], "coldIterations": 1, "coldChecksum": "1250", "steadyIterations": 2000000, "steadyChecksum": "2795213853" },
+    { "id": "interp_struct", "category": "interpreter", "features": ["valuetype", "field"], "coldIterations": 1, "coldChecksum": "11", "steadyIterations": 500000, "steadyChecksum": "-224390085616" },
+    { "id": "interp_generic", "category": "interpreter", "features": ["generic", "valuetype"], "coldIterations": 1, "coldChecksum": "1", "steadyIterations": 2000000, "steadyChecksum": "2000001000000" },
+    { "id": "interp_virtual", "category": "interpreter", "features": ["virtual", "interface"], "coldIterations": 1, "coldChecksum": "1", "steadyIterations": 1000000, "steadyChecksum": "1499999500000" },
+    { "id": "interp_delegate", "category": "interpreter", "features": ["delegate", "dispatch"], "coldIterations": 1, "coldChecksum": "1", "steadyIterations": 1000000, "steadyChecksum": "500000500000" },
+    { "id": "interp_exception", "category": "interpreter", "features": ["exception", "finally"], "coldIterations": 8, "coldChecksum": "36", "steadyIterations": 100000, "steadyChecksum": "3750150000" },
+    { "id": "interp_to_aot_boundary", "category": "boundary", "features": ["interp-to-aot", "static-call"], "coldIterations": 1, "coldChecksum": "3", "steadyIterations": 2000000, "steadyChecksum": "2000005000000" },
+    { "id": "aot_to_interp_boundary", "category": "boundary", "features": ["aot-to-interp", "delegate"], "coldIterations": 1, "coldChecksum": "1", "steadyIterations": 1000000, "steadyChecksum": "500000500000" },
+    { "id": "fgs_static_bridge", "category": "full-generic-sharing", "features": ["interp-to-aot", "static-call", "struct"], "coldIterations": 1, "coldChecksum": "28", "steadyIterations": 200000, "steadyChecksum": "155967104528" },
+    { "id": "fgs_virtual_bridge", "category": "full-generic-sharing", "features": ["interp-to-aot", "interface", "struct"], "coldIterations": 1, "coldChecksum": "28", "steadyIterations": 200000, "steadyChecksum": "155967104528" },
+    { "id": "fgs_delegate_bridge", "category": "full-generic-sharing", "features": ["interp-to-aot", "delegate", "struct"], "coldIterations": 1, "coldChecksum": "28", "steadyIterations": 200000, "steadyChecksum": "155967104528" },
+    { "id": "fgs_calli_bridge", "category": "full-generic-sharing", "features": ["interp-to-aot", "calli", "struct"], "coldIterations": 1, "coldChecksum": "28", "steadyIterations": 200000, "steadyChecksum": "155967104528" },
+    { "id": "interp_string_allocation", "category": "allocation", "features": ["string", "allocation"], "coldIterations": 1, "coldChecksum": "1", "steadyIterations": 300000, "steadyChecksum": "2034638" },
+    { "id": "interp_boxing", "category": "optimizer-pattern", "features": ["boxing", "int32", "non-escaping", "elidable"], "coldIterations": 1, "coldChecksum": "0", "steadyIterations": 500000, "steadyChecksum": "124999750000" },
+    { "id": "interp_boxing_escape", "category": "allocation", "features": ["boxing", "int32", "escaping", "object-array"], "coldIterations": 1, "coldChecksum": "0", "steadyIterations": 500000, "steadyChecksum": "124999750000" },
+    { "id": "interp_boxing_mixed", "category": "allocation", "features": ["boxing", "int32", "mixed-escape"], "coldIterations": 1, "coldChecksum": "0", "steadyIterations": 500000, "steadyChecksum": "97656000000" }
+  ]
+}

@@ -2,9 +2,9 @@
   "schemaVersion": 1,
   "status": "uncalibrated",
   "minimumIndependentProcesses": 10,
+  "coldProcessIsolation": "one-workload-per-process",
   "warmupBatches": 5,
   "measurementBatches": 20,
   "noiseThresholdPercent": null,
   "notes": "The threshold will be set after repeated Clean Baseline runs."
 }
-

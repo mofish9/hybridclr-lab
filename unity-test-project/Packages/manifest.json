@@ -1,0 +1,9 @@
+{
+  "dependencies": {
+    "com.code-philosophy.hybridclr": "file:../../../repos/hybridclr_unity",
+    "com.unity.ai.navigation": "1.1.6",
+    "com.unity.modules.androidjni": "1.0.0",
+    "com.unity.modules.infinity": "1.0.0",
+    "com.unity.modules.jsonserialize": "1.0.0"
+  }
+}

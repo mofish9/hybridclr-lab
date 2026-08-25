@@ -4,11 +4,19 @@
 
 **/bin/
 **/obj/
+managed-cases/HybridCLR.MetadataStress/Generated/
 
 artifacts/
 staging/
 reports/raw/
 reports/*.tmp
+reports/*.log
+reports/*-player-result.json
+reports/*-differential-result.json
+reports/*-build-manifest.json
+reports/build-environment.json
+reports/player-debug-*.json
+reports/player-debug-*.log
 
 unity-test-project/Library/
 unity-test-project/Temp/
@@ -19,4 +27,9 @@ unity-test-project/Builds/
 unity-test-project/UserSettings/
 unity-test-project/HybridCLRData/
 unity-test-project/LocalIl2CppData-*/
-
+unity-test-project/Assets/StreamingAssets/
+unity-test-project/Assets/StreamingAssets.meta
+unity-test-project/Assets/Plugins/
+unity-test-project/Assets/Plugins.meta
+unity-test-project/Assets/HybridCLRGenerate/
+unity-test-project/Assets/HybridCLRGenerate.meta

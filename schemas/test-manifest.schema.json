@@ -7,7 +7,7 @@
   "required": ["schemaVersion", "suiteId", "cases"],
   "properties": {
     "schemaVersion": {
-      "const": 1
+      "const": 2
     },
     "suiteId": {
       "type": "string",
@@ -19,7 +19,7 @@
       "items": {
         "type": "object",
         "additionalProperties": false,
-        "required": ["id", "category", "required"],
+        "required": ["id", "category", "layer", "features", "required"],
         "properties": {
           "id": {
             "type": "string",
@@ -29,6 +29,14 @@
             "type": "string",
             "minLength": 1
           },
+          "layer": {
+            "enum": ["managed-core", "player-boundary"]
+          },
+          "features": {
+            "type": "array",
+            "items": { "type": "string", "minLength": 1 },
+            "uniqueItems": true
+          },
           "required": {
             "type": "boolean"
           }
@@ -37,4 +45,3 @@
     }
   }
 }
-

@@ -1,18 +1,2213 @@
 {
-  "$schema": "../schemas/test-manifest.schema.json",
-  "schemaVersion": 1,
-  "suiteId": "managed-smoke-v1",
+  "schemaVersion": 2,
+  "suiteId": "managed-differential-v2",
   "cases": [
-    { "id": "integer_sum_of_squares", "category": "numeric", "required": true },
-    { "id": "checked_overflow", "category": "numeric", "required": true },
-    { "id": "float_bit_pattern", "category": "numeric", "required": true },
-    { "id": "struct_ref_out", "category": "value-type", "required": true },
-    { "id": "array_and_string", "category": "array", "required": true },
-    { "id": "generic_value_type", "category": "generic", "required": true },
-    { "id": "virtual_interface_call", "category": "dispatch", "required": true },
-    { "id": "delegate_call", "category": "dispatch", "required": true },
-    { "id": "boxing_unboxing", "category": "value-type", "required": true },
-    { "id": "exception_finally", "category": "exception", "required": true }
+    {
+      "id": "array_and_string",
+      "category": "array",
+      "layer": "managed-core",
+      "features": [],
+      "required": true
+    },
+    {
+      "id": "array_binary_search",
+      "category": "array",
+      "layer": "managed-core",
+      "features": [
+        "array",
+        "binary-search"
+      ],
+      "required": true
+    },
+    {
+      "id": "array_clear_and_fill",
+      "category": "array",
+      "layer": "managed-core",
+      "features": [
+        "array",
+        "clear",
+        "stelem"
+      ],
+      "required": true
+    },
+    {
+      "id": "array_copy_resize",
+      "category": "array",
+      "layer": "managed-core",
+      "features": [],
+      "required": true
+    },
+    {
+      "id": "array_covariance",
+      "category": "array",
+      "layer": "managed-core",
+      "features": [],
+      "required": true
+    },
+    {
+      "id": "array_covariance_type_mismatch",
+      "category": "array",
+      "layer": "managed-core",
+      "features": [
+        "array",
+        "covariance",
+        "stelem",
+        "exception"
+      ],
+      "required": true
+    },
+    {
+      "id": "array_null_reference_roundtrip",
+      "category": "array",
+      "layer": "managed-core",
+      "features": [
+        "array",
+        "reference",
+        "null"
+      ],
+      "required": true
+    },
+    {
+      "id": "array_reverse_segment",
+      "category": "array",
+      "layer": "managed-core",
+      "features": [
+        "array",
+        "reverse",
+        "range"
+      ],
+      "required": true
+    },
+    {
+      "id": "array_segment_enumeration",
+      "category": "array",
+      "layer": "managed-core",
+      "features": [
+        "array",
+        "enumerator",
+        "struct"
+      ],
+      "required": true
+    },
+    {
+      "id": "jagged_array",
+      "category": "array",
+      "layer": "managed-core",
+      "features": [],
+      "required": true
+    },
+    {
+      "id": "multidimensional_array",
+      "category": "array",
+      "layer": "managed-core",
+      "features": [],
+      "required": true
+    },
+    {
+      "id": "optimizer_array_backedge_bounds",
+      "category": "array",
+      "layer": "managed-core",
+      "features": [
+        "array",
+        "bounds",
+        "loop",
+        "backward-branch",
+        "exception"
+      ],
+      "required": true
+    },
+    {
+      "id": "optimizer_array_branch_join",
+      "category": "array",
+      "layer": "managed-core",
+      "features": [
+        "array",
+        "branch",
+        "control-flow-join",
+        "range-analysis"
+      ],
+      "required": true
+    },
+    {
+      "id": "optimizer_array_conditional_store_default",
+      "category": "array",
+      "layer": "managed-core",
+      "features": [
+        "array",
+        "range",
+        "conditional-store",
+        "initlocals",
+        "exception"
+      ],
+      "required": true
+    },
+    {
+      "id": "optimizer_array_direct_store_load",
+      "category": "array",
+      "layer": "managed-core",
+      "features": [
+        "array",
+        "loop",
+        "range-analysis",
+        "ldelem",
+        "stelem"
+      ],
+      "required": true
+    },
+    {
+      "id": "optimizer_array_exception_edges",
+      "category": "array",
+      "layer": "managed-core",
+      "features": [
+        "array",
+        "null",
+        "bounds",
+        "exception"
+      ],
+      "required": true
+    },
+    {
+      "id": "optimizer_array_loop_range",
+      "category": "array",
+      "layer": "managed-core",
+      "features": [
+        "array",
+        "loop",
+        "range-analysis",
+        "ldelem",
+        "stelem"
+      ],
+      "required": true
+    },
+    {
+      "id": "optimizer_array_repeated_store_negative",
+      "category": "array",
+      "layer": "managed-core",
+      "features": [
+        "array",
+        "range",
+        "repeated-store",
+        "negative",
+        "exception"
+      ],
+      "required": true
+    },
+    {
+      "id": "optimizer_array_repeated_store_range",
+      "category": "array",
+      "layer": "managed-core",
+      "features": [
+        "array",
+        "range",
+        "repeated-store",
+        "loop"
+      ],
+      "required": true
+    },
+    {
+      "id": "rectangular_array_write",
+      "category": "array",
+      "layer": "managed-core",
+      "features": [
+        "array",
+        "multidimensional",
+        "write"
+      ],
+      "required": true
+    },
+    {
+      "id": "struct_array_mutation",
+      "category": "array",
+      "layer": "managed-core",
+      "features": [
+        "array",
+        "struct",
+        "ldelema"
+      ],
+      "required": true
+    },
+    {
+      "id": "async_await_yield",
+      "category": "async",
+      "layer": "managed-core",
+      "features": [
+        "async",
+        "await",
+        "yield"
+      ],
+      "required": true
+    },
+    {
+      "id": "async_cancellation_propagation",
+      "category": "async",
+      "layer": "managed-core",
+      "features": [
+        "async",
+        "cancellation",
+        "exception"
+      ],
+      "required": true
+    },
+    {
+      "id": "async_completed_task",
+      "category": "async",
+      "layer": "managed-core",
+      "features": [],
+      "required": true
+    },
+    {
+      "id": "async_exception_unwrap",
+      "category": "async",
+      "layer": "managed-core",
+      "features": [
+        "async",
+        "exception"
+      ],
+      "required": true
+    },
+    {
+      "id": "async_multiple_awaits",
+      "category": "async",
+      "layer": "managed-core",
+      "features": [
+        "async",
+        "await",
+        "state-machine",
+        "multi-await"
+      ],
+      "required": true
+    },
+    {
+      "id": "async_state_machine_result",
+      "category": "async",
+      "layer": "managed-core",
+      "features": [
+        "async",
+        "state-machine"
+      ],
+      "required": true
+    },
+    {
+      "id": "async_when_any_completed",
+      "category": "async",
+      "layer": "managed-core",
+      "features": [
+        "async",
+        "task",
+        "when-any"
+      ],
+      "required": true
+    },
+    {
+      "id": "custom_awaiter",
+      "category": "async",
+      "layer": "managed-core",
+      "features": [
+        "async",
+        "awaiter",
+        "state-machine"
+      ],
+      "required": true
+    },
+    {
+      "id": "task_continuation_order",
+      "category": "async",
+      "layer": "managed-core",
+      "features": [
+        "task",
+        "continuation"
+      ],
+      "required": true
+    },
+    {
+      "id": "task_when_all_order",
+      "category": "async",
+      "layer": "managed-core",
+      "features": [
+        "task",
+        "when-all"
+      ],
+      "required": true
+    },
+    {
+      "id": "custom_sort_comparer",
+      "category": "collection",
+      "layer": "managed-core",
+      "features": [
+        "sort",
+        "comparer",
+        "delegate"
+      ],
+      "required": true
+    },
+    {
+      "id": "dictionary_custom_comparer",
+      "category": "collection",
+      "layer": "managed-core",
+      "features": [
+        "dictionary",
+        "comparer",
+        "string"
+      ],
+      "required": true
+    },
+    {
+      "id": "dictionary_lookup",
+      "category": "collection",
+      "layer": "managed-core",
+      "features": [],
+      "required": true
+    },
+    {
+      "id": "dictionary_struct_values",
+      "category": "collection",
+      "layer": "managed-core",
+      "features": [
+        "dictionary",
+        "struct",
+        "generic"
+      ],
+      "required": true
+    },
+    {
+      "id": "hashset_set_operations",
+      "category": "collection",
+      "layer": "managed-core",
+      "features": [
+        "hashset",
+        "set"
+      ],
+      "required": true
+    },
+    {
+      "id": "key_value_pair_copy",
+      "category": "collection",
+      "layer": "managed-core",
+      "features": [
+        "keyvaluepair",
+        "struct"
+      ],
+      "required": true
+    },
+    {
+      "id": "linked_list_navigation",
+      "category": "collection",
+      "layer": "managed-core",
+      "features": [
+        "linked-list",
+        "reference"
+      ],
+      "required": true
+    },
+    {
+      "id": "list_foreach",
+      "category": "collection",
+      "layer": "managed-core",
+      "features": [],
+      "required": true
+    },
+    {
+      "id": "list_insert_remove",
+      "category": "collection",
+      "layer": "managed-core",
+      "features": [
+        "list",
+        "remove",
+        "insert"
+      ],
+      "required": true
+    },
+    {
+      "id": "queue_stack_roundtrip",
+      "category": "collection",
+      "layer": "managed-core",
+      "features": [
+        "queue",
+        "stack"
+      ],
+      "required": true
+    },
+    {
+      "id": "sorted_dictionary_order",
+      "category": "collection",
+      "layer": "managed-core",
+      "features": [
+        "sorted-dictionary",
+        "enumeration"
+      ],
+      "required": true
+    },
+    {
+      "id": "conditional_expression",
+      "category": "control-flow",
+      "layer": "managed-core",
+      "features": [
+        "conditional",
+        "branch"
+      ],
+      "required": true
+    },
+    {
+      "id": "dense_integer_switch",
+      "category": "control-flow",
+      "layer": "managed-core",
+      "features": [
+        "switch",
+        "dense"
+      ],
+      "required": true
+    },
+    {
+      "id": "do_while_accumulation",
+      "category": "control-flow",
+      "layer": "managed-core",
+      "features": [
+        "loop",
+        "backward-branch"
+      ],
+      "required": true
+    },
+    {
+      "id": "enum_switch",
+      "category": "control-flow",
+      "layer": "managed-core",
+      "features": [],
+      "required": true
+    },
+    {
+      "id": "mutual_recursion",
+      "category": "control-flow",
+      "layer": "managed-core",
+      "features": [
+        "call",
+        "recursion"
+      ],
+      "required": true
+    },
+    {
+      "id": "nested_break_continue",
+      "category": "control-flow",
+      "layer": "managed-core",
+      "features": [
+        "loop",
+        "break",
+        "continue"
+      ],
+      "required": true
+    },
+    {
+      "id": "null_coalescing_chain",
+      "category": "control-flow",
+      "layer": "managed-core",
+      "features": [
+        "null",
+        "coalesce"
+      ],
+      "required": true
+    },
+    {
+      "id": "performance_arithmetic_loop_regression",
+      "category": "control-flow",
+      "layer": "managed-core",
+      "features": [
+        "loop",
+        "backward-branch",
+        "ldloc-copy-propagation"
+      ],
+      "required": true
+    },
+    {
+      "id": "recursive_factorial",
+      "category": "control-flow",
+      "layer": "managed-core",
+      "features": [],
+      "required": true
+    },
+    {
+      "id": "short_circuit_side_effect",
+      "category": "control-flow",
+      "layer": "managed-core",
+      "features": [
+        "brfalse",
+        "brtrue"
+      ],
+      "required": true
+    },
+    {
+      "id": "sparse_integer_switch",
+      "category": "control-flow",
+      "layer": "managed-core",
+      "features": [
+        "branch",
+        "sparse-switch"
+      ],
+      "required": true
+    },
+    {
+      "id": "string_switch",
+      "category": "control-flow",
+      "layer": "managed-core",
+      "features": [],
+      "required": true
+    },
+    {
+      "id": "base_virtual_chain",
+      "category": "dispatch",
+      "layer": "managed-core",
+      "features": [],
+      "required": true
+    },
+    {
+      "id": "delegate_call",
+      "category": "dispatch",
+      "layer": "managed-core",
+      "features": [],
+      "required": true
+    },
+    {
+      "id": "delegate_covariant_return",
+      "category": "dispatch",
+      "layer": "managed-core",
+      "features": [],
+      "required": true
+    },
+    {
+      "id": "delegate_eval_stack_branch_join",
+      "category": "dispatch",
+      "layer": "managed-core",
+      "features": [
+        "delegate",
+        "branch",
+        "evaluation-stack"
+      ],
+      "required": true
+    },
+    {
+      "id": "delegate_loop_reassignment",
+      "category": "dispatch",
+      "layer": "managed-core",
+      "features": [],
+      "required": true
+    },
+    {
+      "id": "delegate_multicast",
+      "category": "dispatch",
+      "layer": "managed-core",
+      "features": [],
+      "required": true
+    },
+    {
+      "id": "delegate_multicast_remove",
+      "category": "dispatch",
+      "layer": "managed-core",
+      "features": [
+        "delegate",
+        "multicast",
+        "remove"
+      ],
+      "required": true
+    },
+    {
+      "id": "delegate_result_branch",
+      "category": "dispatch",
+      "layer": "managed-core",
+      "features": [],
+      "required": true
+    },
+    {
+      "id": "instance_delegate",
+      "category": "dispatch",
+      "layer": "managed-core",
+      "features": [],
+      "required": true
+    },
+    {
+      "id": "interface_branch_join_dispatch",
+      "category": "dispatch",
+      "layer": "managed-core",
+      "features": [
+        "interface",
+        "branch",
+        "control-flow-join"
+      ],
+      "required": true
+    },
+    {
+      "id": "interface_eval_stack_branch_join",
+      "category": "dispatch",
+      "layer": "managed-core",
+      "features": [
+        "interface",
+        "branch",
+        "evaluation-stack"
+      ],
+      "required": true
+    },
+    {
+      "id": "interface_loop_type_change",
+      "category": "dispatch",
+      "layer": "managed-core",
+      "features": [
+        "interface",
+        "loop",
+        "backward-branch"
+      ],
+      "required": true
+    },
+    {
+      "id": "lambda_capture",
+      "category": "dispatch",
+      "layer": "managed-core",
+      "features": [],
+      "required": true
+    },
+    {
+      "id": "struct_interface_dispatch",
+      "category": "dispatch",
+      "layer": "managed-core",
+      "features": [],
+      "required": true
+    },
+    {
+      "id": "virtual_interface_call",
+      "category": "dispatch",
+      "layer": "managed-core",
+      "features": [],
+      "required": true
+    },
+    {
+      "id": "catch_filter",
+      "category": "exception",
+      "layer": "managed-core",
+      "features": [],
+      "required": true
+    },
+    {
+      "id": "custom_exception_catch",
+      "category": "exception",
+      "layer": "managed-core",
+      "features": [
+        "custom-exception",
+        "catch"
+      ],
+      "required": true
+    },
+    {
+      "id": "deferred_iterator_exception",
+      "category": "exception",
+      "layer": "managed-core",
+      "features": [
+        "iterator",
+        "exception"
+      ],
+      "required": true
+    },
+    {
+      "id": "divide_by_zero_catch",
+      "category": "exception",
+      "layer": "managed-core",
+      "features": [
+        "div",
+        "exception"
+      ],
+      "required": true
+    },
+    {
+      "id": "exception_finally",
+      "category": "exception",
+      "layer": "managed-core",
+      "features": [],
+      "required": true
+    },
+    {
+      "id": "filter_falls_through",
+      "category": "exception",
+      "layer": "managed-core",
+      "features": [
+        "filter",
+        "catch"
+      ],
+      "required": true
+    },
+    {
+      "id": "finally_continue",
+      "category": "exception",
+      "layer": "managed-core",
+      "features": [
+        "finally",
+        "continue"
+      ],
+      "required": true
+    },
+    {
+      "id": "finally_replaces_exception",
+      "category": "exception",
+      "layer": "managed-core",
+      "features": [
+        "finally",
+        "unwind"
+      ],
+      "required": true
+    },
+    {
+      "id": "index_out_of_range_catch",
+      "category": "exception",
+      "layer": "managed-core",
+      "features": [
+        "array",
+        "exception"
+      ],
+      "required": true
+    },
+    {
+      "id": "invalid_cast_catch",
+      "category": "exception",
+      "layer": "managed-core",
+      "features": [
+        "castclass",
+        "catch"
+      ],
+      "required": true
+    },
+    {
+      "id": "multiple_exception_catches",
+      "category": "exception",
+      "layer": "managed-core",
+      "features": [
+        "catch",
+        "type-test"
+      ],
+      "required": true
+    },
+    {
+      "id": "nested_finally_leave",
+      "category": "exception",
+      "layer": "managed-core",
+      "features": [
+        "exception",
+        "finally",
+        "leave",
+        "nested"
+      ],
+      "required": true
+    },
+    {
+      "id": "nested_try_catch",
+      "category": "exception",
+      "layer": "managed-core",
+      "features": [],
+      "required": true
+    },
+    {
+      "id": "nested_using_dispose_order",
+      "category": "exception",
+      "layer": "managed-core",
+      "features": [
+        "using",
+        "nested-finally"
+      ],
+      "required": true
+    },
+    {
+      "id": "null_reference_catch",
+      "category": "exception",
+      "layer": "managed-core",
+      "features": [
+        "nullref",
+        "catch"
+      ],
+      "required": true
+    },
+    {
+      "id": "throw_rethrow",
+      "category": "exception",
+      "layer": "managed-core",
+      "features": [],
+      "required": true
+    },
+    {
+      "id": "using_dispose_order",
+      "category": "exception",
+      "layer": "managed-core",
+      "features": [
+        "using",
+        "dispose"
+      ],
+      "required": true
+    },
+    {
+      "id": "generic_array_transform",
+      "category": "generic",
+      "layer": "managed-core",
+      "features": [
+        "array",
+        "generic-method"
+      ],
+      "required": true
+    },
+    {
+      "id": "generic_constraint_class",
+      "category": "generic",
+      "layer": "managed-core",
+      "features": [
+        "constraint.class",
+        "interface"
+      ],
+      "required": true
+    },
+    {
+      "id": "generic_constraint_new",
+      "category": "generic",
+      "layer": "managed-core",
+      "features": [
+        "constraint.new",
+        "constructor"
+      ],
+      "required": true
+    },
+    {
+      "id": "generic_contravariance",
+      "category": "generic",
+      "layer": "managed-core",
+      "features": [
+        "contravariance",
+        "comparer"
+      ],
+      "required": true
+    },
+    {
+      "id": "generic_covariance",
+      "category": "generic",
+      "layer": "managed-core",
+      "features": [
+        "variance",
+        "interface"
+      ],
+      "required": true
+    },
+    {
+      "id": "generic_default_value",
+      "category": "generic",
+      "layer": "managed-core",
+      "features": [
+        "default",
+        "valuetype"
+      ],
+      "required": true
+    },
+    {
+      "id": "generic_delegate_factory",
+      "category": "generic",
+      "layer": "managed-core",
+      "features": [
+        "delegate",
+        "generic-method"
+      ],
+      "required": true
+    },
+    {
+      "id": "generic_dictionary_struct",
+      "category": "generic",
+      "layer": "managed-core",
+      "features": [
+        "dictionary",
+        "generic-sharing",
+        "struct"
+      ],
+      "required": true
+    },
+    {
+      "id": "generic_interface_constraint",
+      "category": "generic",
+      "layer": "managed-core",
+      "features": [],
+      "required": true
+    },
+    {
+      "id": "generic_interface_struct",
+      "category": "generic",
+      "layer": "managed-core",
+      "features": [
+        "generic-interface",
+        "constrained-call"
+      ],
+      "required": true
+    },
+    {
+      "id": "generic_list_value_types",
+      "category": "generic",
+      "layer": "managed-core",
+      "features": [
+        "list",
+        "generic-sharing",
+        "int"
+      ],
+      "required": true
+    },
+    {
+      "id": "generic_method_roundtrip",
+      "category": "generic",
+      "layer": "managed-core",
+      "features": [],
+      "required": true
+    },
+    {
+      "id": "generic_nested_combo",
+      "category": "generic",
+      "layer": "managed-core",
+      "features": [],
+      "required": true
+    },
+    {
+      "id": "generic_nullable_roundtrip",
+      "category": "generic",
+      "layer": "managed-core",
+      "features": [
+        "nullable",
+        "generic"
+      ],
+      "required": true
+    },
+    {
+      "id": "generic_out_parameter",
+      "category": "generic",
+      "layer": "managed-core",
+      "features": [
+        "out",
+        "generic"
+      ],
+      "required": true
+    },
+    {
+      "id": "generic_reference_type",
+      "category": "generic",
+      "layer": "managed-core",
+      "features": [],
+      "required": true
+    },
+    {
+      "id": "generic_static_per_type",
+      "category": "generic",
+      "layer": "managed-core",
+      "features": [
+        "generic-static",
+        "cctor"
+      ],
+      "required": true
+    },
+    {
+      "id": "generic_tuple_roundtrip",
+      "category": "generic",
+      "layer": "managed-core",
+      "features": [
+        "tuple",
+        "generic"
+      ],
+      "required": true
+    },
+    {
+      "id": "generic_value_type",
+      "category": "generic",
+      "layer": "managed-core",
+      "features": [],
+      "required": true
+    },
+    {
+      "id": "generic_virtual_method",
+      "category": "generic",
+      "layer": "managed-core",
+      "features": [
+        "generic-virtual",
+        "dispatch"
+      ],
+      "required": true
+    },
+    {
+      "id": "pinvoke_process_id",
+      "category": "interop",
+      "layer": "managed-core",
+      "features": [
+        "p-invoke",
+        "native-call"
+      ],
+      "required": true
+    },
+    {
+      "id": "reverse_pinvoke_qsort",
+      "category": "interop",
+      "layer": "managed-core",
+      "features": [
+        "reverse-p-invoke",
+        "delegate",
+        "native-call"
+      ],
+      "required": true
+    },
+    {
+      "id": "iterator_enumeration",
+      "category": "iterator",
+      "layer": "managed-core",
+      "features": [],
+      "required": true
+    },
+    {
+      "id": "iterator_finally_dispose",
+      "category": "iterator",
+      "layer": "managed-core",
+      "features": [
+        "iterator",
+        "finally",
+        "dispose"
+      ],
+      "required": true
+    },
+    {
+      "id": "iterator_yield_break_cleanup",
+      "category": "iterator",
+      "layer": "managed-core",
+      "features": [
+        "iterator",
+        "yield-break",
+        "finally",
+        "dispose"
+      ],
+      "required": true
+    },
+    {
+      "id": "bitwise_shift",
+      "category": "numeric",
+      "layer": "managed-core",
+      "features": [],
+      "required": true
+    },
+    {
+      "id": "character_arithmetic",
+      "category": "numeric",
+      "layer": "managed-core",
+      "features": [
+        "char",
+        "conv.u2"
+      ],
+      "required": true
+    },
+    {
+      "id": "checked_multiply_overflow",
+      "category": "numeric",
+      "layer": "managed-core",
+      "features": [
+        "mul.ovf"
+      ],
+      "required": true
+    },
+    {
+      "id": "checked_overflow",
+      "category": "numeric",
+      "layer": "managed-core",
+      "features": [],
+      "required": true
+    },
+    {
+      "id": "decimal_arithmetic",
+      "category": "numeric",
+      "layer": "managed-core",
+      "features": [
+        "decimal",
+        "value-type-call"
+      ],
+      "required": true
+    },
+    {
+      "id": "double_infinity",
+      "category": "numeric",
+      "layer": "managed-core",
+      "features": [
+        "float64",
+        "infinity"
+      ],
+      "required": true
+    },
+    {
+      "id": "double_precision_math",
+      "category": "numeric",
+      "layer": "managed-core",
+      "features": [],
+      "required": true
+    },
+    {
+      "id": "float_bit_pattern",
+      "category": "numeric",
+      "layer": "managed-core",
+      "features": [],
+      "required": true
+    },
+    {
+      "id": "float_nan_comparison",
+      "category": "numeric",
+      "layer": "managed-core",
+      "features": [
+        "float32",
+        "nan",
+        "comparison"
+      ],
+      "required": true
+    },
+    {
+      "id": "float_negative_zero",
+      "category": "numeric",
+      "layer": "managed-core",
+      "features": [
+        "float32",
+        "bit-pattern"
+      ],
+      "required": true
+    },
+    {
+      "id": "integer_sum_of_squares",
+      "category": "numeric",
+      "layer": "managed-core",
+      "features": [],
+      "required": true
+    },
+    {
+      "id": "long_shift_masking",
+      "category": "numeric",
+      "layer": "managed-core",
+      "features": [
+        "shl",
+        "shr",
+        "int64"
+      ],
+      "required": true
+    },
+    {
+      "id": "math_divrem",
+      "category": "numeric",
+      "layer": "managed-core",
+      "features": [],
+      "required": true
+    },
+    {
+      "id": "numeric_truncating_cast",
+      "category": "numeric",
+      "layer": "managed-core",
+      "features": [
+        "conv.i4",
+        "float64"
+      ],
+      "required": true
+    },
+    {
+      "id": "signed_conversion_chain",
+      "category": "numeric",
+      "layer": "managed-core",
+      "features": [
+        "conv",
+        "sign-extension"
+      ],
+      "required": true
+    },
+    {
+      "id": "signed_division_remainder",
+      "category": "numeric",
+      "layer": "managed-core",
+      "features": [
+        "div",
+        "rem",
+        "int32"
+      ],
+      "required": true
+    },
+    {
+      "id": "unchecked_wraparound",
+      "category": "numeric",
+      "layer": "managed-core",
+      "features": [],
+      "required": true
+    },
+    {
+      "id": "unsigned_comparison",
+      "category": "numeric",
+      "layer": "managed-core",
+      "features": [
+        "comparison.un",
+        "uint32"
+      ],
+      "required": true
+    },
+    {
+      "id": "unsigned_wide_arithmetic",
+      "category": "numeric",
+      "layer": "managed-core",
+      "features": [
+        "uint64",
+        "sub",
+        "add"
+      ],
+      "required": true
+    },
+    {
+      "id": "reflection_attribute_read",
+      "category": "reflection",
+      "layer": "managed-core",
+      "features": [
+        "reflection",
+        "attribute"
+      ],
+      "required": true
+    },
+    {
+      "id": "reflection_constructor_invoke",
+      "category": "reflection",
+      "layer": "managed-core",
+      "features": [
+        "reflection",
+        "constructor"
+      ],
+      "required": true
+    },
+    {
+      "id": "reflection_delegate_create",
+      "category": "reflection",
+      "layer": "managed-core",
+      "features": [
+        "reflection",
+        "delegate"
+      ],
+      "required": true
+    },
+    {
+      "id": "reflection_enum_metadata",
+      "category": "reflection",
+      "layer": "managed-core",
+      "features": [
+        "reflection",
+        "enum"
+      ],
+      "required": true
+    },
+    {
+      "id": "reflection_interface_base_chain",
+      "category": "reflection",
+      "layer": "managed-core",
+      "features": [
+        "reflection",
+        "base",
+        "interface"
+      ],
+      "required": true
+    },
+    {
+      "id": "reflection_invoke",
+      "category": "reflection",
+      "layer": "managed-core",
+      "features": [],
+      "required": true
+    },
+    {
+      "id": "reflection_invoke_exception",
+      "category": "reflection",
+      "layer": "managed-core",
+      "features": [
+        "reflection",
+        "invoke",
+        "exception"
+      ],
+      "required": true
+    },
+    {
+      "id": "reflection_make_generic_method",
+      "category": "reflection",
+      "layer": "managed-core",
+      "features": [
+        "reflection",
+        "generic-method"
+      ],
+      "required": true
+    },
+    {
+      "id": "reflection_make_generic_type",
+      "category": "reflection",
+      "layer": "managed-core",
+      "features": [
+        "reflection",
+        "generic-type"
+      ],
+      "required": true
+    },
+    {
+      "id": "reflection_nested_type",
+      "category": "reflection",
+      "layer": "managed-core",
+      "features": [
+        "reflection",
+        "nested-type"
+      ],
+      "required": true
+    },
+    {
+      "id": "reflection_private_member",
+      "category": "reflection",
+      "layer": "managed-core",
+      "features": [
+        "reflection",
+        "private-field"
+      ],
+      "required": true
+    },
+    {
+      "id": "reflection_property_field_access",
+      "category": "reflection",
+      "layer": "managed-core",
+      "features": [
+        "reflection",
+        "property",
+        "field"
+      ],
+      "required": true
+    },
+    {
+      "id": "delegate_instance_target_lifetime",
+      "category": "runtime",
+      "layer": "managed-core",
+      "features": [
+        "delegate",
+        "gc",
+        "target-lifetime"
+      ],
+      "required": true
+    },
+    {
+      "id": "weak_reference_lifecycle",
+      "category": "runtime",
+      "layer": "managed-core",
+      "features": [
+        "gc",
+        "weak-reference"
+      ],
+      "required": true
+    },
+    {
+      "id": "static_constructor_once",
+      "category": "static",
+      "layer": "managed-core",
+      "features": [],
+      "required": true
+    },
+    {
+      "id": "string_builder_editing",
+      "category": "string",
+      "layer": "managed-core",
+      "features": [
+        "stringbuilder",
+        "insert",
+        "remove"
+      ],
+      "required": true
+    },
+    {
+      "id": "string_char_enumeration",
+      "category": "string",
+      "layer": "managed-core",
+      "features": [
+        "string",
+        "char",
+        "foreach"
+      ],
+      "required": true
+    },
+    {
+      "id": "string_formatting",
+      "category": "string",
+      "layer": "managed-core",
+      "features": [],
+      "required": true
+    },
+    {
+      "id": "string_search_comparison",
+      "category": "string",
+      "layer": "managed-core",
+      "features": [
+        "string",
+        "ordinal",
+        "search"
+      ],
+      "required": true
+    },
+    {
+      "id": "string_split_join",
+      "category": "string",
+      "layer": "managed-core",
+      "features": [
+        "string",
+        "split",
+        "join"
+      ],
+      "required": true
+    },
+    {
+      "id": "concurrent_generic_reentry",
+      "category": "thread",
+      "layer": "managed-core",
+      "features": [
+        "thread",
+        "task",
+        "concurrent",
+        "generic-sharing"
+      ],
+      "required": true
+    },
+    {
+      "id": "concurrent_interpreter_reentry",
+      "category": "thread",
+      "layer": "managed-core",
+      "features": [
+        "thread",
+        "task",
+        "concurrent",
+        "interpreter-reentry"
+      ],
+      "required": true
+    },
+    {
+      "id": "interlocked_increment",
+      "category": "thread",
+      "layer": "managed-core",
+      "features": [
+        "interlocked",
+        "thread"
+      ],
+      "required": true
+    },
+    {
+      "id": "monitor_lock_mutation",
+      "category": "thread",
+      "layer": "managed-core",
+      "features": [
+        "monitor",
+        "lock"
+      ],
+      "required": true
+    },
+    {
+      "id": "thread_interlocked_exchange",
+      "category": "thread",
+      "layer": "managed-core",
+      "features": [
+        "thread",
+        "interlocked",
+        "exchange"
+      ],
+      "required": true
+    },
+    {
+      "id": "thread_join",
+      "category": "thread",
+      "layer": "managed-core",
+      "features": [],
+      "required": true
+    },
+    {
+      "id": "thread_name_and_join",
+      "category": "thread",
+      "layer": "managed-core",
+      "features": [
+        "thread",
+        "join"
+      ],
+      "required": true
+    },
+    {
+      "id": "thread_static_isolation",
+      "category": "thread",
+      "layer": "managed-core",
+      "features": [
+        "thread-static",
+        "thread"
+      ],
+      "required": true
+    },
+    {
+      "id": "volatile_visibility",
+      "category": "thread",
+      "layer": "managed-core",
+      "features": [
+        "volatile",
+        "thread"
+      ],
+      "required": true
+    },
+    {
+      "id": "boxing_unboxing",
+      "category": "value-type",
+      "layer": "managed-core",
+      "features": [],
+      "required": true
+    },
+    {
+      "id": "boxing_unboxing_safepoint",
+      "category": "value-type",
+      "layer": "managed-core",
+      "features": [
+        "boxing",
+        "unboxing",
+        "gc-safepoint"
+      ],
+      "required": true
+    },
+    {
+      "id": "enum_underlying_sizes",
+      "category": "value-type",
+      "layer": "managed-core",
+      "features": [
+        "enum",
+        "underlying-type"
+      ],
+      "required": true
+    },
+    {
+      "id": "generic_boxing_unboxing",
+      "category": "value-type",
+      "layer": "managed-core",
+      "features": [
+        "boxing",
+        "generic"
+      ],
+      "required": true
+    },
+    {
+      "id": "in_parameter_struct",
+      "category": "value-type",
+      "layer": "managed-core",
+      "features": [
+        "in",
+        "struct"
+      ],
+      "required": true
+    },
+    {
+      "id": "nested_struct_layout",
+      "category": "value-type",
+      "layer": "managed-core",
+      "features": [
+        "nested-struct",
+        "layout"
+      ],
+      "required": true
+    },
+    {
+      "id": "nullable_value_type",
+      "category": "value-type",
+      "layer": "managed-core",
+      "features": [],
+      "required": true
+    },
+    {
+      "id": "optimizer_explicit_struct_layout",
+      "category": "value-type",
+      "layer": "managed-core",
+      "features": [
+        "struct",
+        "explicit-layout",
+        "overlap",
+        "constructor"
+      ],
+      "required": true
+    },
+    {
+      "id": "optimizer_four_scalar_struct_ctor",
+      "category": "value-type",
+      "layer": "managed-core",
+      "features": [
+        "struct",
+        "scalar-fields",
+        "sequential-layout",
+        "constructor"
+      ],
+      "required": true
+    },
+    {
+      "id": "optimizer_scalar_struct_layout",
+      "category": "value-type",
+      "layer": "managed-core",
+      "features": [
+        "struct",
+        "scalar-fields",
+        "layout",
+        "constructor"
+      ],
+      "required": true
+    },
+    {
+      "id": "readonly_struct_method",
+      "category": "value-type",
+      "layer": "managed-core",
+      "features": [
+        "readonly-struct",
+        "method"
+      ],
+      "required": true
+    },
+    {
+      "id": "struct_copy_semantics",
+      "category": "value-type",
+      "layer": "managed-core",
+      "features": [
+        "struct-copy",
+        "field"
+      ],
+      "required": true
+    },
+    {
+      "id": "struct_ref_out",
+      "category": "value-type",
+      "layer": "managed-core",
+      "features": [],
+      "required": true
+    },
+    {
+      "id": "struct_ref_return",
+      "category": "value-type",
+      "layer": "managed-core",
+      "features": [
+        "ref-return",
+        "ldelema"
+      ],
+      "required": true
+    },
+    {
+      "id": "tuple_deconstruction",
+      "category": "value-type",
+      "layer": "managed-core",
+      "features": [
+        "valuetuple",
+        "deconstruction"
+      ],
+      "required": true
+    },
+    {
+      "id": "boundary_aot_boxes_struct",
+      "category": "boundary",
+      "layer": "player-boundary",
+      "features": [
+        "aot-to-interp",
+        "boxing",
+        "struct"
+      ],
+      "required": true
+    },
+    {
+      "id": "boundary_aot_calls_delegate",
+      "category": "boundary",
+      "layer": "player-boundary",
+      "features": [
+        "aot-to-interp",
+        "delegate"
+      ],
+      "required": true
+    },
+    {
+      "id": "boundary_aot_calls_func",
+      "category": "boundary",
+      "layer": "player-boundary",
+      "features": [
+        "aot-to-interp",
+        "delegate",
+        "generic-delegate"
+      ],
+      "required": true
+    },
+    {
+      "id": "boundary_aot_calls_interface",
+      "category": "boundary",
+      "layer": "player-boundary",
+      "features": [
+        "aot-to-interp",
+        "interface"
+      ],
+      "required": true
+    },
+    {
+      "id": "boundary_aot_calls_string_interface",
+      "category": "boundary",
+      "layer": "player-boundary",
+      "features": [
+        "aot-to-interp",
+        "string"
+      ],
+      "required": true
+    },
+    {
+      "id": "boundary_aot_calls_struct_interface",
+      "category": "boundary",
+      "layer": "player-boundary",
+      "features": [
+        "aot-to-interp",
+        "struct",
+        "interface"
+      ],
+      "required": true
+    },
+    {
+      "id": "boundary_aot_calls_virtual",
+      "category": "boundary",
+      "layer": "player-boundary",
+      "features": [
+        "aot-to-interp",
+        "virtual"
+      ],
+      "required": true
+    },
+    {
+      "id": "boundary_aot_catches_interpreter_exception",
+      "category": "boundary",
+      "layer": "player-boundary",
+      "features": [
+        "aot-to-interp",
+        "exception"
+      ],
+      "required": true
+    },
+    {
+      "id": "boundary_aot_constrained_struct",
+      "category": "boundary",
+      "layer": "player-boundary",
+      "features": [
+        "aot-to-interp",
+        "generic",
+        "constraint"
+      ],
+      "required": true
+    },
+    {
+      "id": "boundary_aot_generic_string_echo",
+      "category": "boundary",
+      "layer": "player-boundary",
+      "features": [
+        "aot-to-interp",
+        "generic",
+        "string"
+      ],
+      "required": true
+    },
+    {
+      "id": "boundary_aot_generic_struct_echo",
+      "category": "boundary",
+      "layer": "player-boundary",
+      "features": [
+        "aot-to-interp",
+        "generic",
+        "struct"
+      ],
+      "required": true
+    },
+    {
+      "id": "boundary_aot_reads_virtual_property",
+      "category": "boundary",
+      "layer": "player-boundary",
+      "features": [
+        "aot-to-interp",
+        "virtual",
+        "property"
+      ],
+      "required": true
+    },
+    {
+      "id": "boundary_aot_ref_out_struct",
+      "category": "boundary",
+      "layer": "player-boundary",
+      "features": [
+        "aot-to-interp",
+        "ref",
+        "out",
+        "struct"
+      ],
+      "required": true
+    },
+    {
+      "id": "boundary_aot_sum_array",
+      "category": "boundary",
+      "layer": "player-boundary",
+      "features": [
+        "aot-to-interp",
+        "array"
+      ],
+      "required": true
+    },
+    {
+      "id": "boundary_enum_payload_roundtrip",
+      "category": "boundary",
+      "layer": "player-boundary",
+      "features": [
+        "aot-to-interp",
+        "enum",
+        "struct"
+      ],
+      "required": true
+    },
+    {
+      "id": "boundary_fgs_aot_calls_hot_generic_delegate",
+      "category": "boundary",
+      "layer": "player-boundary",
+      "features": [
+        "aot-to-interp",
+        "full-generic-sharing",
+        "delegate",
+        "generic-method",
+        "struct-return"
+      ],
+      "required": true
+    },
+    {
+      "id": "boundary_fgs_calli_large_return",
+      "category": "boundary",
+      "layer": "player-boundary",
+      "features": [
+        "interp-to-aot",
+        "full-generic-sharing",
+        "calli",
+        "struct-return"
+      ],
+      "required": true
+    },
+    {
+      "id": "boundary_fgs_calli_small_return",
+      "category": "boundary",
+      "layer": "player-boundary",
+      "features": [
+        "interp-to-aot",
+        "full-generic-sharing",
+        "calli",
+        "small-return"
+      ],
+      "required": true
+    },
+    {
+      "id": "boundary_fgs_calli_void",
+      "category": "boundary",
+      "layer": "player-boundary",
+      "features": [
+        "interp-to-aot",
+        "full-generic-sharing",
+        "calli",
+        "void-return"
+      ],
+      "required": true
+    },
+    {
+      "id": "boundary_fgs_delegate_closed_instance",
+      "category": "boundary",
+      "layer": "player-boundary",
+      "features": [
+        "interp-to-aot",
+        "full-generic-sharing",
+        "delegate",
+        "closed-instance"
+      ],
+      "required": true
+    },
+    {
+      "id": "boundary_fgs_delegate_multicast_void",
+      "category": "boundary",
+      "layer": "player-boundary",
+      "features": [
+        "interp-to-aot",
+        "full-generic-sharing",
+        "delegate",
+        "multicast",
+        "void-return"
+      ],
+      "required": true
+    },
+    {
+      "id": "boundary_fgs_delegate_open_instance",
+      "category": "boundary",
+      "layer": "player-boundary",
+      "features": [
+        "interp-to-aot",
+        "full-generic-sharing",
+        "delegate",
+        "open-instance"
+      ],
+      "required": true
+    },
+    {
+      "id": "boundary_fgs_delegate_static_large_return",
+      "category": "boundary",
+      "layer": "player-boundary",
+      "features": [
+        "interp-to-aot",
+        "full-generic-sharing",
+        "delegate",
+        "struct-return"
+      ],
+      "required": true
+    },
+    {
+      "id": "boundary_fgs_delegate_static_small_return",
+      "category": "boundary",
+      "layer": "player-boundary",
+      "features": [
+        "interp-to-aot",
+        "full-generic-sharing",
+        "delegate",
+        "small-return"
+      ],
+      "required": true
+    },
+    {
+      "id": "boundary_fgs_delegate_static_void",
+      "category": "boundary",
+      "layer": "player-boundary",
+      "features": [
+        "interp-to-aot",
+        "full-generic-sharing",
+        "delegate",
+        "void-return"
+      ],
+      "required": true
+    },
+    {
+      "id": "boundary_fgs_direct_interface_large_return",
+      "category": "boundary",
+      "layer": "player-boundary",
+      "features": [
+        "interp-to-aot",
+        "full-generic-sharing",
+        "interface",
+        "struct-return"
+      ],
+      "required": true
+    },
+    {
+      "id": "boundary_fgs_direct_interface_small_return",
+      "category": "boundary",
+      "layer": "player-boundary",
+      "features": [
+        "interp-to-aot",
+        "full-generic-sharing",
+        "interface",
+        "small-return"
+      ],
+      "required": true
+    },
+    {
+      "id": "boundary_fgs_direct_interface_void",
+      "category": "boundary",
+      "layer": "player-boundary",
+      "features": [
+        "interp-to-aot",
+        "full-generic-sharing",
+        "interface",
+        "void-return"
+      ],
+      "required": true
+    },
+    {
+      "id": "boundary_fgs_direct_virtual_large_return",
+      "category": "boundary",
+      "layer": "player-boundary",
+      "features": [
+        "interp-to-aot",
+        "full-generic-sharing",
+        "virtual",
+        "struct-return"
+      ],
+      "required": true
+    },
+    {
+      "id": "boundary_fgs_direct_virtual_small_return",
+      "category": "boundary",
+      "layer": "player-boundary",
+      "features": [
+        "interp-to-aot",
+        "full-generic-sharing",
+        "virtual",
+        "small-return"
+      ],
+      "required": true
+    },
+    {
+      "id": "boundary_fgs_direct_virtual_void",
+      "category": "boundary",
+      "layer": "player-boundary",
+      "features": [
+        "interp-to-aot",
+        "full-generic-sharing",
+        "virtual",
+        "void-return"
+      ],
+      "required": true
+    },
+    {
+      "id": "boundary_fgs_generic_container",
+      "category": "boundary",
+      "layer": "player-boundary",
+      "features": [
+        "interp-to-aot",
+        "full-generic-sharing",
+        "generic-class",
+        "struct"
+      ],
+      "required": true
+    },
+    {
+      "id": "boundary_fgs_generic_delegate",
+      "category": "boundary",
+      "layer": "player-boundary",
+      "features": [
+        "interp-to-aot",
+        "full-generic-sharing",
+        "delegate",
+        "struct"
+      ],
+      "required": true
+    },
+    {
+      "id": "boundary_fgs_generic_interface",
+      "category": "boundary",
+      "layer": "player-boundary",
+      "features": [
+        "interp-to-aot",
+        "aot-to-interp",
+        "full-generic-sharing",
+        "interface",
+        "struct"
+      ],
+      "required": true
+    },
+    {
+      "id": "boundary_fgs_generic_virtual",
+      "category": "boundary",
+      "layer": "player-boundary",
+      "features": [
+        "interp-to-aot",
+        "full-generic-sharing",
+        "virtual",
+        "struct"
+      ],
+      "required": true
+    },
+    {
+      "id": "boundary_fgs_hot_enum",
+      "category": "boundary",
+      "layer": "player-boundary",
+      "features": [
+        "interp-to-aot",
+        "full-generic-sharing",
+        "enum"
+      ],
+      "required": true
+    },
+    {
+      "id": "boundary_fgs_large_struct",
+      "category": "boundary",
+      "layer": "player-boundary",
+      "features": [
+        "interp-to-aot",
+        "full-generic-sharing",
+        "struct"
+      ],
+      "required": true
+    },
+    {
+      "id": "boundary_fgs_nested_array",
+      "category": "boundary",
+      "layer": "player-boundary",
+      "features": [
+        "interp-to-aot",
+        "full-generic-sharing",
+        "array",
+        "struct"
+      ],
+      "required": true
+    },
+    {
+      "id": "boundary_fgs_nullable_struct",
+      "category": "boundary",
+      "layer": "player-boundary",
+      "features": [
+        "interp-to-aot",
+        "full-generic-sharing",
+        "nullable",
+        "struct"
+      ],
+      "required": true
+    },
+    {
+      "id": "boundary_fgs_ref_swap",
+      "category": "boundary",
+      "layer": "player-boundary",
+      "features": [
+        "interp-to-aot",
+        "full-generic-sharing",
+        "ref",
+        "struct"
+      ],
+      "required": true
+    },
+    {
+      "id": "boundary_fgs_reflection_make_generic",
+      "category": "boundary",
+      "layer": "player-boundary",
+      "features": [
+        "interp-to-aot",
+        "full-generic-sharing",
+        "reflection",
+        "struct"
+      ],
+      "required": true
+    },
+    {
+      "id": "boundary_interpreter_calls_aot",
+      "category": "boundary",
+      "layer": "player-boundary",
+      "features": [
+        "interp-to-aot",
+        "static-call"
+      ],
+      "required": true
+    },
+    {
+      "id": "boundary_interpreter_catches_aot_exception",
+      "category": "boundary",
+      "layer": "player-boundary",
+      "features": [
+        "interp-to-aot",
+        "exception"
+      ],
+      "required": true
+    },
+    {
+      "id": "boundary_null_interface_exception",
+      "category": "boundary",
+      "layer": "player-boundary",
+      "features": [
+        "aot-to-interp",
+        "null",
+        "exception"
+      ],
+      "required": true
+    },
+    {
+      "id": "boundary_object_array_roundtrip",
+      "category": "boundary",
+      "layer": "player-boundary",
+      "features": [
+        "aot-to-interp",
+        "array",
+        "object"
+      ],
+      "required": true
+    },
+    {
+      "id": "boundary_repeated_aot_calls",
+      "category": "boundary",
+      "layer": "player-boundary",
+      "features": [
+        "interp-to-aot",
+        "call-frequency"
+      ],
+      "required": true
+    }
   ]
 }
-

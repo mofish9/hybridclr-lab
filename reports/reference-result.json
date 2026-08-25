@@ -1,117 +1,3325 @@
 {
-  "schemaVersion": 1,
-  "suiteId": "managed-smoke-v1",
+  "schemaVersion": 2,
+  "suiteId": "managed-differential-v2",
   "runner": "dotnet-reference-v1",
   "runtime": ".NET 6.0.36",
   "platform": "Microsoft Windows 10.0.19045",
   "architecture": "X64",
-  "startedAtUtc": "2026-08-09T15:20:21.4267325+00:00",
-  "manifestSha256": "955C80FFCEA31E49A38AE1D041A81E61E133C597B9773B19B636B54ACBF2C1C6",
-  "managedAssemblySha256": "BF324B77796275836BC73B67CA0F51E45A1C72E3063DFCA73AC6647987C7FF98",
+  "startedAtUtc": "2026-08-25T13:15:10.5919257+00:00",
+  "manifestSha256": "A13BF4638B6870C63EFCC049F398346077011ADAF7BEFE21C4E582DA1AE1C1F7",
+  "goldenContractSha256": "4947C8501662FBDEE32F886B640779064190C9C069A011693081DF28013126F4",
+  "managedAssemblySha256": "B38AA1FB3AB8739837591759C63EC3E5708D478396B77C7954517168F08FDF88",
   "summary": {
-    "total": 10,
-    "passed": 10,
+    "total": 220,
+    "passed": 220,
     "failed": 0
   },
   "cases": [
     {
-      "id": "integer_sum_of_squares",
-      "category": "numeric",
-      "status": "passed",
-      "returnValue": "333833500",
-      "sideEffect": "",
-      "exceptionType": null,
-      "durationNanoseconds": 506300,
-      "message": null
-    },
-    {
-      "id": "checked_overflow",
-      "category": "numeric",
-      "status": "passed",
-      "returnValue": null,
-      "sideEffect": null,
-      "exceptionType": "System.OverflowException",
-      "durationNanoseconds": 3495100,
-      "message": null
-    },
-    {
-      "id": "float_bit_pattern",
-      "category": "numeric",
-      "status": "passed",
-      "returnValue": "40980000",
-      "sideEffect": "",
-      "exceptionType": null,
-      "durationNanoseconds": 104800,
-      "message": null
-    },
-    {
-      "id": "struct_ref_out",
-      "category": "value-type",
-      "status": "passed",
-      "returnValue": "8,2",
-      "sideEffect": "10",
-      "exceptionType": null,
-      "durationNanoseconds": 111100,
-      "message": null
-    },
-    {
       "id": "array_and_string",
       "category": "array",
+      "layer": "managed-core",
+      "features": [],
       "status": "passed",
       "returnValue": "1,2,3,4,5",
       "sideEffect": "15",
       "exceptionType": null,
-      "durationNanoseconds": 759200,
+      "durationNanoseconds": 1722100,
       "message": null
     },
     {
-      "id": "generic_value_type",
-      "category": "generic",
+      "id": "array_binary_search",
+      "category": "array",
+      "layer": "managed-core",
+      "features": [
+        "array",
+        "binary-search"
+      ],
       "status": "passed",
-      "returnValue": "11,7",
-      "sideEffect": "18",
+      "returnValue": "2,-3",
+      "sideEffect": "",
       "exceptionType": null,
-      "durationNanoseconds": 87700,
+      "durationNanoseconds": 445200,
       "message": null
     },
     {
-      "id": "virtual_interface_call",
-      "category": "dispatch",
+      "id": "array_clear_and_fill",
+      "category": "array",
+      "layer": "managed-core",
+      "features": [
+        "array",
+        "clear",
+        "stelem"
+      ],
+      "status": "passed",
+      "returnValue": "1,9,3",
+      "sideEffect": "",
+      "exceptionType": null,
+      "durationNanoseconds": 580600,
+      "message": null
+    },
+    {
+      "id": "array_copy_resize",
+      "category": "array",
+      "layer": "managed-core",
+      "features": [],
+      "status": "passed",
+      "returnValue": "1,2,3,0,0",
+      "sideEffect": "1,2,3,4",
+      "exceptionType": null,
+      "durationNanoseconds": 109600,
+      "message": null
+    },
+    {
+      "id": "array_covariance",
+      "category": "array",
+      "layer": "managed-core",
+      "features": [],
+      "status": "passed",
+      "returnValue": "alpha,gamma",
+      "sideEffect": "String[]",
+      "exceptionType": null,
+      "durationNanoseconds": 169800,
+      "message": null
+    },
+    {
+      "id": "array_covariance_type_mismatch",
+      "category": "array",
+      "layer": "managed-core",
+      "features": [
+        "array",
+        "covariance",
+        "stelem",
+        "exception"
+      ],
+      "status": "passed",
+      "returnValue": "mismatch",
+      "sideEffect": "",
+      "exceptionType": null,
+      "durationNanoseconds": 4760800,
+      "message": null
+    },
+    {
+      "id": "array_null_reference_roundtrip",
+      "category": "array",
+      "layer": "managed-core",
+      "features": [
+        "array",
+        "reference",
+        "null"
+      ],
+      "status": "passed",
+      "returnValue": "True,hotfix",
+      "sideEffect": "",
+      "exceptionType": null,
+      "durationNanoseconds": 177200,
+      "message": null
+    },
+    {
+      "id": "array_reverse_segment",
+      "category": "array",
+      "layer": "managed-core",
+      "features": [
+        "array",
+        "reverse",
+        "range"
+      ],
+      "status": "passed",
+      "returnValue": "6,5,4,3,2,1",
+      "sideEffect": "",
+      "exceptionType": null,
+      "durationNanoseconds": 73200,
+      "message": null
+    },
+    {
+      "id": "array_segment_enumeration",
+      "category": "array",
+      "layer": "managed-core",
+      "features": [
+        "array",
+        "enumerator",
+        "struct"
+      ],
+      "status": "passed",
+      "returnValue": "2,4,6",
+      "sideEffect": "",
+      "exceptionType": null,
+      "durationNanoseconds": 674800,
+      "message": null
+    },
+    {
+      "id": "jagged_array",
+      "category": "array",
+      "layer": "managed-core",
+      "features": [],
+      "status": "passed",
+      "returnValue": "2,4;1,3,5",
+      "sideEffect": "15",
+      "exceptionType": null,
+      "durationNanoseconds": 473400,
+      "message": null
+    },
+    {
+      "id": "multidimensional_array",
+      "category": "array",
+      "layer": "managed-core",
+      "features": [],
+      "status": "passed",
+      "returnValue": "21",
+      "sideEffect": "6",
+      "exceptionType": null,
+      "durationNanoseconds": 732800,
+      "message": null
+    },
+    {
+      "id": "optimizer_array_backedge_bounds",
+      "category": "array",
+      "layer": "managed-core",
+      "features": [
+        "array",
+        "bounds",
+        "loop",
+        "backward-branch",
+        "exception"
+      ],
+      "status": "passed",
+      "returnValue": "IndexOutOfRangeException",
+      "sideEffect": "",
+      "exceptionType": null,
+      "durationNanoseconds": 403700,
+      "message": null
+    },
+    {
+      "id": "optimizer_array_branch_join",
+      "category": "array",
+      "layer": "managed-core",
+      "features": [
+        "array",
+        "branch",
+        "control-flow-join",
+        "range-analysis"
+      ],
+      "status": "passed",
+      "returnValue": "80",
+      "sideEffect": "0",
+      "exceptionType": null,
+      "durationNanoseconds": 410200,
+      "message": null
+    },
+    {
+      "id": "optimizer_array_conditional_store_default",
+      "category": "array",
+      "layer": "managed-core",
+      "features": [
+        "array",
+        "range",
+        "conditional-store",
+        "initlocals",
+        "exception"
+      ],
+      "status": "passed",
+      "returnValue": "0",
+      "sideEffect": "1",
+      "exceptionType": null,
+      "durationNanoseconds": 472900,
+      "message": null
+    },
+    {
+      "id": "optimizer_array_direct_store_load",
+      "category": "array",
+      "layer": "managed-core",
+      "features": [
+        "array",
+        "loop",
+        "range-analysis",
+        "ldelem",
+        "stelem"
+      ],
+      "status": "passed",
+      "returnValue": "120",
+      "sideEffect": "92",
+      "exceptionType": null,
+      "durationNanoseconds": 406200,
+      "message": null
+    },
+    {
+      "id": "optimizer_array_exception_edges",
+      "category": "array",
+      "layer": "managed-core",
+      "features": [
+        "array",
+        "null",
+        "bounds",
+        "exception"
+      ],
+      "status": "passed",
+      "returnValue": "null,index,negative",
+      "sideEffect": "",
+      "exceptionType": null,
+      "durationNanoseconds": 361900,
+      "message": null
+    },
+    {
+      "id": "optimizer_array_loop_range",
+      "category": "array",
+      "layer": "managed-core",
+      "features": [
+        "array",
+        "loop",
+        "range-analysis",
+        "ldelem",
+        "stelem"
+      ],
+      "status": "passed",
+      "returnValue": "1832",
+      "sideEffect": "63",
+      "exceptionType": null,
+      "durationNanoseconds": 414200,
+      "message": null
+    },
+    {
+      "id": "optimizer_array_repeated_store_negative",
+      "category": "array",
+      "layer": "managed-core",
+      "features": [
+        "array",
+        "range",
+        "repeated-store",
+        "negative",
+        "exception"
+      ],
+      "status": "passed",
+      "returnValue": "0",
+      "sideEffect": "1",
+      "exceptionType": null,
+      "durationNanoseconds": 441300,
+      "message": null
+    },
+    {
+      "id": "optimizer_array_repeated_store_range",
+      "category": "array",
+      "layer": "managed-core",
+      "features": [
+        "array",
+        "range",
+        "repeated-store",
+        "loop"
+      ],
+      "status": "passed",
+      "returnValue": "2016",
+      "sideEffect": "27",
+      "exceptionType": null,
+      "durationNanoseconds": 354800,
+      "message": null
+    },
+    {
+      "id": "rectangular_array_write",
+      "category": "array",
+      "layer": "managed-core",
+      "features": [
+        "array",
+        "multidimensional",
+        "write"
+      ],
+      "status": "passed",
+      "returnValue": "10,20,30,60",
+      "sideEffect": "",
+      "exceptionType": null,
+      "durationNanoseconds": 512000,
+      "message": null
+    },
+    {
+      "id": "struct_array_mutation",
+      "category": "array",
+      "layer": "managed-core",
+      "features": [
+        "array",
+        "struct",
+        "ldelema"
+      ],
+      "status": "passed",
+      "returnValue": "3,7,11",
+      "sideEffect": "",
+      "exceptionType": null,
+      "durationNanoseconds": 1488000,
+      "message": null
+    },
+    {
+      "id": "async_await_yield",
+      "category": "async",
+      "layer": "managed-core",
+      "features": [
+        "async",
+        "await",
+        "yield"
+      ],
+      "status": "passed",
+      "returnValue": "13",
+      "sideEffect": "",
+      "exceptionType": null,
+      "durationNanoseconds": 58838200,
+      "message": null
+    },
+    {
+      "id": "async_cancellation_propagation",
+      "category": "async",
+      "layer": "managed-core",
+      "features": [
+        "async",
+        "cancellation",
+        "exception"
+      ],
+      "status": "passed",
+      "returnValue": "canceled",
+      "sideEffect": "",
+      "exceptionType": null,
+      "durationNanoseconds": 534800,
+      "message": null
+    },
+    {
+      "id": "async_completed_task",
+      "category": "async",
+      "layer": "managed-core",
+      "features": [],
+      "status": "passed",
+      "returnValue": "34",
+      "sideEffect": "",
+      "exceptionType": null,
+      "durationNanoseconds": 403700,
+      "message": null
+    },
+    {
+      "id": "async_exception_unwrap",
+      "category": "async",
+      "layer": "managed-core",
+      "features": [
+        "async",
+        "exception"
+      ],
+      "status": "passed",
+      "returnValue": "InvalidOperationException",
+      "sideEffect": "",
+      "exceptionType": null,
+      "durationNanoseconds": 847400,
+      "message": null
+    },
+    {
+      "id": "async_multiple_awaits",
+      "category": "async",
+      "layer": "managed-core",
+      "features": [
+        "async",
+        "await",
+        "state-machine",
+        "multi-await"
+      ],
+      "status": "passed",
+      "returnValue": "30",
+      "sideEffect": "",
+      "exceptionType": null,
+      "durationNanoseconds": 17644500,
+      "message": null
+    },
+    {
+      "id": "async_state_machine_result",
+      "category": "async",
+      "layer": "managed-core",
+      "features": [
+        "async",
+        "state-machine"
+      ],
+      "status": "passed",
+      "returnValue": "55",
+      "sideEffect": "",
+      "exceptionType": null,
+      "durationNanoseconds": 520400,
+      "message": null
+    },
+    {
+      "id": "async_when_any_completed",
+      "category": "async",
+      "layer": "managed-core",
+      "features": [
+        "async",
+        "task",
+        "when-any"
+      ],
+      "status": "passed",
+      "returnValue": "9",
+      "sideEffect": "",
+      "exceptionType": null,
+      "durationNanoseconds": 749200,
+      "message": null
+    },
+    {
+      "id": "custom_awaiter",
+      "category": "async",
+      "layer": "managed-core",
+      "features": [
+        "async",
+        "awaiter",
+        "state-machine"
+      ],
+      "status": "passed",
+      "returnValue": "37",
+      "sideEffect": "",
+      "exceptionType": null,
+      "durationNanoseconds": 13906400,
+      "message": null
+    },
+    {
+      "id": "task_continuation_order",
+      "category": "async",
+      "layer": "managed-core",
+      "features": [
+        "task",
+        "continuation"
+      ],
+      "status": "passed",
+      "returnValue": "A,B,C",
+      "sideEffect": "",
+      "exceptionType": null,
+      "durationNanoseconds": 16226100,
+      "message": null
+    },
+    {
+      "id": "task_when_all_order",
+      "category": "async",
+      "layer": "managed-core",
+      "features": [
+        "task",
+        "when-all"
+      ],
+      "status": "passed",
+      "returnValue": "3,5,7",
+      "sideEffect": "",
+      "exceptionType": null,
+      "durationNanoseconds": 3159500,
+      "message": null
+    },
+    {
+      "id": "custom_sort_comparer",
+      "category": "collection",
+      "layer": "managed-core",
+      "features": [
+        "sort",
+        "comparer",
+        "delegate"
+      ],
+      "status": "passed",
+      "returnValue": "1,2,3,4",
+      "sideEffect": "",
+      "exceptionType": null,
+      "durationNanoseconds": 550000,
+      "message": null
+    },
+    {
+      "id": "dictionary_custom_comparer",
+      "category": "collection",
+      "layer": "managed-core",
+      "features": [
+        "dictionary",
+        "comparer",
+        "string"
+      ],
+      "status": "passed",
+      "returnValue": "2,Alpha",
+      "sideEffect": "",
+      "exceptionType": null,
+      "durationNanoseconds": 845900,
+      "message": null
+    },
+    {
+      "id": "dictionary_lookup",
+      "category": "collection",
+      "layer": "managed-core",
+      "features": [],
+      "status": "passed",
+      "returnValue": "15",
+      "sideEffect": "3",
+      "exceptionType": null,
+      "durationNanoseconds": 159600,
+      "message": null
+    },
+    {
+      "id": "dictionary_struct_values",
+      "category": "collection",
+      "layer": "managed-core",
+      "features": [
+        "dictionary",
+        "struct",
+        "generic"
+      ],
+      "status": "passed",
+      "returnValue": "30,2",
+      "sideEffect": "",
+      "exceptionType": null,
+      "durationNanoseconds": 3197100,
+      "message": null
+    },
+    {
+      "id": "hashset_set_operations",
+      "category": "collection",
+      "layer": "managed-core",
+      "features": [
+        "hashset",
+        "set"
+      ],
+      "status": "passed",
+      "returnValue": "1,2,3,4,5",
+      "sideEffect": "",
+      "exceptionType": null,
+      "durationNanoseconds": 1428800,
+      "message": null
+    },
+    {
+      "id": "key_value_pair_copy",
+      "category": "collection",
+      "layer": "managed-core",
+      "features": [
+        "keyvaluepair",
+        "struct"
+      ],
+      "status": "passed",
+      "returnValue": "alpha=9",
+      "sideEffect": "",
+      "exceptionType": null,
+      "durationNanoseconds": 139100,
+      "message": null
+    },
+    {
+      "id": "linked_list_navigation",
+      "category": "collection",
+      "layer": "managed-core",
+      "features": [
+        "linked-list",
+        "reference"
+      ],
+      "status": "passed",
+      "returnValue": "a,b,c",
+      "sideEffect": "",
+      "exceptionType": null,
+      "durationNanoseconds": 723600,
+      "message": null
+    },
+    {
+      "id": "list_foreach",
+      "category": "collection",
+      "layer": "managed-core",
+      "features": [],
+      "status": "passed",
+      "returnValue": "1,2,3,4",
+      "sideEffect": "10",
+      "exceptionType": null,
+      "durationNanoseconds": 1086700,
+      "message": null
+    },
+    {
+      "id": "list_insert_remove",
+      "category": "collection",
+      "layer": "managed-core",
+      "features": [
+        "list",
+        "remove",
+        "insert"
+      ],
+      "status": "passed",
+      "returnValue": "1,4,3,3",
+      "sideEffect": "",
+      "exceptionType": null,
+      "durationNanoseconds": 179600,
+      "message": null
+    },
+    {
+      "id": "queue_stack_roundtrip",
+      "category": "collection",
+      "layer": "managed-core",
+      "features": [
+        "queue",
+        "stack"
+      ],
+      "status": "passed",
+      "returnValue": "first,last",
+      "sideEffect": "2",
+      "exceptionType": null,
+      "durationNanoseconds": 524200,
+      "message": null
+    },
+    {
+      "id": "sorted_dictionary_order",
+      "category": "collection",
+      "layer": "managed-core",
+      "features": [
+        "sorted-dictionary",
+        "enumeration"
+      ],
+      "status": "passed",
+      "returnValue": "1:one;2:two;3:three",
+      "sideEffect": "",
+      "exceptionType": null,
+      "durationNanoseconds": 8061400,
+      "message": null
+    },
+    {
+      "id": "conditional_expression",
+      "category": "control-flow",
+      "layer": "managed-core",
+      "features": [
+        "conditional",
+        "branch"
+      ],
+      "status": "passed",
+      "returnValue": "odd:9",
+      "sideEffect": "",
+      "exceptionType": null,
+      "durationNanoseconds": 119200,
+      "message": null
+    },
+    {
+      "id": "dense_integer_switch",
+      "category": "control-flow",
+      "layer": "managed-core",
+      "features": [
+        "switch",
+        "dense"
+      ],
       "status": "passed",
       "returnValue": "39",
       "sideEffect": "",
       "exceptionType": null,
-      "durationNanoseconds": 60900,
+      "durationNanoseconds": 172500,
+      "message": null
+    },
+    {
+      "id": "do_while_accumulation",
+      "category": "control-flow",
+      "layer": "managed-core",
+      "features": [
+        "loop",
+        "backward-branch"
+      ],
+      "status": "passed",
+      "returnValue": "55",
+      "sideEffect": "",
+      "exceptionType": null,
+      "durationNanoseconds": 98500,
+      "message": null
+    },
+    {
+      "id": "enum_switch",
+      "category": "control-flow",
+      "layer": "managed-core",
+      "features": [],
+      "status": "passed",
+      "returnValue": "4",
+      "sideEffect": "Screen",
+      "exceptionType": null,
+      "durationNanoseconds": 552600,
+      "message": null
+    },
+    {
+      "id": "mutual_recursion",
+      "category": "control-flow",
+      "layer": "managed-core",
+      "features": [
+        "call",
+        "recursion"
+      ],
+      "status": "passed",
+      "returnValue": "True,True",
+      "sideEffect": "",
+      "exceptionType": null,
+      "durationNanoseconds": 166100,
+      "message": null
+    },
+    {
+      "id": "nested_break_continue",
+      "category": "control-flow",
+      "layer": "managed-core",
+      "features": [
+        "loop",
+        "break",
+        "continue"
+      ],
+      "status": "passed",
+      "returnValue": "91",
+      "sideEffect": "",
+      "exceptionType": null,
+      "durationNanoseconds": 149100,
+      "message": null
+    },
+    {
+      "id": "null_coalescing_chain",
+      "category": "control-flow",
+      "layer": "managed-core",
+      "features": [
+        "null",
+        "coalesce"
+      ],
+      "status": "passed",
+      "returnValue": "fallback",
+      "sideEffect": "",
+      "exceptionType": null,
+      "durationNanoseconds": 57800,
+      "message": null
+    },
+    {
+      "id": "performance_arithmetic_loop_regression",
+      "category": "control-flow",
+      "layer": "managed-core",
+      "features": [
+        "loop",
+        "backward-branch",
+        "ldloc-copy-propagation"
+      ],
+      "status": "passed",
+      "returnValue": "1073851942304517",
+      "sideEffect": "",
+      "exceptionType": null,
+      "durationNanoseconds": 2113700,
+      "message": null
+    },
+    {
+      "id": "recursive_factorial",
+      "category": "control-flow",
+      "layer": "managed-core",
+      "features": [],
+      "status": "passed",
+      "returnValue": "720",
+      "sideEffect": "",
+      "exceptionType": null,
+      "durationNanoseconds": 113600,
+      "message": null
+    },
+    {
+      "id": "short_circuit_side_effect",
+      "category": "control-flow",
+      "layer": "managed-core",
+      "features": [
+        "brfalse",
+        "brtrue"
+      ],
+      "status": "passed",
+      "returnValue": "False,True",
+      "sideEffect": "1",
+      "exceptionType": null,
+      "durationNanoseconds": 126300,
+      "message": null
+    },
+    {
+      "id": "sparse_integer_switch",
+      "category": "control-flow",
+      "layer": "managed-core",
+      "features": [
+        "branch",
+        "sparse-switch"
+      ],
+      "status": "passed",
+      "returnValue": "49",
+      "sideEffect": "",
+      "exceptionType": null,
+      "durationNanoseconds": 71100,
+      "message": null
+    },
+    {
+      "id": "string_switch",
+      "category": "control-flow",
+      "layer": "managed-core",
+      "features": [],
+      "status": "passed",
+      "returnValue": "2",
+      "sideEffect": "beta",
+      "exceptionType": null,
+      "durationNanoseconds": 73000,
+      "message": null
+    },
+    {
+      "id": "base_virtual_chain",
+      "category": "dispatch",
+      "layer": "managed-core",
+      "features": [],
+      "status": "passed",
+      "returnValue": "18",
+      "sideEffect": "TriplingStage",
+      "exceptionType": null,
+      "durationNanoseconds": 235700,
       "message": null
     },
     {
       "id": "delegate_call",
       "category": "dispatch",
+      "layer": "managed-core",
+      "features": [],
       "status": "passed",
       "returnValue": "42",
       "sideEffect": "",
       "exceptionType": null,
-      "durationNanoseconds": 51500,
+      "durationNanoseconds": 162600,
       "message": null
     },
     {
-      "id": "boxing_unboxing",
-      "category": "value-type",
+      "id": "delegate_covariant_return",
+      "category": "dispatch",
+      "layer": "managed-core",
+      "features": [],
       "status": "passed",
-      "returnValue": "32",
+      "returnValue": "hybrid",
       "sideEffect": "",
       "exceptionType": null,
-      "durationNanoseconds": 46300,
+      "durationNanoseconds": 93000,
+      "message": null
+    },
+    {
+      "id": "delegate_eval_stack_branch_join",
+      "category": "dispatch",
+      "layer": "managed-core",
+      "features": [
+        "delegate",
+        "branch",
+        "evaluation-stack"
+      ],
+      "status": "passed",
+      "returnValue": "16,15",
+      "sideEffect": "",
+      "exceptionType": null,
+      "durationNanoseconds": 197500,
+      "message": null
+    },
+    {
+      "id": "delegate_loop_reassignment",
+      "category": "dispatch",
+      "layer": "managed-core",
+      "features": [],
+      "status": "passed",
+      "returnValue": "13",
+      "sideEffect": "",
+      "exceptionType": null,
+      "durationNanoseconds": 435700,
+      "message": null
+    },
+    {
+      "id": "delegate_multicast",
+      "category": "dispatch",
+      "layer": "managed-core",
+      "features": [],
+      "status": "passed",
+      "returnValue": "12",
+      "sideEffect": "AB",
+      "exceptionType": null,
+      "durationNanoseconds": 515900,
+      "message": null
+    },
+    {
+      "id": "delegate_multicast_remove",
+      "category": "dispatch",
+      "layer": "managed-core",
+      "features": [
+        "delegate",
+        "multicast",
+        "remove"
+      ],
+      "status": "passed",
+      "returnValue": "B",
+      "sideEffect": "",
+      "exceptionType": null,
+      "durationNanoseconds": 267300,
+      "message": null
+    },
+    {
+      "id": "delegate_result_branch",
+      "category": "dispatch",
+      "layer": "managed-core",
+      "features": [],
+      "status": "passed",
+      "returnValue": "positive",
+      "sideEffect": "",
+      "exceptionType": null,
+      "durationNanoseconds": 149200,
+      "message": null
+    },
+    {
+      "id": "instance_delegate",
+      "category": "dispatch",
+      "layer": "managed-core",
+      "features": [],
+      "status": "passed",
+      "returnValue": "22",
+      "sideEffect": "Accumulator",
+      "exceptionType": null,
+      "durationNanoseconds": 237700,
+      "message": null
+    },
+    {
+      "id": "interface_branch_join_dispatch",
+      "category": "dispatch",
+      "layer": "managed-core",
+      "features": [
+        "interface",
+        "branch",
+        "control-flow-join"
+      ],
+      "status": "passed",
+      "returnValue": "16,15",
+      "sideEffect": "",
+      "exceptionType": null,
+      "durationNanoseconds": 236300,
+      "message": null
+    },
+    {
+      "id": "interface_eval_stack_branch_join",
+      "category": "dispatch",
+      "layer": "managed-core",
+      "features": [
+        "interface",
+        "branch",
+        "evaluation-stack"
+      ],
+      "status": "passed",
+      "returnValue": "16,15",
+      "sideEffect": "",
+      "exceptionType": null,
+      "durationNanoseconds": 93700,
+      "message": null
+    },
+    {
+      "id": "interface_loop_type_change",
+      "category": "dispatch",
+      "layer": "managed-core",
+      "features": [
+        "interface",
+        "loop",
+        "backward-branch"
+      ],
+      "status": "passed",
+      "returnValue": "14",
+      "sideEffect": "",
+      "exceptionType": null,
+      "durationNanoseconds": 176900,
+      "message": null
+    },
+    {
+      "id": "lambda_capture",
+      "category": "dispatch",
+      "layer": "managed-core",
+      "features": [],
+      "status": "passed",
+      "returnValue": "13,17",
+      "sideEffect": "",
+      "exceptionType": null,
+      "durationNanoseconds": 170400,
+      "message": null
+    },
+    {
+      "id": "struct_interface_dispatch",
+      "category": "dispatch",
+      "layer": "managed-core",
+      "features": [],
+      "status": "passed",
+      "returnValue": "20",
+      "sideEffect": "15",
+      "exceptionType": null,
+      "durationNanoseconds": 242500,
+      "message": null
+    },
+    {
+      "id": "virtual_interface_call",
+      "category": "dispatch",
+      "layer": "managed-core",
+      "features": [],
+      "status": "passed",
+      "returnValue": "39",
+      "sideEffect": "",
+      "exceptionType": null,
+      "durationNanoseconds": 147900,
+      "message": null
+    },
+    {
+      "id": "catch_filter",
+      "category": "exception",
+      "layer": "managed-core",
+      "features": [],
+      "status": "passed",
+      "returnValue": "ArgumentException",
+      "sideEffect": "filtered",
+      "exceptionType": null,
+      "durationNanoseconds": 198600,
+      "message": null
+    },
+    {
+      "id": "custom_exception_catch",
+      "category": "exception",
+      "layer": "managed-core",
+      "features": [
+        "custom-exception",
+        "catch"
+      ],
+      "status": "passed",
+      "returnValue": "custom:77",
+      "sideEffect": "",
+      "exceptionType": null,
+      "durationNanoseconds": 204700,
+      "message": null
+    },
+    {
+      "id": "deferred_iterator_exception",
+      "category": "exception",
+      "layer": "managed-core",
+      "features": [
+        "iterator",
+        "exception"
+      ],
+      "status": "passed",
+      "returnValue": "InvalidOperationException",
+      "sideEffect": "",
+      "exceptionType": null,
+      "durationNanoseconds": 647800,
+      "message": null
+    },
+    {
+      "id": "divide_by_zero_catch",
+      "category": "exception",
+      "layer": "managed-core",
+      "features": [
+        "div",
+        "exception"
+      ],
+      "status": "passed",
+      "returnValue": "divide",
+      "sideEffect": "",
+      "exceptionType": null,
+      "durationNanoseconds": 191300,
       "message": null
     },
     {
       "id": "exception_finally",
       "category": "exception",
+      "layer": "managed-core",
+      "features": [],
       "status": "passed",
       "returnValue": "16",
       "sideEffect": "",
       "exceptionType": null,
-      "durationNanoseconds": 68800,
+      "durationNanoseconds": 136000,
+      "message": null
+    },
+    {
+      "id": "filter_falls_through",
+      "category": "exception",
+      "layer": "managed-core",
+      "features": [
+        "filter",
+        "catch"
+      ],
+      "status": "passed",
+      "returnValue": "outer",
+      "sideEffect": "",
+      "exceptionType": null,
+      "durationNanoseconds": 217300,
+      "message": null
+    },
+    {
+      "id": "finally_continue",
+      "category": "exception",
+      "layer": "managed-core",
+      "features": [
+        "finally",
+        "continue"
+      ],
+      "status": "passed",
+      "returnValue": "9",
+      "sideEffect": "",
+      "exceptionType": null,
+      "durationNanoseconds": 138400,
+      "message": null
+    },
+    {
+      "id": "finally_replaces_exception",
+      "category": "exception",
+      "layer": "managed-core",
+      "features": [
+        "finally",
+        "unwind"
+      ],
+      "status": "passed",
+      "returnValue": "finally",
+      "sideEffect": "",
+      "exceptionType": null,
+      "durationNanoseconds": 126400,
+      "message": null
+    },
+    {
+      "id": "index_out_of_range_catch",
+      "category": "exception",
+      "layer": "managed-core",
+      "features": [
+        "array",
+        "exception"
+      ],
+      "status": "passed",
+      "returnValue": "index",
+      "sideEffect": "",
+      "exceptionType": null,
+      "durationNanoseconds": 131800,
+      "message": null
+    },
+    {
+      "id": "invalid_cast_catch",
+      "category": "exception",
+      "layer": "managed-core",
+      "features": [
+        "castclass",
+        "catch"
+      ],
+      "status": "passed",
+      "returnValue": "cast",
+      "sideEffect": "",
+      "exceptionType": null,
+      "durationNanoseconds": 267000,
+      "message": null
+    },
+    {
+      "id": "multiple_exception_catches",
+      "category": "exception",
+      "layer": "managed-core",
+      "features": [
+        "catch",
+        "type-test"
+      ],
+      "status": "passed",
+      "returnValue": "argument",
+      "sideEffect": "",
+      "exceptionType": null,
+      "durationNanoseconds": 111300,
+      "message": null
+    },
+    {
+      "id": "nested_finally_leave",
+      "category": "exception",
+      "layer": "managed-core",
+      "features": [
+        "exception",
+        "finally",
+        "leave",
+        "nested"
+      ],
+      "status": "passed",
+      "returnValue": "27,inner,outer",
+      "sideEffect": "",
+      "exceptionType": null,
+      "durationNanoseconds": 179800,
+      "message": null
+    },
+    {
+      "id": "nested_try_catch",
+      "category": "exception",
+      "layer": "managed-core",
+      "features": [],
+      "status": "passed",
+      "returnValue": "31",
+      "sideEffect": "",
+      "exceptionType": null,
+      "durationNanoseconds": 123500,
+      "message": null
+    },
+    {
+      "id": "nested_using_dispose_order",
+      "category": "exception",
+      "layer": "managed-core",
+      "features": [
+        "using",
+        "nested-finally"
+      ],
+      "status": "passed",
+      "returnValue": "inner,inner-dispose,outer-dispose",
+      "sideEffect": "",
+      "exceptionType": null,
+      "durationNanoseconds": 285100,
+      "message": null
+    },
+    {
+      "id": "null_reference_catch",
+      "category": "exception",
+      "layer": "managed-core",
+      "features": [
+        "nullref",
+        "catch"
+      ],
+      "status": "passed",
+      "returnValue": "null",
+      "sideEffect": "",
+      "exceptionType": null,
+      "durationNanoseconds": 115000,
+      "message": null
+    },
+    {
+      "id": "throw_rethrow",
+      "category": "exception",
+      "layer": "managed-core",
+      "features": [],
+      "status": "passed",
+      "returnValue": "24",
+      "sideEffect": "rethrow",
+      "exceptionType": null,
+      "durationNanoseconds": 122700,
+      "message": null
+    },
+    {
+      "id": "using_dispose_order",
+      "category": "exception",
+      "layer": "managed-core",
+      "features": [
+        "using",
+        "dispose"
+      ],
+      "status": "passed",
+      "returnValue": "body,resource-dispose",
+      "sideEffect": "",
+      "exceptionType": null,
+      "durationNanoseconds": 122700,
+      "message": null
+    },
+    {
+      "id": "generic_array_transform",
+      "category": "generic",
+      "layer": "managed-core",
+      "features": [
+        "array",
+        "generic-method"
+      ],
+      "status": "passed",
+      "returnValue": "2,4,6",
+      "sideEffect": "",
+      "exceptionType": null,
+      "durationNanoseconds": 489000,
+      "message": null
+    },
+    {
+      "id": "generic_constraint_class",
+      "category": "generic",
+      "layer": "managed-core",
+      "features": [
+        "constraint.class",
+        "interface"
+      ],
+      "status": "passed",
+      "returnValue": "21",
+      "sideEffect": "",
+      "exceptionType": null,
+      "durationNanoseconds": 174100,
+      "message": null
+    },
+    {
+      "id": "generic_constraint_new",
+      "category": "generic",
+      "layer": "managed-core",
+      "features": [
+        "constraint.new",
+        "constructor"
+      ],
+      "status": "passed",
+      "returnValue": "created",
+      "sideEffect": "",
+      "exceptionType": null,
+      "durationNanoseconds": 339800,
+      "message": null
+    },
+    {
+      "id": "generic_contravariance",
+      "category": "generic",
+      "layer": "managed-core",
+      "features": [
+        "contravariance",
+        "comparer"
+      ],
+      "status": "passed",
+      "returnValue": "-1",
+      "sideEffect": "",
+      "exceptionType": null,
+      "durationNanoseconds": 1254300,
+      "message": null
+    },
+    {
+      "id": "generic_covariance",
+      "category": "generic",
+      "layer": "managed-core",
+      "features": [
+        "variance",
+        "interface"
+      ],
+      "status": "passed",
+      "returnValue": "a,b,c",
+      "sideEffect": "",
+      "exceptionType": null,
+      "durationNanoseconds": 212000,
+      "message": null
+    },
+    {
+      "id": "generic_default_value",
+      "category": "generic",
+      "layer": "managed-core",
+      "features": [
+        "default",
+        "valuetype"
+      ],
+      "status": "passed",
+      "returnValue": "0,False",
+      "sideEffect": "",
+      "exceptionType": null,
+      "durationNanoseconds": 116500,
+      "message": null
+    },
+    {
+      "id": "generic_delegate_factory",
+      "category": "generic",
+      "layer": "managed-core",
+      "features": [
+        "delegate",
+        "generic-method"
+      ],
+      "status": "passed",
+      "returnValue": "56",
+      "sideEffect": "",
+      "exceptionType": null,
+      "durationNanoseconds": 131800,
+      "message": null
+    },
+    {
+      "id": "generic_dictionary_struct",
+      "category": "generic",
+      "layer": "managed-core",
+      "features": [
+        "dictionary",
+        "generic-sharing",
+        "struct"
+      ],
+      "status": "passed",
+      "returnValue": "33,2",
+      "sideEffect": "",
+      "exceptionType": null,
+      "durationNanoseconds": 2753100,
+      "message": null
+    },
+    {
+      "id": "generic_interface_constraint",
+      "category": "generic",
+      "layer": "managed-core",
+      "features": [],
+      "status": "passed",
+      "returnValue": "21",
+      "sideEffect": "15",
+      "exceptionType": null,
+      "durationNanoseconds": 206600,
+      "message": null
+    },
+    {
+      "id": "generic_interface_struct",
+      "category": "generic",
+      "layer": "managed-core",
+      "features": [
+        "generic-interface",
+        "constrained-call"
+      ],
+      "status": "passed",
+      "returnValue": "27,30",
+      "sideEffect": "",
+      "exceptionType": null,
+      "durationNanoseconds": 179700,
+      "message": null
+    },
+    {
+      "id": "generic_list_value_types",
+      "category": "generic",
+      "layer": "managed-core",
+      "features": [
+        "list",
+        "generic-sharing",
+        "int"
+      ],
+      "status": "passed",
+      "returnValue": "1,2,3",
+      "sideEffect": "9",
+      "exceptionType": null,
+      "durationNanoseconds": 807600,
+      "message": null
+    },
+    {
+      "id": "generic_method_roundtrip",
+      "category": "generic",
+      "layer": "managed-core",
+      "features": [],
+      "status": "passed",
+      "returnValue": "lab,41",
+      "sideEffect": "2,5",
+      "exceptionType": null,
+      "durationNanoseconds": 249000,
+      "message": null
+    },
+    {
+      "id": "generic_nested_combo",
+      "category": "generic",
+      "layer": "managed-core",
+      "features": [],
+      "status": "passed",
+      "returnValue": "2,5",
+      "sideEffect": "3,7",
+      "exceptionType": null,
+      "durationNanoseconds": 282000,
+      "message": null
+    },
+    {
+      "id": "generic_nullable_roundtrip",
+      "category": "generic",
+      "layer": "managed-core",
+      "features": [
+        "nullable",
+        "generic"
+      ],
+      "status": "passed",
+      "returnValue": "17,False",
+      "sideEffect": "",
+      "exceptionType": null,
+      "durationNanoseconds": 306500,
+      "message": null
+    },
+    {
+      "id": "generic_out_parameter",
+      "category": "generic",
+      "layer": "managed-core",
+      "features": [
+        "out",
+        "generic"
+      ],
+      "status": "passed",
+      "returnValue": "42",
+      "sideEffect": "",
+      "exceptionType": null,
+      "durationNanoseconds": 354700,
+      "message": null
+    },
+    {
+      "id": "generic_reference_type",
+      "category": "generic",
+      "layer": "managed-core",
+      "features": [],
+      "status": "passed",
+      "returnValue": "right,left",
+      "sideEffect": "9",
+      "exceptionType": null,
+      "durationNanoseconds": 217900,
+      "message": null
+    },
+    {
+      "id": "generic_static_per_type",
+      "category": "generic",
+      "layer": "managed-core",
+      "features": [
+        "generic-static",
+        "cctor"
+      ],
+      "status": "passed",
+      "returnValue": "2,1",
+      "sideEffect": "",
+      "exceptionType": null,
+      "durationNanoseconds": 165400,
+      "message": null
+    },
+    {
+      "id": "generic_tuple_roundtrip",
+      "category": "generic",
+      "layer": "managed-core",
+      "features": [
+        "tuple",
+        "generic"
+      ],
+      "status": "passed",
+      "returnValue": "3:5",
+      "sideEffect": "",
+      "exceptionType": null,
+      "durationNanoseconds": 138200,
+      "message": null
+    },
+    {
+      "id": "generic_value_type",
+      "category": "generic",
+      "layer": "managed-core",
+      "features": [],
+      "status": "passed",
+      "returnValue": "11,7",
+      "sideEffect": "18",
+      "exceptionType": null,
+      "durationNanoseconds": 83300,
+      "message": null
+    },
+    {
+      "id": "generic_virtual_method",
+      "category": "generic",
+      "layer": "managed-core",
+      "features": [
+        "generic-virtual",
+        "dispatch"
+      ],
+      "status": "passed",
+      "returnValue": "42",
+      "sideEffect": "",
+      "exceptionType": null,
+      "durationNanoseconds": 151300,
+      "message": null
+    },
+    {
+      "id": "pinvoke_process_id",
+      "category": "interop",
+      "layer": "managed-core",
+      "features": [
+        "p-invoke",
+        "native-call"
+      ],
+      "status": "passed",
+      "returnValue": "True",
+      "sideEffect": "",
+      "exceptionType": null,
+      "durationNanoseconds": 257500,
+      "message": null
+    },
+    {
+      "id": "reverse_pinvoke_qsort",
+      "category": "interop",
+      "layer": "managed-core",
+      "features": [
+        "reverse-p-invoke",
+        "delegate",
+        "native-call"
+      ],
+      "status": "passed",
+      "returnValue": "1,2,3,4",
+      "sideEffect": "",
+      "exceptionType": null,
+      "durationNanoseconds": 2234000,
+      "message": null
+    },
+    {
+      "id": "iterator_enumeration",
+      "category": "iterator",
+      "layer": "managed-core",
+      "features": [],
+      "status": "passed",
+      "returnValue": "1,2,3,4",
+      "sideEffect": "10",
+      "exceptionType": null,
+      "durationNanoseconds": 871700,
+      "message": null
+    },
+    {
+      "id": "iterator_finally_dispose",
+      "category": "iterator",
+      "layer": "managed-core",
+      "features": [
+        "iterator",
+        "finally",
+        "dispose"
+      ],
+      "status": "passed",
+      "returnValue": "1,disposed",
+      "sideEffect": "",
+      "exceptionType": null,
+      "durationNanoseconds": 951700,
+      "message": null
+    },
+    {
+      "id": "iterator_yield_break_cleanup",
+      "category": "iterator",
+      "layer": "managed-core",
+      "features": [
+        "iterator",
+        "yield-break",
+        "finally",
+        "dispose"
+      ],
+      "status": "passed",
+      "returnValue": "1,disposed",
+      "sideEffect": "",
+      "exceptionType": null,
+      "durationNanoseconds": 1048500,
+      "message": null
+    },
+    {
+      "id": "bitwise_shift",
+      "category": "numeric",
+      "layer": "managed-core",
+      "features": [],
+      "status": "passed",
+      "returnValue": "105",
+      "sideEffect": "",
+      "exceptionType": null,
+      "durationNanoseconds": 54500,
+      "message": null
+    },
+    {
+      "id": "character_arithmetic",
+      "category": "numeric",
+      "layer": "managed-core",
+      "features": [
+        "char",
+        "conv.u2"
+      ],
+      "status": "passed",
+      "returnValue": "937,939",
+      "sideEffect": "",
+      "exceptionType": null,
+      "durationNanoseconds": 51800,
+      "message": null
+    },
+    {
+      "id": "checked_multiply_overflow",
+      "category": "numeric",
+      "layer": "managed-core",
+      "features": [
+        "mul.ovf"
+      ],
+      "status": "passed",
+      "returnValue": null,
+      "sideEffect": null,
+      "exceptionType": "System.OverflowException",
+      "durationNanoseconds": 218400,
+      "message": null
+    },
+    {
+      "id": "checked_overflow",
+      "category": "numeric",
+      "layer": "managed-core",
+      "features": [],
+      "status": "passed",
+      "returnValue": null,
+      "sideEffect": null,
+      "exceptionType": "System.OverflowException",
+      "durationNanoseconds": 135000,
+      "message": null
+    },
+    {
+      "id": "decimal_arithmetic",
+      "category": "numeric",
+      "layer": "managed-core",
+      "features": [
+        "decimal",
+        "value-type-call"
+      ],
+      "status": "passed",
+      "returnValue": "37.0",
+      "sideEffect": "",
+      "exceptionType": null,
+      "durationNanoseconds": 199100,
+      "message": null
+    },
+    {
+      "id": "double_infinity",
+      "category": "numeric",
+      "layer": "managed-core",
+      "features": [
+        "float64",
+        "infinity"
+      ],
+      "status": "passed",
+      "returnValue": "True,True",
+      "sideEffect": "",
+      "exceptionType": null,
+      "durationNanoseconds": 211800,
+      "message": null
+    },
+    {
+      "id": "double_precision_math",
+      "category": "numeric",
+      "layer": "managed-core",
+      "features": [],
+      "status": "passed",
+      "returnValue": "3FE3333333333334",
+      "sideEffect": "",
+      "exceptionType": null,
+      "durationNanoseconds": 117800,
+      "message": null
+    },
+    {
+      "id": "float_bit_pattern",
+      "category": "numeric",
+      "layer": "managed-core",
+      "features": [],
+      "status": "passed",
+      "returnValue": "40980000",
+      "sideEffect": "",
+      "exceptionType": null,
+      "durationNanoseconds": 88400,
+      "message": null
+    },
+    {
+      "id": "float_nan_comparison",
+      "category": "numeric",
+      "layer": "managed-core",
+      "features": [
+        "float32",
+        "nan",
+        "comparison"
+      ],
+      "status": "passed",
+      "returnValue": "False,True,True",
+      "sideEffect": "",
+      "exceptionType": null,
+      "durationNanoseconds": 174300,
+      "message": null
+    },
+    {
+      "id": "float_negative_zero",
+      "category": "numeric",
+      "layer": "managed-core",
+      "features": [
+        "float32",
+        "bit-pattern"
+      ],
+      "status": "passed",
+      "returnValue": "80000000",
+      "sideEffect": "",
+      "exceptionType": null,
+      "durationNanoseconds": 58600,
+      "message": null
+    },
+    {
+      "id": "integer_sum_of_squares",
+      "category": "numeric",
+      "layer": "managed-core",
+      "features": [],
+      "status": "passed",
+      "returnValue": "333833500",
+      "sideEffect": "",
+      "exceptionType": null,
+      "durationNanoseconds": 334700,
+      "message": null
+    },
+    {
+      "id": "long_shift_masking",
+      "category": "numeric",
+      "layer": "managed-core",
+      "features": [
+        "shl",
+        "shr",
+        "int64"
+      ],
+      "status": "passed",
+      "returnValue": "2,-4",
+      "sideEffect": "",
+      "exceptionType": null,
+      "durationNanoseconds": 175600,
+      "message": null
+    },
+    {
+      "id": "math_divrem",
+      "category": "numeric",
+      "layer": "managed-core",
+      "features": [],
+      "status": "passed",
+      "returnValue": "184",
+      "sideEffect": "17",
+      "exceptionType": null,
+      "durationNanoseconds": 78600,
+      "message": null
+    },
+    {
+      "id": "numeric_truncating_cast",
+      "category": "numeric",
+      "layer": "managed-core",
+      "features": [
+        "conv.i4",
+        "float64"
+      ],
+      "status": "passed",
+      "returnValue": "3,-3",
+      "sideEffect": "",
+      "exceptionType": null,
+      "durationNanoseconds": 32200,
+      "message": null
+    },
+    {
+      "id": "signed_conversion_chain",
+      "category": "numeric",
+      "layer": "managed-core",
+      "features": [
+        "conv",
+        "sign-extension"
+      ],
+      "status": "passed",
+      "returnValue": "254,-2,65534",
+      "sideEffect": "",
+      "exceptionType": null,
+      "durationNanoseconds": 142000,
+      "message": null
+    },
+    {
+      "id": "signed_division_remainder",
+      "category": "numeric",
+      "layer": "managed-core",
+      "features": [
+        "div",
+        "rem",
+        "int32"
+      ],
+      "status": "passed",
+      "returnValue": "-3,-2",
+      "sideEffect": "",
+      "exceptionType": null,
+      "durationNanoseconds": 59200,
+      "message": null
+    },
+    {
+      "id": "unchecked_wraparound",
+      "category": "numeric",
+      "layer": "managed-core",
+      "features": [],
+      "status": "passed",
+      "returnValue": "-2147483647",
+      "sideEffect": "",
+      "exceptionType": null,
+      "durationNanoseconds": 47500,
+      "message": null
+    },
+    {
+      "id": "unsigned_comparison",
+      "category": "numeric",
+      "layer": "managed-core",
+      "features": [
+        "comparison.un",
+        "uint32"
+      ],
+      "status": "passed",
+      "returnValue": "True,True",
+      "sideEffect": "",
+      "exceptionType": null,
+      "durationNanoseconds": 73700,
+      "message": null
+    },
+    {
+      "id": "unsigned_wide_arithmetic",
+      "category": "numeric",
+      "layer": "managed-core",
+      "features": [
+        "uint64",
+        "sub",
+        "add"
+      ],
+      "status": "passed",
+      "returnValue": "18446744073709551612",
+      "sideEffect": "",
+      "exceptionType": null,
+      "durationNanoseconds": 192400,
+      "message": null
+    },
+    {
+      "id": "reflection_attribute_read",
+      "category": "reflection",
+      "layer": "managed-core",
+      "features": [
+        "reflection",
+        "attribute"
+      ],
+      "status": "passed",
+      "returnValue": "lab:7",
+      "sideEffect": "",
+      "exceptionType": null,
+      "durationNanoseconds": 650600,
+      "message": null
+    },
+    {
+      "id": "reflection_constructor_invoke",
+      "category": "reflection",
+      "layer": "managed-core",
+      "features": [
+        "reflection",
+        "constructor"
+      ],
+      "status": "passed",
+      "returnValue": "probe:12",
+      "sideEffect": "",
+      "exceptionType": null,
+      "durationNanoseconds": 426600,
+      "message": null
+    },
+    {
+      "id": "reflection_delegate_create",
+      "category": "reflection",
+      "layer": "managed-core",
+      "features": [
+        "reflection",
+        "delegate"
+      ],
+      "status": "passed",
+      "returnValue": "49",
+      "sideEffect": "",
+      "exceptionType": null,
+      "durationNanoseconds": 2392800,
+      "message": null
+    },
+    {
+      "id": "reflection_enum_metadata",
+      "category": "reflection",
+      "layer": "managed-core",
+      "features": [
+        "reflection",
+        "enum"
+      ],
+      "status": "passed",
+      "returnValue": "MetadataByteEnum,1",
+      "sideEffect": "",
+      "exceptionType": null,
+      "durationNanoseconds": 287100,
+      "message": null
+    },
+    {
+      "id": "reflection_interface_base_chain",
+      "category": "reflection",
+      "layer": "managed-core",
+      "features": [
+        "reflection",
+        "base",
+        "interface"
+      ],
+      "status": "passed",
+      "returnValue": "True,True",
+      "sideEffect": "",
+      "exceptionType": null,
+      "durationNanoseconds": 168500,
+      "message": null
+    },
+    {
+      "id": "reflection_invoke",
+      "category": "reflection",
+      "layer": "managed-core",
+      "features": [],
+      "status": "passed",
+      "returnValue": "21",
+      "sideEffect": "ReflectionTarget",
+      "exceptionType": null,
+      "durationNanoseconds": 358900,
+      "message": null
+    },
+    {
+      "id": "reflection_invoke_exception",
+      "category": "reflection",
+      "layer": "managed-core",
+      "features": [
+        "reflection",
+        "invoke",
+        "exception"
+      ],
+      "status": "passed",
+      "returnValue": "InvalidOperationException",
+      "sideEffect": "",
+      "exceptionType": null,
+      "durationNanoseconds": 1242300,
+      "message": null
+    },
+    {
+      "id": "reflection_make_generic_method",
+      "category": "reflection",
+      "layer": "managed-core",
+      "features": [
+        "reflection",
+        "generic-method"
+      ],
+      "status": "passed",
+      "returnValue": "hello:42",
+      "sideEffect": "",
+      "exceptionType": null,
+      "durationNanoseconds": 381400,
+      "message": null
+    },
+    {
+      "id": "reflection_make_generic_type",
+      "category": "reflection",
+      "layer": "managed-core",
+      "features": [
+        "reflection",
+        "generic-type"
+      ],
+      "status": "passed",
+      "returnValue": "Int32:17",
+      "sideEffect": "",
+      "exceptionType": null,
+      "durationNanoseconds": 381300,
+      "message": null
+    },
+    {
+      "id": "reflection_nested_type",
+      "category": "reflection",
+      "layer": "managed-core",
+      "features": [
+        "reflection",
+        "nested-type"
+      ],
+      "status": "passed",
+      "returnValue": "NestedProbe",
+      "sideEffect": "",
+      "exceptionType": null,
+      "durationNanoseconds": 317600,
+      "message": null
+    },
+    {
+      "id": "reflection_private_member",
+      "category": "reflection",
+      "layer": "managed-core",
+      "features": [
+        "reflection",
+        "private-field"
+      ],
+      "status": "passed",
+      "returnValue": "_value:31",
+      "sideEffect": "",
+      "exceptionType": null,
+      "durationNanoseconds": 257500,
+      "message": null
+    },
+    {
+      "id": "reflection_property_field_access",
+      "category": "reflection",
+      "layer": "managed-core",
+      "features": [
+        "reflection",
+        "property",
+        "field"
+      ],
+      "status": "passed",
+      "returnValue": "21,33",
+      "sideEffect": "",
+      "exceptionType": null,
+      "durationNanoseconds": 152800,
+      "message": null
+    },
+    {
+      "id": "delegate_instance_target_lifetime",
+      "category": "runtime",
+      "layer": "managed-core",
+      "features": [
+        "delegate",
+        "gc",
+        "target-lifetime"
+      ],
+      "status": "passed",
+      "returnValue": "43,True",
+      "sideEffect": "",
+      "exceptionType": null,
+      "durationNanoseconds": 7124400,
+      "message": null
+    },
+    {
+      "id": "weak_reference_lifecycle",
+      "category": "runtime",
+      "layer": "managed-core",
+      "features": [
+        "gc",
+        "weak-reference"
+      ],
+      "status": "passed",
+      "returnValue": "True",
+      "sideEffect": "",
+      "exceptionType": null,
+      "durationNanoseconds": 78200,
+      "message": null
+    },
+    {
+      "id": "static_constructor_once",
+      "category": "static",
+      "layer": "managed-core",
+      "features": [],
+      "status": "passed",
+      "returnValue": "1",
+      "sideEffect": "1",
+      "exceptionType": null,
+      "durationNanoseconds": 105700,
+      "message": null
+    },
+    {
+      "id": "string_builder_editing",
+      "category": "string",
+      "layer": "managed-core",
+      "features": [
+        "stringbuilder",
+        "insert",
+        "remove"
+      ],
+      "status": "passed",
+      "returnValue": "hybrid-clr",
+      "sideEffect": "",
+      "exceptionType": null,
+      "durationNanoseconds": 94300,
+      "message": null
+    },
+    {
+      "id": "string_char_enumeration",
+      "category": "string",
+      "layer": "managed-core",
+      "features": [
+        "string",
+        "char",
+        "foreach"
+      ],
+      "status": "passed",
+      "returnValue": "ABC,198",
+      "sideEffect": "",
+      "exceptionType": null,
+      "durationNanoseconds": 289600,
+      "message": null
+    },
+    {
+      "id": "string_formatting",
+      "category": "string",
+      "layer": "managed-core",
+      "features": [],
+      "status": "passed",
+      "returnValue": "hybrid:07:3",
+      "sideEffect": "",
+      "exceptionType": null,
+      "durationNanoseconds": 89800,
+      "message": null
+    },
+    {
+      "id": "string_search_comparison",
+      "category": "string",
+      "layer": "managed-core",
+      "features": [
+        "string",
+        "ordinal",
+        "search"
+      ],
+      "status": "passed",
+      "returnValue": "6,True,False",
+      "sideEffect": "",
+      "exceptionType": null,
+      "durationNanoseconds": 229200,
+      "message": null
+    },
+    {
+      "id": "string_split_join",
+      "category": "string",
+      "layer": "managed-core",
+      "features": [
+        "string",
+        "split",
+        "join"
+      ],
+      "status": "passed",
+      "returnValue": "a|b|c|d",
+      "sideEffect": "",
+      "exceptionType": null,
+      "durationNanoseconds": 101400,
+      "message": null
+    },
+    {
+      "id": "concurrent_generic_reentry",
+      "category": "thread",
+      "layer": "managed-core",
+      "features": [
+        "thread",
+        "task",
+        "concurrent",
+        "generic-sharing"
+      ],
+      "status": "passed",
+      "returnValue": "196",
+      "sideEffect": "",
+      "exceptionType": null,
+      "durationNanoseconds": 47113100,
+      "message": null
+    },
+    {
+      "id": "concurrent_interpreter_reentry",
+      "category": "thread",
+      "layer": "managed-core",
+      "features": [
+        "thread",
+        "task",
+        "concurrent",
+        "interpreter-reentry"
+      ],
+      "status": "passed",
+      "returnValue": "148",
+      "sideEffect": "",
+      "exceptionType": null,
+      "durationNanoseconds": 17269600,
+      "message": null
+    },
+    {
+      "id": "interlocked_increment",
+      "category": "thread",
+      "layer": "managed-core",
+      "features": [
+        "interlocked",
+        "thread"
+      ],
+      "status": "passed",
+      "returnValue": "8",
+      "sideEffect": "",
+      "exceptionType": null,
+      "durationNanoseconds": 1824300,
+      "message": null
+    },
+    {
+      "id": "monitor_lock_mutation",
+      "category": "thread",
+      "layer": "managed-core",
+      "features": [
+        "monitor",
+        "lock"
+      ],
+      "status": "passed",
+      "returnValue": "3",
+      "sideEffect": "",
+      "exceptionType": null,
+      "durationNanoseconds": 125400,
+      "message": null
+    },
+    {
+      "id": "thread_interlocked_exchange",
+      "category": "thread",
+      "layer": "managed-core",
+      "features": [
+        "thread",
+        "interlocked",
+        "exchange"
+      ],
+      "status": "passed",
+      "returnValue": "9,4",
+      "sideEffect": "",
+      "exceptionType": null,
+      "durationNanoseconds": 42100,
+      "message": null
+    },
+    {
+      "id": "thread_join",
+      "category": "thread",
+      "layer": "managed-core",
+      "features": [],
+      "status": "passed",
+      "returnValue": "23",
+      "sideEffect": "",
+      "exceptionType": null,
+      "durationNanoseconds": 16234600,
+      "message": null
+    },
+    {
+      "id": "thread_name_and_join",
+      "category": "thread",
+      "layer": "managed-core",
+      "features": [
+        "thread",
+        "join"
+      ],
+      "status": "passed",
+      "returnValue": "worker:24",
+      "sideEffect": "",
+      "exceptionType": null,
+      "durationNanoseconds": 27606600,
+      "message": null
+    },
+    {
+      "id": "thread_static_isolation",
+      "category": "thread",
+      "layer": "managed-core",
+      "features": [
+        "thread-static",
+        "thread"
+      ],
+      "status": "passed",
+      "returnValue": "0,9",
+      "sideEffect": "",
+      "exceptionType": null,
+      "durationNanoseconds": 19653500,
+      "message": null
+    },
+    {
+      "id": "volatile_visibility",
+      "category": "thread",
+      "layer": "managed-core",
+      "features": [
+        "volatile",
+        "thread"
+      ],
+      "status": "passed",
+      "returnValue": "1",
+      "sideEffect": "",
+      "exceptionType": null,
+      "durationNanoseconds": 4571400,
+      "message": null
+    },
+    {
+      "id": "boxing_unboxing",
+      "category": "value-type",
+      "layer": "managed-core",
+      "features": [],
+      "status": "passed",
+      "returnValue": "32",
+      "sideEffect": "",
+      "exceptionType": null,
+      "durationNanoseconds": 237300,
+      "message": null
+    },
+    {
+      "id": "boxing_unboxing_safepoint",
+      "category": "value-type",
+      "layer": "managed-core",
+      "features": [
+        "boxing",
+        "unboxing",
+        "gc-safepoint"
+      ],
+      "status": "passed",
+      "returnValue": "42",
+      "sideEffect": "",
+      "exceptionType": null,
+      "durationNanoseconds": 1864900,
+      "message": null
+    },
+    {
+      "id": "enum_underlying_sizes",
+      "category": "value-type",
+      "layer": "managed-core",
+      "features": [
+        "enum",
+        "underlying-type"
+      ],
+      "status": "passed",
+      "returnValue": "255,9223372036854775807",
+      "sideEffect": "",
+      "exceptionType": null,
+      "durationNanoseconds": 226200,
+      "message": null
+    },
+    {
+      "id": "generic_boxing_unboxing",
+      "category": "value-type",
+      "layer": "managed-core",
+      "features": [
+        "boxing",
+        "generic"
+      ],
+      "status": "passed",
+      "returnValue": "19,19",
+      "sideEffect": "",
+      "exceptionType": null,
+      "durationNanoseconds": 74100,
+      "message": null
+    },
+    {
+      "id": "in_parameter_struct",
+      "category": "value-type",
+      "layer": "managed-core",
+      "features": [
+        "in",
+        "struct"
+      ],
+      "status": "passed",
+      "returnValue": "35",
+      "sideEffect": "",
+      "exceptionType": null,
+      "durationNanoseconds": 38900,
+      "message": null
+    },
+    {
+      "id": "nested_struct_layout",
+      "category": "value-type",
+      "layer": "managed-core",
+      "features": [
+        "nested-struct",
+        "layout"
+      ],
+      "status": "passed",
+      "returnValue": "1,2,3,6",
+      "sideEffect": "",
+      "exceptionType": null,
+      "durationNanoseconds": 220400,
+      "message": null
+    },
+    {
+      "id": "nullable_value_type",
+      "category": "value-type",
+      "layer": "managed-core",
+      "features": [],
+      "status": "passed",
+      "returnValue": "20",
+      "sideEffect": "True,False",
+      "exceptionType": null,
+      "durationNanoseconds": 88200,
+      "message": null
+    },
+    {
+      "id": "optimizer_explicit_struct_layout",
+      "category": "value-type",
+      "layer": "managed-core",
+      "features": [
+        "struct",
+        "explicit-layout",
+        "overlap",
+        "constructor"
+      ],
+      "status": "passed",
+      "returnValue": "22,22,44,44",
+      "sideEffect": "",
+      "exceptionType": null,
+      "durationNanoseconds": 182700,
+      "message": null
+    },
+    {
+      "id": "optimizer_four_scalar_struct_ctor",
+      "category": "value-type",
+      "layer": "managed-core",
+      "features": [
+        "struct",
+        "scalar-fields",
+        "sequential-layout",
+        "constructor"
+      ],
+      "status": "passed",
+      "returnValue": "11,22,33,44,110",
+      "sideEffect": "0B00000016000000210000002C000000",
+      "exceptionType": null,
+      "durationNanoseconds": 803000,
+      "message": null
+    },
+    {
+      "id": "optimizer_scalar_struct_layout",
+      "category": "value-type",
+      "layer": "managed-core",
+      "features": [
+        "struct",
+        "scalar-fields",
+        "layout",
+        "constructor"
+      ],
+      "status": "passed",
+      "returnValue": "18,72623859790382856,3.5,-7,72623859790382870|size=32|bytes=120000000000000008070605040302010000000000000C40F9FF000000000000",
+      "sideEffect": "",
+      "exceptionType": null,
+      "durationNanoseconds": 699600,
+      "message": null
+    },
+    {
+      "id": "readonly_struct_method",
+      "category": "value-type",
+      "layer": "managed-core",
+      "features": [
+        "readonly-struct",
+        "method"
+      ],
+      "status": "passed",
+      "returnValue": "30",
+      "sideEffect": "",
+      "exceptionType": null,
+      "durationNanoseconds": 88100,
+      "message": null
+    },
+    {
+      "id": "struct_copy_semantics",
+      "category": "value-type",
+      "layer": "managed-core",
+      "features": [
+        "struct-copy",
+        "field"
+      ],
+      "status": "passed",
+      "returnValue": "2,9",
+      "sideEffect": "",
+      "exceptionType": null,
+      "durationNanoseconds": 33400,
+      "message": null
+    },
+    {
+      "id": "struct_ref_out",
+      "category": "value-type",
+      "layer": "managed-core",
+      "features": [],
+      "status": "passed",
+      "returnValue": "8,2",
+      "sideEffect": "10",
+      "exceptionType": null,
+      "durationNanoseconds": 108700,
+      "message": null
+    },
+    {
+      "id": "struct_ref_return",
+      "category": "value-type",
+      "layer": "managed-core",
+      "features": [
+        "ref-return",
+        "ldelema"
+      ],
+      "status": "passed",
+      "returnValue": "18,18",
+      "sideEffect": "",
+      "exceptionType": null,
+      "durationNanoseconds": 81800,
+      "message": null
+    },
+    {
+      "id": "tuple_deconstruction",
+      "category": "value-type",
+      "layer": "managed-core",
+      "features": [
+        "valuetuple",
+        "deconstruction"
+      ],
+      "status": "passed",
+      "returnValue": "left:7",
+      "sideEffect": "",
+      "exceptionType": null,
+      "durationNanoseconds": 76100,
+      "message": null
+    },
+    {
+      "id": "boundary_aot_boxes_struct",
+      "category": "boundary",
+      "layer": "player-boundary",
+      "features": [
+        "aot-to-interp",
+        "boxing",
+        "struct"
+      ],
+      "status": "passed",
+      "returnValue": "5,12,3",
+      "sideEffect": "",
+      "exceptionType": null,
+      "durationNanoseconds": 42782000,
+      "message": null
+    },
+    {
+      "id": "boundary_aot_calls_delegate",
+      "category": "boundary",
+      "layer": "player-boundary",
+      "features": [
+        "aot-to-interp",
+        "delegate"
+      ],
+      "status": "passed",
+      "returnValue": "42",
+      "sideEffect": "",
+      "exceptionType": null,
+      "durationNanoseconds": 212900,
+      "message": null
+    },
+    {
+      "id": "boundary_aot_calls_func",
+      "category": "boundary",
+      "layer": "player-boundary",
+      "features": [
+        "aot-to-interp",
+        "delegate",
+        "generic-delegate"
+      ],
+      "status": "passed",
+      "returnValue": "34",
+      "sideEffect": "",
+      "exceptionType": null,
+      "durationNanoseconds": 146900,
+      "message": null
+    },
+    {
+      "id": "boundary_aot_calls_interface",
+      "category": "boundary",
+      "layer": "player-boundary",
+      "features": [
+        "aot-to-interp",
+        "interface"
+      ],
+      "status": "passed",
+      "returnValue": "39",
+      "sideEffect": "",
+      "exceptionType": null,
+      "durationNanoseconds": 183900,
+      "message": null
+    },
+    {
+      "id": "boundary_aot_calls_string_interface",
+      "category": "boundary",
+      "layer": "player-boundary",
+      "features": [
+        "aot-to-interp",
+        "string"
+      ],
+      "status": "passed",
+      "returnValue": "prefix:hotfix-service",
+      "sideEffect": "",
+      "exceptionType": null,
+      "durationNanoseconds": 95200,
+      "message": null
+    },
+    {
+      "id": "boundary_aot_calls_struct_interface",
+      "category": "boundary",
+      "layer": "player-boundary",
+      "features": [
+        "aot-to-interp",
+        "struct",
+        "interface"
+      ],
+      "status": "passed",
+      "returnValue": "3,15,7",
+      "sideEffect": "25",
+      "exceptionType": null,
+      "durationNanoseconds": 289400,
+      "message": null
+    },
+    {
+      "id": "boundary_aot_calls_virtual",
+      "category": "boundary",
+      "layer": "player-boundary",
+      "features": [
+        "aot-to-interp",
+        "virtual"
+      ],
+      "status": "passed",
+      "returnValue": "30",
+      "sideEffect": "BoundaryDerived",
+      "exceptionType": null,
+      "durationNanoseconds": 305900,
+      "message": null
+    },
+    {
+      "id": "boundary_aot_catches_interpreter_exception",
+      "category": "boundary",
+      "layer": "player-boundary",
+      "features": [
+        "aot-to-interp",
+        "exception"
+      ],
+      "status": "passed",
+      "returnValue": "91",
+      "sideEffect": "",
+      "exceptionType": null,
+      "durationNanoseconds": 249700,
+      "message": null
+    },
+    {
+      "id": "boundary_aot_constrained_struct",
+      "category": "boundary",
+      "layer": "player-boundary",
+      "features": [
+        "aot-to-interp",
+        "generic",
+        "constraint"
+      ],
+      "status": "passed",
+      "returnValue": "27",
+      "sideEffect": "",
+      "exceptionType": null,
+      "durationNanoseconds": 160600,
+      "message": null
+    },
+    {
+      "id": "boundary_aot_generic_string_echo",
+      "category": "boundary",
+      "layer": "player-boundary",
+      "features": [
+        "aot-to-interp",
+        "generic",
+        "string"
+      ],
+      "status": "passed",
+      "returnValue": "boundary",
+      "sideEffect": "",
+      "exceptionType": null,
+      "durationNanoseconds": 77700,
+      "message": null
+    },
+    {
+      "id": "boundary_aot_generic_struct_echo",
+      "category": "boundary",
+      "layer": "player-boundary",
+      "features": [
+        "aot-to-interp",
+        "generic",
+        "struct"
+      ],
+      "status": "passed",
+      "returnValue": "4,8,7",
+      "sideEffect": "",
+      "exceptionType": null,
+      "durationNanoseconds": 151900,
+      "message": null
+    },
+    {
+      "id": "boundary_aot_reads_virtual_property",
+      "category": "boundary",
+      "layer": "player-boundary",
+      "features": [
+        "aot-to-interp",
+        "virtual",
+        "property"
+      ],
+      "status": "passed",
+      "returnValue": "BoundaryDerived",
+      "sideEffect": "",
+      "exceptionType": null,
+      "durationNanoseconds": 39600,
+      "message": null
+    },
+    {
+      "id": "boundary_aot_ref_out_struct",
+      "category": "boundary",
+      "layer": "player-boundary",
+      "features": [
+        "aot-to-interp",
+        "ref",
+        "out",
+        "struct"
+      ],
+      "status": "passed",
+      "returnValue": "3,6,7",
+      "sideEffect": "16",
+      "exceptionType": null,
+      "durationNanoseconds": 159400,
+      "message": null
+    },
+    {
+      "id": "boundary_aot_sum_array",
+      "category": "boundary",
+      "layer": "player-boundary",
+      "features": [
+        "aot-to-interp",
+        "array"
+      ],
+      "status": "passed",
+      "returnValue": "15",
+      "sideEffect": "",
+      "exceptionType": null,
+      "durationNanoseconds": 207500,
+      "message": null
+    },
+    {
+      "id": "boundary_enum_payload_roundtrip",
+      "category": "boundary",
+      "layer": "player-boundary",
+      "features": [
+        "aot-to-interp",
+        "enum",
+        "struct"
+      ],
+      "status": "passed",
+      "returnValue": "7",
+      "sideEffect": "",
+      "exceptionType": null,
+      "durationNanoseconds": 156300,
+      "message": null
+    },
+    {
+      "id": "boundary_fgs_aot_calls_hot_generic_delegate",
+      "category": "boundary",
+      "layer": "player-boundary",
+      "features": [
+        "aot-to-interp",
+        "full-generic-sharing",
+        "delegate",
+        "generic-method",
+        "struct-return"
+      ],
+      "status": "passed",
+      "returnValue": "131,137,13.5,139",
+      "sideEffect": "",
+      "exceptionType": null,
+      "durationNanoseconds": 540500,
+      "message": null
+    },
+    {
+      "id": "boundary_fgs_calli_large_return",
+      "category": "boundary",
+      "layer": "player-boundary",
+      "features": [
+        "interp-to-aot",
+        "full-generic-sharing",
+        "calli",
+        "struct-return"
+      ],
+      "status": "passed",
+      "returnValue": "113,127,12.5,131",
+      "sideEffect": "",
+      "exceptionType": null,
+      "durationNanoseconds": 119400,
+      "message": null
+    },
+    {
+      "id": "boundary_fgs_calli_small_return",
+      "category": "boundary",
+      "layer": "player-boundary",
+      "features": [
+        "interp-to-aot",
+        "full-generic-sharing",
+        "calli",
+        "small-return"
+      ],
+      "status": "passed",
+      "returnValue": "251",
+      "sideEffect": "",
+      "exceptionType": null,
+      "durationNanoseconds": 140300,
+      "message": null
+    },
+    {
+      "id": "boundary_fgs_calli_void",
+      "category": "boundary",
+      "layer": "player-boundary",
+      "features": [
+        "interp-to-aot",
+        "full-generic-sharing",
+        "calli",
+        "void-return"
+      ],
+      "status": "passed",
+      "returnValue": "1",
+      "sideEffect": "",
+      "exceptionType": null,
+      "durationNanoseconds": 161100,
+      "message": null
+    },
+    {
+      "id": "boundary_fgs_delegate_closed_instance",
+      "category": "boundary",
+      "layer": "player-boundary",
+      "features": [
+        "interp-to-aot",
+        "full-generic-sharing",
+        "delegate",
+        "closed-instance"
+      ],
+      "status": "passed",
+      "returnValue": "89,97,10.5,101",
+      "sideEffect": "",
+      "exceptionType": null,
+      "durationNanoseconds": 2306900,
+      "message": null
+    },
+    {
+      "id": "boundary_fgs_delegate_multicast_void",
+      "category": "boundary",
+      "layer": "player-boundary",
+      "features": [
+        "interp-to-aot",
+        "full-generic-sharing",
+        "delegate",
+        "multicast",
+        "void-return"
+      ],
+      "status": "passed",
+      "returnValue": "2",
+      "sideEffect": "",
+      "exceptionType": null,
+      "durationNanoseconds": 384100,
+      "message": null
+    },
+    {
+      "id": "boundary_fgs_delegate_open_instance",
+      "category": "boundary",
+      "layer": "player-boundary",
+      "features": [
+        "interp-to-aot",
+        "full-generic-sharing",
+        "delegate",
+        "open-instance"
+      ],
+      "status": "passed",
+      "returnValue": "103,107,11.5,109",
+      "sideEffect": "",
+      "exceptionType": null,
+      "durationNanoseconds": 266000,
+      "message": null
+    },
+    {
+      "id": "boundary_fgs_delegate_static_large_return",
+      "category": "boundary",
+      "layer": "player-boundary",
+      "features": [
+        "interp-to-aot",
+        "full-generic-sharing",
+        "delegate",
+        "struct-return"
+      ],
+      "status": "passed",
+      "returnValue": "73,79,9.5,83",
+      "sideEffect": "",
+      "exceptionType": null,
+      "durationNanoseconds": 282400,
+      "message": null
+    },
+    {
+      "id": "boundary_fgs_delegate_static_small_return",
+      "category": "boundary",
+      "layer": "player-boundary",
+      "features": [
+        "interp-to-aot",
+        "full-generic-sharing",
+        "delegate",
+        "small-return"
+      ],
+      "status": "passed",
+      "returnValue": "241",
+      "sideEffect": "",
+      "exceptionType": null,
+      "durationNanoseconds": 124300,
+      "message": null
+    },
+    {
+      "id": "boundary_fgs_delegate_static_void",
+      "category": "boundary",
+      "layer": "player-boundary",
+      "features": [
+        "interp-to-aot",
+        "full-generic-sharing",
+        "delegate",
+        "void-return"
+      ],
+      "status": "passed",
+      "returnValue": "1",
+      "sideEffect": "",
+      "exceptionType": null,
+      "durationNanoseconds": 74300,
+      "message": null
+    },
+    {
+      "id": "boundary_fgs_direct_interface_large_return",
+      "category": "boundary",
+      "layer": "player-boundary",
+      "features": [
+        "interp-to-aot",
+        "full-generic-sharing",
+        "interface",
+        "struct-return"
+      ],
+      "status": "passed",
+      "returnValue": "51,53,7.5,55",
+      "sideEffect": "",
+      "exceptionType": null,
+      "durationNanoseconds": 72700,
+      "message": null
+    },
+    {
+      "id": "boundary_fgs_direct_interface_small_return",
+      "category": "boundary",
+      "layer": "player-boundary",
+      "features": [
+        "interp-to-aot",
+        "full-generic-sharing",
+        "interface",
+        "small-return"
+      ],
+      "status": "passed",
+      "returnValue": "231",
+      "sideEffect": "",
+      "exceptionType": null,
+      "durationNanoseconds": 102000,
+      "message": null
+    },
+    {
+      "id": "boundary_fgs_direct_interface_void",
+      "category": "boundary",
+      "layer": "player-boundary",
+      "features": [
+        "interp-to-aot",
+        "full-generic-sharing",
+        "interface",
+        "void-return"
+      ],
+      "status": "passed",
+      "returnValue": "1",
+      "sideEffect": "",
+      "exceptionType": null,
+      "durationNanoseconds": 98400,
+      "message": null
+    },
+    {
+      "id": "boundary_fgs_direct_virtual_large_return",
+      "category": "boundary",
+      "layer": "player-boundary",
+      "features": [
+        "interp-to-aot",
+        "full-generic-sharing",
+        "virtual",
+        "struct-return"
+      ],
+      "status": "passed",
+      "returnValue": "61,67,8.5,71",
+      "sideEffect": "",
+      "exceptionType": null,
+      "durationNanoseconds": 167900,
+      "message": null
+    },
+    {
+      "id": "boundary_fgs_direct_virtual_small_return",
+      "category": "boundary",
+      "layer": "player-boundary",
+      "features": [
+        "interp-to-aot",
+        "full-generic-sharing",
+        "virtual",
+        "small-return"
+      ],
+      "status": "passed",
+      "returnValue": "239",
+      "sideEffect": "",
+      "exceptionType": null,
+      "durationNanoseconds": 131200,
+      "message": null
+    },
+    {
+      "id": "boundary_fgs_direct_virtual_void",
+      "category": "boundary",
+      "layer": "player-boundary",
+      "features": [
+        "interp-to-aot",
+        "full-generic-sharing",
+        "virtual",
+        "void-return"
+      ],
+      "status": "passed",
+      "returnValue": "1",
+      "sideEffect": "",
+      "exceptionType": null,
+      "durationNanoseconds": 75200,
+      "message": null
+    },
+    {
+      "id": "boundary_fgs_generic_container",
+      "category": "boundary",
+      "layer": "player-boundary",
+      "features": [
+        "interp-to-aot",
+        "full-generic-sharing",
+        "generic-class",
+        "struct"
+      ],
+      "status": "passed",
+      "returnValue": "17,19,1.5,21",
+      "sideEffect": "",
+      "exceptionType": null,
+      "durationNanoseconds": 127100,
+      "message": null
+    },
+    {
+      "id": "boundary_fgs_generic_delegate",
+      "category": "boundary",
+      "layer": "player-boundary",
+      "features": [
+        "interp-to-aot",
+        "full-generic-sharing",
+        "delegate",
+        "struct"
+      ],
+      "status": "passed",
+      "returnValue": "7,12,4.5,15",
+      "sideEffect": "",
+      "exceptionType": null,
+      "durationNanoseconds": 151900,
+      "message": null
+    },
+    {
+      "id": "boundary_fgs_generic_interface",
+      "category": "boundary",
+      "layer": "player-boundary",
+      "features": [
+        "interp-to-aot",
+        "aot-to-interp",
+        "full-generic-sharing",
+        "interface",
+        "struct"
+      ],
+      "status": "passed",
+      "returnValue": "6,8,2.5,10",
+      "sideEffect": "",
+      "exceptionType": null,
+      "durationNanoseconds": 181600,
+      "message": null
+    },
+    {
+      "id": "boundary_fgs_generic_virtual",
+      "category": "boundary",
+      "layer": "player-boundary",
+      "features": [
+        "interp-to-aot",
+        "full-generic-sharing",
+        "virtual",
+        "struct"
+      ],
+      "status": "passed",
+      "returnValue": "23,29,3.5,31",
+      "sideEffect": "",
+      "exceptionType": null,
+      "durationNanoseconds": 123000,
+      "message": null
+    },
+    {
+      "id": "boundary_fgs_hot_enum",
+      "category": "boundary",
+      "layer": "player-boundary",
+      "features": [
+        "interp-to-aot",
+        "full-generic-sharing",
+        "enum"
+      ],
+      "status": "passed",
+      "returnValue": "Large",
+      "sideEffect": "",
+      "exceptionType": null,
+      "durationNanoseconds": 204000,
+      "message": null
+    },
+    {
+      "id": "boundary_fgs_large_struct",
+      "category": "boundary",
+      "layer": "player-boundary",
+      "features": [
+        "interp-to-aot",
+        "full-generic-sharing",
+        "struct"
+      ],
+      "status": "passed",
+      "returnValue": "3,5,7.5,11",
+      "sideEffect": "",
+      "exceptionType": null,
+      "durationNanoseconds": 53900,
+      "message": null
+    },
+    {
+      "id": "boundary_fgs_nested_array",
+      "category": "boundary",
+      "layer": "player-boundary",
+      "features": [
+        "interp-to-aot",
+        "full-generic-sharing",
+        "array",
+        "struct"
+      ],
+      "status": "passed",
+      "returnValue": "2:47",
+      "sideEffect": "",
+      "exceptionType": null,
+      "durationNanoseconds": 154100,
+      "message": null
+    },
+    {
+      "id": "boundary_fgs_nullable_struct",
+      "category": "boundary",
+      "layer": "player-boundary",
+      "features": [
+        "interp-to-aot",
+        "full-generic-sharing",
+        "nullable",
+        "struct"
+      ],
+      "status": "passed",
+      "returnValue": "13,True",
+      "sideEffect": "",
+      "exceptionType": null,
+      "durationNanoseconds": 252800,
+      "message": null
+    },
+    {
+      "id": "boundary_fgs_ref_swap",
+      "category": "boundary",
+      "layer": "player-boundary",
+      "features": [
+        "interp-to-aot",
+        "full-generic-sharing",
+        "ref",
+        "struct"
+      ],
+      "status": "passed",
+      "returnValue": "9,2",
+      "sideEffect": "",
+      "exceptionType": null,
+      "durationNanoseconds": 74300,
+      "message": null
+    },
+    {
+      "id": "boundary_fgs_reflection_make_generic",
+      "category": "boundary",
+      "layer": "player-boundary",
+      "features": [
+        "interp-to-aot",
+        "full-generic-sharing",
+        "reflection",
+        "struct"
+      ],
+      "status": "passed",
+      "returnValue": "37,41,6.5,43",
+      "sideEffect": "",
+      "exceptionType": null,
+      "durationNanoseconds": 168200,
+      "message": null
+    },
+    {
+      "id": "boundary_interpreter_calls_aot",
+      "category": "boundary",
+      "layer": "player-boundary",
+      "features": [
+        "interp-to-aot",
+        "static-call"
+      ],
+      "status": "passed",
+      "returnValue": "42",
+      "sideEffect": "",
+      "exceptionType": null,
+      "durationNanoseconds": 41400,
+      "message": null
+    },
+    {
+      "id": "boundary_interpreter_catches_aot_exception",
+      "category": "boundary",
+      "layer": "player-boundary",
+      "features": [
+        "interp-to-aot",
+        "exception"
+      ],
+      "status": "passed",
+      "returnValue": "ArgumentException",
+      "sideEffect": "",
+      "exceptionType": null,
+      "durationNanoseconds": 181000,
+      "message": null
+    },
+    {
+      "id": "boundary_null_interface_exception",
+      "category": "boundary",
+      "layer": "player-boundary",
+      "features": [
+        "aot-to-interp",
+        "null",
+        "exception"
+      ],
+      "status": "passed",
+      "returnValue": "NullReferenceException",
+      "sideEffect": "",
+      "exceptionType": null,
+      "durationNanoseconds": 188300,
+      "message": null
+    },
+    {
+      "id": "boundary_object_array_roundtrip",
+      "category": "boundary",
+      "layer": "player-boundary",
+      "features": [
+        "aot-to-interp",
+        "array",
+        "object"
+      ],
+      "status": "passed",
+      "returnValue": "1,hotfix,3",
+      "sideEffect": "",
+      "exceptionType": null,
+      "durationNanoseconds": 93400,
+      "message": null
+    },
+    {
+      "id": "boundary_repeated_aot_calls",
+      "category": "boundary",
+      "layer": "player-boundary",
+      "features": [
+        "interp-to-aot",
+        "call-frequency"
+      ],
+      "status": "passed",
+      "returnValue": "55",
+      "sideEffect": "",
+      "exceptionType": null,
+      "durationNanoseconds": 99800,
       "message": null
     }
   ]

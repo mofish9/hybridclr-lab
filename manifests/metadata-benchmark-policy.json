@@ -1,0 +1,32 @@
+{
+  "schemaVersion": 1,
+  "suiteId": "hybridclr-metadata-load-v2",
+  "status": "calibrated-windows-x64",
+  "minimumIndependentProcesses": 10,
+  "fullGcBeforeSnapshot": true,
+  "settleMilliseconds": 50,
+  "stressAssembly": {
+    "assemblyName": "HybridCLR.MetadataStress",
+    "typeCount": 1024,
+    "methodsPerType": 12,
+    "fieldsPerType": 8,
+    "propertiesPerType": 4
+  },
+  "acceptance": {
+    "maximumTimeRegressionPercent": 10.0,
+    "maximumTimeRegressionNanoseconds": 1000000,
+    "maximumMemoryRegressionPercent": 5.0,
+    "maximumMemoryRegressionBytes": 8388608,
+    "minimumTimeImprovementPercent": 10.0,
+    "minimumTimeImprovementNanoseconds": 1000000,
+    "minimumMemoryImprovementPercent": 5.0,
+    "minimumMemoryImprovementBytes": 1048576
+  },
+  "calibrationProtocol": {
+    "platform": "StandaloneWindows64",
+    "independentProcessesPerSide": 20,
+    "pairedOrder": "odd baseline-candidate; even candidate-baseline",
+    "result": "reports/metadata-benchmark-calibration-v2.json"
+  },
+  "notes": "Time claims must clear both 10% and 1 ms. Memory claims must clear both 5% and 1 MiB. The absolute time floor prevents short phases from being classified by high relative noise."
+}

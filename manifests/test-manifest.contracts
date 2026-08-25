@@ -1,0 +1,221 @@
+suiteId=managed-differential-v2
+array_and_string	array	managed-core	
+array_binary_search	array	managed-core	array,binary-search
+array_clear_and_fill	array	managed-core	array,clear,stelem
+array_copy_resize	array	managed-core	
+array_covariance	array	managed-core	
+array_covariance_type_mismatch	array	managed-core	array,covariance,stelem,exception
+array_null_reference_roundtrip	array	managed-core	array,reference,null
+array_reverse_segment	array	managed-core	array,reverse,range
+array_segment_enumeration	array	managed-core	array,enumerator,struct
+jagged_array	array	managed-core	
+multidimensional_array	array	managed-core	
+optimizer_array_backedge_bounds	array	managed-core	array,bounds,loop,backward-branch,exception
+optimizer_array_branch_join	array	managed-core	array,branch,control-flow-join,range-analysis
+optimizer_array_conditional_store_default	array	managed-core	array,range,conditional-store,initlocals,exception
+optimizer_array_direct_store_load	array	managed-core	array,loop,range-analysis,ldelem,stelem
+optimizer_array_exception_edges	array	managed-core	array,null,bounds,exception
+optimizer_array_loop_range	array	managed-core	array,loop,range-analysis,ldelem,stelem
+optimizer_array_repeated_store_negative	array	managed-core	array,range,repeated-store,negative,exception
+optimizer_array_repeated_store_range	array	managed-core	array,range,repeated-store,loop
+rectangular_array_write	array	managed-core	array,multidimensional,write
+struct_array_mutation	array	managed-core	array,struct,ldelema
+async_await_yield	async	managed-core	async,await,yield
+async_cancellation_propagation	async	managed-core	async,cancellation,exception
+async_completed_task	async	managed-core	
+async_exception_unwrap	async	managed-core	async,exception
+async_multiple_awaits	async	managed-core	async,await,state-machine,multi-await
+async_state_machine_result	async	managed-core	async,state-machine
+async_when_any_completed	async	managed-core	async,task,when-any
+custom_awaiter	async	managed-core	async,awaiter,state-machine
+task_continuation_order	async	managed-core	task,continuation
+task_when_all_order	async	managed-core	task,when-all
+custom_sort_comparer	collection	managed-core	sort,comparer,delegate
+dictionary_custom_comparer	collection	managed-core	dictionary,comparer,string
+dictionary_lookup	collection	managed-core	
+dictionary_struct_values	collection	managed-core	dictionary,struct,generic
+hashset_set_operations	collection	managed-core	hashset,set
+key_value_pair_copy	collection	managed-core	keyvaluepair,struct
+linked_list_navigation	collection	managed-core	linked-list,reference
+list_foreach	collection	managed-core	
+list_insert_remove	collection	managed-core	list,remove,insert
+queue_stack_roundtrip	collection	managed-core	queue,stack
+sorted_dictionary_order	collection	managed-core	sorted-dictionary,enumeration
+conditional_expression	control-flow	managed-core	conditional,branch
+dense_integer_switch	control-flow	managed-core	switch,dense
+do_while_accumulation	control-flow	managed-core	loop,backward-branch
+enum_switch	control-flow	managed-core	
+mutual_recursion	control-flow	managed-core	call,recursion
+nested_break_continue	control-flow	managed-core	loop,break,continue
+null_coalescing_chain	control-flow	managed-core	null,coalesce
+performance_arithmetic_loop_regression	control-flow	managed-core	loop,backward-branch,ldloc-copy-propagation
+recursive_factorial	control-flow	managed-core	
+short_circuit_side_effect	control-flow	managed-core	brfalse,brtrue
+sparse_integer_switch	control-flow	managed-core	branch,sparse-switch
+string_switch	control-flow	managed-core	
+base_virtual_chain	dispatch	managed-core	
+delegate_call	dispatch	managed-core	
+delegate_covariant_return	dispatch	managed-core	
+delegate_eval_stack_branch_join	dispatch	managed-core	delegate,branch,evaluation-stack
+delegate_loop_reassignment	dispatch	managed-core	
+delegate_multicast	dispatch	managed-core	
+delegate_multicast_remove	dispatch	managed-core	delegate,multicast,remove
+delegate_result_branch	dispatch	managed-core	
+instance_delegate	dispatch	managed-core	
+interface_branch_join_dispatch	dispatch	managed-core	interface,branch,control-flow-join
+interface_eval_stack_branch_join	dispatch	managed-core	interface,branch,evaluation-stack
+interface_loop_type_change	dispatch	managed-core	interface,loop,backward-branch
+lambda_capture	dispatch	managed-core	
+struct_interface_dispatch	dispatch	managed-core	
+virtual_interface_call	dispatch	managed-core	
+catch_filter	exception	managed-core	
+custom_exception_catch	exception	managed-core	custom-exception,catch
+deferred_iterator_exception	exception	managed-core	iterator,exception
+divide_by_zero_catch	exception	managed-core	div,exception
+exception_finally	exception	managed-core	
+filter_falls_through	exception	managed-core	filter,catch
+finally_continue	exception	managed-core	finally,continue
+finally_replaces_exception	exception	managed-core	finally,unwind
+index_out_of_range_catch	exception	managed-core	array,exception
+invalid_cast_catch	exception	managed-core	castclass,catch
+multiple_exception_catches	exception	managed-core	catch,type-test
+nested_finally_leave	exception	managed-core	exception,finally,leave,nested
+nested_try_catch	exception	managed-core	
+nested_using_dispose_order	exception	managed-core	using,nested-finally
+null_reference_catch	exception	managed-core	nullref,catch
+throw_rethrow	exception	managed-core	
+using_dispose_order	exception	managed-core	using,dispose
+generic_array_transform	generic	managed-core	array,generic-method
+generic_constraint_class	generic	managed-core	constraint.class,interface
+generic_constraint_new	generic	managed-core	constraint.new,constructor
+generic_contravariance	generic	managed-core	contravariance,comparer
+generic_covariance	generic	managed-core	variance,interface
+generic_default_value	generic	managed-core	default,valuetype
+generic_delegate_factory	generic	managed-core	delegate,generic-method
+generic_dictionary_struct	generic	managed-core	dictionary,generic-sharing,struct
+generic_interface_constraint	generic	managed-core	
+generic_interface_struct	generic	managed-core	generic-interface,constrained-call
+generic_list_value_types	generic	managed-core	list,generic-sharing,int
+generic_method_roundtrip	generic	managed-core	
+generic_nested_combo	generic	managed-core	
+generic_nullable_roundtrip	generic	managed-core	nullable,generic
+generic_out_parameter	generic	managed-core	out,generic
+generic_reference_type	generic	managed-core	
+generic_static_per_type	generic	managed-core	generic-static,cctor
+generic_tuple_roundtrip	generic	managed-core	tuple,generic
+generic_value_type	generic	managed-core	
+generic_virtual_method	generic	managed-core	generic-virtual,dispatch
+pinvoke_process_id	interop	managed-core	p-invoke,native-call
+reverse_pinvoke_qsort	interop	managed-core	reverse-p-invoke,delegate,native-call
+iterator_enumeration	iterator	managed-core	
+iterator_finally_dispose	iterator	managed-core	iterator,finally,dispose
+iterator_yield_break_cleanup	iterator	managed-core	iterator,yield-break,finally,dispose
+bitwise_shift	numeric	managed-core	
+character_arithmetic	numeric	managed-core	char,conv.u2
+checked_multiply_overflow	numeric	managed-core	mul.ovf
+checked_overflow	numeric	managed-core	
+decimal_arithmetic	numeric	managed-core	decimal,value-type-call
+double_infinity	numeric	managed-core	float64,infinity
+double_precision_math	numeric	managed-core	
+float_bit_pattern	numeric	managed-core	
+float_nan_comparison	numeric	managed-core	float32,nan,comparison
+float_negative_zero	numeric	managed-core	float32,bit-pattern
+integer_sum_of_squares	numeric	managed-core	
+long_shift_masking	numeric	managed-core	shl,shr,int64
+math_divrem	numeric	managed-core	
+numeric_truncating_cast	numeric	managed-core	conv.i4,float64
+signed_conversion_chain	numeric	managed-core	conv,sign-extension
+signed_division_remainder	numeric	managed-core	div,rem,int32
+unchecked_wraparound	numeric	managed-core	
+unsigned_comparison	numeric	managed-core	comparison.un,uint32
+unsigned_wide_arithmetic	numeric	managed-core	uint64,sub,add
+reflection_attribute_read	reflection	managed-core	reflection,attribute
+reflection_constructor_invoke	reflection	managed-core	reflection,constructor
+reflection_delegate_create	reflection	managed-core	reflection,delegate
+reflection_enum_metadata	reflection	managed-core	reflection,enum
+reflection_interface_base_chain	reflection	managed-core	reflection,base,interface
+reflection_invoke	reflection	managed-core	
+reflection_invoke_exception	reflection	managed-core	reflection,invoke,exception
+reflection_make_generic_method	reflection	managed-core	reflection,generic-method
+reflection_make_generic_type	reflection	managed-core	reflection,generic-type
+reflection_nested_type	reflection	managed-core	reflection,nested-type
+reflection_private_member	reflection	managed-core	reflection,private-field
+reflection_property_field_access	reflection	managed-core	reflection,property,field
+delegate_instance_target_lifetime	runtime	managed-core	delegate,gc,target-lifetime
+weak_reference_lifecycle	runtime	managed-core	gc,weak-reference
+static_constructor_once	static	managed-core	
+string_builder_editing	string	managed-core	stringbuilder,insert,remove
+string_char_enumeration	string	managed-core	string,char,foreach
+string_formatting	string	managed-core	
+string_search_comparison	string	managed-core	string,ordinal,search
+string_split_join	string	managed-core	string,split,join
+concurrent_generic_reentry	thread	managed-core	thread,task,concurrent,generic-sharing
+concurrent_interpreter_reentry	thread	managed-core	thread,task,concurrent,interpreter-reentry
+interlocked_increment	thread	managed-core	interlocked,thread
+monitor_lock_mutation	thread	managed-core	monitor,lock
+thread_interlocked_exchange	thread	managed-core	thread,interlocked,exchange
+thread_join	thread	managed-core	
+thread_name_and_join	thread	managed-core	thread,join
+thread_static_isolation	thread	managed-core	thread-static,thread
+volatile_visibility	thread	managed-core	volatile,thread
+boxing_unboxing	value-type	managed-core	
+boxing_unboxing_safepoint	value-type	managed-core	boxing,unboxing,gc-safepoint
+enum_underlying_sizes	value-type	managed-core	enum,underlying-type
+generic_boxing_unboxing	value-type	managed-core	boxing,generic
+in_parameter_struct	value-type	managed-core	in,struct
+nested_struct_layout	value-type	managed-core	nested-struct,layout
+nullable_value_type	value-type	managed-core	
+optimizer_explicit_struct_layout	value-type	managed-core	struct,explicit-layout,overlap,constructor
+optimizer_four_scalar_struct_ctor	value-type	managed-core	struct,scalar-fields,sequential-layout,constructor
+optimizer_scalar_struct_layout	value-type	managed-core	struct,scalar-fields,layout,constructor
+readonly_struct_method	value-type	managed-core	readonly-struct,method
+struct_copy_semantics	value-type	managed-core	struct-copy,field
+struct_ref_out	value-type	managed-core	
+struct_ref_return	value-type	managed-core	ref-return,ldelema
+tuple_deconstruction	value-type	managed-core	valuetuple,deconstruction
+boundary_aot_boxes_struct	boundary	player-boundary	aot-to-interp,boxing,struct
+boundary_aot_calls_delegate	boundary	player-boundary	aot-to-interp,delegate
+boundary_aot_calls_func	boundary	player-boundary	aot-to-interp,delegate,generic-delegate
+boundary_aot_calls_interface	boundary	player-boundary	aot-to-interp,interface
+boundary_aot_calls_string_interface	boundary	player-boundary	aot-to-interp,string
+boundary_aot_calls_struct_interface	boundary	player-boundary	aot-to-interp,struct,interface
+boundary_aot_calls_virtual	boundary	player-boundary	aot-to-interp,virtual
+boundary_aot_catches_interpreter_exception	boundary	player-boundary	aot-to-interp,exception
+boundary_aot_constrained_struct	boundary	player-boundary	aot-to-interp,generic,constraint
+boundary_aot_generic_string_echo	boundary	player-boundary	aot-to-interp,generic,string
+boundary_aot_generic_struct_echo	boundary	player-boundary	aot-to-interp,generic,struct
+boundary_aot_reads_virtual_property	boundary	player-boundary	aot-to-interp,virtual,property
+boundary_aot_ref_out_struct	boundary	player-boundary	aot-to-interp,ref,out,struct
+boundary_aot_sum_array	boundary	player-boundary	aot-to-interp,array
+boundary_enum_payload_roundtrip	boundary	player-boundary	aot-to-interp,enum,struct
+boundary_fgs_aot_calls_hot_generic_delegate	boundary	player-boundary	aot-to-interp,full-generic-sharing,delegate,generic-method,struct-return
+boundary_fgs_calli_large_return	boundary	player-boundary	interp-to-aot,full-generic-sharing,calli,struct-return
+boundary_fgs_calli_small_return	boundary	player-boundary	interp-to-aot,full-generic-sharing,calli,small-return
+boundary_fgs_calli_void	boundary	player-boundary	interp-to-aot,full-generic-sharing,calli,void-return
+boundary_fgs_delegate_closed_instance	boundary	player-boundary	interp-to-aot,full-generic-sharing,delegate,closed-instance
+boundary_fgs_delegate_multicast_void	boundary	player-boundary	interp-to-aot,full-generic-sharing,delegate,multicast,void-return
+boundary_fgs_delegate_open_instance	boundary	player-boundary	interp-to-aot,full-generic-sharing,delegate,open-instance
+boundary_fgs_delegate_static_large_return	boundary	player-boundary	interp-to-aot,full-generic-sharing,delegate,struct-return
+boundary_fgs_delegate_static_small_return	boundary	player-boundary	interp-to-aot,full-generic-sharing,delegate,small-return
+boundary_fgs_delegate_static_void	boundary	player-boundary	interp-to-aot,full-generic-sharing,delegate,void-return
+boundary_fgs_direct_interface_large_return	boundary	player-boundary	interp-to-aot,full-generic-sharing,interface,struct-return
+boundary_fgs_direct_interface_small_return	boundary	player-boundary	interp-to-aot,full-generic-sharing,interface,small-return
+boundary_fgs_direct_interface_void	boundary	player-boundary	interp-to-aot,full-generic-sharing,interface,void-return
+boundary_fgs_direct_virtual_large_return	boundary	player-boundary	interp-to-aot,full-generic-sharing,virtual,struct-return
+boundary_fgs_direct_virtual_small_return	boundary	player-boundary	interp-to-aot,full-generic-sharing,virtual,small-return
+boundary_fgs_direct_virtual_void	boundary	player-boundary	interp-to-aot,full-generic-sharing,virtual,void-return
+boundary_fgs_generic_container	boundary	player-boundary	interp-to-aot,full-generic-sharing,generic-class,struct
+boundary_fgs_generic_delegate	boundary	player-boundary	interp-to-aot,full-generic-sharing,delegate,struct
+boundary_fgs_generic_interface	boundary	player-boundary	interp-to-aot,aot-to-interp,full-generic-sharing,interface,struct
+boundary_fgs_generic_virtual	boundary	player-boundary	interp-to-aot,full-generic-sharing,virtual,struct
+boundary_fgs_hot_enum	boundary	player-boundary	interp-to-aot,full-generic-sharing,enum
+boundary_fgs_large_struct	boundary	player-boundary	interp-to-aot,full-generic-sharing,struct
+boundary_fgs_nested_array	boundary	player-boundary	interp-to-aot,full-generic-sharing,array,struct
+boundary_fgs_nullable_struct	boundary	player-boundary	interp-to-aot,full-generic-sharing,nullable,struct
+boundary_fgs_ref_swap	boundary	player-boundary	interp-to-aot,full-generic-sharing,ref,struct
+boundary_fgs_reflection_make_generic	boundary	player-boundary	interp-to-aot,full-generic-sharing,reflection,struct
+boundary_interpreter_calls_aot	boundary	player-boundary	interp-to-aot,static-call
+boundary_interpreter_catches_aot_exception	boundary	player-boundary	interp-to-aot,exception
+boundary_null_interface_exception	boundary	player-boundary	aot-to-interp,null,exception
+boundary_object_array_roundtrip	boundary	player-boundary	aot-to-interp,array,object
+boundary_repeated_aot_calls	boundary	player-boundary	interp-to-aot,call-frequency

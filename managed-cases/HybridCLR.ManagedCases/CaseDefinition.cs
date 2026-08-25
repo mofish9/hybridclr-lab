@@ -1,4 +1,5 @@
 using System;
+using System.Collections.Generic;
 
 namespace HybridCLR.Lab.ManagedCases
 {
@@ -10,7 +11,9 @@ namespace HybridCLR.Lab.ManagedCases
             Func<CaseObservation> execute,
             string? expectedReturnValue,
             string? expectedSideEffect = "",
-            string? expectedExceptionType = null)
+            string? expectedExceptionType = null,
+            string layer = "managed-core",
+            params string[] features)
         {
             Id = id;
             Category = category;
@@ -18,6 +21,8 @@ namespace HybridCLR.Lab.ManagedCases
             ExpectedReturnValue = expectedReturnValue;
             ExpectedSideEffect = expectedSideEffect;
             ExpectedExceptionType = expectedExceptionType;
+            Layer = layer;
+            Features = features;
         }
 
         public string Id { get; }
@@ -31,6 +36,9 @@ namespace HybridCLR.Lab.ManagedCases
         public string? ExpectedSideEffect { get; }
 
         public string? ExpectedExceptionType { get; }
+
+        public string Layer { get; }
+
+        public IReadOnlyList<string> Features { get; }
     }
 }
-
