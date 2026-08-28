@@ -90,6 +90,25 @@ source commit. The package ID is still required after that bootstrap; it binds
 the exact unpacked payload but does not replace archive signing or transport
 authentication.
 
+The source release workflow creates the transport records without executing the
+candidate package. It republishes the exact clean commit, verifies the unpacked
+package and a fresh ZIP extraction through the trusted source verifier,
+creates and verifies a Git bundle for the same HEAD, and binds those hashes to
+the runtime tree and passing installed-consumer gate:
+
+```powershell
+./scripts/publish-dhe-toolchain-release.ps1 `
+  -PackageRoot C:/releases/dhe-toolchain-0.1.1 `
+  -RuntimeManifest ./staging/runtime/DHE-Tuanjie2022/runtime-manifest.json `
+  -InstalledConsumerGate ./artifacts/dhe-installed-consumer-gate/installed-consumer-gate-report.json `
+  -ForceOutput
+```
+
+The sibling `*.release.json` is the transport integrity record. Distribute its
+authenticated hash (or sign that record) through the trusted release channel;
+SHA-256 records establish exact identity but are not authentication by
+themselves.
+
 Installation verifies source, staged, and final copies. Upgrades additionally
 verify the existing installation before swapping directories and roll back an
 in-process failure. The destination shares a mutex with installed workflows, so

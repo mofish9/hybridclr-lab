@@ -52,6 +52,7 @@
     "scripts/install-dhe-toolchain.ps1",
     "scripts/new-dhe-project-adapter.ps1",
     "scripts/publish-dhe-toolchain.ps1",
+    "scripts/publish-dhe-toolchain-release.ps1",
     "scripts/resolve-dhe-native-manifest.ps1",
     "scripts/resolve-repos-root.ps1",
     "scripts/run-dhe-archive-gate.ps1",

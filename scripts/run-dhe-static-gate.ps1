@@ -81,6 +81,7 @@ $formalScriptNames = @(
     "install-dhe-toolchain.ps1",
     "new-dhe-project-adapter.ps1",
     "publish-dhe-toolchain.ps1",
+    "publish-dhe-toolchain-release.ps1",
     "apply-dhe-generated-cpp.ps1",
     "run-dhe-deterministic-player-build.ps1",
     "run-dhe-demo-workflow.ps1",

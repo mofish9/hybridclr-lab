@@ -48,6 +48,16 @@ jobs:
           -OutputRoot ./artifacts/dhe-installed-consumer-gate
           -ForceOutput
 
+      - name: Publish transport package and source records
+        shell: pwsh
+        run: >-
+          ./scripts/publish-dhe-toolchain-release.ps1
+          -PackageRoot ./artifacts/dhe-toolchain-release/package
+          -OutputPrefix ./artifacts/dhe-toolchain-release/dhe-toolchain
+          -RuntimeManifest ./staging/runtime/DHE-Tuanjie2022/runtime-manifest.json
+          -InstalledConsumerGate ./artifacts/dhe-installed-consumer-gate/installed-consumer-gate-report.json
+          -ForceOutput
+
       - name: Validate native-lane JSON contracts
         shell: pwsh
         run: >-
@@ -65,4 +75,5 @@ jobs:
             artifacts/dhe-project-adapter-contract/**
             artifacts/dhe-native-gate/**
             artifacts/dhe-installed-consumer-gate/**
+            artifacts/dhe-toolchain-release/**
             artifacts/dhe-native-schema-gate/**
