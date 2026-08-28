@@ -87,6 +87,7 @@ $formalScriptNames = @(
     "validate-dhe-artifacts.ps1",
     "run-dhe-release-gate.ps1",
     "run-dhe-schema-gate.ps1",
+    "run-dhe-installed-consumer-gate.ps1",
     "run-dhe-capability-gate.ps1",
     "run-dhe-compatibility-negative-gate.ps1",
     "run-dhe-script-fixture-gate.ps1",

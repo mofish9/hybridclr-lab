@@ -498,6 +498,67 @@ Require $schemaDuplicatePropertyRejected "Schema gate accepted a duplicate JSON 
 Remove-Item -LiteralPath $schemaNegativeInputRoot -Recurse -Force
 $global:LASTEXITCODE = 0
 
+# Adapter-owned DHE report formats remain fail closed until their schema root
+# is supplied explicitly. Registering that root must not modify the installed
+# tool or weaken handling for any other unknown DHE format.
+$customSchemaRoot = Join-Path $OutputRoot "adapter-schema-root"
+$customSchemaInputRoot = Join-Path $OutputRoot "adapter-schema-input"
+$customSchemaRejectRoot = Join-Path $OutputRoot "adapter-schema-unregistered"
+$customSchemaAcceptRoot = Join-Path $OutputRoot "adapter-schema-registered"
+New-Item -ItemType Directory -Force -Path $customSchemaRoot, $customSchemaInputRoot | Out-Null
+$customSchemaPath = Join-Path $customSchemaRoot "dhe-adapter-custom.schema.json"
+$customDocumentPath = Join-Path $customSchemaInputRoot "adapter-custom.json"
+$customSchemaJson = @'
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://example.invalid/hybridclr/dhe-adapter-custom.schema.json",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schemaVersion", "format", "passed"],
+  "properties": {
+    "schemaVersion": { "const": 1 },
+    "format": { "const": "hybridclr.dhe-adapter-custom.json" },
+    "passed": { "const": true }
+  }
+}
+'@
+[IO.File]::WriteAllText($customSchemaPath, $customSchemaJson, (New-Object Text.UTF8Encoding($false)))
+[IO.File]::WriteAllText($customDocumentPath,
+    '{"schemaVersion":1,"format":"hybridclr.dhe-adapter-custom.json","passed":true}',
+    (New-Object Text.UTF8Encoding($false)))
+$customSchemaRejectedExit = Invoke-ExpectedFailure @(
+    (Join-Path $LabRoot "scripts/run-dhe-schema-gate.ps1"),
+    "-InputRoot", $customSchemaInputRoot,
+    "-OutputRoot", $customSchemaRejectRoot,
+    "-ForceOutput")
+$customSchemaRejectedReport = Get-Content -Raw -LiteralPath (
+    Join-Path $customSchemaRejectRoot "schema-gate-report.json") | ConvertFrom-Json
+$customSchemaUnregisteredRejected = $customSchemaRejectedExit -ne 0 -and
+    @($customSchemaRejectedReport.errors | Where-Object { $_ -like "*No DHE schema is registered*" }).Count -eq 1
+Require $customSchemaUnregisteredRejected "Schema gate accepted an unregistered adapter DHE format."
+
+& (Resolve-DhePowerShellHost) -NoProfile -ExecutionPolicy Bypass -File (
+    Join-Path $LabRoot "scripts/run-dhe-schema-gate.ps1") `
+    -InputRoot $customSchemaInputRoot -AdditionalSchemaRoot $customSchemaRoot `
+    -OutputRoot $customSchemaAcceptRoot -ForceOutput | Out-Null
+$customSchemaAcceptedExit = [int]$LASTEXITCODE
+$customSchemaAcceptedReport = Get-Content -Raw -LiteralPath (
+    Join-Path $customSchemaAcceptRoot "schema-gate-report.json") | ConvertFrom-Json
+$additionalSchemaRegistered = $customSchemaAcceptedExit -eq 0 -and
+    [bool]$customSchemaAcceptedReport.passed -and
+    @($customSchemaAcceptedReport.schemaRoots | Where-Object {
+            ([IO.Path]::GetFullPath([string]$_)).Equals(
+                [IO.Path]::GetFullPath($customSchemaRoot), [StringComparison]::OrdinalIgnoreCase)
+        }).Count -eq 1 -and
+    @($customSchemaAcceptedReport.documents | Where-Object {
+            ([IO.Path]::GetFullPath([string]$_.path)).Equals(
+                [IO.Path]::GetFullPath($customDocumentPath), [StringComparison]::OrdinalIgnoreCase) -and
+            [bool]$_.passed
+        }).Count -eq 1
+Require $additionalSchemaRegistered "Schema gate did not validate an explicitly registered adapter schema."
+Remove-Item -LiteralPath $customSchemaRoot, $customSchemaInputRoot -Recurse -Force
+$global:LASTEXITCODE = 0
+
 # Gate reports are evidence, so no gate may overwrite one of its input reports
 # even when the caller explicitly chooses a custom output path.
 $overwriteProbePath = Join-Path $OutputRoot "overwrite-protection.json"
@@ -1085,6 +1146,8 @@ $report = [ordered]@{
     adapterTargetParameterValidated = $adapterTargetParameterValidated
     adapterContractMismatchRejected = $adapterContractMismatchRejected
     schemaDuplicatePropertyRejected = $schemaDuplicatePropertyRejected
+    customSchemaUnregisteredRejected = $customSchemaUnregisteredRejected
+    additionalSchemaRegistered = $additionalSchemaRegistered
     externalDnlibFallbackRejected = $externalDnlibFallbackRejected
     externalEmbeddedPackageLockValidated = $externalEmbeddedPackageLockValidated
     legacyLabRelativePackageLockRejected = $legacyLabRelativePackageLockRejected

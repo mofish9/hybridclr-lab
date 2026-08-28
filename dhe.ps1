@@ -1,7 +1,7 @@
 [CmdletBinding(PositionalBinding = $false)]
 param(
     [Parameter(Position = 0)]
-    [ValidateSet("help", "archive", "doctor", "install", "new-adapter", "preflight", "release", "validate", "verify-package", "version", "workflow")]
+    [ValidateSet("help", "archive", "doctor", "install", "new-adapter", "preflight", "release", "schema", "validate", "verify-package", "version", "workflow")]
     [string]$Command = "help",
     [Parameter(ValueFromRemainingArguments = $true)]
     [string[]]$CommandArguments = @()
@@ -15,7 +15,7 @@ $manifestPath = Join-Path $toolRoot "dhe-toolchain-manifest.json"
 if ($Command -eq "help") {
     Write-Host "HybridCLR DHE toolchain commands:"
     Write-Host "  doctor, install, new-adapter, preflight, workflow"
-    Write-Host "  validate, release, archive, verify-package, version"
+    Write-Host "  validate, release, archive, schema, verify-package, version"
     exit 0
 }
 
@@ -37,6 +37,7 @@ $scriptByCommand = @{
     "new-adapter" = "new-dhe-project-adapter.ps1"
     "preflight" = "run-dhe-project-preflight.ps1"
     "release" = "run-dhe-release-gate.ps1"
+    "schema" = "run-dhe-schema-gate.ps1"
     "validate" = "validate-dhe-artifacts.ps1"
     "verify-package" = "test-dhe-toolchain-package.ps1"
     "workflow" = "run-dhe-project-workflow.ps1"

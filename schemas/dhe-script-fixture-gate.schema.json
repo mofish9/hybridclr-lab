@@ -4,7 +4,7 @@
   "title": "HybridCLR DHE Script Fixture Gate Report",
   "type": "object",
   "additionalProperties": true,
-  "required": ["schemaVersion", "format", "passed", "guardRequested", "guardTransformed", "guardSecondPassTransformed", "abiChangedMethodCount", "abiSupportedChangedMethodCount", "abiUnsupportedChangedMethodCount", "genericChangedMethodCount", "genericSupportedChangedMethodCount", "genericGuardedMethodCount", "genericNativeEntryCount", "multiAssemblyChangedMethodCount", "multiAssemblySupportedChangedMethodCount", "multiAssemblyUnsupportedChangedMethodCount", "malformedNativeTokenRejected", "duplicateMappingRejected", "probeTransactionRollbackPassed", "outputCollisionRejected", "exploratoryReleaseRejected", "releaseDerivedOutputsIsolated", "unsafeSourceOutputRejected", "singleTrackedOutputRejected", "foreignGitRootRejected", "separateGitIdentitiesValidated", "gitApplyRootIsolated", "prePrepareGateTested", "invalidRuntimeRejectedBeforeAdapter", "adapterTargetParameterValidated", "adapterContractMismatchRejected", "schemaDuplicatePropertyRejected", "externalDnlibFallbackRejected", "externalEmbeddedPackageLockValidated", "legacyLabRelativePackageLockRejected", "absolutePackageLockRejected", "workflowLockTested", "workflowLockRejected", "workflowLockReusable", "projectPreflightFailureReported"],
+  "required": ["schemaVersion", "format", "passed", "guardRequested", "guardTransformed", "guardSecondPassTransformed", "abiChangedMethodCount", "abiSupportedChangedMethodCount", "abiUnsupportedChangedMethodCount", "genericChangedMethodCount", "genericSupportedChangedMethodCount", "genericGuardedMethodCount", "genericNativeEntryCount", "multiAssemblyChangedMethodCount", "multiAssemblySupportedChangedMethodCount", "multiAssemblyUnsupportedChangedMethodCount", "malformedNativeTokenRejected", "duplicateMappingRejected", "probeTransactionRollbackPassed", "outputCollisionRejected", "exploratoryReleaseRejected", "releaseDerivedOutputsIsolated", "unsafeSourceOutputRejected", "singleTrackedOutputRejected", "foreignGitRootRejected", "separateGitIdentitiesValidated", "gitApplyRootIsolated", "prePrepareGateTested", "invalidRuntimeRejectedBeforeAdapter", "adapterTargetParameterValidated", "adapterContractMismatchRejected", "schemaDuplicatePropertyRejected", "customSchemaUnregisteredRejected", "additionalSchemaRegistered", "externalDnlibFallbackRejected", "externalEmbeddedPackageLockValidated", "legacyLabRelativePackageLockRejected", "absolutePackageLockRejected", "workflowLockTested", "workflowLockRejected", "workflowLockReusable", "projectPreflightFailureReported"],
   "properties": {
     "schemaVersion": { "const": 1 },
     "format": { "const": "hybridclr.dhe-script-fixture-gate.json" },
@@ -39,6 +39,8 @@
     "adapterTargetParameterValidated": { "type": ["boolean", "null"] },
     "adapterContractMismatchRejected": { "const": true },
     "schemaDuplicatePropertyRejected": { "const": true },
+    "customSchemaUnregisteredRejected": { "const": true },
+    "additionalSchemaRegistered": { "const": true },
     "externalDnlibFallbackRejected": { "const": true },
     "externalEmbeddedPackageLockValidated": { "const": true },
     "legacyLabRelativePackageLockRejected": { "const": true },

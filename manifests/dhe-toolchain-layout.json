@@ -1,7 +1,7 @@
 {
   "schemaVersion": 1,
   "format": "hybridclr.dhe-toolchain-layout.json",
-  "toolchainVersion": "0.1.0",
+  "toolchainVersion": "0.1.1",
   "contractVersion": 1,
   "exactPaths": [
     ".gitattributes",
@@ -83,6 +83,7 @@
     "new-adapter",
     "preflight",
     "release",
+    "schema",
     "validate",
     "verify-package",
     "version",

@@ -64,6 +64,7 @@
     "scripts/run-dhe-project-workflow.ps1",
     "scripts/run-dhe-release-gate.ps1",
     "scripts/run-dhe-schema-gate.ps1",
+    "scripts/run-dhe-installed-consumer-gate.ps1",
     "scripts/run-dhe-script-fixture-gate.ps1",
     "scripts/run-dhe-source-preflight.ps1",
     "scripts/run-dhe-native-gate.ps1",

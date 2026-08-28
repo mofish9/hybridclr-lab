@@ -392,6 +392,7 @@ $releasePackagePublished = $LASTEXITCODE -eq 0 -and $null -ne $releaseManifest -
     [string]$releaseManifest.sourceIdentity.head -eq $releaseSourceHead
 if (-not $releasePackagePublished) { $errors.Add("Clean Release toolchain package was not published with the expected source identity.") }
 $releasePackageId = if ($null -eq $releaseManifest) { "" } else { [string]$releaseManifest.packageId }
+$releasePackageVersion = if ($null -eq $releaseManifest) { "" } else { [string]$releaseManifest.toolchainVersion }
 
 & (Join-Path $releaseSourceRoot "scripts/publish-dhe-toolchain.ps1") `
     -LabRoot $releaseSourceRoot -OutputRoot $releasePackageRepeatRoot -Mode Release -ForceOutput | Out-Null
@@ -540,7 +541,7 @@ $downgradeRejectExit = Invoke-Child @(
     "-ExpectedPackageId", $downgradePackageId
 )
 $installedVersionAfterReject = [string](Get-Content -Raw -LiteralPath (Join-Path $releaseInstalledRoot "dhe-toolchain-manifest.json") | ConvertFrom-Json).toolchainVersion
-$downgradeRejected = $downgradeRejectExit -ne 0 -and $installedVersionAfterReject -eq "0.1.0"
+$downgradeRejected = $downgradeRejectExit -ne 0 -and $installedVersionAfterReject -eq $releasePackageVersion
 if (-not $downgradeRejected) { $errors.Add("Installer did not reject the Release toolchain downgrade by default.") }
 
 & (Join-Path $downgradePackageRoot "scripts/install-dhe-toolchain.ps1") `
@@ -556,7 +557,7 @@ if (-not $explicitDowngradeValidated) { $errors.Add("Explicit verified toolchain
 $downgradeRecoveryExitCode = [int]$LASTEXITCODE
 $releaseConsumerFinalStatus = @(& git -C $releaseConsumerRoot status --porcelain=v1 --untracked-files=all)
 $downgradeRecoveryValidated = $downgradeRecoveryExitCode -eq 0 -and
-    [string](Get-Content -Raw -LiteralPath (Join-Path $releaseInstalledRoot "dhe-toolchain-manifest.json") | ConvertFrom-Json).toolchainVersion -eq "0.1.0" -and
+    [string](Get-Content -Raw -LiteralPath (Join-Path $releaseInstalledRoot "dhe-toolchain-manifest.json") | ConvertFrom-Json).toolchainVersion -eq $releasePackageVersion -and
     $releaseConsumerFinalStatus.Count -eq 0
 if (-not $downgradeRecoveryValidated) { $errors.Add("Toolchain did not recover from the explicit downgrade to the pinned clean Release installation.") }
 

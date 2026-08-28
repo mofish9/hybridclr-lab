@@ -5,6 +5,9 @@ param(
     [string[]]$InputRoot = @(),
     [string]$InputRootList = "",
     [string]$InputRootListBase64 = "",
+    [string[]]$AdditionalSchemaRoot = @(),
+    [string]$AdditionalSchemaRootList = "",
+    [string]$AdditionalSchemaRootListBase64 = "",
     [switch]$ForceOutput
 )
 
@@ -37,6 +40,29 @@ if (-not [string]::IsNullOrWhiteSpace($InputRootList)) {
     $InputRoot = ConvertFrom-DheStringListArgument -Value $InputRootList
 }
 $InputRoot = @($InputRoot | ForEach-Object { [IO.Path]::GetFullPath($_) } | Select-Object -Unique)
+if (-not [string]::IsNullOrWhiteSpace($AdditionalSchemaRootList) -and
+    -not [string]::IsNullOrWhiteSpace($AdditionalSchemaRootListBase64)) {
+    throw "Pass only one of -AdditionalSchemaRootList or -AdditionalSchemaRootListBase64."
+}
+if ($AdditionalSchemaRoot.Count -gt 0 -and
+    (-not [string]::IsNullOrWhiteSpace($AdditionalSchemaRootList) -or
+     -not [string]::IsNullOrWhiteSpace($AdditionalSchemaRootListBase64))) {
+    throw "Pass either -AdditionalSchemaRoot or an additional-schema-root list, not both."
+}
+if (-not [string]::IsNullOrWhiteSpace($AdditionalSchemaRootListBase64)) {
+    try {
+        $AdditionalSchemaRootList = [Text.Encoding]::UTF8.GetString(
+            [Convert]::FromBase64String($AdditionalSchemaRootListBase64))
+    } catch {
+        throw "DHE additional-schema-root list is not valid base64: $($_.Exception.Message)"
+    }
+}
+if (-not [string]::IsNullOrWhiteSpace($AdditionalSchemaRootList)) {
+    $AdditionalSchemaRoot = ConvertFrom-DheStringListArgument -Value $AdditionalSchemaRootList
+}
+$AdditionalSchemaRoot = @($AdditionalSchemaRoot | ForEach-Object {
+        [IO.Path]::GetFullPath($_)
+    } | Select-Object -Unique)
 
 # Test-Json's draft 2020-12 implementation and duplicate-property-aware
 # Newtonsoft parser are guaranteed by pwsh, not Windows PowerShell 5.1.
@@ -54,6 +80,11 @@ if ($PSVersionTable.PSEdition -ne "Core") {
         $inputRootJson = ConvertTo-DheStringListArgument -Values $InputRoot
         $inputRootBase64 = [Convert]::ToBase64String([Text.Encoding]::UTF8.GetBytes($inputRootJson))
         $arguments += @("-InputRootListBase64", $inputRootBase64)
+    }
+    if ($AdditionalSchemaRoot.Count -gt 0) {
+        $schemaRootJson = ConvertTo-DheStringListArgument -Values $AdditionalSchemaRoot
+        $schemaRootBase64 = [Convert]::ToBase64String([Text.Encoding]::UTF8.GetBytes($schemaRootJson))
+        $arguments += @("-AdditionalSchemaRootListBase64", $schemaRootBase64)
     }
     if ($ForceOutput) { $arguments += "-ForceOutput" }
     & $pwsh.Source @arguments
@@ -94,8 +125,16 @@ function Get-JsonProperty($Object, [string]$Name) {
     return $property.Value
 }
 
-$schemaRoot = Join-Path $LabRoot "schemas"
-foreach ($schemaFile in @(Get-ChildItem -LiteralPath $schemaRoot -File -Filter "dhe-*.schema.json" | Sort-Object Name)) {
+$schemaRoot = [IO.Path]::GetFullPath((Join-Path $LabRoot "schemas"))
+$schemaRoots = @($schemaRoot) + @($AdditionalSchemaRoot | Where-Object {
+        -not $_.Equals($schemaRoot, [StringComparison]::OrdinalIgnoreCase)
+    })
+foreach ($currentSchemaRoot in $schemaRoots) {
+    if (-not [IO.Directory]::Exists($currentSchemaRoot)) {
+        $errors.Add("DHE schema root was not found: $currentSchemaRoot")
+        continue
+    }
+    foreach ($schemaFile in @(Get-ChildItem -LiteralPath $currentSchemaRoot -File -Filter "dhe-*.schema.json" | Sort-Object Name)) {
     $passed = $false
     $detail = ""
     try {
@@ -104,6 +143,15 @@ foreach ($schemaFile in @(Get-ChildItem -LiteralPath $schemaRoot -File -Filter "
             [string]::IsNullOrWhiteSpace([string](Get-JsonProperty $schema '$id')) -or
             [string](Get-JsonProperty $schema "type") -ne "object") {
             throw "Schema must declare draft 2020-12, a non-empty `$id, and type=object."
+        }
+        if ($schemaByName.ContainsKey($schemaFile.Name)) {
+            $existingSchemaPath = [string]$schemaByName[$schemaFile.Name]
+            $existingSchemaHash = (Get-FileHash -LiteralPath $existingSchemaPath -Algorithm SHA256).Hash
+            $candidateSchemaHash = (Get-FileHash -LiteralPath $schemaFile.FullName -Algorithm SHA256).Hash
+            if ([StringComparer]::OrdinalIgnoreCase.Equals($existingSchemaHash, $candidateSchemaHash)) {
+                continue
+            }
+            throw "Schema file name '$($schemaFile.Name)' conflicts with $existingSchemaPath."
         }
         $schemaByName[$schemaFile.Name] = $schemaFile.FullName
         $formatDefinition = Get-JsonProperty (Get-JsonProperty $schema "properties") "format"
@@ -125,6 +173,7 @@ foreach ($schemaFile in @(Get-ChildItem -LiteralPath $schemaRoot -File -Filter "
         passed = $passed
         detail = $detail
     })
+    }
 }
 
 $requiredSchemaNames = @(
@@ -237,6 +286,7 @@ $report = [ordered]@{
     documentCount = $documentRecords.Count
     skippedDocumentCount = $skippedDocumentCount
     inputRoots = $InputRoot
+    schemaRoots = $schemaRoots
     schemas = $schemaRecords.ToArray()
     documents = $documentRecords.ToArray()
     errors = $errors.ToArray()

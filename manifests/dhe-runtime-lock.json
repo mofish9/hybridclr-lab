@@ -7,7 +7,7 @@
       "repository": "hybridclr",
       "baseCommit": "ae21c37ee25992c4c62c77acffaf74b59f4461a3",
       "path": "patches/dhe-lite/hybridclr.patch",
-      "sha256": "64EF64DDD6320D8CC70DC7CE23B1933CA09BD31B904B4EF8B03D3186ED5CF0AB",
+      "sha256": "33A573FB4D94844969E71014FAB0356CD6679C086F3E5D599BA0019590D94B15",
       "applyRoot": "libil2cpp",
       "stripComponents": 1
     },

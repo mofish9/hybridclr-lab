@@ -14,6 +14,7 @@
     "documentCount": { "type": "integer", "minimum": 0 },
     "skippedDocumentCount": { "type": "integer", "minimum": 0 },
     "inputRoots": { "type": "array", "items": { "type": "string", "minLength": 1 } },
+    "schemaRoots": { "type": "array", "items": { "type": "string", "minLength": 1 } },
     "schemas": { "type": "array" },
     "documents": { "type": "array" },
     "errors": { "type": "array", "items": { "type": "string" } },

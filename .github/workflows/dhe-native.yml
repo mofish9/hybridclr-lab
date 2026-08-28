@@ -40,24 +40,12 @@ jobs:
         shell: pwsh
         run: ./scripts/run-dhe-native-gate.ps1 -Profile DHE-Tuanjie2022 -OutputRoot ./artifacts/dhe-native-gate -ForceOutput
 
-      - name: Run full DHE demo through the project workflow
+      - name: Publish, install, and run the full DHE consumer workflow
         shell: pwsh
         run: >-
-          ./scripts/run-dhe-project-workflow.ps1
-          -AdapterScript ./scripts/adapters/dhe-demo-project-adapter.ps1
-          -ProjectPath ./unity2021-dhe-demo
-          -SettingsFile ./unity2021-dhe-demo/ProjectSettings/HybridCLRSettings.asset
+          ./scripts/run-dhe-installed-consumer-gate.ps1
           -RuntimeSource ./staging/runtime/DHE-Tuanjie2022/libil2cpp
-          -OutputRoot ./artifacts/dhe-project-workflow
-          -ArchiveRoot ./artifacts/dhe-project-workflow-archive
-          -DnlibPath ./unity2021-dhe-demo/Packages/com.code-philosophy.hybridclr/Plugins/dnlib.dll
-          -PackageLockPath ./manifests/dhe-package-lock.json
-          -IdentityTemplatePath ./unity2021-dhe-demo/Assets/Runtime/HybridCLRDheBuildIdentity.cs
-          -GitRoot .
-          -SourceBoundaryPath ./manifests/dhe-source-boundary.json
-          -Mode Release
-          -RequireEmbeddedPackage
-          -RequireIdentityTemplate
+          -OutputRoot ./artifacts/dhe-installed-consumer-gate
           -ForceOutput
 
       - name: Validate native-lane JSON contracts
@@ -76,7 +64,5 @@ jobs:
           path: |
             artifacts/dhe-project-adapter-contract/**
             artifacts/dhe-native-gate/**
-            artifacts/dhe-project-workflow/**
-            artifacts/dhe-project-workflow-archive/**
-            artifacts/dhe-project-workflow-archive.gate.json
+            artifacts/dhe-installed-consumer-gate/**
             artifacts/dhe-native-schema-gate/**

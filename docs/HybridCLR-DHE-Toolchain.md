@@ -3,7 +3,7 @@
 ## Distribution contract
 
 The formal distribution is a versioned source toolchain, not a copy of the lab
-workspace. Version `0.1.0` uses toolchain and adapter contract version `1`.
+workspace. Version `0.1.1` uses toolchain and adapter contract version `1`.
 
 The package contains:
 
@@ -38,7 +38,7 @@ Publish only from a clean Git checkout in which every layout input is tracked:
 
 ```powershell
 ./scripts/publish-dhe-toolchain.ps1 `
-  -OutputRoot ./artifacts/dhe-toolchain-0.1.0 `
+  -OutputRoot ./artifacts/dhe-toolchain-0.1.1 `
   -Mode Release -ForceOutput
 ```
 
@@ -66,7 +66,7 @@ trusted tool root:
 ```powershell
 $packageId = "<64-hex-package-id>"
 $trustedTool = "C:/trusted/HybridCLRDhe"
-$candidate = "C:/releases/dhe-toolchain-0.1.0"
+$candidate = "C:/releases/dhe-toolchain-0.1.1"
 
 & "$trustedTool/scripts/test-dhe-toolchain-package.ps1" `
   -PackageRoot $candidate `
@@ -175,13 +175,33 @@ Other entry-point commands are:
 
 ```text
 archive  doctor  install  new-adapter  preflight
-release  validate  verify-package  version  workflow
+release  schema  validate  verify-package  version  workflow
+```
+
+Adapters may publish additional versioned DHE report formats without copying
+their schemas into the installed tool. Register the adapter-owned schema
+directory explicitly while retaining fail-closed handling for every other
+unknown `hybridclr.dhe-*` document:
+
+```powershell
+./Tools/HybridCLRDhe/dhe.ps1 schema `
+  -InputRoot C:/build-artifacts/dhe-workflow `
+  -AdditionalSchemaRoot C:/project/Build/DheSchemas `
+  -OutputRoot C:/build-artifacts/dhe-schema-gate `
+  -ForceOutput
 ```
 
 Release requires complete hot-update/DHE assembly equality, compatible method
 changes, complete native coverage, real Player evidence, clean project/tool Git
 identities, clean runtime provenance, and a portable archive. Preflight-only and
 Exploratory results never become Release evidence.
+
+The source repository's self-hosted native lane additionally runs
+`scripts/run-dhe-installed-consumer-gate.ps1`. It publishes the exact clean
+source commit, verifies and installs that package into a fresh Git clone,
+commits the installed tool boundary, and runs doctor, Player, archive, Release,
+and adapter-extended schema gates only through the installed entry point. This
+prevents a source-checkout pass from masking a broken package or installer.
 
 ## Runtime boundary
 

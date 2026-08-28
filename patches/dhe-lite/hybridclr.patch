@@ -1361,7 +1361,13 @@ index 7b2cb9f..da94096 100644
          // FIXME. not free memory.
          if (!aotAss)
          {
-@@ -218,6 +236,14 @@ namespace metadata
+@@ -214,4 +232,5 @@ namespace metadata
+         image->SetTargetAssembly(aotAss);
+         if (AOTHomologousImage::FindImageByAssemblyLocked(image->GetTargetAssembly(), lock))
+         {
++            delete image;
+             return LoadImageErrorCode::HOMOLOGOUS_ASSEMBLY_HAS_BEEN_LOADED;
+@@ -218,6 +237,14 @@ namespace metadata
          }
          image->InitRuntimeMetadatas();
          AOTHomologousImage::RegisterLocked(image, lock);
