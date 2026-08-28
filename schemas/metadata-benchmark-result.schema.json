@@ -1,0 +1,190 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://mofish9.github.io/hybridclr-lab/schemas/metadata-benchmark-result.schema.json",
+  "title": "HybridCLR metadata load benchmark result",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schemaVersion",
+    "suiteId",
+    "runner",
+    "metadataMode",
+    "runtime",
+    "platform",
+    "architecture",
+    "startedAtUtc",
+    "processId",
+    "buildIdentity",
+    "stressAssembly",
+    "aotMetadata",
+    "durationsNanoseconds",
+    "touchCounts",
+    "snapshots"
+  ],
+  "properties": {
+    "schemaVersion": { "const": 1 },
+    "suiteId": { "const": "hybridclr-metadata-load-v2" },
+    "runner": { "enum": ["hybridclr-player-metadata-v2", "tuanjie-player-metadata-v2"] },
+    "metadataMode": { "enum": ["supplemental", "none"] },
+    "metadataScenario": { "enum": ["entry-first", "reflection-first"] },
+    "runtime": { "type": "string", "minLength": 1 },
+    "platform": { "type": "string", "minLength": 1 },
+    "architecture": { "enum": ["x86", "x64", "arm64"] },
+    "startedAtUtc": { "type": "string", "format": "date-time" },
+    "processId": { "type": "integer", "minimum": 1 },
+    "buildIdentity": { "$ref": "#/$defs/buildIdentity" },
+    "reflectionContract": { "$ref": "#/$defs/reflectionContract" },
+    "stressAssembly": { "$ref": "#/$defs/input" },
+    "aotMetadata": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["totalBytes", "fileCount"],
+      "properties": {
+        "totalBytes": { "type": "integer", "minimum": 0 },
+        "fileCount": { "type": "integer", "minimum": 0 }
+      }
+    },
+    "metadataWarmup": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["mode", "nanoseconds", "acrossFrames", "frameCount", "batchCount", "processingNanoseconds", "maxFrameNanoseconds"],
+      "properties": {
+        "mode": { "enum": ["none", "entry", "entry-method", "entry-graph", "entry-method-graph"] },
+        "nanoseconds": { "type": "integer", "minimum": 0 },
+        "acrossFrames": { "type": "boolean" },
+        "frameCount": { "type": "integer", "minimum": 0 },
+        "batchCount": { "type": "integer", "minimum": 0 },
+        "processingNanoseconds": { "type": "integer", "minimum": 0 },
+        "maxFrameNanoseconds": { "type": "integer", "minimum": 0 }
+      }
+    },
+    "durationsNanoseconds": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["aotMetadataLoad", "assemblyLoad", "reflectionTouch", "entryExecute"],
+      "properties": {
+        "aotMetadataLoad": { "type": "integer", "minimum": 0 },
+        "assemblyLoad": { "type": "integer", "minimum": 0 },
+        "entryResolve": { "type": "integer", "minimum": 0 },
+        "reflectionTouch": { "type": "integer", "minimum": 0 },
+        "entryExecute": { "type": "integer", "minimum": 0 }
+      }
+    },
+    "reflectionPhasesNanoseconds": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["typeDiscovery", "typeAttributes", "memberDiscovery", "memberAttributes"],
+      "properties": {
+        "typeDiscovery": { "type": "integer", "minimum": 0 },
+        "typeAttributes": { "type": "integer", "minimum": 0 },
+        "memberDiscovery": { "type": "integer", "minimum": 0 },
+        "memberAttributes": { "type": "integer", "minimum": 0 }
+      }
+    },
+    "touchCounts": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["types", "members", "attributes", "entryChecksum"],
+      "properties": {
+        "types": { "type": "integer", "minimum": 0 },
+        "members": { "type": "integer", "minimum": 0 },
+        "attributes": { "type": "integer", "minimum": 0 },
+        "entryChecksum": { "type": "integer" }
+      }
+    },
+    "snapshots": {
+      "type": "array",
+      "minItems": 7,
+      "items": { "$ref": "#/$defs/snapshot" }
+    }
+  },
+  "$defs": {
+    "reflectionContract": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["profile", "requestedTypeCount"],
+      "properties": {
+        "profile": { "enum": ["exhaustive", "selective"] },
+        "requestedTypeCount": { "type": "integer", "minimum": 0, "maximum": 1024 }
+      },
+      "oneOf": [
+        {
+          "properties": {
+            "profile": { "const": "exhaustive" },
+            "requestedTypeCount": { "const": 0 }
+          }
+        },
+        {
+          "properties": {
+            "profile": { "const": "selective" },
+            "requestedTypeCount": { "minimum": 1 }
+          }
+        }
+      ]
+    },
+    "input": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["name", "bytes", "sha256"],
+      "properties": {
+        "name": { "type": "string", "minLength": 1 },
+        "bytes": { "type": "integer", "minimum": 1 },
+        "sha256": { "type": "string", "pattern": "^[0-9A-F]{64}$" }
+      }
+    },
+    "buildIdentity": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["sha256", "profile", "target", "architecture", "il2cppCodeGeneration", "aotMetadataPackaging", "hybridclrUnityTreeSha256", "stagedRuntimeSha256", "managedAssemblySha256"],
+      "properties": {
+        "sha256": { "type": "string", "pattern": "^[0-9A-F]{64}$" },
+        "profile": { "type": "string", "minLength": 1 },
+        "target": { "enum": ["StandaloneWindows64", "Android"] },
+        "architecture": { "enum": ["x64", "arm64-v8a"] },
+        "il2cppCodeGeneration": { "enum": ["OptimizeSpeed", "OptimizeSize"] },
+        "aotMetadataPackaging": { "enum": ["include", "exclude"] },
+        "fullGenericSharingDiagnostics": { "type": "boolean" },
+        "hybridclrUnityTreeSha256": { "type": "string", "pattern": "^[0-9A-F]{64}$" },
+        "stagedRuntimeSha256": { "type": "string", "pattern": "^[0-9A-F]{64}$" },
+        "managedAssemblySha256": { "type": "string", "pattern": "^[0-9A-F]{64}$" }
+      }
+    },
+    "snapshot": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "name",
+        "privateBytes",
+        "workingSetBytes",
+        "peakPrivateBytes",
+        "peakWorkingSetBytes",
+        "managedHeapBytes",
+        "unityAllocatedBytes",
+        "unityReservedBytes",
+        "androidPssBytes"
+      ],
+      "properties": {
+        "name": {
+          "enum": [
+            "baseline",
+            "aot-metadata-loaded",
+            "hot-update-bytes-read",
+            "hot-update-assembly-loaded",
+            "hot-update-bytes-released",
+            "entry-executed",
+            "reflection-touched",
+            "metadata-warmed"
+          ]
+        },
+        "privateBytes": { "type": "integer", "minimum": -1 },
+        "workingSetBytes": { "type": "integer", "minimum": -1 },
+        "peakPrivateBytes": { "type": "integer", "minimum": -1 },
+        "peakWorkingSetBytes": { "type": "integer", "minimum": -1 },
+        "managedHeapBytes": { "type": "integer", "minimum": 0 },
+        "unityAllocatedBytes": { "type": "integer", "minimum": -1 },
+        "unityReservedBytes": { "type": "integer", "minimum": -1 },
+        "androidPssBytes": { "type": "integer", "minimum": -1 }
+      }
+    }
+  }
+}

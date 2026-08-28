@@ -48,28 +48,30 @@ $stagedLibil2cpp = Join-Path $stagingPath "libil2cpp"
 $stagedExternal = Join-Path $stagingPath "external"
 
 $noCheckout = $Profile -ne "Baseline-Clean"
+$hybridClrSourceExplicit = -not [string]::IsNullOrWhiteSpace($HybridClrSource)
+$il2CppPlusSourceExplicit = -not [string]::IsNullOrWhiteSpace($Il2CppPlusSource)
 $bootstrapNoCheckout = $noCheckout -or
-    -not [string]::IsNullOrWhiteSpace($HybridClrSource) -or
-    -not [string]::IsNullOrWhiteSpace($Il2CppPlusSource)
+    $hybridClrSourceExplicit -or
+    $il2CppPlusSourceExplicit
 $bootstrapParameters = @{
     LabRoot = $LabRoot
     AllowDirty = [bool]$AllowDirty
     NoCheckout = $bootstrapNoCheckout
 }
 $skipBootstrapDirtyCheck = @()
-if (-not [string]::IsNullOrWhiteSpace($HybridClrSource)) { $skipBootstrapDirtyCheck += "hybridclr" }
-if (-not [string]::IsNullOrWhiteSpace($Il2CppPlusSource)) { $skipBootstrapDirtyCheck += "il2cpp_plus" }
+if ($hybridClrSourceExplicit) { $skipBootstrapDirtyCheck += "hybridclr" }
+if ($il2CppPlusSourceExplicit) { $skipBootstrapDirtyCheck += "il2cpp_plus" }
 if ($skipBootstrapDirtyCheck.Count -gt 0) {
     $bootstrapParameters.SkipDirtyCheckFor = $skipBootstrapDirtyCheck
 }
 & (Join-Path $PSScriptRoot "bootstrap-repos.ps1") @bootstrapParameters
 
-$hybridclrPath = if ([string]::IsNullOrWhiteSpace($HybridClrSource)) {
+$hybridclrPath = if (-not $hybridClrSourceExplicit) {
     Join-Path $reposRoot "hybridclr"
 } else {
     [IO.Path]::GetFullPath($HybridClrSource)
 }
-$il2cppPath = if ([string]::IsNullOrWhiteSpace($Il2CppPlusSource)) {
+$il2cppPath = if (-not $il2CppPlusSourceExplicit) {
     Join-Path $reposRoot "il2cpp_plus"
 } else {
     [IO.Path]::GetFullPath($Il2CppPlusSource)
@@ -77,12 +79,16 @@ $il2cppPath = if ([string]::IsNullOrWhiteSpace($Il2CppPlusSource)) {
 $hybridclrSpec = $lock.repositories.hybridclr
 $il2cppSpec = $lock.repositories.il2cpp_plus
 
-foreach ($item in @(@("hybridclr", $hybridclrPath, $hybridclrSpec.commit), @("il2cpp_plus", $il2cppPath, $il2cppSpec.commit))) {
-    $name = $item[0]
-    $path = $item[1]
-    $expected = $item[2]
+foreach ($item in @(
+    [pscustomobject]@{ Name = "hybridclr"; Path = $hybridclrPath; Expected = $hybridclrSpec.commit; SourceExplicit = $hybridClrSourceExplicit },
+    [pscustomobject]@{ Name = "il2cpp_plus"; Path = $il2cppPath; Expected = $il2cppSpec.commit; SourceExplicit = $il2CppPlusSourceExplicit }
+)) {
+    $name = $item.Name
+    $path = $item.Path
+    $expected = $item.Expected
+    $sourceExplicit = $item.SourceExplicit
     $actual = (Invoke-Git $path @("rev-parse", "HEAD")).Trim()
-    if (-not $noCheckout -and $actual -ne $expected) { throw "$name is at $actual, expected $expected" }
+    if (-not $noCheckout -and -not $sourceExplicit -and $actual -ne $expected) { throw "$name is at $actual, expected $expected" }
     $dirty = (Get-MeaningfulGitStatus @(Invoke-Git $path @("status", "--porcelain"))).Count -gt 0
     if ($dirty -and -not $AllowDirty) { throw "$name is dirty; pass -AllowDirty only for an explicit local profile." }
 }

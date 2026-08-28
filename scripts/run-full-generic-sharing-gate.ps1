@@ -86,6 +86,10 @@ if ($AotMetadataMode -eq "supplemental" -and
 if ([int]$run.summary.failed -ne 0 -or [int]$run.summary.passed -ne [int]$run.summary.total) {
     throw "Full generic sharing correctness failed: $($run.summary.passed)/$($run.summary.total)."
 }
+if ($run.correctnessProbes.crossAssemblyLazyVTable -ne $true -or
+    $run.correctnessProbes.lazyMetadataConcurrentFirstTouch -ne $true) {
+    throw "Full generic sharing lazy metadata correctness probes did not pass."
+}
 if ($null -eq $run.PSObject.Properties["fullGenericSharingDiagnostics"] -or
     $null -eq $run.fullGenericSharingDiagnostics.PSObject.Properties["dispatchCount"] -or
     $null -eq $run.fullGenericSharingDiagnostics.PSObject.Properties["interpreterInvokerCount"]) {

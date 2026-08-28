@@ -1,0 +1,30 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://github.com/mofish9/hybridclr-lab/schemas/performance-summary.schema.json",
+  "title": "HybridCLR Lab Performance Baseline Summary",
+  "type": "object",
+  "required": ["schemaVersion", "suiteId", "profile", "status", "createdAtUtc", "runtime", "environment", "correctness", "policy", "player", "reference", "inputs"],
+  "properties": {
+    "schemaVersion": { "const": 1 },
+    "suiteId": { "const": "managed-performance-v1" },
+    "profile": { "const": "Baseline-Clean" },
+    "status": { "const": "clean-baseline-measured" },
+    "createdAtUtc": { "type": "string", "format": "date-time" },
+    "runtime": { "type": "object" },
+    "environment": { "type": "object", "required": ["report", "sha256", "details"] },
+    "correctness": {
+      "type": "object",
+      "required": ["native", "reference", "player", "differentialDifferences"],
+      "properties": {
+        "native": { "const": "CTest passed" },
+        "reference": { "type": "object" },
+        "player": { "type": "object" },
+        "differentialDifferences": { "const": 0 }
+      }
+    },
+    "policy": { "type": "object" },
+    "player": { "type": "object", "required": ["hybridclr", "aot", "comparison"] },
+    "reference": { "type": "object", "required": ["steady", "cold"] },
+    "inputs": { "type": "object" }
+  }
+}

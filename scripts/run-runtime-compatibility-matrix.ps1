@@ -37,20 +37,28 @@ $results = @()
 $hasSurrogateExternalHeaders = $false
 
 foreach ($workflow in $manifest.workflows) {
-    $il2cppPath = [IO.Path]::GetFullPath((Join-Path $LabRoot $workflow.il2cppPlus.path))
+    $il2cppSource = $workflow.il2cppPlus
+    if ($CompatibilityScope -eq "Metadata") {
+        if ($null -eq $workflow.PSObject.Properties["metadataIl2cppPlus"]) {
+            throw "Metadata il2cpp_plus source is not declared for '$($workflow.id)'."
+        }
+        $il2cppSource = $workflow.metadataIl2cppPlus
+    }
+    $il2cppPath = [IO.Path]::GetFullPath((Join-Path $LabRoot $il2cppSource.path))
     if (-not (Test-Path $il2cppPath)) {
         throw "il2cpp_plus worktree for '$($workflow.id)' was not found: $il2cppPath"
     }
     $actualCommit = (& git -C $il2cppPath rev-parse HEAD).Trim()
-    if ($LASTEXITCODE -ne 0 -or $actualCommit -ne $workflow.il2cppPlus.commit) {
-        throw "il2cpp_plus for '$($workflow.id)' is at $actualCommit, expected $($workflow.il2cppPlus.commit)."
+    if ($LASTEXITCODE -ne 0 -or $actualCommit -ne $il2cppSource.commit) {
+        throw "il2cpp_plus for '$($workflow.id)' is at $actualCommit, expected $($il2cppSource.commit)."
     }
     $requestedIl2CppTreeSha256 = Get-TreeHash (Join-Path $il2cppPath "libil2cpp")
 
     $nativeTestProfile = if ($CompatibilityScope -eq "Metadata") {
         switch ($workflow.id) {
-            "Tuanjie2022Fgs" { "Metadata-Candidate" }
+            "Tuanjie2022Fgs" { "Metadata-Tuanjie2022" }
             "Unity2022Fgs" { "Metadata-Unity2022" }
+            "Unity2021Standard" { "Metadata-Unity2021" }
             default { [string]$workflow.nativeTestProfile }
         }
     } else {

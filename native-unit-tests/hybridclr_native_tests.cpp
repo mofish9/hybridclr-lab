@@ -13,6 +13,7 @@
 
 #include "hybridclr/Il2CppCompatibleDef.h"
 #include "hybridclr/metadata/BlobReader.h"
+#include "hybridclr/metadata/InterpreterImage.h"
 #include "hybridclr/metadata/MetadataUtil.h"
 #include "hybridclr/metadata/Opcodes.h"
 #include "hybridclr/transform/BasicBlockSpliter.h"
@@ -404,6 +405,37 @@ namespace
         CHECK(hybridclr::metadata::DecodeImageIndex(hybridclr::metadata::kInvalidIndex) == 0);
         CHECK(hybridclr::metadata::DecodeMetadataIndex(hybridclr::metadata::kInvalidIndex) == hybridclr::metadata::kInvalidIndex);
         CHECK(!hybridclr::metadata::IsInterpreterIndex(hybridclr::metadata::kInvalidIndex));
+
+#if HYBRIDCLR_LAB_HAS_CUSTOM_ATTRIBUTE_TOKEN_MAP
+		hybridclr::metadata::CustomAttributeTokenMap attributeTokens;
+		uint32_t handleIndex = 0;
+		attributeTokens.Reset(0);
+		CHECK(!attributeTokens.TryGet(0x02000001, handleIndex));
+		attributeTokens.Reset(384);
+		for (uint32_t table = 0; table < 3; ++table)
+		{
+			for (uint32_t row = 1; row <= 128; ++row)
+			{
+				uint32_t token = ((table + 2) << 24) | row;
+				attributeTokens.Insert(token, table * 128 + row - 1);
+			}
+		}
+		CHECK(attributeTokens.Size() == 384);
+		for (uint32_t table = 0; table < 3; ++table)
+		{
+			for (uint32_t row = 1; row <= 128; ++row)
+			{
+				uint32_t token = ((table + 2) << 24) | row;
+				CHECK(attributeTokens.TryGet(token, handleIndex));
+				CHECK(handleIndex == table * 128 + row - 1);
+			}
+		}
+		CHECK(!attributeTokens.TryGet(0x06000100, handleIndex));
+		attributeTokens.Reset(1);
+		CHECK(!attributeTokens.TryGet(0x02000001, handleIndex));
+		attributeTokens.Insert(0x06000001, 42);
+		CHECK(attributeTokens.TryGet(0x06000001, handleIndex) && handleIndex == 42);
+#endif
     }
 
     void TestOpcodeDecode()

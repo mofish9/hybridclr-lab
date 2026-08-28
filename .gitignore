@@ -2,6 +2,16 @@
 .vs/
 .vscode/
 
+# Local experiment outputs and generated benchmark artifacts.
+--help
+lab/
+logs/
+reports/*.json
+reports/*.csv
+reports/*.txt
+reports/*/
+reports/MetadataStressPrewarmManifest*.cs
+
 **/bin/
 **/obj/
 managed-cases/HybridCLR.MetadataStress/Generated/
@@ -33,3 +43,4 @@ unity-test-project/Assets/Plugins/
 unity-test-project/Assets/Plugins.meta
 unity-test-project/Assets/HybridCLRGenerate/
 unity-test-project/Assets/HybridCLRGenerate.meta
+unity-test-project/ProjectSettings/boot.config

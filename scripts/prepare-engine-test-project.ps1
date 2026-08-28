@@ -39,7 +39,7 @@ if (Test-Path $destination) {
 New-Item -ItemType Directory -Force -Path (Join-Path $destination "Assets") | Out-Null
 Copy-Item -LiteralPath (Join-Path $source "Packages") -Destination $destination -Recurse
 Copy-Item -LiteralPath (Join-Path $source "ProjectSettings") -Destination $destination -Recurse
-foreach ($asset in @("Editor", "Editor.meta", "Runtime", "Runtime.meta", "Scenes", "Scenes.meta")) {
+foreach ($asset in @("Editor", "Editor.meta", "Plugins", "Plugins.meta", "Runtime", "Runtime.meta", "Scenes", "Scenes.meta")) {
     Copy-Item -LiteralPath (Join-Path $source "Assets/$asset") -Destination (Join-Path $destination "Assets") -Recurse
 }
 Get-ChildItem -LiteralPath (Join-Path $destination "Assets") -Filter "*.meta" -File -Recurse |

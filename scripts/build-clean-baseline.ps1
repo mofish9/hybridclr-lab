@@ -45,6 +45,7 @@ if ($EngineWorkflow -eq "Unity2021Standard" -and
 $runtimeManifest = Join-Path $LabRoot "staging/runtime/$Profile/runtime-manifest.json"
 $runtimeSource = Join-Path $LabRoot "staging/runtime/$Profile/libil2cpp"
 $managedBuild = Join-Path $LabRoot "artifacts/managed-cases/StandaloneWindows64/HybridCLR.ManagedCases.dll"
+$packagePath = Join-Path $LabRoot "../repos/hybridclr_unity"
 $codeGenerationVariant = if ($Il2CppCodeGeneration -eq "OptimizeSpeed") { $Profile } else { "$Profile-$Il2CppCodeGeneration" }
 $buildVariant = if ($AotMetadataPackaging -eq "exclude") { "$codeGenerationVariant-NoMetadata" } else { $codeGenerationVariant }
 $buildDirectory = Join-Path $projectRoot "Builds/$buildVariant"
@@ -96,6 +97,21 @@ function Test-FileContainsText([string]$Path, [string]$Expected) {
     } catch {
         return $false
     }
+}
+
+function Wait-ForPlayerBuildCompletion([string]$PlayerPath, [string]$LogPath, [int]$TimeoutSeconds = 900) {
+    $deadline = [DateTime]::UtcNow.AddSeconds($TimeoutSeconds)
+    do {
+        if ((Test-Path -LiteralPath $PlayerPath) -and
+            (Test-FileContainsText -Path $LogPath -Expected "[HybridCLR Lab] Player build result: Succeeded")) {
+            return
+        }
+        if (Test-FileContainsText -Path $LogPath -Expected "HybridCLR Lab Player build failed") {
+            throw "Player build failed. See $LogPath"
+        }
+        Start-Sleep -Milliseconds 500
+    } while ([DateTime]::UtcNow -lt $deadline)
+    throw "Player build did not produce a success marker and executable within $TimeoutSeconds seconds. See $LogPath"
 }
 
 function Complete-TuanjieExportedPlayer([string]$BuildDirectory, [string]$PlayerPath) {
@@ -190,8 +206,21 @@ $crossAssemblyBuild = Join-Path (Split-Path $managedBuild) "HybridCLR.CrossAssem
 $aotBenchmarkBuild = Join-Path (Split-Path $managedBuild) "Aot/HybridCLR.ManagedCasesAot.dll"
 $managedAssemblySha256 = (Get-FileHash -LiteralPath $managedBuild -Algorithm SHA256).Hash
 $metadataStressAssemblySha256 = (Get-FileHash -LiteralPath $metadataStressBuild -Algorithm SHA256).Hash
+$prewarmManifestPath = Join-Path $LabRoot "reports/prewarm-manifest-stress-StandaloneWindows64.json"
+& (Join-Path $PSScriptRoot "generate-prewarm-manifest.ps1") `
+    -LabRoot $LabRoot `
+    -Assembly $metadataStressBuild `
+    -RootType "HybridCLR.Lab.MetadataStress.MetadataStressEntry" `
+    -RootMethod "Touch" `
+    -RootParameterCount 0 `
+    -OutputJson $prewarmManifestPath `
+    -OutputCSharp (Join-Path $LabRoot "reports/MetadataStressPrewarmManifest.cs")
+if ($LASTEXITCODE -ne 0) { throw "Prewarm manifest generation failed." }
+$prewarmManifestSha256 = (Get-FileHash -LiteralPath $prewarmManifestPath -Algorithm SHA256).Hash
 $crossAssemblyDerivedSha256 = (Get-FileHash -LiteralPath $crossAssemblyBuild -Algorithm SHA256).Hash
 $aotBenchmarkAssemblySha256 = (Get-FileHash -LiteralPath $aotBenchmarkBuild -Algorithm SHA256).Hash
+Restore-GeneratedUnityMeta -RepoPath $packagePath
+$hybridclrUnityTreeSha256 = Get-GitWorktreeHash $packagePath
 
 $buildIdentityDirectory = Join-Path $LabRoot "staging/build-identities"
 New-Item -ItemType Directory -Force -Path $buildIdentityDirectory | Out-Null
@@ -205,6 +234,7 @@ $buildIdentity = [ordered]@{
     il2cppCodeGeneration = $Il2CppCodeGeneration
     aotMetadataPackaging = $AotMetadataPackaging
     fullGenericSharingDiagnostics = [bool]$runtime.fullGenericSharingDiagnostics
+    hybridclrUnityTreeSha256 = $hybridclrUnityTreeSha256
     stagedRuntimeSha256 = $runtime.stagedRuntimeSha256
     managedAssemblySha256 = $managedAssemblySha256
     crossAssemblyDerivedSha256 = $crossAssemblyDerivedSha256
@@ -242,7 +272,7 @@ $installArgs = @(
 $installProcess = Start-Process -FilePath $editor -ArgumentList $installArgs -PassThru -WindowStyle Hidden
 $installProcess.WaitForExit()
 $installExitCode = $installProcess.ExitCode
-& (Join-Path $PSScriptRoot "wait-for-tuanjie-project-exit.ps1") -ProjectRoot $projectRoot -EditorProcessName $editorProcessName
+& (Join-Path $PSScriptRoot "wait-for-tuanjie-project-exit.ps1") -ProjectRoot $projectRoot -EditorProcessName $editorProcessName -InitialDiscoverySeconds 15
 try {
     Wait-ForExpectedFileContent -Path $installedVersion -Expected "8.13.0"
 } catch {
@@ -262,6 +292,7 @@ $buildArgs = @(
     "-labProfile", $Profile,
     "-labRoot", $LabRoot,
     "-labManagedDll", $managedBuild,
+    "-labPrewarmManifest", $prewarmManifestPath,
     "-labBuildPath", $player,
     "-labIl2CppCodeGeneration", $Il2CppCodeGeneration,
     "-labAotMetadataPackaging", $AotMetadataPackaging,
@@ -271,8 +302,12 @@ $buildArgs = @(
 $buildProcess = Start-Process -FilePath $editor -ArgumentList $buildArgs -PassThru -WindowStyle Hidden
 $buildProcess.WaitForExit()
 $buildExitCode = $buildProcess.ExitCode
-& (Join-Path $PSScriptRoot "wait-for-tuanjie-project-exit.ps1") -ProjectRoot $projectRoot -EditorProcessName $editorProcessName
-$unityRestartCompletedBuild = $EngineWorkflow -in @("Unity2021Standard", "Unity2022Fgs") -and
+$unityWorkflow = $EngineWorkflow -in @("Unity2021Standard", "Unity2022Fgs")
+if ($unityWorkflow) {
+    Wait-ForPlayerBuildCompletion -PlayerPath $player -LogPath $buildEditorLog
+}
+& (Join-Path $PSScriptRoot "wait-for-tuanjie-project-exit.ps1") -ProjectRoot $projectRoot -EditorProcessName $editorProcessName -InitialDiscoverySeconds 15
+$unityRestartCompletedBuild = $unityWorkflow -and
     (Test-Path -LiteralPath $player) -and
     (Test-FileContainsText -Path $buildEditorLog -Expected "[HybridCLR Lab] Player build result: Succeeded")
 $tuanjieCompletedBuild = $false
@@ -315,11 +350,14 @@ if (-not $SkipPlayerRun) {
     }
     $playerResult = Get-Content -Raw $resultPath | ConvertFrom-Json
     if ($playerResult.summary.failed -ne 0) { throw "Player correctness suite failed: $($playerResult.summary.failed) cases. See $resultPath" }
+    if ($playerResult.correctnessProbes.crossAssemblyLazyVTable -ne $true -or
+        $playerResult.correctnessProbes.lazyMetadataConcurrentFirstTouch -ne $true) {
+        throw "Player lazy metadata correctness probes did not pass. See $resultPath"
+    }
     $diffPath = "reports/$($Profile.ToLowerInvariant())-differential-result.json"
     & (Join-Path $PSScriptRoot "compare-results.ps1") -LabRoot $LabRoot -Actual $resultPath -Output $diffPath
 }
 
-$packagePath = Join-Path $LabRoot "../repos/hybridclr_unity"
 $generatedCpp = Join-Path $projectRoot "HybridCLRData/LocalIl2CppData-WindowsEditor/il2cpp/libil2cpp/hybridclr/generated/MethodBridge.cpp"
 $buildManifest = [ordered]@{
     schemaVersion = 1
@@ -333,7 +371,7 @@ $buildManifest = [ordered]@{
         editorPath = $editor
     }
     repositories = [ordered]@{
-        hybridclr_unity = [ordered]@{ url = $lock.repositories.hybridclr_unity.fork; commit = (git -C $packagePath rev-parse HEAD).Trim(); dirty = ((Get-MeaningfulGitStatus @(& git -C $packagePath status --porcelain)).Count -gt 0) }
+        hybridclr_unity = [ordered]@{ url = $lock.repositories.hybridclr_unity.fork; commit = (git -C $packagePath rev-parse HEAD).Trim(); dirty = ((Get-MeaningfulGitStatus @(& git -C $packagePath status --porcelain)).Count -gt 0); treeSha256 = $hybridclrUnityTreeSha256 }
         hybridclr = $runtime.source.hybridclr
         il2cpp_plus = $runtime.source.il2cpp_plus
     }
@@ -343,10 +381,12 @@ $buildManifest = [ordered]@{
     aotMetadataPackaging = $AotMetadataPackaging
     fullGenericSharingDiagnostics = [bool]$runtime.fullGenericSharingDiagnostics
     buildIdentitySha256 = $buildIdentitySha256
+    hybridclrUnityTreeSha256 = $hybridclrUnityTreeSha256
     stagedRuntimeSha256 = $runtime.stagedRuntimeSha256
     managedAssemblySha256 = $managedAssemblySha256
     crossAssemblyDerivedSha256 = $crossAssemblyDerivedSha256
     metadataStressAssemblySha256 = $metadataStressAssemblySha256
+    metadataStressPrewarmManifestSha256 = $prewarmManifestSha256
     metadataStressSourceSha256 = (Get-FileHash -LiteralPath (Join-Path $LabRoot "managed-cases/HybridCLR.MetadataStress/Generated/MetadataStress.Generated.cs") -Algorithm SHA256).Hash
     metadataBenchmarkPolicySha256 = (Get-FileHash -LiteralPath (Join-Path $LabRoot "manifests/metadata-benchmark-policy.json") -Algorithm SHA256).Hash
     aotBenchmarkAssemblySha256 = $aotBenchmarkAssemblySha256
@@ -369,6 +409,11 @@ $buildManifest.playerSize = [ordered]@{
     dataDirectoryBytes = [int64](($dataFiles | Measure-Object -Property Length -Sum).Sum)
     supplementalAotMetadataBytes = [int64](($builtAotMetadata | Measure-Object -Property Length -Sum).Sum)
 }
+$buildManifest.playerSha256 = (Get-FileHash -LiteralPath $player -Algorithm SHA256).Hash
+if ($gameAssembly.Count -ne 1) {
+    throw "Expected exactly one GameAssembly.dll in the player build, found $($gameAssembly.Count)."
+}
+$buildManifest.gameAssemblySha256 = (Get-FileHash -LiteralPath $gameAssembly[0].FullName -Algorithm SHA256).Hash
 if ($AotMetadataPackaging -eq "exclude" -and $buildManifest.playerSize.supplementalAotMetadataBytes -ne 0) {
     throw "No-metadata build still contains $($buildManifest.playerSize.supplementalAotMetadataBytes) bytes of supplemental AOT metadata."
 }
@@ -384,8 +429,11 @@ if (Test-Path $generatedCpp) {
     $buildManifest.generatedCppSha256 = (Get-FileHash -LiteralPath $generatedCpp -Algorithm SHA256).Hash
 }
 $manifestOutput = Join-Path $LabRoot "reports/$profileSlug-build-manifest.json"
-$buildManifest | ConvertTo-Json -Depth 8 | Set-Content -LiteralPath $manifestOutput -Encoding UTF8
 Restore-GeneratedUnityMeta -RepoPath $packagePath
+if ((Get-GitWorktreeHash $packagePath) -ne $hybridclrUnityTreeSha256) {
+    throw "hybridclr_unity worktree changed while the player was being built."
+}
+$buildManifest | ConvertTo-Json -Depth 8 | Set-Content -LiteralPath $manifestOutput -Encoding UTF8
 Write-Host "Clean baseline player: $player"
 if (-not $SkipPlayerRun) { Write-Host "Player result: $resultPath" }
 Write-Host "Build manifest: $manifestOutput"

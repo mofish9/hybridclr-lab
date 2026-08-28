@@ -1,0 +1,120 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://github.com/mofish9/hybridclr-lab/schemas/benchmark-result.schema.json",
+  "title": "HybridCLR Lab Benchmark Process Result",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schemaVersion",
+    "suiteId",
+    "benchmarkMode",
+    "runner",
+    "runtime",
+    "platform",
+    "architecture",
+    "startedAtUtc",
+    "processId",
+    "stopwatchFrequency",
+    "policySha256",
+    "managedAssemblySha256",
+    "buildIdentity",
+    "startup",
+    "workloads"
+  ],
+  "properties": {
+    "schemaVersion": { "const": 1 },
+    "suiteId": { "const": "managed-performance-v1" },
+    "benchmarkMode": { "enum": ["cold", "steady"] },
+    "aotMetadataMode": { "enum": ["supplemental", "none"] },
+    "runner": { "type": "string", "minLength": 1 },
+    "runtime": { "type": "string", "minLength": 1 },
+    "platform": { "type": "string", "minLength": 1 },
+    "architecture": { "type": "string", "minLength": 1 },
+    "startedAtUtc": { "type": "string", "format": "date-time" },
+    "processId": { "type": "integer", "minimum": 1 },
+    "stopwatchFrequency": { "type": "integer", "minimum": 1 },
+    "policySha256": { "$ref": "#/$defs/sha256" },
+    "managedAssemblySha256": { "$ref": "#/$defs/sha256" },
+    "buildIdentity": { "$ref": "#/$defs/buildIdentity" },
+    "startup": { "$ref": "#/$defs/startup" },
+    "workloads": {
+      "type": "array",
+      "minItems": 1,
+      "items": { "$ref": "#/$defs/workload" }
+    }
+  },
+  "$defs": {
+    "sha256": {
+      "type": "string",
+      "pattern": "^[A-F0-9]{64}$"
+    },
+    "buildIdentity": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["sha256", "profile", "target", "architecture", "il2cppCodeGeneration", "aotMetadataPackaging", "hybridclrUnityTreeSha256", "stagedRuntimeSha256", "managedAssemblySha256"],
+      "properties": {
+        "sha256": { "$ref": "#/$defs/sha256" },
+        "profile": { "type": "string", "minLength": 1 },
+        "target": { "enum": ["StandaloneWindows64", "Android"] },
+        "architecture": { "enum": ["x64", "arm64-v8a"] },
+        "il2cppCodeGeneration": { "enum": ["OptimizeSpeed", "OptimizeSize"] },
+        "aotMetadataPackaging": { "enum": ["include", "exclude"] },
+        "hybridclrUnityTreeSha256": { "$ref": "#/$defs/sha256" },
+        "stagedRuntimeSha256": { "$ref": "#/$defs/sha256" },
+        "managedAssemblySha256": { "$ref": "#/$defs/sha256" }
+      }
+    },
+    "startup": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "aotMetadataLoadNanoseconds",
+        "hotUpdateAssemblyLoadNanoseconds",
+        "workloadDiscoveryNanoseconds"
+      ],
+      "properties": {
+        "aotMetadataLoadNanoseconds": { "type": "integer", "minimum": 0 },
+        "hotUpdateAssemblyLoadNanoseconds": { "type": "integer", "minimum": 0 },
+        "workloadDiscoveryNanoseconds": { "type": "integer", "minimum": 0 }
+      }
+    },
+    "workload": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "id",
+        "category",
+        "features",
+        "iterations",
+        "warmupBatches",
+        "measurementBatches",
+        "checksum",
+        "batchNanoseconds",
+        "nanosecondsPerIteration",
+        "gcCollections"
+      ],
+      "properties": {
+        "id": { "type": "string", "minLength": 1 },
+        "category": { "enum": ["interpreter", "boundary", "allocation", "full-generic-sharing"] },
+        "features": { "type": "array", "items": { "type": "string" }, "uniqueItems": true },
+        "iterations": { "type": "integer", "minimum": 1 },
+        "warmupBatches": { "type": "integer", "minimum": 0 },
+        "measurementBatches": { "type": "integer", "minimum": 1 },
+        "repetitions": { "type": "integer", "minimum": 1 },
+        "checksum": { "type": "string" },
+        "batchNanoseconds": { "type": "array", "items": { "type": "integer", "minimum": 0 }, "minItems": 1 },
+        "nanosecondsPerIteration": { "type": "array", "items": { "type": "number", "minimum": 0 }, "minItems": 1 },
+        "gcCollections": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["generation0", "generation1", "generation2"],
+          "properties": {
+            "generation0": { "type": "integer", "minimum": 0 },
+            "generation1": { "type": "integer", "minimum": 0 },
+            "generation2": { "type": "integer", "minimum": 0 }
+          }
+        }
+      }
+    }
+  }
+}

@@ -28,6 +28,13 @@ else()
     set(HYBRIDCLR_TEST_HAS_ADVANCED_OPTIMIZATION_OPCODES 0)
 endif()
 
+file(READ "${HYBRIDCLR_TEST_SOURCE_ROOT}/metadata/InterpreterImage.h" HYBRIDCLR_INTERPRETER_IMAGE_HEADER)
+if (HYBRIDCLR_INTERPRETER_IMAGE_HEADER MATCHES "class CustomAttributeTokenMap")
+	set(HYBRIDCLR_TEST_HAS_CUSTOM_ATTRIBUTE_TOKEN_MAP 1)
+else()
+	set(HYBRIDCLR_TEST_HAS_CUSTOM_ATTRIBUTE_TOKEN_MAP 0)
+endif()
+
 add_executable(hybridclr_native_tests
     hybridclr_native_tests.cpp
     native_runtime_stubs.cpp
@@ -39,8 +46,14 @@ add_executable(hybridclr_native_tests
 )
 
 add_library(hybridclr_metadata_compile_gate OBJECT
+    "${HYBRIDCLR_TEST_SOURCE_ROOT}/RuntimeApi.cpp"
+    "${HYBRIDCLR_RUNTIME_ROOT}/icalls/mscorlib/System/RuntimeType.cpp"
     "${HYBRIDCLR_RUNTIME_ROOT}/metadata/ArrayMetadata.cpp"
     "${HYBRIDCLR_RUNTIME_ROOT}/metadata/GenericMethod.cpp"
+    "${HYBRIDCLR_RUNTIME_ROOT}/vm/Class.cpp"
+    "${HYBRIDCLR_RUNTIME_ROOT}/vm/GenericClass.cpp"
+    "${HYBRIDCLR_RUNTIME_ROOT}/vm/MetadataCache.cpp"
+    "${HYBRIDCLR_RUNTIME_ROOT}/vm/Reflection.cpp"
     "${HYBRIDCLR_TEST_SOURCE_ROOT}/metadata/ClassFieldLayoutCalculator.cpp"
     "${HYBRIDCLR_TEST_SOURCE_ROOT}/metadata/InterpreterImage.cpp"
     "${HYBRIDCLR_TEST_SOURCE_ROOT}/metadata/VTableSetup.cpp"
@@ -77,6 +90,9 @@ function(configure_hybridclr_target target)
     if (HYBRIDCLR_TEST_HAS_ADVANCED_OPTIMIZATION_OPCODES)
         target_compile_definitions(${target} PRIVATE HYBRIDCLR_LAB_HAS_ADVANCED_OPTIMIZATION_OPCODES=1)
     endif()
+    if (HYBRIDCLR_TEST_HAS_CUSTOM_ATTRIBUTE_TOKEN_MAP)
+		target_compile_definitions(${target} PRIVATE HYBRIDCLR_LAB_HAS_CUSTOM_ATTRIBUTE_TOKEN_MAP=1)
+	endif()
     target_include_directories(${target} PRIVATE
         "${HYBRIDCLR_RUNTIME_ROOT}"
         "${HYBRIDCLR_TEST_SOURCE_ROOT}"

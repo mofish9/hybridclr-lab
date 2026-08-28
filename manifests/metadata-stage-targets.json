@@ -1,0 +1,16 @@
+{
+  "schemaVersion": 1,
+  "stage": "assembly-load-60",
+  "targets": {
+    "assemblyLoadMinimumImprovementPercent": 60.0,
+    "loadAndEntryMinimumImprovementPercent": 45.0,
+    "loadAndReflectionMinimumImprovementPercent": 0.0,
+    "throughReflectionMinimumImprovementPercent": 0.0,
+    "loadOnlyPrivateBytesMinimumImprovementPercent": 30.0,
+    "entryExecutedPrivateBytesMinimumImprovementPercent": 30.0,
+    "entryExecuteMaximumRegressionPercent": 25.0,
+    "entryResolveMaximumRegressionPercent": 25.0,
+    "reflectionTouchMaximumRegressionPercent": 10.0,
+    "reflectionTouchedPrivateBytesMaximumRegressionPercent": 5.0
+  }
+}

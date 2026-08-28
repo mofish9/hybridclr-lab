@@ -1,0 +1,74 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://mofish9.github.io/hybridclr-lab/schemas/metadata-benchmark-comparison.schema.json",
+  "title": "HybridCLR metadata benchmark comparison",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schemaVersion",
+    "suiteId",
+    "createdAtUtc",
+    "metadataMode",
+    "policySha256",
+    "stageTargetSha256",
+    "acceptance",
+    "stageTarget",
+    "inputs",
+    "time",
+    "memory",
+    "summary"
+  ],
+  "properties": {
+    "schemaVersion": { "const": 1 },
+    "suiteId": { "const": "hybridclr-metadata-comparison-v1" },
+    "createdAtUtc": { "type": "string", "format": "date-time" },
+    "metadataMode": { "enum": ["supplemental", "none"] },
+    "policySha256": { "type": "string", "pattern": "^[A-F0-9]{64}$" },
+    "stageTargetSha256": { "type": "string", "pattern": "^[A-F0-9]{64}$" },
+    "acceptance": { "type": "object" },
+    "stageTarget": { "type": "object" },
+    "inputs": { "type": "object" },
+    "time": {
+      "type": "array",
+      "minItems": 8,
+      "maxItems": 10,
+      "items": { "$ref": "#/$defs/comparison" }
+    },
+    "memory": {
+      "type": "array",
+      "minItems": 3,
+      "maxItems": 3,
+      "items": { "$ref": "#/$defs/comparison" }
+    },
+    "summary": {
+      "type": "object",
+      "required": ["hardGatePassed", "stageTargetPassed", "stageTargetFailures", "regressionCount", "improvementCount", "regressions", "improvements"],
+      "properties": {
+        "hardGatePassed": { "type": "boolean" },
+        "stageTargetPassed": { "type": "boolean" },
+        "stageTargetFailures": { "type": "array", "items": { "type": "string" } },
+        "regressionCount": { "type": "integer", "minimum": 0 },
+        "improvementCount": { "type": "integer", "minimum": 0 },
+        "regressions": { "type": "array", "items": { "type": "string" } },
+        "improvements": { "type": "array", "items": { "type": "string" } }
+      }
+    }
+  },
+  "$defs": {
+    "comparison": {
+      "type": "object",
+      "required": ["name", "deltaPercent", "verdict"],
+      "properties": {
+        "name": { "type": "string" },
+        "delta": { "type": "number" },
+        "deltaBytes": { "type": "number" },
+        "deltaPercent": { "type": ["number", "null"] },
+        "verdict": { "enum": ["regression", "improvement", "within-threshold", "not-comparable"] }
+      },
+      "anyOf": [
+        { "required": ["delta"] },
+        { "required": ["deltaBytes"] }
+      ]
+    }
+  }
+}

@@ -184,6 +184,8 @@ if ($result.aotMetadataMode -ne "supplemental" -or
         [int64]$_.fullGenericSharingAotBridgeCount -ne 0 -or
         [int64]$_.fullGenericSharingInterpreterInvokerCount -ne 0
     }).Count -ne 0 -or
+    $result.correctnessProbes.crossAssemblyLazyVTable -ne $true -or
+    $result.correctnessProbes.lazyMetadataConcurrentFirstTouch -ne $true -or
     [int]$result.summary.total -le 0 -or [int]$result.summary.failed -ne 0 -or
     [int]$result.summary.passed -ne [int]$result.summary.total -or
     [int]$diff.summary.differences -ne 0) {

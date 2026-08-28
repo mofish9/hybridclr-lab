@@ -14,6 +14,7 @@
   },
   "acceptance": {
     "maximumTimeRegressionPercent": 10.0,
+    "maximumP99TimeRegressionPercent": 15.0,
     "maximumTimeRegressionNanoseconds": 1000000,
     "maximumMemoryRegressionPercent": 5.0,
     "maximumMemoryRegressionBytes": 8388608,
@@ -28,5 +29,5 @@
     "pairedOrder": "odd baseline-candidate; even candidate-baseline",
     "result": "reports/metadata-benchmark-calibration-v2.json"
   },
-  "notes": "Time claims must clear both 10% and 1 ms. Memory claims must clear both 5% and 1 MiB. The absolute time floor prevents short phases from being classified by high relative noise."
+  "notes": "Median/P95 time claims must clear both 10% and 1 ms. Qualified P99 regressions allow 15% and still require the 1 ms floor plus at least 100 independent processes per side. Memory claims must clear both 5% and 1 MiB."
 }

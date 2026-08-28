@@ -1,0 +1,47 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "HybridCLR runtime prewarm manifest",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schemaVersion", "assemblyName", "assemblySha256", "rootType", "rootMethod", "rootParameterCount", "maxDepth", "maxMethods", "reachableMethodCount", "graphCoverage", "dynamicEdgesIncluded", "types"],
+  "properties": {
+    "schemaVersion": { "const": 1 },
+    "assemblyName": { "type": "string", "minLength": 1 },
+    "assemblySha256": { "type": "string", "pattern": "^[A-Fa-f0-9]{64}$" },
+    "rootType": { "type": "string", "minLength": 1 },
+    "rootMethod": { "type": "string", "minLength": 1 },
+    "rootParameterCount": { "type": "integer", "minimum": 0 },
+    "maxDepth": { "type": "integer", "minimum": 1 },
+    "maxMethods": { "type": "integer", "minimum": 1 },
+    "reachableMethodCount": { "type": "integer", "minimum": 1 },
+    "graphCoverage": { "const": "static-il-candidates" },
+    "dynamicEdgesIncluded": { "const": false },
+    "methodCount": { "type": "integer", "minimum": 0 },
+    "methods": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["declaringType", "name", "parameterCount", "genericParameterCount"],
+        "properties": {
+          "declaringType": { "type": "string", "minLength": 1 },
+          "name": { "type": "string", "minLength": 1 },
+          "parameterCount": { "type": "integer", "minimum": 0 },
+          "genericParameterCount": { "type": "integer", "const": 0 },
+          "metadataToken": { "type": "integer", "minimum": 0 },
+          "parameterTypes": {
+            "type": "array",
+            "items": { "type": "string", "minLength": 1 }
+          },
+          "returnType": { "type": "string", "minLength": 1 }
+        }
+      },
+      "uniqueItems": true
+    },
+    "types": {
+      "type": "array",
+      "items": { "type": "string", "minLength": 1, "pattern": "^[^<>]+(?:<.+>)?$" },
+      "uniqueItems": true
+    }
+  }
+}

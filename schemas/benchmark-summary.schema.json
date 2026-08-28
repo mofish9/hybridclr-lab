@@ -1,0 +1,147 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://github.com/mofish9/hybridclr-lab/schemas/benchmark-summary.schema.json",
+  "title": "HybridCLR Lab Multi-process Benchmark Summary",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schemaVersion",
+    "suiteId",
+    "benchmarkMode",
+    "runner",
+    "createdAtUtc",
+    "runtime",
+    "platform",
+    "architecture",
+    "policySha256",
+    "managedAssemblySha256",
+    "buildManifestSha256",
+    "sourceResultCount",
+    "minimumIndependentProcesses",
+    "minimumProcessCountMet",
+    "startup",
+    "workloads",
+    "calibration"
+  ],
+  "properties": {
+    "schemaVersion": { "const": 1 },
+    "suiteId": { "const": "managed-performance-v1" },
+    "benchmarkMode": { "enum": ["cold", "steady"] },
+    "aotMetadataMode": { "enum": ["supplemental", "none"] },
+    "runner": { "type": "string", "minLength": 1 },
+    "createdAtUtc": { "type": "string", "format": "date-time" },
+    "runtime": { "type": "string", "minLength": 1 },
+    "platform": { "type": "string", "minLength": 1 },
+    "architecture": { "type": "string", "minLength": 1 },
+    "policySha256": { "$ref": "#/$defs/sha256" },
+    "managedAssemblySha256": { "$ref": "#/$defs/sha256" },
+    "buildManifestSha256": { "anyOf": [{ "$ref": "#/$defs/sha256" }, { "type": "null" }] },
+    "buildIdentity": { "$ref": "#/$defs/buildIdentity" },
+    "sourceResultCount": { "type": "integer", "minimum": 1 },
+    "minimumIndependentProcesses": { "type": "integer", "minimum": 1 },
+    "minimumProcessCountMet": { "type": "boolean" },
+    "startup": { "$ref": "#/$defs/statisticsGroup" },
+    "workloads": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["id", "category", "features", "iterations", "checksum", "processCount", "processSamples", "aggregate", "gcCollectionsTotal"],
+        "properties": {
+          "id": { "type": "string", "minLength": 1 },
+          "category": { "enum": ["interpreter", "boundary", "allocation", "full-generic-sharing"] },
+          "features": { "type": "array", "items": { "type": "string" }, "uniqueItems": true },
+          "iterations": { "type": "integer", "minimum": 1 },
+          "checksum": { "type": "string" },
+          "processCount": { "type": "integer", "minimum": 1 },
+          "processSamples": {
+            "type": "array",
+            "minItems": 1,
+            "items": {
+              "type": "object",
+              "additionalProperties": false,
+              "required": ["startedAtUtc", "processId", "repetitions", "minimumNanosecondsPerIteration", "medianNanosecondsPerIteration", "p95NanosecondsPerIteration", "maximumNanosecondsPerIteration", "batchNanoseconds", "nanosecondsPerIteration", "gcCollections"],
+              "properties": {
+                "startedAtUtc": { "type": "string", "format": "date-time" },
+                "processId": { "type": "integer", "minimum": 1 },
+                "repetitions": { "type": "integer", "minimum": 1 },
+                "minimumNanosecondsPerIteration": { "type": "number", "minimum": 0 },
+                "medianNanosecondsPerIteration": { "type": "number", "minimum": 0 },
+                "p95NanosecondsPerIteration": { "type": "number", "minimum": 0 },
+                "maximumNanosecondsPerIteration": { "type": "number", "minimum": 0 },
+                "batchNanoseconds": { "type": "array", "items": { "type": "integer", "minimum": 0 }, "minItems": 1 },
+                "nanosecondsPerIteration": { "type": "array", "items": { "type": "number", "minimum": 0 }, "minItems": 1 },
+                "gcCollections": { "$ref": "#/$defs/gcCollections" }
+              }
+            }
+          },
+          "aggregate": { "$ref": "#/$defs/statistics" },
+          "gcCollectionsTotal": { "$ref": "#/$defs/gcCollections" }
+        }
+      }
+    },
+    "calibration": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["maximumRelativeMadPercent", "maximumP95DeviationPercent", "recommendedNoiseThresholdPercent"],
+      "properties": {
+        "maximumRelativeMadPercent": { "type": "number", "minimum": 0 },
+        "maximumP95DeviationPercent": { "type": "number", "minimum": 0 },
+        "recommendedNoiseThresholdPercent": { "type": "number", "minimum": 0 }
+      }
+    }
+  },
+  "$defs": {
+    "sha256": { "type": "string", "pattern": "^[A-F0-9]{64}$" },
+    "buildIdentity": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["sha256", "profile", "target", "architecture", "il2cppCodeGeneration", "aotMetadataPackaging", "stagedRuntimeSha256", "managedAssemblySha256"],
+      "properties": {
+        "sha256": { "$ref": "#/$defs/sha256" },
+        "profile": { "type": "string", "minLength": 1 },
+        "target": { "enum": ["StandaloneWindows64", "Android"] },
+        "architecture": { "enum": ["x64", "arm64-v8a"] },
+        "il2cppCodeGeneration": { "enum": ["OptimizeSpeed", "OptimizeSize"] },
+        "aotMetadataPackaging": { "enum": ["include", "exclude"] },
+        "stagedRuntimeSha256": { "$ref": "#/$defs/sha256" },
+        "managedAssemblySha256": { "$ref": "#/$defs/sha256" }
+      }
+    },
+    "gcCollections": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["generation0", "generation1", "generation2"],
+      "properties": {
+        "generation0": { "type": "integer", "minimum": 0 },
+        "generation1": { "type": "integer", "minimum": 0 },
+        "generation2": { "type": "integer", "minimum": 0 }
+      }
+    },
+    "statistics": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["minimum", "median", "p95", "maximum", "medianAbsoluteDeviation", "relativeMadPercent", "p95DeviationPercent"],
+      "properties": {
+        "minimum": { "type": "number", "minimum": 0 },
+        "median": { "type": "number", "minimum": 0 },
+        "p95": { "type": "number", "minimum": 0 },
+        "maximum": { "type": "number", "minimum": 0 },
+        "medianAbsoluteDeviation": { "type": "number", "minimum": 0 },
+        "relativeMadPercent": { "type": "number", "minimum": 0 },
+        "p95DeviationPercent": { "type": "number", "minimum": 0 }
+      }
+    },
+    "statisticsGroup": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["aotMetadataLoadNanoseconds", "hotUpdateAssemblyLoadNanoseconds", "workloadDiscoveryNanoseconds"],
+      "properties": {
+        "aotMetadataLoadNanoseconds": { "$ref": "#/$defs/statistics" },
+        "hotUpdateAssemblyLoadNanoseconds": { "$ref": "#/$defs/statistics" },
+        "workloadDiscoveryNanoseconds": { "$ref": "#/$defs/statistics" }
+      }
+    }
+  }
+}

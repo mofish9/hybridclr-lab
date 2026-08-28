@@ -19,6 +19,7 @@ namespace HybridCLR.Lab.Editor
         private const string MetadataStressAssemblyName = "HybridCLR.MetadataStress";
         private const string MetadataStressAssemblyFileName = MetadataStressAssemblyName + ".dll";
         private const string MetadataStressAssemblyRuntimeFileName = MetadataStressAssemblyFileName + ".bytes";
+        private const string MetadataStressPrewarmManifestFileName = "metadata-stress-prewarm.json";
         private const string CrossAssemblyDerivedName = "HybridCLR.CrossAssemblyDerived";
         private const string CrossAssemblyDerivedFileName = CrossAssemblyDerivedName + ".dll";
         private const string CrossAssemblyDerivedRuntimeFileName = CrossAssemblyDerivedFileName + ".bytes";
@@ -105,6 +106,7 @@ namespace HybridCLR.Lab.Editor
 
             string runtimeAssemblyPath = CopyManagedAssemblyToStreamingAssets(managedDll);
             CopyAssemblyToStreamingAssets(metadataStressDll, MetadataStressAssemblyRuntimeFileName);
+            CopyMetadataStressPrewarmManifestToStreamingAssets(GetArgument("-labPrewarmManifest"));
             CopyAssemblyToStreamingAssets(crossAssemblyDerivedDll, CrossAssemblyDerivedRuntimeFileName);
             StageAotMetadata();
             CopyBuildIdentityToStreamingAssets();
@@ -286,6 +288,23 @@ namespace HybridCLR.Lab.Editor
             string destinationDirectory = Path.Combine(ProjectRoot(), "Assets", "StreamingAssets", "HybridCLRLab");
             Directory.CreateDirectory(destinationDirectory);
             string destinationPath = Path.Combine(destinationDirectory, "test-manifest.json");
+            File.Copy(sourcePath, destinationPath, true);
+            return destinationPath;
+        }
+
+        private static string CopyMetadataStressPrewarmManifestToStreamingAssets(string requestedSourcePath)
+        {
+            string sourcePath = string.IsNullOrWhiteSpace(requestedSourcePath)
+                ? Path.Combine(LabRoot(), "reports", "prewarm-manifest-stress.json")
+                : Path.GetFullPath(requestedSourcePath);
+            if (!File.Exists(sourcePath))
+            {
+                throw new FileNotFoundException("Metadata stress prewarm manifest was not found. Generate it before building the Player.", sourcePath);
+            }
+
+            string destinationDirectory = Path.Combine(ProjectRoot(), "Assets", "StreamingAssets", "HybridCLRLab");
+            Directory.CreateDirectory(destinationDirectory);
+            string destinationPath = Path.Combine(destinationDirectory, MetadataStressPrewarmManifestFileName);
             File.Copy(sourcePath, destinationPath, true);
             return destinationPath;
         }
