@@ -243,6 +243,9 @@ Player 或历史实验目录一并纳入提交。
 - archive 会重写 source preflight、clean checkout、MV 和 plan-validation 中的路径，
   并递归拒绝所有 JSON 中的 Windows drive/UNC 绝对路径；manifest 保留双 Git 身份 hash，
   Release archive 不允许缺失 project/tool provenance。
+- project preflight 现在声明并转发 `-RequireCleanRuntimeSources`；Release orchestrator 的
+  runtime clean 要求可以真正到达 source preflight，缺失 runtime fixture 同时覆盖该
+  Release-only 参数链，避免 Exploratory 通过而 Release 在参数绑定阶段失败。
 
 当前磁盘上的运行产物仍然很多，但都不属于提交边界：本 DHE worktree 的
 `artifacts/` 约 5.57 GB、`staging/` 约 5.37 GB、Unity demo 的缓存/Player 约

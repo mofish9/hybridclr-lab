@@ -19,6 +19,7 @@ param(
     [switch]$RequireCompleteCoverage,
     [switch]$RequireDheEqualsHotUpdate,
     [switch]$RequireNonSurrogateExternalHeaders,
+    [switch]$RequireCleanRuntimeSources,
     [switch]$ForceOutput
 )
 
@@ -61,6 +62,7 @@ foreach ($item in @(@($settingsPath, "HybridCLR settings", "Leaf"), @($baselineP
 $resolvedDnlibPath = Resolve-DheDnlibPath -RequestedPath $DnlibPath -ProjectRoot $projectRootPath -LabRoot $LabRoot
 $scriptHost = Resolve-DhePowerShellHost
 $runSourcePreflight = $RequireRuntime -or $RequireEmbeddedPackage -or $RequireIdentityTemplate -or
+    $RequireCleanRuntimeSources -or
     -not [string]::IsNullOrWhiteSpace($RuntimeSource) -or
     -not [string]::IsNullOrWhiteSpace($PackageLockPath) -or
     -not [string]::IsNullOrWhiteSpace($IdentityTemplatePath)
@@ -87,6 +89,7 @@ if ($runSourcePreflight) {
     if ($RequireEmbeddedPackage) { $sourcePreflightArgs += "-RequireEmbeddedPackage" }
     if ($RequireIdentityTemplate) { $sourcePreflightArgs += "-RequireIdentityTemplate" }
     if ($RequireNonSurrogateExternalHeaders) { $sourcePreflightArgs += "-RequireNonSurrogateExternalHeaders" }
+    if ($RequireCleanRuntimeSources) { $sourcePreflightArgs += "-RequireCleanRuntimeSources" }
     & $scriptHost @sourcePreflightArgs | Out-Null
     $sourcePreflightExitCode = $LASTEXITCODE
     if (-not (Test-Path -LiteralPath $sourcePreflightPath -PathType Leaf)) {

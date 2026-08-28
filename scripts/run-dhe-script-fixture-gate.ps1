@@ -188,6 +188,7 @@ $preflightFailureExit = Invoke-ExpectedFailure @(
     "-RuntimeSource", (Join-Path $preflightFailureInput "missing-runtime/libil2cpp"),
     "-DnlibPath", $demoDnlib,
     "-RequireRuntime",
+    "-RequireCleanRuntimeSources",
     "-ForceOutput")
 $preflightFailureReportPath = Join-Path $preflightFailureOutput "project-preflight-report.json"
 $preflightSourceFailureReportPath = Join-Path $preflightFailureOutput "source-preflight/source-preflight-report.json"
