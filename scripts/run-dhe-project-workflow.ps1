@@ -241,6 +241,7 @@ try {
         $cleanCheckoutArgs = @{
             LabRoot = $labRoot
             ProjectPath = $projectPath
+            RuntimeSource = $runtimePath
             OutputRoot = $cleanCheckoutRoot
             ToolGitRoot = $labRoot
             ToolSourceBoundaryPath = (Join-Path $labRoot "manifests/dhe-source-boundary.json")

@@ -246,6 +246,9 @@ Player 或历史实验目录一并纳入提交。
 - project preflight 现在声明并转发 `-RequireCleanRuntimeSources`；Release orchestrator 的
   runtime clean 要求可以真正到达 source preflight，缺失 runtime fixture 同时覆盖该
   Release-only 参数链，避免 Exploratory 通过而 Release 在参数绑定阶段失败。
+- Release orchestrator 也会把实际 `RuntimeSource` 传给 clean-checkout gate，从而强制执行
+  stale-manifest 负例。artifact validator 遍历 project/tool Git 身份时使用独立变量，
+  不再覆盖 build identity 后产生虚假的 identity mismatch。
 
 当前磁盘上的运行产物仍然很多，但都不属于提交边界：本 DHE worktree 的
 `artifacts/` 约 5.57 GB、`staging/` 约 5.37 GB、Unity demo 的缓存/Player 约

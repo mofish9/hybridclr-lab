@@ -773,19 +773,19 @@ if (-not [string]::IsNullOrWhiteSpace($WorkflowReport)) {
                     )
                     foreach ($formalGitIdentity in $formalGitIdentities) {
                         $identityName = [string]$formalGitIdentity[0]
-                        $identity = $formalGitIdentity[1]
-                        if ($null -eq $identity -or
-                            (Get-StringProperty $identity "name") -ne $identityName -or
-                            -not (Get-BoolProperty $identity "tested") -or
-                            -not (Get-BoolProperty $identity "passed") -or
-                            -not (Get-BoolProperty $identity "cleanRequired") -or
-                            -not (Get-BoolProperty $identity "clean") -or
-                            -not (Get-BoolProperty $identity "trackedSourcesTested") -or
-                            -not (Get-BoolProperty $identity "trackedSourcesRequired") -or
-                            -not (Get-BoolProperty $identity "trackedSourcesComplete") -or
-                            (Get-StringProperty $identity "head") -notmatch '^[0-9a-fA-F]{40,64}$' -or
-                            (Get-StringProperty $identity "tree") -notmatch '^[0-9a-fA-F]{40,64}$' -or
-                            (Get-StringProperty $identity "sourceBoundarySha256") -notmatch '^[0-9a-fA-F]{64}$') {
+                        $gitIdentity = $formalGitIdentity[1]
+                        if ($null -eq $gitIdentity -or
+                            (Get-StringProperty $gitIdentity "name") -ne $identityName -or
+                            -not (Get-BoolProperty $gitIdentity "tested") -or
+                            -not (Get-BoolProperty $gitIdentity "passed") -or
+                            -not (Get-BoolProperty $gitIdentity "cleanRequired") -or
+                            -not (Get-BoolProperty $gitIdentity "clean") -or
+                            -not (Get-BoolProperty $gitIdentity "trackedSourcesTested") -or
+                            -not (Get-BoolProperty $gitIdentity "trackedSourcesRequired") -or
+                            -not (Get-BoolProperty $gitIdentity "trackedSourcesComplete") -or
+                            (Get-StringProperty $gitIdentity "head") -notmatch '^[0-9a-fA-F]{40,64}$' -or
+                            (Get-StringProperty $gitIdentity "tree") -notmatch '^[0-9a-fA-F]{40,64}$' -or
+                            (Get-StringProperty $gitIdentity "sourceBoundarySha256") -notmatch '^[0-9a-fA-F]{64}$') {
                             Add-Error "Release workflow $identityName Git identity is incomplete or not clean/tracked."
                             $cleanGateInvalid = $true
                         }
