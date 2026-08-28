@@ -1,6 +1,6 @@
 # HybridCLR 开源版性能优化任务设计文档
 
-状态：Draft 0.2  
+状态：Phase 0/0.5 complete / Candidate 4 measured
 工作目录：`C:\hybridclr_optimize`  
 文档目的：固定优化项目的版本、边界、测试方法和验收标准，避免在没有基线的情况下直接修改运行时。
 
@@ -66,6 +66,12 @@ il2cpp_plus: v2022-tuanjie-8.13.0
 
 ```text
 C:\Program Files\Tuanjie\Hub\Editor\2022.3.62t12
+```
+
+Batchmode executable：
+
+```text
+C:\Program Files\Tuanjie\Hub\Editor\2022.3.62t12\Editor\Tuanjie.exe
 ```
 
 完整 commit 锁定见 `manifests/repo-lock.json`。所有性能结果必须记录这份锁定信息，不能只记录 package 版本。
@@ -211,14 +217,27 @@ Tuanjie 工程不在测试协议尚未定义时创建，也不能推迟到开始
 
 ### 6.2 C++ 单元测试
 
-适合脱离 Tuanjie 测试的内容：
+适合脱离 Tuanjie 测试的内容。当前 CTest 已直接编译合并后的
+8.13.0 `libil2cpp` 源码并通过 8 组测试：
 
-- Opcode 解码和指令长度。
-- BasicBlock 切分和控制流分析。
-- IR 优化和 SuperInstruction 融合。
-- 常量折叠和局部指令重写。
-- 临时内存分配器。
-- 方法体缓存的淘汰策略。
+- BlobReader、端序和压缩整数。
+- metadata index 编解码。
+- Opcode 表、前缀和 switch 指令长度。
+- BasicBlock branch/switch/EH 切分。
+- TemporaryMemoryArena 分配、rollover 和 alignment。
+- Interpreter stack-copy 定长/重叠复制与清零。
+- InstructionCombiner 的 `LdlocVarVar_2` 融合、顺序 alias 和 IR 尺寸。
+- 常量/转换加法融合、branch 复制传播、offset 保留和拒绝危险别名。
+
+后续新增 IR 优化、SuperInstruction、常量折叠或方法体缓存策略时，应在
+同一个 native target 中继续增加对应的纯 C++ 组测试。
+
+当前实际覆盖为 BlobReader/端序和压缩整数（包括 TryRead、Peek、Skip 和
+GetAndSkip 边界）、metadata index、opcode 表和 switch/前缀/短长参数解码、
+BasicBlock 的短长 branch、zero-offset branch、leave 和 EH 切分、
+TemporaryMemoryArena 的 rollover/alignment/大量分配，以及 CopyBySize 的
+零长度/小尺寸/双向重叠复制和 StackObject 拷贝。native 测试使用最小
+IL2CPP stub；真实 GC、异常展开、对象布局和 ABI 仍必须通过 Tuanjie Player。
 
 不通过大量 Mock 伪造 `Il2CppClass`、GC 和元数据系统。涉及真实 IL2CPP ABI、对象布局或异常展开的逻辑必须进入 Player 集成测试。
 
@@ -234,7 +253,7 @@ Tuanjie 工程不在测试协议尚未定义时创建，也不能推迟到开始
 Candidate HybridCLR
 ```
 
-测试用例不依赖 NUnit 或 Unity Test Framework，由统一注册表暴露给 .NET runner 和 Player runner。测试输出使用结构化结果，不比较不稳定的异常文本或反射顺序：
+测试用例不依赖 NUnit 或 Unity Test Framework，由统一注册表暴露给 .NET runner 和 Player runner。当前清单 schema v2 包含 220 个用例（174 个 `managed-core`、46 个 `player-boundary`），每个用例显式声明 `category`、`layer` 和 `features`。测试输出使用结构化结果，不比较不稳定的异常文本或反射顺序：
 
 ```json
 {
@@ -269,17 +288,31 @@ platform and process architecture
 使用最小的命令行 Player，不使用当前项目场景和业务程序集。它负责：
 
 - 初始化 HybridCLR。
+- 加载 `mscorlib`、`System`、`System.Core` 和边界契约程序集的补充 AOT 元数据。
 - 加载测试热更新 DLL。
 - 执行测试清单。
-- 输出正确性和性能 JSON。
+- 输出正确性 JSON；每个 case 在线程池执行并有 10 秒超时，Player 进程本身有 180 秒上限。
 
 只有这层才能可靠验证 GC、泛型共享、异常、AOT/解释器调用桥、P/Invoke 和真实平台 ABI。
 
 Tuanjie 工程只作为执行宿主，不承载测试真值。测试真值、测试清单和比较逻辑位于引擎无关的 `managed-cases` 与 `runners` 中。
 
+### 6.5 当前覆盖结论
+
+220 个用例已经足以作为 Windows x64、Tuanjie 1.10.0、HybridCLR 8.13.0
+的 Phase 0 正确性门禁：它同时约束 managed 语义、AOT/解释器边界、真实
+GC/线程/异常行为、P/Invoke 生成链和 Reverse P/Invoke wrapper。它不是
+“整个 HybridCLR 的完备证明”，也不能替代平台专项和长时间压力测试。
+
+当前仍明确留在后续阶段的风险包括：Android ARM64 实机 ABI、数小时级 GC
+和线程压力、finalizer/resurrection、故障注入下的损坏 metadata、完整
+TransformContext/IR 优化路径的结构化断言，以及真实工程规模的程序集/类型
+加载压力。任何性能优化如果触及这些路径，必须先把对应回归加入本实验室，
+再进入 Candidate 对比；不能因为 220 个基础用例通过就跳过专项测试。
+
 ## 7. 测试用例矩阵
 
-第一版测试至少覆盖：
+当前 220 个用例覆盖：
 
 - 整数、浮点、双精度、转换、checked/unchecked。
 - 分支、循环、比较、switch 和异常控制流。
@@ -289,8 +322,16 @@ Tuanjie 工程只作为执行宿主，不承载测试真值。测试真值、测
 - 虚调用、接口调用、委托调用和函数指针。
 - 解释器内部调用、解释器到 AOT、AOT 到解释器。
 - 反射、动态程序集加载、静态构造函数。
-- 异常、`finally`、线程、ThreadStatic、async。
-- P/Invoke 和 Reverse P/Invoke。
+- 异常、嵌套 `finally`/`leave`、线程、ThreadStatic、async、取消、WhenAny 和自定义 awaiter。
+- AOT 到解释器、解释器到 AOT、泛型共享、约束泛型、值类型、委托、接口、虚调用、数组和异常边界。
+- Windows P/Invoke、带 `MonoPInvokeCallback` 的 Reverse P/Invoke，以及委托目标 GC 生命周期。
+- 多线程并发进入解释器和并发泛型调用，反射私有字段和反射异常包装。
+- 与正式 `interp_arithmetic` workload 同构的百万次循环，专项约束 branch offset 修补和 `Ldloc` 复制传播。
+
+manifest 不是静态文档：`scripts/summarize-coverage.ps1` 会按 layer、category、feature
+汇总 manifest、.NET reference 和 Player 三份结果，并在门禁中生成
+`reports/<profile>-coverage-summary.json`。新增用例如果没有进入清单、没有在
+Player 中执行，或者 metadata 不一致，都会在生成/运行阶段失败。
 
 ## 8. 性能测量规范
 
@@ -327,6 +368,79 @@ Windows x64 用于快速迭代，Android ARM64 用于移动端最终确认。每
 - Android Build Support、SDK、NDK 和 JDK 版本可记录并可重复使用。
 - C++ 编译工具链版本已固定。
 - 编辑器路径和构建模块与 `repo-lock.json` 一致。
+
+### 8.3 社区版与 AOT 正式基线
+
+Windows x64 Release Player 已使用同一份 `PerformanceWorkload.cs` 完成
+社区版解释执行与 IL2CPP AOT 对照。热更新版本由 `Assembly.Load` 动态加载，
+AOT 版本以普通 Unity Plugin 参与 IL2CPP 编译；15 项 workload 的 checksum
+逐项一致。每个 workload 使用 10 个独立 Player 进程，稳态结果如下：
+
+| Workload | AOT 相对社区版加速 |
+|---|---:|
+| `interp_call` | 67.2x |
+| `interp_array` | 52.4x |
+| `aot_to_interp_boundary` | 36.2x |
+| `interp_to_aot_boundary` | 33.5x |
+| `interp_generic` | 27.3x |
+| `interp_field` | 27.2x |
+| `interp_branch` | 25.2x |
+| `interp_arithmetic` | 23.3x |
+| `interp_delegate` | 23.4x |
+| `interp_struct` | 13.2x |
+| `interp_float` | 11.2x |
+| `interp_virtual` | 10.8x |
+| `interp_string_allocation` | 1.2x |
+| `interp_boxing` | 1.1x |
+| `interp_exception` | 0.6x |
+
+核心解释器与互调边界 workload 的几何均值为 AOT `25.32x`，全部 15 项
+几何均值为 AOT `13.04x`。AOT 在 14 项显著更快；异常 workload 是唯一反例，
+不能据此推断一般异常处理性能，因为该 case 同时包含分支、抛出、捕获和
+`finally`，且 AOT/解释器的异常路径实现不同。
+
+正式报告为 `reports/baseline-clean-hybridclr-vs-aot.json` 和
+`reports/baseline-clean-performance-summary.json`。两种执行方式绑定同一个
+Player build manifest（SHA-256
+`AEDCD48AC3C231D84E101152D2D1B626DB4C1E5459ED4908F8901C01ED1353EF`）。
+本轮社区版稳态校准噪声阈值为 `8%`；冷路径当前抖动过大，只用于判断
+数量级，不用于验收小幅优化。
+
+### 8.4 商业版公开资料与可独立实现边界
+
+资料固定到官方 `hybridclr-doc` 仓库 commit
+`0598ba156fc3c07ea8a712559e813aeee85a0cec`（2026-06-01）：
+
+- [社区版/AOT/商业版性能](https://github.com/focus-creative-games/hybridclr-doc/blob/0598ba156fc3c07ea8a712559e813aeee85a0cec/docs/basic/performance.md)
+- [标准解释优化](https://github.com/focus-creative-games/hybridclr-doc/blob/0598ba156fc3c07ea8a712559e813aeee85a0cec/docs/business/basicoptimization.md)
+- [离线指令优化](https://github.com/focus-creative-games/hybridclr-doc/blob/0598ba156fc3c07ea8a712559e813aeee85a0cec/docs/business/advancedoptimization.md)
+- [差分混合执行](https://github.com/focus-creative-games/hybridclr-doc/blob/0598ba156fc3c07ea8a712559e813aeee85a0cec/docs/business/differentialhybridexecution.md)
+- [完全泛型共享](https://github.com/focus-creative-games/hybridclr-doc/blob/0598ba156fc3c07ea8a712559e813aeee85a0cec/docs/business/fullgenericsharing.md)
+- [Assembly.Load 优化](https://github.com/focus-creative-games/hybridclr-doc/blob/0598ba156fc3c07ea8a712559e813aeee85a0cec/docs/business/assemblyloadoptimization.md)
+- [元数据优化](https://github.com/focus-creative-games/hybridclr-doc/blob/0598ba156fc3c07ea8a712559e813aeee85a0cec/docs/business/metadataoptimization.md)
+
+官方公开宣称 AOT 是社区版数值 workload 的 `4.1-90x`，标准解释优化是
+社区版的 `2.87-7.35x`，AOT 仍是商业优化版的 `1.30-12.9x`。这些数据来自
+OnePlus 9R ArmV8 和官方用例，不能与本实验室 Windows x64 的数值直接横向
+比较；本实验室结果只证明同一代码、同一 Player 中社区版与 AOT 的差距。
+
+公开的标准解释优化方向只有：指令分发优化、指令合并、无用指令消除和特殊
+instinct 指令。它们可以作为独立实现的研究方向，但公开资料没有披露算法和
+代码，本项目不会反编译或复制闭源实现。
+
+需要严格区分三类能力：
+
+1. 标准解释优化提升解释器本身，是当前开源优化的主要可比对象。
+2. DHE 让未变化函数继续执行包内 AOT 代码，整体接近原生不等于解释器本身
+   接近 AOT；本阶段不把它计入解释器优化成绩。
+3. OIO 页面列出栈指令消除、窥孔、复制传播、解释/AOT inline、检查消除和
+   CheckOnce，但页面明确标注“开发中”，只能视为路线候选，不能视为已交付
+   商业能力。
+
+完全泛型共享解决的是省去补充元数据，并不等于 IL2CPP 生成能力会自动接通
+HybridCLR 的 managed-to-native bridge。Assembly.Load 和元数据优化属于加载
+时间与内存方向。官方当前公开数据为商业版加载耗时约为社区版 `30%`；这条
+路线会单独测量，不能与稳态解释执行加速合并成一个倍率。
 
 ## 9. 优化路线
 
@@ -368,6 +482,12 @@ Windows x64 用于快速迭代，Android ARM64 用于移动端最终确认。每
 
 在 Windows 基线稳定后，再处理 ARM64 调度、编译器优化和移动端内存行为。
 
+Android ARM64 的执行标准已经落地到
+`docs/HybridCLR-Android-ARM64-Test-Standard.md`。该通道包含 NDK AArch64
+C++ 单测、真实 Android IL2CPP 的 185 项正确性门禁、设备环境留证，以及
+Clean/Candidate 交替顺序的成对稳态 benchmark。没有真机结果时，AArch64
+交叉编译与 APK 构建成功不能替代 Phase 5 的运行验收。
+
 ## 10. 优化验收标准
 
 每项优化必须满足：
@@ -383,15 +503,37 @@ Windows x64 用于快速迭代，Android ARM64 用于移动端最终确认。每
 
 ## 11. 当前状态和下一步
 
-当前已完成源码 Fork、版本锁定、独立 workspace 和 Tuanjie 版本校正，尚未修改 runtime 源码，也尚未创建 Tuanjie 测试工程。
+已完成源码 Fork、版本锁定、独立 workspace、Tuanjie 版本校正、测试 Schema、220 个纯 C# 与边界用例、.NET reference runner、Clean 的 6 组和 Candidate 的 8 组 C++ native 单元测试、最小 Tuanjie 工程、本地 runtime 装配脚本和 Player runner。Installer 已在未修改的 8.13.0 源码上完成实际安装，`GenerateAll` 已生成 Il2CppDef、link.xml、裁剪 AOT 流程和 MethodBridge 输入。
 
-下一步执行顺序固定为：
+Clean Baseline 已在 Windows x64 Release Player 实测通过：reference `185/185`、Player `185/185`、differential `0`。社区版与 AOT 的 15 项正式对照也已完成，核心解释器/边界几何均值差距为 `25.32x`，全部 workload 几何均值为 `13.04x`，AOT 在 `14/15` 项显著更快。结果、覆盖矩阵、性能对照和构建锁定信息均保存在 `reports/`。
 
-1. 创建并 clone `mofish9/hybridclr-lab` Git 仓库。
-2. 提交本文档、结果 Schema、测试清单格式和构建 manifest 格式。
-3. 建立第一批纯 C# smoke cases 和 .NET reference runner。
-4. 完成 Tuanjie 构建环境前置检查。
-5. 创建最小 Tuanjie 1.10.0 工程并纳入同一个 lab 仓库。
-6. 实现本地 runtime 装配脚本和 Player runner。
-7. 使用未修改的三个 Fork 构建并验证 Clean Baseline。
-8. 固化第一版测试与性能基线后，才开始 Instrumented Baseline 和 runtime 优化。
+重复执行入口：
+
+```powershell
+./scripts/check-build-environment.ps1 -Target StandaloneWindows64
+./scripts/assemble-runtime.ps1 -Profile Baseline-Clean -AllowDirty
+./scripts/run-correctness-gate.ps1 -Profile Baseline-Clean -SkipAssembly
+```
+
+Phase 0 和 Phase 0.5 已完成。画像显示 `LdlocVarVar` 占动态分发 `48.34%`，其中
+连续 pair 占 `25.47%`。Candidate 4 在 `hybridclr/transform` 实现了四项社区版
+可复现的低风险变换：`LdlocVarVar_2`、`LdcVarConst_4_Add_i4`、
+`ConvertVarVar_i4_i8_Add_i8`，以及对 `LdlocVarVar`/`LdlocVarVar_2` 到
+`BranchVarVar_Clt_i4` 的原地复制传播。所有变换均在无 PDB 映射时启用；复制传播
+保留原 branch 对象，避免破坏 `PushOffset` 保存的 offset 修补地址。
+
+Candidate 4 已通过 native `8/8`、reference `185/185`、Player `185/185`、
+differential `0`。最新 10 进程 steady 测量中，Candidate 相对 Clean 的核心
+几何均值为 `1.2345x`（全 15 项为 `1.1878x`），`9/15` 项超过当前噪声阈值，
+无 regression；同一 Candidate Player 的 AOT 相对 Candidate 核心为 `20.5403x`
+（全 15 项为 `10.9890x`）。冷路径仅作诊断：Candidate/Clean 核心为 `1.0119x`，
+AOT/Candidate 核心为 `17.1485x`，因冷启动噪声不作为小幅优化验收依据。
+
+本轮 Candidate runtime SHA-256 为
+`A9002394F5AFBB6991E765F6590E7AD787CDD67F125E921CF0646EF427E7193B`，Player
+build manifest SHA-256 为
+`EA79F29C40A7F812B5B6031878F0E84D4889A27EEB80E6422872CBA99563A715`；Clean 与
+Candidate 的 managed assembly hash 仍为
+`374E0EA3854A54E14CC1A05B5E17E2DD848985EE6DA4F15C5752E6964204502B`。
+完整三方数据见 `reports/candidate4-triple-performance-comparison-repeat.json`。
+Instrumented 成绩没有进入任何最终倍率。
