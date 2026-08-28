@@ -11,22 +11,22 @@
     "hybridclr_unity": {
       "upstream": "https://github.com/focus-creative-games/hybridclr_unity.git",
       "fork": "https://github.com/mofish9/hybridclr_unity.git",
-      "tag": "optimize/v8.13.0",
-      "commit": "04dd2067f2b52624b778913afae2a4e627d2c4af",
+      "tag": "v8.13.0-opt3",
+      "commit": "ac0fdc5c6363a1b6323d017e068c536dd22127dc",
       "localBranch": "optimize/v8.13.0"
     },
     "hybridclr": {
       "upstream": "https://github.com/focus-creative-games/hybridclr.git",
       "fork": "https://github.com/mofish9/hybridclr.git",
-      "tag": "v8.13.0",
-      "commit": "ae21c37ee25992c4c62c77acffaf74b59f4461a3",
+      "tag": "v8.13.0-opt3",
+      "commit": "f40c6f08ccd0391ad9285276b4cc21ada3a180ab",
       "localBranch": "optimize/v8.13.0"
     },
     "il2cpp_plus": {
       "upstream": "https://github.com/focus-creative-games/il2cpp_plus.git",
       "fork": "https://github.com/mofish9/il2cpp_plus.git",
-      "tag": "v2022-tuanjie-8.13.0",
-      "commit": "68fbca2345d6c781c3f3d7ea2495942617cde277",
+      "tag": "v2022-tuanjie-8.13.0-opt3",
+      "commit": "82162cb681f1564807d2ab5e7f3a9312271d0a73",
       "localBranch": "optimize/tuanjie-1.10-v8.13.0"
     }
   },
@@ -36,29 +36,29 @@
     "il2cpp_plus": "https://github.com/mofish9/il2cpp_plus"
   },
   "assemblyLoadMetadataOptimization": {
-    "candidateId": "assembly-load-metadata-v1",
+    "candidateId": "assembly-load-metadata-opt3",
     "package": {
-      "tag": "optimize/v8.13.0",
-      "commit": "04dd2067f2b52624b778913afae2a4e627d2c4af"
+      "tag": "v8.13.0-opt3",
+      "commit": "ac0fdc5c6363a1b6323d017e068c536dd22127dc"
     },
     "hybridclr": {
-      "tag": "optimize/assembly-load-metadata-v8.13.0",
+      "tag": "v8.13.0-opt3",
       "commit": "f40c6f08ccd0391ad9285276b4cc21ada3a180ab",
       "path": "../worktrees/hybridclr-metadata-v8.13.0"
     },
     "il2cppPlus": {
       "Tuanjie2022": {
-        "tag": "optimize/assembly-load-metadata-tuanjie-1.10-v8.13.0",
+        "tag": "v2022-tuanjie-8.13.0-opt3",
         "commit": "82162cb681f1564807d2ab5e7f3a9312271d0a73",
         "path": "../worktrees/il2cpp-plus-metadata-tuanjie-v8.13.0"
       },
       "Unity2021": {
-        "tag": "optimize/assembly-load-metadata-unity2021-v8.1.0",
-        "commit": "3e38f1b77304c40e45c89bb583d417602e0bc44d",
+        "tag": "v2021-8.1.0-opt3",
+        "commit": "511df62f4aa7cba2bdb505deead48a8d080d582c",
         "path": "../worktrees/il2cpp-plus-metadata-unity2021-v8.1.0"
       },
       "Unity2022": {
-        "tag": "optimize/assembly-load-metadata-unity2022-v8.11.0",
+        "tag": "v2022-8.11.0-opt3",
         "commit": "bf15337e189ae7da5876aa51c9b896a36c52a155",
         "path": "../worktrees/il2cpp-plus-metadata-unity2022-v8.11.0"
       }

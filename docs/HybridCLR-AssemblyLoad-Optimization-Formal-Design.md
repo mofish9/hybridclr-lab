@@ -1,6 +1,6 @@
 # HybridCLR Assembly.Load 优化正式方案
 
-文档状态：源码候选已冻结并具备正式评审材料；生产发布仍需完成同身份 Player 重采样和 Android ARM64 门禁。
+文档状态：opt3 源码、维护分支和 release tag 已冻结；生产启用仍需完成同身份性能重采样和 Android ARM64 门禁。
 
 更新时间：2026-08-28
 
@@ -9,20 +9,20 @@
 本方案针对热更新程序集的 `Assembly.Load` 冷加载路径。核心做法是把不属于加载必需路径的
 metadata 构建拆成按需阶段，并在类、方法和类型缓存层减少重复分配、锁竞争和跨边界调用。
 它不减少 DLL 的读取字节，也不依赖完全泛型共享（FGS）；FGS、Interpreter 和 DHE 均保持独立
-工作区和独立验收。提交候选使用 `hybridclr` commit
+工作区和独立验收。opt3 发布使用 `hybridclr` commit
 `f40c6f08ccd0391ad9285276b4cc21ada3a180ab`、package commit
-`04dd2067f2b52624b778913afae2a4e627d2c4af`；三个 engine hook 的正式分支和 commit
+`ac0fdc5c6363a1b6323d017e068c536dd22127dc`；三个 engine hook 的正式分支、tag 和 commit
 见 `manifests/repo-lock.json`。
 
 冻结组合：
 
 | 仓库 | ref | commit |
 |---|---|---|
-| `hybridclr_unity` | `optimize/v8.13.0` | `04dd2067f2b52624b778913afae2a4e627d2c4af` |
-| `hybridclr` | `optimize/assembly-load-metadata-v8.13.0` | `f40c6f08ccd0391ad9285276b4cc21ada3a180ab` |
-| `il2cpp_plus` / Tuanjie 2022 | `optimize/assembly-load-metadata-tuanjie-1.10-v8.13.0` | `82162cb681f1564807d2ab5e7f3a9312271d0a73` |
-| `il2cpp_plus` / Unity 2022 | `optimize/assembly-load-metadata-unity2022-v8.11.0` | `bf15337e189ae7da5876aa51c9b896a36c52a155` |
-| `il2cpp_plus` / Unity 2021 | `optimize/assembly-load-metadata-unity2021-v8.1.0` | `3e38f1b77304c40e45c89bb583d417602e0bc44d` |
+| `hybridclr_unity` | `v8.13.0-opt3` (`optimize/v8.13.0`) | `ac0fdc5c6363a1b6323d017e068c536dd22127dc` |
+| `hybridclr` | `v8.13.0-opt3` (`optimize/v8.13.0`) | `f40c6f08ccd0391ad9285276b4cc21ada3a180ab` |
+| `il2cpp_plus` / Tuanjie 2022 | `v2022-tuanjie-8.13.0-opt3` (`optimize/tuanjie-1.10-v8.13.0`) | `82162cb681f1564807d2ab5e7f3a9312271d0a73` |
+| `il2cpp_plus` / Unity 2022 | `v2022-8.11.0-opt3` (`optimize/unity2022-v8.11.0`) | `bf15337e189ae7da5876aa51c9b896a36c52a155` |
+| `il2cpp_plus` / Unity 2021 | `v2021-8.1.0-opt3` (`optimize/unity2021-v8.1.0`) | `511df62f4aa7cba2bdb505deead48a8d080d582c` |
 
 在 Windows x64 的正式 workload（2051 个类型、45065 个成员、27653 个 CustomAttribute，
 每端 100 个独立进程）上，历史稳定候选得到如下结果：
@@ -38,10 +38,13 @@ metadata 构建拆成按需阶段，并在类、方法和类型缓存层减少�
 | Reflection touch median | +1.97% | 待同身份重采样 | -0.01% |
 | Entry execute median | -17.53% | 待同身份重采样 | -9.79% |
 
-三端 native compile gate 和 native tests 通过；Unity 2022 冻结候选已完成 Player
+opt3 的 Metadata 与 Workflow native compatibility matrix 均为三端 `3/3` 通过，
+`mergeReady=true`、`surrogateExternalHeadersUsed=false`，使用了三套真实 Editor headers。
+对应报告为 `runtime-compatibility-matrix-metadata-opt3.json` 和
+`runtime-compatibility-matrix-workflow-opt3.json`。Unity 2022 冻结候选已完成 Player
 correctness `220/220`、differential `0`，团结和 Unity 2021 的同项记录也均为
 `220/220`、differential `0`，但属于较早产物身份。上表是已完成的历史实测证据，不是冻结候选的最终发布证明；
-候选源码已提交，但仍必须使用这些 commit 重新构建并重新采样。Android ARM64 尚未完成同一身份的 Player correctness、
+发布源码已提交并锁定到 opt3 tag，但仍必须使用这些 commit 重新构建并重新采样。Android ARM64 尚未完成同一身份的 Player correctness、
 PSS 和尾延迟门禁，因此当前结论是“方案可提交评审，发布有条件通过”。
 
 ## 2. 目标与边界
@@ -137,9 +140,9 @@ CustomAttribute parent/constructor 范围。NestedClass 循环、重复参数序
 
 相关源码：
 
-- Tuanjie：[`Class.cpp`](/C:/hybridclr_optimize/worktrees/il2cpp-plus-metadata-tuanjie-v8.13.0/libil2cpp/vm/Class.cpp)，正式分支 `optimize/assembly-load-metadata-tuanjie-1.10-v8.13.0`
-- Unity 2022：[`Class.cpp`](/C:/hybridclr_optimize/worktrees/il2cpp-plus-metadata-unity2022-v8.11.0/libil2cpp/vm/Class.cpp)，正式分支 `optimize/assembly-load-metadata-unity2022-v8.11.0`
-- Unity 2021：[`Class.cpp`](/C:/hybridclr_optimize/worktrees/il2cpp-plus-metadata-unity2021-v8.1.0/libil2cpp/vm/Class.cpp)，正式分支 `optimize/assembly-load-metadata-unity2021-v8.1.0`
+- Tuanjie：[`Class.cpp`](/C:/hybridclr_optimize/worktrees/il2cpp-plus-metadata-tuanjie-v8.13.0/libil2cpp/vm/Class.cpp)，正式分支 `optimize/tuanjie-1.10-v8.13.0`，tag `v2022-tuanjie-8.13.0-opt3`
+- Unity 2022：[`Class.cpp`](/C:/hybridclr_optimize/worktrees/il2cpp-plus-metadata-unity2022-v8.11.0/libil2cpp/vm/Class.cpp)，正式分支 `optimize/unity2022-v8.11.0`，tag `v2022-8.11.0-opt3`
+- Unity 2021：[`Class.cpp`](/C:/hybridclr_optimize/worktrees/il2cpp-plus-metadata-unity2021-v8.1.0/libil2cpp/vm/Class.cpp)，正式分支 `optimize/unity2021-v8.1.0`，tag `v2021-8.1.0-opt3`
 - metadata：[`InterpreterImage.cpp`](/C:/hybridclr_optimize/worktrees/hybridclr-metadata-v8.13.0/hybridclr/metadata/InterpreterImage.cpp)
 
 ## 4. 运行时 API 与预热方案
@@ -266,9 +269,8 @@ token 清单可使用 `CreateIncrementalMethodTokenQueue`；它在队列推进�
 ./lab/scripts/assemble-runtime.ps1 `
   -LabRoot ./lab -Profile Metadata-Candidate `
   -EngineWorkflow Tuanjie2022Fgs `
-  -HybridClrSource ./worktrees/hybridclr-metadata-v8.13.0 `
+  -HybridClrSource ./repos/hybridclr `
   -Il2CppPlusSource ./worktrees/il2cpp-plus-metadata-tuanjie-v8.13.0 `
-  -AllowDirty
 ./lab/scripts/run-native-tests.ps1 -LabRoot ./lab `
   -Profile Metadata-Candidate -Configuration Release
 ```
@@ -300,6 +302,8 @@ Unity 2022 使用 `-Profile Metadata-Unity2022`、`-EngineWorkflow Unity2022Fgs`
 
 正式历史报告：
 
+- opt3 native compatibility：`reports/runtime-compatibility-matrix-metadata-opt3.json`、
+  `reports/runtime-compatibility-matrix-workflow-opt3.json`
 - [Tuanjie 2022 100 进程 comparison](/C:/hybridclr_optimize/lab/reports/vtable-share-comparison-tuanjie-100.json)
 - [Unity 2021 100 进程 comparison](/C:/hybridclr_optimize/lab/reports/metadata-final-unity2021-100-comparison.json)
 - [Tuanjie Player correctness](/C:/hybridclr_optimize/lab/reports/metadata-tuanjie2022-player-result.json)
@@ -325,7 +329,7 @@ Unity 2022 使用 `-Profile Metadata-Unity2022`、`-EngineWorkflow Unity2022Fgs`
 
 ### 发布前 checklist
 
-- [ ] 四棵正式源码树（metadata + 三套 il2cpp hook）提交并记录 commit、tree SHA、runtime SHA。
+- [x] 五个正式发布身份（package、metadata runtime、三套 il2cpp hook）已进入维护分支并锁定 annotated tag/commit。
 - [ ] 以冻结身份分别构建 Tuanjie 2022 和 Unity 2021 Player；重跑 correctness/differential（Unity 2022 已完成）。
 - [ ] 三端 Windows x64 各完成至少 100 进程 comparison，包含 P50/P95/P99、Reflection 和 Entry。
 - [ ] 同身份构建 Android ARM64；完成 Player correctness、native tests、PSS、温度和弱核门禁。
@@ -341,7 +345,7 @@ Unity 2022 使用 `-Profile Metadata-Unity2022`、`-EngineWorkflow Unity2022Fgs`
 
 ### 回滚边界
 
-候选由三部分组成，可独立回滚：
+opt3 发布由三部分组成，可独立回滚：
 
 1. HybridCLR metadata runtime（`worktrees/hybridclr-metadata-v8.13.0`）；
 2. Tuanjie/Unity 2022/Unity 2021 各自的 il2cpp hook；
@@ -357,7 +361,7 @@ Unity 2022 使用 `-Profile Metadata-Unity2022`、`-EngineWorkflow Unity2022Fgs`
 - 首次 Entry/Reflection 的尾延迟和单类型不可中断物化；
 - Unity 2021 批量 method setup 与 Tuanjie per-method 路径的不对称；
 - Android ARM64 同身份 PSS、温度和弱核证据；
-- 源码、Player、runtime、manifest 尚未完全冻结到同一个提交身份。
+- Windows 性能 Player、runtime 和不可变 manifest 尚未全部重建到 opt3 身份。
 
 在这些门禁闭环前，不应以“小游戏平台已完成发布验收”对外承诺。通过后，正式提交应包含本
 文档、不可变 build manifest、JSON comparison、correctness/differential、Android PSS 报告和

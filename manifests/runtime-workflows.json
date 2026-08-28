@@ -13,18 +13,18 @@
         "executablePath": "C:/Program Files/Tuanjie/Hub/Editor/2022.3.62t12/Editor/Tuanjie.exe"
       },
       "il2cppPlus": {
-        "tag": "v2022-tuanjie-8.13.0",
-        "commit": "68fbca2345d6c781c3f3d7ea2495942617cde277",
-        "path": "../worktrees/il2cpp-plus-fgs-compatibility-v8.13.0"
+        "tag": "v2022-tuanjie-8.13.0-opt3",
+        "commit": "82162cb681f1564807d2ab5e7f3a9312271d0a73",
+        "path": "../worktrees/il2cpp-plus-metadata-tuanjie-v8.13.0"
       },
       "metadataIl2cppPlus": {
-        "tag": "optimize/assembly-load-metadata-tuanjie-1.10-v8.13.0",
+        "tag": "v2022-tuanjie-8.13.0-opt3",
         "commit": "82162cb681f1564807d2ab5e7f3a9312271d0a73",
         "path": "../worktrees/il2cpp-plus-metadata-tuanjie-v8.13.0"
       },
       "metadataPackage": {
-        "tag": "optimize/v8.13.0",
-        "commit": "04dd2067f2b52624b778913afae2a4e627d2c4af"
+        "tag": "v8.13.0-opt3",
+        "commit": "ac0fdc5c6363a1b6323d017e068c536dd22127dc"
       },
       "fullGenericSharing": "required",
       "productionWorkflow": {
@@ -52,18 +52,18 @@
         "nativeTestExternalPath": "C:/Program Files/Tuanjie/Hub/Editor/2022.3.62t12/Editor/Data/il2cpp/external"
       },
       "il2cppPlus": {
-        "tag": "v2022-8.11.0",
-        "commit": "684ad89ea38d08629c3aaac32a048dd05984eff8",
-        "path": "../worktrees/il2cpp-plus-unity2022-v8.11.0"
+        "tag": "v2022-8.11.0-opt3",
+        "commit": "bf15337e189ae7da5876aa51c9b896a36c52a155",
+        "path": "../worktrees/il2cpp-plus-metadata-unity2022-v8.11.0"
       },
       "metadataIl2cppPlus": {
-        "tag": "optimize/assembly-load-metadata-unity2022-v8.11.0",
+        "tag": "v2022-8.11.0-opt3",
         "commit": "bf15337e189ae7da5876aa51c9b896a36c52a155",
         "path": "../worktrees/il2cpp-plus-metadata-unity2022-v8.11.0"
       },
       "metadataPackage": {
-        "tag": "optimize/v8.13.0",
-        "commit": "04dd2067f2b52624b778913afae2a4e627d2c4af"
+        "tag": "v8.13.0-opt3",
+        "commit": "ac0fdc5c6363a1b6323d017e068c536dd22127dc"
       },
       "fullGenericSharing": "required",
       "productionWorkflow": {
@@ -90,18 +90,18 @@
         "executablePath": "C:/Program Files/Unity/Hub/Editor/2021.3.45f2/Editor/Unity.exe"
       },
       "il2cppPlus": {
-        "tag": "v2021-8.1.0",
-        "commit": "13a30454da9fe3b17c35115fdec1beab7984f4a6",
-        "path": "../worktrees/il2cpp-plus-unity2021-v8.1.0"
+        "tag": "v2021-8.1.0-opt3",
+        "commit": "511df62f4aa7cba2bdb505deead48a8d080d582c",
+        "path": "../worktrees/il2cpp-plus-metadata-unity2021-v8.1.0"
       },
       "metadataIl2cppPlus": {
-        "tag": "optimize/assembly-load-metadata-unity2021-v8.1.0",
-        "commit": "3e38f1b77304c40e45c89bb583d417602e0bc44d",
+        "tag": "v2021-8.1.0-opt3",
+        "commit": "511df62f4aa7cba2bdb505deead48a8d080d582c",
         "path": "../worktrees/il2cpp-plus-metadata-unity2021-v8.1.0"
       },
       "metadataPackage": {
-        "tag": "optimize/v8.13.0",
-        "commit": "04dd2067f2b52624b778913afae2a4e627d2c4af"
+        "tag": "v8.13.0-opt3",
+        "commit": "ac0fdc5c6363a1b6323d017e068c536dd22127dc"
       },
       "fullGenericSharing": "disabled",
       "productionWorkflow": {

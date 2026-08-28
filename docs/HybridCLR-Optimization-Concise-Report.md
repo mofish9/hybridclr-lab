@@ -1,21 +1,21 @@
 # HybridCLR 优化总览与 Review
 
-更新时间：2026-08-27
+更新时间：2026-08-28
 
 范围：`Assembly.Load`/metadata lazy、首次入口和反射触达；FGS、Interpreter、DHE
 分别验收，不把它们的收益计入 `Assembly.Load`。
 
-注：2026-08-28 新增了延迟 token manifest queue，managed package 已冻结为 commit
-`04dd2067f2b52624b778913afae2a4e627d2c4af`。下文旧 Player 数字均明确属于变更前身份，
+注：2026-08-28 新增了延迟 token manifest queue，managed package 已冻结为 opt3 commit
+`ac0fdc5c6363a1b6323d017e068c536dd22127dc`。下文旧 Player 数字均明确属于变更前身份，
 不能直接用于本轮发布门禁；需要重建同身份 Player 后再采样。
 
 ## 结论
 
 核心方向成立：把加载期的完整类型成员构建拆成按需初始化，Windows x64 的
 `Assembly.Load` 中位数已经稳定超过 60% 目标；新增的预热接口还能把可预测入口的
-首次执行成本移到 Loading/Lobby。当前不能宣布为发布候选：最新候选仍有首次入口
-执行尾延迟回退，源码、staging runtime 和性能报告也没有冻结到同一个身份；小游戏
-平台还缺少同一身份的 Android ARM64 证据。
+首次执行成本移到 Loading/Lobby。源码已合入正式维护线并锁定 opt3 tag，但这只表示代码
+发布身份可复现，不代表小游戏生产门禁已通过：opt3 仍需同身份复采首次入口/反射尾延迟，
+并补齐 Android ARM64 correctness、PSS 和性能证据。
 
 ## 优化清单
 
@@ -281,6 +281,8 @@ queue，在每帧调用一次 `Process`，而不是把整个循环同步放在�
 
 ## 正确性与发布状态
 
+- opt3 的 Metadata/Workflow native compatibility matrix 各自三端 `3/3` 通过，
+  `mergeReady=true`，使用真实 Editor headers，未使用 surrogate headers。
 - 当前团结 2022 Player（build `F4697D75...`，runtime `CC622E9F...`）为 `220/220`，
   differential `0`，跨程序集 VTable 和并发首触达 probe 通过。
 - 当前 Unity 2021 Player（build `D473A523...`，runtime `8383F347...`）为 `220/220`，
@@ -295,10 +297,9 @@ queue，在每帧调用一次 `Process`，而不是把整个循环同步放在�
 
 ## Review Findings
 
-1. **P0：源码尚未冻结。** 当前 Windows 证据已绑定到 Tuanjie `F4697D75.../CC622E9F...` 和
-   Unity 2021 `D473A523.../8383F347...` 的 build/runtime hash，但 Metadata、两端 il2cpp hook
-   和 managed package worktree 仍 dirty；性能数字只能按报告中的 hash 使用，不能按 profile
-   名拼接，也不能把两端结果合并成一个候选。
+1. **已解决：源码发布身份。** Metadata、三端 il2cpp hook 和 managed package 已提交到正式
+   维护线并锁定 opt3 annotated tags；性能数字仍只能按报告中的 build/runtime hash 使用，
+   不能把旧 Player 数据直接标记为 opt3 结果。
 2. **P0：小游戏发布证据缺失。** 尚无当前 runtime 同身份的 Android ARM64 Player
    correctness、PSS、P50/P95/P99、温度和弱核数据。
 3. **P1：首次入口执行是当前主要卡点。** `atomicfast` 100 对中 `entryExecute`
@@ -314,20 +315,21 @@ queue，在每帧调用一次 `Process`，而不是把整个循环同步放在�
 
 ## 当前工作区
 
-- Metadata runtime：`worktrees/hybridclr-metadata-v8.13.0`
-- 团结 2022 hook：`worktrees/il2cpp-plus-metadata-tuanjie-v8.13.0`
-- Unity 2021 hook：`worktrees/il2cpp-plus-metadata-unity2021-v8.1.0`
+- 正式 package：`repos/hybridclr_unity` / `optimize/v8.13.0` / `v8.13.0-opt3`
+- 正式 Metadata runtime：`repos/hybridclr` / `optimize/v8.13.0` / `v8.13.0-opt3`
+- 正式三端 hook：`repos/il2cpp_plus` 的三条 `optimize/*` 维护线及对应 opt3 tag
+- 验证 worktree：`worktrees/il2cpp-plus-metadata-*`
 - Interpreter：`worktrees/hybridclr-interpreter-next-v8.13.0`
 - FGS：`worktrees/hybridclr-fgs-compatibility-v8.13.0`、`worktrees/il2cpp-plus-fgs-compatibility-v8.13.0`
 - DHE：`worktrees/dhe-experiment-*`
 
 ## 最短收尾路径
 
-1. 对当前 dirty worktree 做代码审查和提交前冻结，保留 build/runtime/manifest hash 绑定。
-2. 在同一身份补齐 native CTest 与 Windows 100 对，重点验收 `loadAndEntry`、Entry P95/P99、
+1. 对 opt3 锁定组合完成三端 Workflow/Metadata native compatibility matrix。
+2. 在 opt3 同一身份补齐 Windows 100 对，重点验收 `loadAndEntry`、Entry P95/P99、
    Reflection P95/P99。
 3. 用同一身份制作 Android ARM64，完成 Player correctness、PSS、尾延迟、温度/弱核门禁。
-4. 通过后再提交并冻结三棵 Metadata 源码树；FGS、Interpreter、DHE 保持独立合并和回滚边界。
+4. FGS、Interpreter、DHE 保持独立验收和回滚边界，不把其收益计入 Assembly.Load。
 
 ## 证据索引
 
