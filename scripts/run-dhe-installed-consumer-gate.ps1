@@ -46,9 +46,9 @@ $packageGatePath = Join-Path $evidenceRoot "package-gate.json"
 $installReportPath = Join-Path $evidenceRoot "install.json"
 $doctorReportPath = Join-Path $evidenceRoot "doctor.json"
 $autoConsumer = [string]::IsNullOrWhiteSpace($ConsumerRoot)
-$temporaryConsumerBase = [IO.Path]::GetFullPath((Join-Path ([IO.Path]::GetTempPath()) "HybridCLRDhe/installed-consumer"))
+$temporaryConsumerBase = [IO.Path]::GetFullPath((Join-Path ([IO.Path]::GetTempPath()) "dhec"))
 if ($autoConsumer) {
-    $ConsumerRoot = Join-Path $temporaryConsumerBase ([Guid]::NewGuid().ToString("N"))
+    $ConsumerRoot = Join-Path $temporaryConsumerBase ([Guid]::NewGuid().ToString("N").Substring(0, 12))
 } else {
     $ConsumerRoot = [IO.Path]::GetFullPath($ConsumerRoot)
 }
@@ -68,18 +68,29 @@ function Invoke-PwshFile([string]$Path, [string[]]$Arguments) {
     }
 }
 
-function Copy-Evidence([string]$Source, [string]$Name) {
+function Save-Evidence([string]$Source, [string]$Name, [switch]$Required) {
     if (-not (Test-Path -LiteralPath $Source -PathType Leaf)) {
-        throw "Installed-consumer evidence was not found: $Source"
+        if ($Required) {
+            throw "Installed-consumer evidence was not found: $Source"
+        }
+        return
     }
+    New-Item -ItemType Directory -Force -Path $evidenceRoot | Out-Null
     $destination = Join-Path $evidenceRoot $Name
-    Copy-Item -LiteralPath $Source -Destination $destination -Force
+    if (-not [IO.Path]::GetFullPath($Source).Equals(
+            [IO.Path]::GetFullPath($destination),
+            [StringComparison]::OrdinalIgnoreCase)) {
+        Copy-Item -LiteralPath $Source -Destination $destination -Force
+    }
     $item = Get-Item -LiteralPath $destination
-    $evidenceRecords.Add([ordered]@{
-        path = ("evidence/" + $Name).Replace('\', '/')
-        size = [int64]$item.Length
-        sha256 = (Get-FileHash -LiteralPath $destination -Algorithm SHA256).Hash.ToLowerInvariant()
-    })
+    $recordPath = ("evidence/" + $Name).Replace('\', '/')
+    if (@($evidenceRecords | Where-Object { [string]$_.path -eq $recordPath }).Count -eq 0) {
+        $evidenceRecords.Add([ordered]@{
+            path = $recordPath
+            size = [int64]$item.Length
+            sha256 = (Get-FileHash -LiteralPath $destination -Algorithm SHA256).Hash.ToLowerInvariant()
+        })
+    }
 }
 
 $sourceHead = ""
@@ -88,6 +99,7 @@ $consumerHead = ""
 $consumerTree = ""
 $packageId = ""
 $runtimeTreeSha256 = ""
+$projectRoot = ""
 $consumerWorkflowRoot = ""
 $consumerArchiveRoot = ""
 $consumerArchiveGate = ""
@@ -200,11 +212,11 @@ try {
         "-OutputRoot", $consumerSchemaRoot,
         "-ForceOutput")
 
-    Copy-Evidence (Join-Path $consumerWorkflowRoot "project-workflow-report.json") "project-workflow-report.json"
-    Copy-Evidence (Join-Path $consumerWorkflowRoot "workflow-report.json") "workflow-report.json"
-    Copy-Evidence (Join-Path $consumerWorkflowRoot "dhe-player-result.json") "dhe-player-result.json"
-    Copy-Evidence (Join-Path $consumerWorkflowRoot "release-gate.json") "release-gate.json"
-    Copy-Evidence (Join-Path $consumerSchemaRoot "schema-gate-report.json") "schema-gate-report.json"
+    Save-Evidence (Join-Path $consumerWorkflowRoot "project-workflow-report.json") "project-workflow-report.json" -Required
+    Save-Evidence (Join-Path $consumerWorkflowRoot "workflow-report.json") "workflow-report.json" -Required
+    Save-Evidence (Join-Path $consumerWorkflowRoot "dhe-player-result.json") "dhe-player-result.json" -Required
+    Save-Evidence (Join-Path $consumerWorkflowRoot "release-gate.json") "release-gate.json" -Required
+    Save-Evidence (Join-Path $consumerSchemaRoot "schema-gate-report.json") "schema-gate-report.json" -Required
     Copy-Item -LiteralPath $consumerArchiveRoot -Destination $archiveEvidenceRoot -Recurse -Force
     Copy-Item -LiteralPath $consumerArchiveGate -Destination $archiveGateEvidencePath -Force
 
@@ -224,17 +236,47 @@ try {
 } catch {
     $errors.Add($_.Exception.Message)
 } finally {
+    $diagnostics = @(
+        @{ source = $packageGatePath; name = "package-gate.json" },
+        @{ source = $installReportPath; name = "install.json" },
+        @{ source = $doctorReportPath; name = "doctor.json" }
+    )
+    if (-not [string]::IsNullOrWhiteSpace($projectRoot)) {
+        $diagnostics += @(
+            @{ source = (Join-Path $projectRoot "unity-dhe-install-runtime.log"); name = "unity-dhe-install-runtime.log" },
+            @{ source = (Join-Path $projectRoot "unity-dhe-deterministic-generate.log"); name = "unity-dhe-deterministic-generate.log" },
+            @{ source = (Join-Path $projectRoot "unity-dhe-deterministic-build.log"); name = "unity-dhe-deterministic-build.log" }
+        )
+    }
+    if (-not [string]::IsNullOrWhiteSpace($consumerWorkflowRoot)) {
+        $diagnostics += @(
+            @{ source = (Join-Path $consumerWorkflowRoot "project-workflow-failure.json"); name = "project-workflow-failure.json" },
+            @{ source = (Join-Path $consumerWorkflowRoot "workflow-failure.json"); name = "workflow-failure.json" }
+        )
+    }
+    foreach ($diagnostic in $diagnostics) {
+        try {
+            Save-Evidence ([string]$diagnostic.source) ([string]$diagnostic.name)
+        } catch {
+            $warnings.Add("Unable to preserve installed-consumer diagnostic '$($diagnostic.name)': $($_.Exception.Message)")
+        }
+    }
     if ($autoConsumer -and -not $KeepConsumer -and (Test-Path -LiteralPath $ConsumerRoot)) {
         $resolvedBase = $temporaryConsumerBase.TrimEnd('\', '/') + [IO.Path]::DirectorySeparatorChar
         $resolvedConsumer = [IO.Path]::GetFullPath($ConsumerRoot)
         if ($resolvedConsumer.StartsWith($resolvedBase, [StringComparison]::OrdinalIgnoreCase)) {
-            Remove-Item -LiteralPath $resolvedConsumer -Recurse -Force
+            try {
+                Remove-Item -LiteralPath $resolvedConsumer -Recurse -Force
+            } catch {
+                $errors.Add("Unable to clean the automatic installed-consumer root '$resolvedConsumer': $($_.Exception.Message)")
+            }
         } else {
-            $warnings.Add("Automatic consumer cleanup was skipped because its path escaped the temporary parent.")
+            $errors.Add("Automatic consumer cleanup was skipped because its path escaped the temporary parent.")
         }
     }
 }
 
+$consumerRetained = Test-Path -LiteralPath $ConsumerRoot -PathType Container
 $report = [ordered]@{
     schemaVersion = 1
     format = "hybridclr.dhe-installed-consumer-gate.json"
@@ -250,8 +292,8 @@ $report = [ordered]@{
     packageId = $packageId
     runtimeSource = $RuntimeSource
     runtimeTreeSha256 = $runtimeTreeSha256
-    consumerRetained = [bool]($KeepConsumer -or -not $autoConsumer)
-    consumerRoot = if ($KeepConsumer -or -not $autoConsumer) { $ConsumerRoot } else { $null }
+    consumerRetained = [bool]$consumerRetained
+    consumerRoot = if ($consumerRetained) { $ConsumerRoot } else { $null }
     archiveRoot = if (Test-Path -LiteralPath $archiveEvidenceRoot) { $archiveEvidenceRoot } else { $null }
     archiveGate = if (Test-Path -LiteralPath $archiveGateEvidencePath) { $archiveGateEvidencePath } else { $null }
     evidence = $evidenceRecords.ToArray()
