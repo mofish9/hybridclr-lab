@@ -92,8 +92,9 @@ $generatedPrefixes = if ($null -eq $manifest) { @() } else { @((Get-PropertyValu
 
 if ($null -ne $manifest) {
     if ([int](Get-PropertyValue $manifest "schemaVersion") -ne 1 -or
-        [string](Get-PropertyValue $manifest "format") -ne "hybridclr.dhe-source-boundary.json") {
-        $errors.Add("DHE source boundary manifest schema or format is invalid.")
+        [string](Get-PropertyValue $manifest "format") -ne "hybridclr.dhe-source-boundary.json" -or
+        [string](Get-PropertyValue $manifest "pathBase") -ne "git-root-v1") {
+        $errors.Add("The repository source-boundary gate requires schema v1 with git-root-v1 path semantics.")
     }
     foreach ($field in @("exactPaths", "prefixes", "generatedPrefixes")) {
         $property = $manifest.PSObject.Properties[$field]

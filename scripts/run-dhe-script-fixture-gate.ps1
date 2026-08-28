@@ -69,14 +69,88 @@ $externalProjectRoot = Join-Path $OutputRoot "external-project-without-embedded-
 New-Item -ItemType Directory -Force -Path $externalProjectRoot | Out-Null
 $externalDnlibFallbackRejected = $false
 try {
-    $null = Resolve-DheDnlibPath -ProjectRoot $externalProjectRoot -LabRoot $LabRoot
+    $null = Resolve-DheDnlibPath -ProjectRoot $externalProjectRoot
 } catch {
     $externalDnlibFallbackRejected = $_.Exception.Message -like "dnlib.dll was not found in the project embedded HybridCLR package*"
 }
 Require $externalDnlibFallbackRejected "External project silently fell back to the demo dnlib.dll."
-$demoDnlib = Resolve-DheDnlibPath -ProjectRoot (Join-Path $LabRoot "unity2021-dhe-demo") -LabRoot $LabRoot
+$demoDnlib = Resolve-DheDnlibPath -ProjectRoot (Join-Path $LabRoot "unity2021-dhe-demo")
 Require ($demoDnlib.StartsWith((Join-Path $LabRoot "unity2021-dhe-demo"), [StringComparison]::OrdinalIgnoreCase)) `
     "Demo project did not resolve dnlib.dll from its own embedded package."
+
+# Prove that an embedded-package lock is bound to ProjectPath, not to the lab
+# or to the directory that happens to contain the lock file.
+$externalEmbeddedRoot = Join-Path $OutputRoot "external-project-with-embedded-package"
+$externalEmbeddedProject = Join-Path $externalEmbeddedRoot "consumer-project"
+$externalEmbeddedLockRoot = Join-Path $externalEmbeddedRoot "release-locks-outside-project"
+$externalEmbeddedPackages = Join-Path $externalEmbeddedProject "Packages"
+$externalEmbeddedSettings = Join-Path $externalEmbeddedProject "ProjectSettings"
+New-Item -ItemType Directory -Force -Path $externalEmbeddedPackages,$externalEmbeddedSettings,$externalEmbeddedLockRoot | Out-Null
+Copy-Item -LiteralPath (Join-Path $LabRoot "unity2021-dhe-demo/Packages/com.code-philosophy.hybridclr") `
+    -Destination $externalEmbeddedPackages -Recurse -Force
+Copy-Item -LiteralPath (Join-Path $LabRoot "unity2021-dhe-demo/Packages/manifest.json") `
+    -Destination (Join-Path $externalEmbeddedPackages "manifest.json") -Force
+Copy-Item -LiteralPath (Join-Path $LabRoot "unity2021-dhe-demo/Packages/packages-lock.json") `
+    -Destination (Join-Path $externalEmbeddedPackages "packages-lock.json") -Force
+Copy-Item -LiteralPath (Join-Path $LabRoot "unity2021-dhe-demo/ProjectSettings/HybridCLRSettings.asset") `
+    -Destination (Join-Path $externalEmbeddedSettings "HybridCLRSettings.asset") -Force
+
+$fixtureUtf8NoBom = New-Object Text.UTF8Encoding($false)
+$checkedPackageLock = Get-Content -Raw -LiteralPath (Join-Path $LabRoot "manifests/dhe-package-lock.json") | ConvertFrom-Json
+$externalPackageLockPath = Join-Path $externalEmbeddedLockRoot "dhe-package-lock.json"
+[IO.File]::WriteAllText($externalPackageLockPath, ($checkedPackageLock | ConvertTo-Json -Depth 8), $fixtureUtf8NoBom)
+$externalEmbeddedReportRoot = Join-Path $externalEmbeddedRoot "valid-source-preflight"
+& (Resolve-DhePowerShellHost) -NoProfile -ExecutionPolicy Bypass -File `
+    (Join-Path $LabRoot "scripts/run-dhe-source-preflight.ps1") `
+    -LabRoot $LabRoot -ProjectPath $externalEmbeddedProject -OutputRoot $externalEmbeddedReportRoot `
+    -PackageLockPath $externalPackageLockPath -RequireEmbeddedPackage -RequireDheEqualsHotUpdate -ForceOutput | Out-Null
+$externalEmbeddedReportPath = Join-Path $externalEmbeddedReportRoot "source-preflight-report.json"
+$externalEmbeddedReport = if (Test-Path -LiteralPath $externalEmbeddedReportPath -PathType Leaf) {
+    Get-Content -Raw -LiteralPath $externalEmbeddedReportPath | ConvertFrom-Json
+} else { $null }
+$externalEmbeddedPackageLockValidated = $LASTEXITCODE -eq 0 -and
+    $null -ne $externalEmbeddedReport -and [bool]$externalEmbeddedReport.passed
+Require $externalEmbeddedPackageLockValidated `
+    "A project-root-relative package lock outside the consumer project did not pass source preflight."
+
+$legacyPackageLock = $checkedPackageLock | ConvertTo-Json -Depth 8 | ConvertFrom-Json
+$legacyPackageLock.packagePath = "unity2021-dhe-demo/Packages/com.code-philosophy.hybridclr"
+$legacyPackageLockPath = Join-Path $externalEmbeddedLockRoot "legacy-lab-relative-package-lock.json"
+[IO.File]::WriteAllText($legacyPackageLockPath, ($legacyPackageLock | ConvertTo-Json -Depth 8), $fixtureUtf8NoBom)
+$legacyPackageLockExit = Invoke-ExpectedFailure @(
+    (Join-Path $LabRoot "scripts/run-dhe-source-preflight.ps1"),
+    "-LabRoot", $LabRoot,
+    "-ProjectPath", $externalEmbeddedProject,
+    "-OutputRoot", (Join-Path $externalEmbeddedRoot "legacy-source-preflight"),
+    "-PackageLockPath", $legacyPackageLockPath,
+    "-RequireEmbeddedPackage",
+    "-RequireDheEqualsHotUpdate",
+    "-ForceOutput"
+)
+$legacyLabRelativePackageLockRejected = $legacyPackageLockExit -ne 0
+Require $legacyLabRelativePackageLockRejected `
+    "Source preflight accepted a legacy LabRoot-relative embedded package lock."
+
+$absolutePackageLock = $checkedPackageLock | ConvertTo-Json -Depth 8 | ConvertFrom-Json
+$absolutePackageLock.packagePath = Join-Path $externalEmbeddedProject "Packages/com.code-philosophy.hybridclr"
+$absolutePackageLockPath = Join-Path $externalEmbeddedLockRoot "absolute-package-lock.json"
+[IO.File]::WriteAllText($absolutePackageLockPath, ($absolutePackageLock | ConvertTo-Json -Depth 8), $fixtureUtf8NoBom)
+$absolutePackageLockExit = Invoke-ExpectedFailure @(
+    (Join-Path $LabRoot "scripts/run-dhe-source-preflight.ps1"),
+    "-LabRoot", $LabRoot,
+    "-ProjectPath", $externalEmbeddedProject,
+    "-OutputRoot", (Join-Path $externalEmbeddedRoot "absolute-source-preflight"),
+    "-PackageLockPath", $absolutePackageLockPath,
+    "-RequireEmbeddedPackage",
+    "-RequireDheEqualsHotUpdate",
+    "-ForceOutput"
+)
+$absolutePackageLockRejected = $absolutePackageLockExit -ne 0
+Require $absolutePackageLockRejected `
+    "Source preflight accepted an absolute embedded package lock path."
+# Invalid inputs are probes, not evidence documents. Keep their versioned
+# failure reports but do not leave invalid recognized JSON in aggregate scans.
+Remove-Item -LiteralPath $legacyPackageLockPath,$absolutePackageLockPath -Force
 
 $workflowLockTested = -not [bool]$WorkflowLockAlreadyHeld
 $workflowLockRejected = $null
@@ -103,10 +177,10 @@ if ($workflowLockTested) {
 }
 $global:LASTEXITCODE = 0
 
-$adapterPrepareFailureTested = -not [bool]$WorkflowLockAlreadyHeld
-$adapterPrepareFailureForwarded = $null
-$adapterTargetForwarded = $null
-if ($adapterPrepareFailureTested) {
+$prePrepareGateTested = -not [bool]$WorkflowLockAlreadyHeld
+$invalidRuntimeRejectedBeforeAdapter = $null
+$adapterTargetParameterValidated = $null
+if ($prePrepareGateTested) {
     $prepareFailureRoot = Join-Path $OutputRoot "adapter-prepare-failure"
     $prepareFailureExit = Invoke-ExpectedFailure @(
         (Join-Path $LabRoot "scripts/run-dhe-project-workflow.ps1"),
@@ -122,12 +196,29 @@ if ($adapterPrepareFailureTested) {
     $prepareFailureReport = if (Test-Path -LiteralPath $prepareFailureReportPath -PathType Leaf) {
         Get-Content -Raw -LiteralPath $prepareFailureReportPath | ConvertFrom-Json
     } else { $null }
-    $adapterPrepareFailureForwarded = $prepareFailureExit -ne 0 -and $null -ne $prepareFailureReport -and
-        [string]$prepareFailureReport.error -like "*fixture-prepare-root-cause*"
-    $adapterTargetForwarded = $prepareFailureExit -ne 0 -and $null -ne $prepareFailureReport -and
-        [string]$prepareFailureReport.error -like "*fixture-prepare-root-cause:FixtureTarget*"
-    Require $adapterPrepareFailureForwarded "Project workflow did not forward the adapter Prepare root cause."
-    Require $adapterTargetForwarded "Project workflow did not forward its opaque target to the adapter."
+    $invalidRuntimeRejectedBeforeAdapter = $prepareFailureExit -ne 0 -and $null -ne $prepareFailureReport -and
+        [string]$prepareFailureReport.error -like "*DheRuntime.cpp was not found*" -and
+        -not (Test-Path -LiteralPath (Join-Path $prepareFailureRoot "workflow-failure.json") -PathType Leaf)
+    Require $invalidRuntimeRejectedBeforeAdapter "Project workflow invoked its adapter before rejecting an invalid runtime."
+
+    $directAdapterRoot = Join-Path $OutputRoot "adapter-target-parameter"
+    $directAdapterExit = Invoke-ExpectedFailure @(
+        (Join-Path $fixtures "dhe-project-adapter-failure-fixture.ps1"),
+        "-Action", "Prepare",
+        "-ProjectPath", (Join-Path $LabRoot "unity2021-dhe-demo"),
+        "-SettingsFile", (Join-Path $LabRoot "unity2021-dhe-demo/ProjectSettings/HybridCLRSettings.asset"),
+        "-RuntimeSource", (Join-Path $LabRoot "unity2021-dhe-demo"),
+        "-OutputRoot", $directAdapterRoot,
+        "-Target", "FixtureTarget",
+        "-ToolchainContractVersion", "1",
+        "-Mode", "Exploratory")
+    $directAdapterFailurePath = Join-Path $directAdapterRoot "workflow-failure.json"
+    $directAdapterFailure = if (Test-Path -LiteralPath $directAdapterFailurePath -PathType Leaf) {
+        Get-Content -Raw -LiteralPath $directAdapterFailurePath | ConvertFrom-Json
+    } else { $null }
+    $adapterTargetParameterValidated = $directAdapterExit -ne 0 -and $null -ne $directAdapterFailure -and
+        [string]$directAdapterFailure.error -eq "fixture-prepare-root-cause:FixtureTarget"
+    Require $adapterTargetParameterValidated "Adapter contract did not preserve its opaque target parameter."
 }
 $global:LASTEXITCODE = 0
 
@@ -203,6 +294,37 @@ $projectPreflightFailureReported = $preflightFailureExit -ne 0 -and
 Require $projectPreflightFailureReported "Project preflight failure did not produce both top-level and source reports."
 $global:LASTEXITCODE = 0
 
+$adapterContractMismatchRoot = Join-Path $OutputRoot "adapter-contract-mismatch"
+$adapterContractMismatchExit = Invoke-ExpectedFailure @(
+    (Join-Path $LabRoot "scripts/fixtures/dhe-project-adapter-contract-mismatch-fixture.ps1"),
+    "-Action", "Prepare",
+    "-ProjectPath", (Join-Path $LabRoot "unity2021-dhe-demo"),
+    "-SettingsFile", (Join-Path $LabRoot "unity2021-dhe-demo/ProjectSettings/HybridCLRSettings.asset"),
+    "-RuntimeSource", (Join-Path $LabRoot "unity2021-dhe-demo"),
+    "-OutputRoot", $adapterContractMismatchRoot,
+    "-Target", "FixtureTarget",
+    "-ToolchainContractVersion", "1",
+    "-Mode", "Exploratory"
+)
+$invalidPreparePath = Join-Path $adapterContractMismatchRoot "adapter/prepare.json"
+$invalidPrepare = if (Test-Path -LiteralPath $invalidPreparePath -PathType Leaf) {
+    Get-Content -Raw -LiteralPath $invalidPreparePath | ConvertFrom-Json
+} else { $null }
+$adapterContractMismatchRejected = $adapterContractMismatchExit -eq 0 -and $null -ne $invalidPrepare
+if ($adapterContractMismatchRejected) {
+    try {
+        $null = Assert-DheAdapterPrepareReport -Report $invalidPrepare -ToolchainContractVersion 1 `
+            -Target "FixtureTarget" -ProjectPath (Join-Path $LabRoot "unity2021-dhe-demo") `
+            -SettingsFile (Join-Path $LabRoot "unity2021-dhe-demo/ProjectSettings/HybridCLRSettings.asset")
+        $adapterContractMismatchRejected = $false
+    } catch {
+        $adapterContractMismatchRejected = $_.Exception.Message -like "*does not match toolchain contract version 1*"
+    }
+}
+Require $adapterContractMismatchRejected "Project workflow accepted an adapter with a mismatched toolchain contract version."
+if (Test-Path -LiteralPath $invalidPreparePath -PathType Leaf) { Remove-Item -LiteralPath $invalidPreparePath -Force }
+$global:LASTEXITCODE = 0
+
 $unsafeSourceOutputRejected = $false
 try {
     Assert-DheSafeOutputRoot -Path (Join-Path $LabRoot "scripts")
@@ -210,6 +332,29 @@ try {
     $unsafeSourceOutputRejected = $true
 }
 Require $unsafeSourceOutputRejected "Output safety accepted a formal tracked source directory."
+
+# PowerShell unwraps a one-item native-command result to a scalar. Prove that
+# the tracked-source guard still rejects a directory containing exactly one
+# tracked file and does not swallow StrictMode property-access failures.
+$singleTrackedRepository = Join-Path $OutputRoot "single-tracked-output-repository"
+$singleTrackedDirectory = Join-Path $singleTrackedRepository "single"
+$singleTrackedFile = Join-Path $singleTrackedDirectory "source.txt"
+$null = New-Item -ItemType Directory -Force -Path $singleTrackedDirectory
+[IO.File]::WriteAllText($singleTrackedFile, "tracked", (New-Object Text.UTF8Encoding($false)))
+& git -C $singleTrackedRepository init -q
+& git -C $singleTrackedRepository config user.email "dhe-fixture@example.invalid"
+& git -C $singleTrackedRepository config user.name "DHE Fixture"
+& git -C $singleTrackedRepository add -- single/source.txt
+& git -C $singleTrackedRepository commit -q -m "test: single tracked output"
+if ($LASTEXITCODE -ne 0) { throw "Unable to commit the single-file output safety fixture." }
+$singleTrackedOutputRejected = $false
+try {
+    Assert-DheSafeOutputRoot -Path $singleTrackedDirectory
+} catch {
+    $singleTrackedOutputRejected = $_.Exception.Message -like "DHE output root overlaps Git-tracked source content*"
+}
+Require $singleTrackedOutputRejected "Output safety accepted a directory containing exactly one tracked file."
+Require (Test-Path -LiteralPath $singleTrackedFile -PathType Leaf) "Output safety changed the tracked single-file fixture."
 
 # A custom tracked-source boundary must be structurally valid; an empty JSON
 # object must not accidentally turn the Git coverage check into a no-op.
@@ -290,6 +435,7 @@ try {
     $separateBoundary = [ordered]@{
         schemaVersion = 1
         format = "hybridclr.dhe-source-boundary.json"
+        pathBase = "git-root-v1"
         exactPaths = @("manifests/dhe-source-boundary.json", "ProjectSettings/HybridCLRSettings.asset")
         prefixes = @("ProjectSettings/")
         generatedPrefixes = @("artifacts/")
@@ -929,15 +1075,20 @@ $report = [ordered]@{
     exploratoryReleaseRejected = $exploratoryReleaseRejected
     releaseDerivedOutputsIsolated = $releaseDerivedOutputsIsolated
     unsafeSourceOutputRejected = $unsafeSourceOutputRejected
+    singleTrackedOutputRejected = $singleTrackedOutputRejected
     invalidBoundaryRejected = $invalidBoundaryRejected
     foreignGitRootRejected = $foreignGitRootRejected
     separateGitIdentitiesValidated = $separateGitIdentitiesValidated
     gitApplyRootIsolated = $gitApplyRootIsolated
-    adapterPrepareFailureTested = $adapterPrepareFailureTested
-    adapterPrepareFailureForwarded = $adapterPrepareFailureForwarded
-    adapterTargetForwarded = $adapterTargetForwarded
+    prePrepareGateTested = $prePrepareGateTested
+    invalidRuntimeRejectedBeforeAdapter = $invalidRuntimeRejectedBeforeAdapter
+    adapterTargetParameterValidated = $adapterTargetParameterValidated
+    adapterContractMismatchRejected = $adapterContractMismatchRejected
     schemaDuplicatePropertyRejected = $schemaDuplicatePropertyRejected
     externalDnlibFallbackRejected = $externalDnlibFallbackRejected
+    externalEmbeddedPackageLockValidated = $externalEmbeddedPackageLockValidated
+    legacyLabRelativePackageLockRejected = $legacyLabRelativePackageLockRejected
+    absolutePackageLockRejected = $absolutePackageLockRejected
     workflowLockTested = $workflowLockTested
     workflowLockRejected = $workflowLockRejected
     workflowLockReusable = if ($workflowLockTested) { $lockRetryExit -eq 0 } else { $null }

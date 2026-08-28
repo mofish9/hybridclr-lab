@@ -16,6 +16,7 @@ $LabRoot = if ([string]::IsNullOrWhiteSpace($LabRoot)) {
     [IO.Path]::GetFullPath($LabRoot)
 }
 $project = Join-Path $LabRoot "managed-cases/HybridCLR.ManagedCasesAot/HybridCLR.ManagedCasesAot.csproj"
+$dnlibPath = Join-Path $LabRoot "unity2021-dhe-demo/Packages/com.code-philosophy.hybridclr/Plugins/dnlib.dll"
 $outputRoot = if ([string]::IsNullOrWhiteSpace($OutputRoot)) {
     Join-Path $LabRoot "artifacts/dhe-compatibility-negative-gate"
 } else {
@@ -73,6 +74,7 @@ function Invoke-Scenario([string]$name, [string]$variant) {
         & (Join-Path $LabRoot "scripts/generate-dhe-mv.ps1") `
             -BaselineAssembly $guardBaseline `
             -CurrentAssembly $guardCurrent `
+            -DnlibPath $dnlibPath `
             -Output $guardBaseline
     }
     catch {
@@ -88,6 +90,7 @@ function Invoke-Scenario([string]$name, [string]$variant) {
         & (Join-Path $LabRoot "scripts/generate-dhe-mv.ps1") `
             -BaselineAssembly $guardBaseline `
             -CurrentAssembly $guardCurrent `
+            -DnlibPath $dnlibPath `
             -Output (Join-Path $scenarioRoot "path-guard.mv.json") `
             -BinaryOutput $guardCurrent `
             -StrictCompatibility
@@ -105,6 +108,7 @@ function Invoke-Scenario([string]$name, [string]$variant) {
         & (Join-Path $LabRoot "scripts/generate-dhe-mv.ps1") `
             -BaselineAssembly $baseline `
             -CurrentAssembly $current `
+            -DnlibPath $dnlibPath `
             -Output $strictPath `
             -StrictCompatibility
     }
@@ -121,6 +125,7 @@ function Invoke-Scenario([string]$name, [string]$variant) {
     & (Join-Path $LabRoot "scripts/generate-dhe-mv.ps1") `
         -BaselineAssembly $baseline `
         -CurrentAssembly $current `
+        -DnlibPath $dnlibPath `
         -Output $analysisPath
     if (-not (Test-Path -LiteralPath $analysisPath -PathType Leaf)) {
         throw "Scenario '$name' did not produce an analysis report."

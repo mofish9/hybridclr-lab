@@ -31,6 +31,7 @@ $ErrorActionPreference = "Stop"
 . (Join-Path $PSScriptRoot "dhe-workflow-common.ps1")
 $resolvedHotUpdateAssemblies = @()
 $resolvedDheAssemblies = @()
+$resolvedSettingsProjectRoot = ""
 $configurationErrors = New-Object System.Collections.Generic.List[string]
 
 function Resolve-Root([string]$Path, [string]$Description) {
@@ -89,6 +90,7 @@ if (-not [string]::IsNullOrWhiteSpace($AssemblyListFile)) {
 if (-not [string]::IsNullOrWhiteSpace($SettingsFile)) {
     $settingsPath = [IO.Path]::GetFullPath($SettingsFile)
     $settings = Resolve-DheSettingsAssemblySets -SettingsFile $settingsPath -ProjectRoot $ProjectRoot
+    $resolvedSettingsProjectRoot = [string]$settings.projectRoot
     $resolvedHotUpdateAssemblies = @($settings.hotUpdateAssemblies)
     $resolvedDheAssemblies = @($settings.dheAotAssemblies)
     if ($RequireDheEqualsHotUpdate) {
@@ -118,6 +120,10 @@ $AssemblyNames = @($AssemblyNames | ForEach-Object { $_.Trim() } |
 if ($AssemblyNames.Count -eq 0) {
     throw "No hot-update assemblies were resolved from the supplied inputs."
 }
+$dnlibProjectRoot = if (-not [string]::IsNullOrWhiteSpace($resolvedSettingsProjectRoot)) {
+    $resolvedSettingsProjectRoot
+} else { $ProjectRoot }
+$resolvedDnlibPath = Resolve-DheDnlibPath -RequestedPath $DnlibPath -ProjectRoot $dnlibProjectRoot
 
 $records = New-Object System.Collections.Generic.List[object]
 $failOnIncompatibleDetected = $false
@@ -168,9 +174,7 @@ foreach ($assemblyName in $AssemblyNames) {
             "-CurrentAssembly", $currentPath,
             "-Output", $jsonPath
         )
-        if (-not [string]::IsNullOrWhiteSpace($DnlibPath)) {
-            $args += @("-DnlibPath", $DnlibPath)
-        }
+        $args += @("-DnlibPath", $resolvedDnlibPath)
         if ($StrictCompatibility) {
             $args += "-StrictCompatibility"
         }

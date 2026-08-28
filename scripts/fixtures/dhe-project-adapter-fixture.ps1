@@ -13,6 +13,9 @@ param(
     [string]$OutputRoot,
     [ValidateSet("StandaloneWindows64")]
     [string]$Target = "StandaloneWindows64",
+    [Parameter(Mandatory = $true)]
+    [ValidateRange(1, 1)]
+    [int]$ToolchainContractVersion,
     [string]$Mode = "Exploratory",
     [string]$ProjectPlan = "",
     [string]$ProjectPlanValidation = "",
@@ -81,6 +84,7 @@ if ($Action -eq "Prepare") {
         format = "hybridclr.dhe-project-adapter-prepare.json"
         generatedAtUtc = [DateTimeOffset]::UtcNow.ToString("O")
         passed = [IO.Directory]::Exists($baselineRoot) -and [IO.Directory]::Exists($currentRoot)
+        toolchainContractVersion = $ToolchainContractVersion
         target = $Target
         pathSemantics = "workspace-absolute-v1"
         projectPath = [IO.Path]::GetFullPath($ProjectPath)

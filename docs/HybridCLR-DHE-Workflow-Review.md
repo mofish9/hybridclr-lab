@@ -40,7 +40,8 @@ HybridCLR package 占据绝大多数；DHE 脚本、fixture、schema 和审查�
   默认拒绝非空目录，只有显式 `-ForceOutput` 才会替换，demo 总入口会传入该开关。
 - source preflight 的 package lock 改为显式 `-PackageLockPath`；只有 demo 或显式要求
   embedded package 时才校验 package tree。使用 registry/package manager 的项目不会再
-  错误套用 demo 的 package lock。
+  错误套用 demo 的 package lock。embedded lock 固定使用 `pathBase=project-root-v1`，
+  lock 文件位置不会改变 `packagePath` 的解析基准。
 - strict MV 现在把字段常量、`MethodImpl` 覆盖关系、属性/事件和程序集自定义属性纳入
   元数据边界，并加入字段常量变化负例。
 - MV 的 managed ABI 参数列表现在在 PowerShell 5.1 和 pwsh 7 中都保持数组形状，字符串
@@ -427,7 +428,8 @@ $planned = @($preflight.assemblies | Sort-Object assemblyName)
 `generationPassed`/`validationPassed` 可以为 `true`，但 `coverageComplete`
 和 `artifactReady` 仍会明确反映 missing/incompatible 程序集。离线预检始终
 保持 `releaseReady=false`，因为它不评估 native ABI 和 Player，不能把探索
-结果误读为可发布结果。对非 demo 项目应显式传入项目自己的 `-DnlibPath`。
+结果误读为可发布结果。embedded package 从项目根解析 dnlib；registry/external package
+应显式传入项目自己的 `-DnlibPath`，不会回退到 Demo 或 sibling checkout。
 workflow 会同时归档 `runtime-manifest.json`、`build-identity.json`、
 `dhe-native-manifest.json`、独立的 `runtime-plan/` payload 和
 `artifact-validation.json`；validator 会重新计算归档 payload 的 hash，报告不再依赖

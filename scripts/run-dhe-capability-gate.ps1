@@ -16,6 +16,7 @@ $LabRoot = if ([string]::IsNullOrWhiteSpace($LabRoot)) {
     [IO.Path]::GetFullPath($LabRoot)
 }
 $project = Join-Path $LabRoot "managed-cases/HybridCLR.ManagedCasesAot/HybridCLR.ManagedCasesAot.csproj"
+$dnlibPath = Join-Path $LabRoot "unity2021-dhe-demo/Packages/com.code-philosophy.hybridclr/Plugins/dnlib.dll"
 $outputRoot = if ([string]::IsNullOrWhiteSpace($OutputRoot)) {
     Join-Path $LabRoot "artifacts/dhe-capability-gate"
 } else {
@@ -43,6 +44,7 @@ $diffBinary = Join-Path $outputRoot "HybridCLR.ManagedCasesAot.mv.bytes"
 & (Join-Path $LabRoot "scripts/generate-dhe-mv.ps1") `
     -BaselineAssembly $baselineDll `
     -CurrentAssembly $currentDll `
+    -DnlibPath $dnlibPath `
     -Output $diffJson `
     -BinaryOutput $diffBinary `
     -StrictCompatibility

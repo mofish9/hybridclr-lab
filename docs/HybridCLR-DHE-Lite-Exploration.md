@@ -39,6 +39,7 @@ baseline DLL + current DLL
 ./scripts/generate-dhe-mv.ps1 `
     -BaselineAssembly C:/path/to/baseline/HybridCLR.ManagedCases.dll `
     -CurrentAssembly C:/path/to/current/HybridCLR.ManagedCases.dll `
+    -DnlibPath C:/path/to/project/Packages/com.code-philosophy.hybridclr/Plugins/dnlib.dll `
     -Output staging/dhe/HybridCLR.ManagedCases.mv.json
 ```
 
@@ -48,6 +49,7 @@ baseline DLL + current DLL
 ./scripts/generate-dhe-mv.ps1 `
     -BaselineAssembly C:/path/to/baseline/HybridCLR.ManagedCases.dll `
     -CurrentAssembly C:/path/to/current/HybridCLR.ManagedCases.dll `
+    -DnlibPath C:/path/to/project/Packages/com.code-philosophy.hybridclr/Plugins/dnlib.dll `
     -Output staging/dhe/HybridCLR.ManagedCases.mv.json `
     -BinaryOutput staging/dhe/HybridCLR.ManagedCases.mv.bytes `
     -StrictCompatibility
@@ -58,8 +60,9 @@ abstract/PInvoke）、完整 method attributes 和所有类型布局保持不变
 状态退出；`-BinaryOutput` 只有在严格门禁通过时才会生成，可以直接交给实验 runtime API。
 这份报告可以作为 CI 的发布门禁。
 
-脚本使用 package 自带的 `Plugins/dnlib.dll`。如果无法自动定位，可以显式传入
-`-DnlibPath`。
+低层 `generate-dhe-mv.ps1` 要求显式传入 `-DnlibPath`，不会从 Demo 或 sibling
+checkout 猜测依赖。批处理入口可以通过 `-ProjectRoot` 从项目自己的 embedded
+package 解析 dnlib；registry/external package 仍需显式传入路径。
 
 ## mv 格式
 

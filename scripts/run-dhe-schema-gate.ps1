@@ -143,7 +143,10 @@ $candidateFiles = New-Object 'System.Collections.Generic.HashSet[string]'([Strin
 foreach ($manifestPath in @(
     (Join-Path $LabRoot "manifests/dhe-runtime-lock.json"),
     (Join-Path $LabRoot "manifests/dhe-package-lock.json"),
-    (Join-Path $LabRoot "manifests/dhe-source-boundary.json")
+    (Join-Path $LabRoot "manifests/dhe-source-boundary.json"),
+    (Join-Path $LabRoot "manifests/dhe-toolchain-layout.json"),
+    (Join-Path $LabRoot "dhe-toolchain-manifest.json"),
+    (Join-Path $LabRoot "dhe-source-boundary.json")
 )) {
     if ([IO.File]::Exists($manifestPath)) { $null = $candidateFiles.Add([IO.Path]::GetFullPath($manifestPath)) }
 }

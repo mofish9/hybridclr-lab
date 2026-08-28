@@ -1,7 +1,8 @@
 [CmdletBinding()]
 param(
     [string]$LabRoot = "",
-    [string]$ProjectPath = "",
+    [Parameter(Mandatory = $true)]
+    [string]$ProjectPath,
     [string]$RuntimeSource = "",
     [string]$OutputRoot = "",
     [string]$PackageLockPath = "",
@@ -29,11 +30,7 @@ $LabRoot = if ([string]::IsNullOrWhiteSpace($LabRoot)) {
 } else {
     [IO.Path]::GetFullPath($LabRoot)
 }
-$ProjectPath = if ([string]::IsNullOrWhiteSpace($ProjectPath)) {
-    Join-Path $LabRoot "unity2021-dhe-demo"
-} else {
-    [IO.Path]::GetFullPath($ProjectPath)
-}
+$ProjectPath = [IO.Path]::GetFullPath($ProjectPath)
 $OutputRoot = if ([string]::IsNullOrWhiteSpace($OutputRoot)) {
     Join-Path $LabRoot "artifacts/dhe-clean-checkout-gate"
 } else {
@@ -52,11 +49,9 @@ New-Item -ItemType Directory -Force -Path $OutputRoot | Out-Null
 
 $scriptHost = Resolve-DhePowerShellHost
 $sourcePreflightScript = Join-Path $LabRoot "scripts/run-dhe-source-preflight.ps1"
-$packageLockPath = if ([string]::IsNullOrWhiteSpace($PackageLockPath)) {
-    Join-Path $LabRoot "manifests/dhe-package-lock.json"
-} else {
+$packageLockPath = if (-not [string]::IsNullOrWhiteSpace($PackageLockPath)) {
     [IO.Path]::GetFullPath($PackageLockPath)
-}
+} else { "" }
 $errors = New-Object System.Collections.Generic.List[string]
 
 function Invoke-SourcePreflight([string[]]$Arguments) {
@@ -122,6 +117,7 @@ function Get-GitSourceIdentity {
     $trackedSourcesCompleteValue = $null
     $resolvedBoundaryPath = if ([string]::IsNullOrWhiteSpace($BoundaryPath)) { $null } else { [IO.Path]::GetFullPath($BoundaryPath) }
     $boundarySha256 = $null
+    $boundaryPathBaseValue = $null
 
     if (-not (Test-Path -LiteralPath $resolvedRequestedRoot -PathType Container)) {
         $identityErrors.Add("$Name Git source root was not found: $resolvedRequestedRoot")
@@ -176,13 +172,15 @@ function Get-GitSourceIdentity {
                     if ($null -ne $boundary) {
                         $boundaryFormat = if ($null -ne $boundary.PSObject.Properties["format"]) { [string]$boundary.format } else { "" }
                         $boundarySchema = if ($null -ne $boundary.PSObject.Properties["schemaVersion"]) { [int]$boundary.schemaVersion } else { 0 }
+                        $boundaryPathBaseValue = if ($null -ne $boundary.PSObject.Properties["pathBase"]) { [string]$boundary.pathBase } else { $null }
                         [object[]]$boundaryExact = if ($null -ne $boundary.PSObject.Properties["exactPaths"]) { @($boundary.exactPaths) } else { @() }
                         [object[]]$boundaryPrefixes = if ($null -ne $boundary.PSObject.Properties["prefixes"]) { @($boundary.prefixes) } else { @() }
                         $boundaryExactCount = if ($null -eq $boundary.PSObject.Properties["exactPaths"]) { 0 } else { @($boundary.exactPaths).Count }
                         $boundaryPrefixCount = if ($null -eq $boundary.PSObject.Properties["prefixes"]) { 0 } else { @($boundary.prefixes).Count }
                         if ($boundarySchema -ne 1 -or $boundaryFormat -ne "hybridclr.dhe-source-boundary.json" -or
+                            $boundaryPathBaseValue -notin @("git-root-v1", "manifest-directory-v1") -or
                             $boundaryExactCount -eq 0 -or $boundaryPrefixCount -eq 0) {
-                            $identityErrors.Add("$Name source boundary manifest has an invalid schema, format, or empty exactPaths/prefixes: $resolvedBoundaryPath")
+                            $identityErrors.Add("$Name source boundary manifest has an invalid schema, format, pathBase, or empty exactPaths/prefixes: $resolvedBoundaryPath")
                             $boundary = $null
                         } else {
                             $boundaryValues = @($boundaryExact + $boundaryPrefixes | ForEach-Object { ([string]$_).Replace('\', '/') })
@@ -214,10 +212,32 @@ function Get-GitSourceIdentity {
                                     $resolvedGitRoot.TrimEnd('\', '/').Length).TrimStart('\', '/').Replace('\', '/')
                                 if (-not $trackedSet.Contains($boundaryRelativePath)) { $missingSources.Add($boundaryRelativePath) }
                             }
-                            foreach ($requiredPath in @($boundary.exactPaths | ForEach-Object { ([string]$_).Replace('\', '/') })) {
+                            $boundaryBasePath = if ($boundaryPathBaseValue -eq "manifest-directory-v1") {
+                                [IO.Path]::GetDirectoryName($resolvedBoundaryPath)
+                            } else {
+                                $resolvedGitRoot
+                            }
+                            if (-not (Test-PathWithinRoot -Path $boundaryBasePath -Root $resolvedGitRoot)) {
+                                $identityErrors.Add("$Name source boundary pathBase resolves outside the Git repository: $boundaryBasePath")
+                                $boundaryBaseRelative = ""
+                            } else {
+                                $boundaryBaseRelative = $boundaryBasePath.Substring(
+                                    $resolvedGitRoot.TrimEnd('\', '/').Length).TrimStart('\', '/').Replace('\', '/')
+                            }
+                            $boundaryExactGitPaths = @($boundary.exactPaths | ForEach-Object {
+                                $relative = ([string]$_).Replace('\', '/').TrimStart('/')
+                                if ([string]::IsNullOrWhiteSpace($boundaryBaseRelative)) { $relative }
+                                else { $boundaryBaseRelative.TrimEnd('/') + '/' + $relative }
+                            })
+                            $boundaryPrefixGitPaths = @($boundary.prefixes | ForEach-Object {
+                                $relative = ([string]$_).Replace('\', '/').TrimStart('/')
+                                if ([string]::IsNullOrWhiteSpace($boundaryBaseRelative)) { $relative }
+                                else { $boundaryBaseRelative.TrimEnd('/') + '/' + $relative }
+                            })
+                            foreach ($requiredPath in $boundaryExactGitPaths) {
                                 if (-not $trackedSet.Contains($requiredPath)) { $missingSources.Add($requiredPath) }
                             }
-                            foreach ($requiredPrefix in @($boundary.prefixes | ForEach-Object { ([string]$_).Replace('\', '/') })) {
+                            foreach ($requiredPrefix in $boundaryPrefixGitPaths) {
                                 $prefixMatches = @($trackedSet | Where-Object {
                                     if ($requiredPrefix.Contains('*')) { $_ -like $requiredPrefix }
                                     else {
@@ -254,6 +274,7 @@ function Get-GitSourceIdentity {
         trackedSourcesRequired = [bool]$RequireTracked
         sourceBoundaryPath = $resolvedBoundaryPath
         sourceBoundarySha256 = $boundarySha256
+        sourceBoundaryPathBase = $boundaryPathBaseValue
         missingTrackedSources = $missingSources.ToArray()
         passed = $identityErrors.Count -eq 0
         errors = $identityErrors.ToArray()

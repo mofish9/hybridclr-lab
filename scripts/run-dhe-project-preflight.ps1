@@ -59,7 +59,7 @@ foreach ($item in @(@($settingsPath, "HybridCLR settings", "Leaf"), @($baselineP
         throw "$($item[1]) was not found: $($item[0])"
     }
 }
-$resolvedDnlibPath = Resolve-DheDnlibPath -RequestedPath $DnlibPath -ProjectRoot $projectRootPath -LabRoot $LabRoot
+$resolvedDnlibPath = Resolve-DheDnlibPath -RequestedPath $DnlibPath -ProjectRoot $projectRootPath
 $scriptHost = Resolve-DhePowerShellHost
 $runSourcePreflight = $RequireRuntime -or $RequireEmbeddedPackage -or $RequireIdentityTemplate -or
     $RequireCleanRuntimeSources -or

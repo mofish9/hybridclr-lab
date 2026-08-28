@@ -9,6 +9,7 @@ param(
     [Parameter(Mandatory = $true)]
     [string]$Output,
 
+    [Parameter(Mandatory = $true)]
     [string]$DnlibPath,
 
     [switch]$StrictCompatibility,
@@ -29,7 +30,7 @@ function Resolve-ExistingPath([string]$Path, [string]$Description) {
 }
 
 function Resolve-DnlibPath {
-    return Resolve-DheDnlibPath -RequestedPath $DnlibPath -LabRoot (Split-Path -Parent $PSScriptRoot)
+    return Resolve-DheDnlibPath -RequestedPath $DnlibPath
 }
 
 function Get-Sha256 {

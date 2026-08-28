@@ -59,8 +59,7 @@ function Invoke-DheGitApplyAtRoot {
 function Resolve-DheDnlibPath {
     param(
         [string]$RequestedPath = "",
-        [string]$ProjectRoot = "",
-        [string]$LabRoot = ""
+        [string]$ProjectRoot = ""
     )
 
     if (-not [string]::IsNullOrWhiteSpace($RequestedPath)) {
@@ -71,32 +70,13 @@ function Resolve-DheDnlibPath {
         return $resolvedRequested
     }
 
-    $candidates = New-Object System.Collections.Generic.List[string]
     if (-not [string]::IsNullOrWhiteSpace($ProjectRoot)) {
         $projectPath = [IO.Path]::GetFullPath($ProjectRoot)
-        $candidates.Add((Join-Path $projectPath "Packages/com.code-philosophy.hybridclr/Plugins/dnlib.dll"))
-        foreach ($candidate in $candidates) {
-            $resolvedCandidate = [IO.Path]::GetFullPath($candidate)
-            if ([IO.File]::Exists($resolvedCandidate)) {
-                return $resolvedCandidate
-            }
-        }
-        throw "dnlib.dll was not found in the project embedded HybridCLR package. Pass -DnlibPath explicitly for registry or externally managed packages: $projectPath"
-    }
-
-    if (-not [string]::IsNullOrWhiteSpace($LabRoot)) {
-        $labPath = [IO.Path]::GetFullPath($LabRoot)
-        $candidates.Add((Join-Path $labPath "unity2021-dhe-demo/Packages/com.code-philosophy.hybridclr/Plugins/dnlib.dll"))
-    }
-    $candidates.Add((Join-Path $PSScriptRoot "../unity2021-dhe-demo/Packages/com.code-philosophy.hybridclr/Plugins/dnlib.dll"))
-    $candidates.Add((Join-Path $PSScriptRoot "../../repos/hybridclr_unity/Plugins/dnlib.dll"))
-    $candidates.Add((Join-Path $PSScriptRoot "../../../repos/hybridclr_unity/Plugins/dnlib.dll"))
-
-    foreach ($candidate in $candidates) {
-        $resolvedCandidate = [IO.Path]::GetFullPath($candidate)
+        $resolvedCandidate = [IO.Path]::GetFullPath((Join-Path $projectPath "Packages/com.code-philosophy.hybridclr/Plugins/dnlib.dll"))
         if ([IO.File]::Exists($resolvedCandidate)) {
             return $resolvedCandidate
         }
+        throw "dnlib.dll was not found in the project embedded HybridCLR package. Pass -DnlibPath explicitly for registry or externally managed packages: $projectPath"
     }
     throw "dnlib.dll was not found. Pass -DnlibPath explicitly or provide a project embedded HybridCLR package."
 }
@@ -421,6 +401,51 @@ function Resolve-DheSettingsAssemblySets {
     }
 }
 
+function Assert-DheAdapterPrepareReport {
+    param(
+        [Parameter(Mandatory = $true)]
+        [object]$Report,
+        [Parameter(Mandatory = $true)]
+        [int]$ToolchainContractVersion,
+        [Parameter(Mandatory = $true)]
+        [string]$Target,
+        [Parameter(Mandatory = $true)]
+        [string]$ProjectPath,
+        [Parameter(Mandatory = $true)]
+        [string]$SettingsFile
+    )
+
+    if ([int]$Report.schemaVersion -ne 1 -or
+        [string]$Report.format -ne "hybridclr.dhe-project-adapter-prepare.json") {
+        throw "DHE adapter prepare report has an invalid schema or format."
+    }
+    if ([string]$Report.target -ne $Target -or
+        [string]$Report.pathSemantics -ne "workspace-absolute-v1") {
+        throw "DHE adapter prepare report has an unsupported target or path semantics."
+    }
+    if ([int]$Report.toolchainContractVersion -ne $ToolchainContractVersion) {
+        throw "DHE adapter prepare report does not match toolchain contract version $ToolchainContractVersion."
+    }
+    if (-not (Get-DheStrictBooleanProperty $Report "passed" "DHE adapter prepare passed")) {
+        throw "DHE adapter prepare report did not pass."
+    }
+
+    $references = [ordered]@{}
+    foreach ($propertyName in @("projectPath", "settingsFile", "baselineRoot", "currentRoot")) {
+        $property = $Report.PSObject.Properties[$propertyName]
+        $value = if ($null -eq $property) { "" } else { [string]$property.Value }
+        if ([string]::IsNullOrWhiteSpace($value) -or -not [IO.Path]::IsPathRooted($value)) {
+            throw "DHE adapter prepare $propertyName must be an absolute path under workspace-absolute-v1."
+        }
+        $references[$propertyName] = [IO.Path]::GetFullPath($value)
+    }
+    if ((Normalize-DhePath $references.projectPath) -ne (Normalize-DhePath $ProjectPath) -or
+        (Normalize-DhePath $references.settingsFile) -ne (Normalize-DhePath $SettingsFile)) {
+        throw "DHE adapter prepare report is bound to a different project or settings file."
+    }
+    return [pscustomobject]$references
+}
+
 function Resolve-DhePowerShellHost {
     $preferredNames = if ($PSVersionTable.PSEdition -eq "Core") {
         @("pwsh", "powershell")
@@ -664,6 +689,226 @@ function Test-DhePathRelation([string]$Left, [string]$Right) {
         $rightPath.StartsWith($leftPrefix, [StringComparison]::OrdinalIgnoreCase)
 }
 
+function Test-DhePathWithinRoot([string]$Path, [string]$Root) {
+    $resolvedPath = Normalize-DhePath $Path
+    $resolvedRoot = Normalize-DhePath $Root
+    return $resolvedPath.Equals($resolvedRoot, [StringComparison]::OrdinalIgnoreCase) -or
+        $resolvedPath.StartsWith($resolvedRoot + [IO.Path]::DirectorySeparatorChar, [StringComparison]::OrdinalIgnoreCase)
+}
+
+function Get-DheRegularTreeFiles {
+    param(
+        [Parameter(Mandatory = $true)]
+        [string]$Root
+    )
+
+    $resolvedRoot = [IO.Path]::GetFullPath($Root)
+    if (-not (Test-Path -LiteralPath $resolvedRoot)) {
+        throw "DHE file tree root was not found: $resolvedRoot"
+    }
+    $rootItem = Get-Item -LiteralPath $resolvedRoot -Force
+    if (($rootItem.Attributes -band [IO.FileAttributes]::ReparsePoint) -ne 0) {
+        throw "DHE file tree may not contain a junction or symbolic link: $resolvedRoot"
+    }
+    if (-not $rootItem.PSIsContainer) {
+        return $rootItem
+    }
+
+    $pending = New-Object 'System.Collections.Generic.Queue[string]'
+    $pending.Enqueue($resolvedRoot)
+    while ($pending.Count -gt 0) {
+        $directory = $pending.Dequeue()
+        foreach ($item in @(Get-ChildItem -LiteralPath $directory -Force)) {
+            if (($item.Attributes -band [IO.FileAttributes]::ReparsePoint) -ne 0) {
+                throw "DHE file tree may not contain a junction or symbolic link: $($item.FullName)"
+            }
+            if ($item.PSIsContainer) {
+                $pending.Enqueue($item.FullName)
+            } else {
+                $item
+            }
+        }
+    }
+}
+
+function Find-DheContainingGitRoot([string]$Path) {
+    $cursor = Normalize-DhePath $Path
+    while (-not [string]::IsNullOrWhiteSpace($cursor)) {
+        if (Test-Path -LiteralPath (Join-Path $cursor ".git")) {
+            return $cursor
+        }
+        $cursorRoot = [IO.Path]::GetPathRoot($cursor)
+        if (-not [string]::IsNullOrWhiteSpace($cursorRoot) -and
+            $cursor.Equals($cursorRoot.TrimEnd('\', '/'), [StringComparison]::OrdinalIgnoreCase)) {
+            break
+        }
+        $parent = Split-Path -Parent $cursor
+        if ([string]::IsNullOrWhiteSpace($parent) -or
+            $parent.Equals($cursor, [StringComparison]::OrdinalIgnoreCase)) {
+            break
+        }
+        $cursor = $parent.TrimEnd('\', '/')
+    }
+    return $null
+}
+
+function Assert-DheBasicOutputRootSafety {
+    param(
+        [Parameter(Mandatory = $true)]
+        [string]$Path,
+        [string[]]$ProtectedPaths = @()
+    )
+
+    $resolved = Normalize-DhePath $Path
+    $pathRoot = [IO.Path]::GetPathRoot($resolved)
+    if (-not [string]::IsNullOrWhiteSpace($pathRoot) -and
+        $resolved.Equals($pathRoot.TrimEnd('\', '/'), [StringComparison]::OrdinalIgnoreCase)) {
+        throw "DHE output root may not be a filesystem root: $resolved"
+    }
+    foreach ($protected in @($ProtectedPaths | Where-Object { -not [string]::IsNullOrWhiteSpace($_) })) {
+        if (Test-DhePathRelation $resolved $protected) {
+            throw "DHE output root must not overlap protected path '$([IO.Path]::GetFullPath($protected))': $resolved"
+        }
+    }
+
+    # Reject existing junctions/symlinks anywhere in the output path chain.
+    # This protects both recursive cleanup and verified package replacement.
+    $cursor = $resolved
+    while (-not [string]::IsNullOrWhiteSpace($cursor)) {
+        if (Test-Path -LiteralPath $cursor) {
+            $item = Get-Item -LiteralPath $cursor -Force
+            if (($item.Attributes -band [IO.FileAttributes]::ReparsePoint) -ne 0) {
+                throw "DHE output root may not contain a junction or symbolic link: $cursor"
+            }
+        }
+        $cursorRoot = [IO.Path]::GetPathRoot($cursor)
+        if (-not [string]::IsNullOrWhiteSpace($cursorRoot) -and
+            $cursor.Equals($cursorRoot.TrimEnd('\', '/'), [StringComparison]::OrdinalIgnoreCase)) {
+            break
+        }
+        $parent = Split-Path -Parent $cursor
+        if ([string]::IsNullOrWhiteSpace($parent) -or
+            $parent.Equals($cursor, [StringComparison]::OrdinalIgnoreCase)) {
+            break
+        }
+        $cursor = $parent.TrimEnd('\', '/')
+    }
+}
+
+function Assert-DheSafeVerifiedReplacementRoot {
+    param(
+        [Parameter(Mandatory = $true)]
+        [string]$Path,
+        [string[]]$ProtectedPaths = @()
+    )
+
+    $resolved = Normalize-DhePath $Path
+    Assert-DheBasicOutputRootSafety -Path $resolved -ProtectedPaths $ProtectedPaths
+    $gitRoot = Find-DheContainingGitRoot $resolved
+    if (-not [string]::IsNullOrWhiteSpace([string]$gitRoot) -and
+        $resolved.Equals($gitRoot, [StringComparison]::OrdinalIgnoreCase)) {
+        throw "DHE verified replacement root may not be the Git worktree root: $resolved"
+    }
+}
+
+function New-DheTemporaryReportPath([string]$Name) {
+    $safeName = if ([string]::IsNullOrWhiteSpace($Name)) { "report" } else {
+        [regex]::Replace($Name, '[^A-Za-z0-9._-]', '-')
+    }
+    $reportRoot = Join-Path ([IO.Path]::GetTempPath()) "HybridCLRDhe/reports"
+    return Join-Path $reportRoot ("{0}-{1}-{2}.json" -f $safeName, $PID, [Guid]::NewGuid().ToString("N"))
+}
+
+function Get-DheToolchainPackageId {
+    param(
+        [Parameter(Mandatory = $true)][string]$ToolchainVersion,
+        [Parameter(Mandatory = $true)][int]$ContractVersion,
+        [Parameter(Mandatory = $true)][string]$Mode,
+        [string]$SourceHead = "",
+        [string]$SourceTree = "",
+        [Parameter(Mandatory = $true)][string]$LayoutSha256,
+        [Parameter(Mandatory = $true)][object[]]$Files
+    )
+
+    $recordsByPath = New-Object 'System.Collections.Generic.Dictionary[string,object]'([StringComparer]::Ordinal)
+    foreach ($record in @($Files)) {
+        $path = ([string]$record.path).Replace('\', '/')
+        if ([string]::IsNullOrWhiteSpace($path) -or $recordsByPath.ContainsKey($path)) {
+            throw "DHE toolchain package ID requires unique non-empty file paths."
+        }
+        $recordsByPath.Add($path, $record)
+    }
+    $lines = New-Object System.Collections.Generic.List[string]
+    $lines.Add("hybridclr-dhe-toolchain-package-v1")
+    $lines.Add($ToolchainVersion)
+    $lines.Add($ContractVersion.ToString([Globalization.CultureInfo]::InvariantCulture))
+    $lines.Add($Mode)
+    $lines.Add(([string]$SourceHead).ToLowerInvariant())
+    $lines.Add(([string]$SourceTree).ToLowerInvariant())
+    $lines.Add($LayoutSha256.ToLowerInvariant())
+    foreach ($path in (Sort-DheOrdinal ([string[]]@($recordsByPath.Keys)))) {
+        $record = $recordsByPath[$path]
+        $lines.Add(("{0}`0{1}`0{2}" -f $path, ([int64]$record.size).ToString([Globalization.CultureInfo]::InvariantCulture), ([string]$record.sha256).ToLowerInvariant()))
+    }
+    $payload = [Text.Encoding]::UTF8.GetBytes(($lines -join "`n"))
+    $sha = [Security.Cryptography.SHA256]::Create()
+    try {
+        return (($sha.ComputeHash($payload) | ForEach-Object { $_.ToString("x2") }) -join "")
+    } finally {
+        $sha.Dispose()
+    }
+}
+
+function Assert-DheSafeReportPath {
+    param(
+        [Parameter(Mandatory = $true)]
+        [string]$Path,
+        [string[]]$ProtectedPaths = @()
+    )
+
+    $resolved = [IO.Path]::GetFullPath($Path)
+    if (Test-Path -LiteralPath $resolved) {
+        $existingReportItem = Get-Item -LiteralPath $resolved -Force
+        if (($existingReportItem.Attributes -band [IO.FileAttributes]::ReparsePoint) -ne 0) {
+            throw "DHE report path may not be a junction or symbolic link: $resolved"
+        }
+        if ($existingReportItem.PSIsContainer) {
+            throw "DHE report path may not be an existing directory: $resolved"
+        }
+    }
+    foreach ($protected in @($ProtectedPaths | Where-Object { -not [string]::IsNullOrWhiteSpace($_) })) {
+        if (Test-DhePathRelation $resolved $protected) {
+            throw "DHE report path must not overlap protected path '$([IO.Path]::GetFullPath($protected))': $resolved"
+        }
+    }
+
+    $parent = [IO.Path]::GetDirectoryName($resolved)
+    if ([string]::IsNullOrWhiteSpace($parent)) {
+        throw "DHE report path has no safe parent directory: $resolved"
+    }
+    Assert-DheBasicOutputRootSafety -Path $parent
+
+    $gitRoot = Find-DheContainingGitRoot $parent
+    if (-not [string]::IsNullOrWhiteSpace([string]$gitRoot)) {
+        $relative = $resolved.Substring($gitRoot.Length).TrimStart('\', '/').Replace('\', '/')
+        $oldErrorActionPreference = $ErrorActionPreference
+        try {
+            $ErrorActionPreference = "Continue"
+            [object[]]$tracked = @(& git -C $gitRoot ls-files --cached -- "$relative" 2>&1)
+            $trackedExitCode = [int]$LASTEXITCODE
+        } finally {
+            $ErrorActionPreference = $oldErrorActionPreference
+        }
+        if ($trackedExitCode -ne 0) {
+            throw "DHE report path Git inspection failed for '$resolved' (exit=$trackedExitCode)."
+        }
+        if (@($tracked).Count -gt 0) {
+            throw "DHE report path may not overwrite Git-tracked content: $resolved"
+        }
+    }
+    return $resolved
+}
+
 function Assert-DheOutputNotAncestor {
     param(
         [Parameter(Mandatory = $true)]
@@ -688,17 +933,7 @@ function Assert-DheSafeOutputRoot {
     )
 
     $resolved = Normalize-DhePath $Path
-    $pathRoot = [IO.Path]::GetPathRoot($resolved)
-    if (-not [string]::IsNullOrWhiteSpace($pathRoot) -and
-        $resolved.Equals($pathRoot.TrimEnd('\', '/'), [StringComparison]::OrdinalIgnoreCase)) {
-        throw "DHE output root may not be a filesystem root: $resolved"
-    }
-
-    foreach ($protected in @($ProtectedPaths | Where-Object { -not [string]::IsNullOrWhiteSpace($_) })) {
-        if (Test-DhePathRelation $resolved $protected) {
-            throw "DHE output root must not overlap protected path '$([IO.Path]::GetFullPath($protected))': $resolved"
-        }
-    }
+    Assert-DheBasicOutputRootSafety -Path $resolved -ProtectedPaths $ProtectedPaths
 
     # A caller can otherwise pass a tracked source directory (for example
     # `scripts` or `schemas`) with -ForceOutput and recursively delete the
@@ -706,36 +941,29 @@ function Assert-DheSafeOutputRoot {
     # an output root that is itself a tracked directory.  Descendant output
     # directories remain valid, which preserves the normal `artifacts/...`
     # layout even when the parent is tracked only through other files.
-    $gitRoot = $resolved
-    while (-not [string]::IsNullOrWhiteSpace($gitRoot)) {
-        if (Test-Path -LiteralPath (Join-Path $gitRoot ".git")) { break }
-        $parent = Split-Path -Parent $gitRoot
-        if ([string]::IsNullOrWhiteSpace($parent) -or
-            $parent.Equals($gitRoot, [StringComparison]::OrdinalIgnoreCase)) {
-            $gitRoot = ""
-            break
-        }
-        $gitRoot = $parent.TrimEnd('\', '/')
-    }
+    $gitRoot = Find-DheContainingGitRoot $resolved
     if (-not [string]::IsNullOrWhiteSpace($gitRoot) -and
         (Test-Path -LiteralPath $gitRoot -PathType Container)) {
+        $relative = $resolved.Substring($gitRoot.Length).TrimStart('\', '/').Replace('\', '/')
+        if ([string]::IsNullOrWhiteSpace($relative)) {
+            throw "DHE output root may not be the Git worktree root: $resolved"
+        }
+        $oldErrorActionPreference = $ErrorActionPreference
         try {
-            $relative = $resolved.Substring($gitRoot.Length).TrimStart('\', '/').Replace('\', '/')
-            if ([string]::IsNullOrWhiteSpace($relative)) {
-                throw "DHE output root may not be the Git worktree root: $resolved"
-            }
-            $tracked = if ([string]::IsNullOrWhiteSpace($relative)) {
-                @()
-            } else {
-                @(& git -C $gitRoot ls-files --cached -- "$relative" 2>$null)
-            }
-            if ($LASTEXITCODE -eq 0 -and $tracked.Count -gt 0) {
-                throw "DHE output root overlaps Git-tracked source content; refusing recursive cleanup: $resolved"
-            }
-        } catch {
-            if ($_.Exception.Message -like "DHE output root*") { throw }
-            # Non-Git paths and older Git versions should not make an output
-            # safety check fail for unrelated reasons.
+            # Windows PowerShell 5.1 can promote redirected native stderr to a
+            # terminating error. Capture the exit code explicitly and fail
+            # closed when Git cannot prove that the path is untracked.
+            $ErrorActionPreference = "Continue"
+            [object[]]$tracked = @(& git -C $gitRoot ls-files --cached -- "$relative" 2>&1)
+            $trackedExitCode = [int]$LASTEXITCODE
+        } finally {
+            $ErrorActionPreference = $oldErrorActionPreference
+        }
+        if ($trackedExitCode -ne 0) {
+            throw "DHE output root Git inspection failed for '$resolved' (exit=$trackedExitCode)."
+        }
+        if (@($tracked).Count -gt 0) {
+            throw "DHE output root overlaps Git-tracked source content; refusing recursive cleanup: $resolved"
         }
     }
 
@@ -743,16 +971,46 @@ function Assert-DheSafeOutputRoot {
     # Git index. The checked-in boundary manifest still protects those paths
     # (notably patches/, schemas/, and fixture trees) from -ForceOutput.
     if (-not [string]::IsNullOrWhiteSpace($gitRoot)) {
-        $boundaryPath = Join-Path $gitRoot "manifests/dhe-source-boundary.json"
-        if (Test-Path -LiteralPath $boundaryPath -PathType Leaf) {
+        $boundaryCandidates = New-Object 'System.Collections.Generic.HashSet[string]'([StringComparer]::OrdinalIgnoreCase)
+        $null = $boundaryCandidates.Add((Join-Path $gitRoot "manifests/dhe-source-boundary.json"))
+        $boundaryCursor = $resolved
+        while (-not [string]::IsNullOrWhiteSpace($boundaryCursor) -and
+            (Test-DhePathWithinRoot $boundaryCursor $gitRoot)) {
+            $null = $boundaryCandidates.Add((Join-Path $boundaryCursor "dhe-source-boundary.json"))
+            if ($boundaryCursor.Equals($gitRoot, [StringComparison]::OrdinalIgnoreCase)) { break }
+            $parent = Split-Path -Parent $boundaryCursor
+            if ([string]::IsNullOrWhiteSpace($parent) -or
+                $parent.Equals($boundaryCursor, [StringComparison]::OrdinalIgnoreCase)) { break }
+            $boundaryCursor = $parent.TrimEnd('\', '/')
+        }
+        foreach ($sourceBoundaryPath in $boundaryCandidates) {
+            if (-not (Test-Path -LiteralPath $sourceBoundaryPath -PathType Leaf)) { continue }
             try {
-                $boundary = Get-Content -Raw -LiteralPath $boundaryPath | ConvertFrom-Json
+                $boundary = Get-Content -Raw -LiteralPath $sourceBoundaryPath | ConvertFrom-Json
+                $pathBase = if ($null -eq $boundary.PSObject.Properties["pathBase"]) { "" } else { [string]$boundary.pathBase }
+                $boundaryBase = if ($pathBase -eq "manifest-directory-v1") {
+                    [IO.Path]::GetDirectoryName([IO.Path]::GetFullPath($sourceBoundaryPath))
+                } elseif ($pathBase -eq "git-root-v1") {
+                    $gitRoot
+                } else { throw "DHE source boundary has an unsupported pathBase: $sourceBoundaryPath" }
                 $boundaryPaths = @()
                 foreach ($exact in @($boundary.exactPaths)) {
-                    $boundaryPaths += [IO.Path]::GetFullPath((Join-Path $gitRoot ([string]$exact).Replace('/', [IO.Path]::DirectorySeparatorChar)))
+                    $relative = ([string]$exact).Replace('\', '/').TrimStart('/')
+                    if ([string]::IsNullOrWhiteSpace($relative) -or [IO.Path]::IsPathRooted($relative) -or $relative -match '(^|/)\.\.(/|$)') {
+                        throw "DHE source boundary contains an unsafe exact path: $sourceBoundaryPath"
+                    }
+                    $boundaryPaths += [IO.Path]::GetFullPath((Join-Path $boundaryBase $relative.Replace('/', [IO.Path]::DirectorySeparatorChar)))
                 }
                 foreach ($prefix in @($boundary.prefixes)) {
-                    $boundaryPaths += [IO.Path]::GetFullPath((Join-Path $gitRoot ([string]$prefix).TrimEnd('/', '\').Replace('/', [IO.Path]::DirectorySeparatorChar)))
+                    $relative = ([string]$prefix).Replace('\', '/').TrimStart('/')
+                    $wildcard = $relative.IndexOf('*')
+                    if ($wildcard -ge 0) {
+                        $relative = $relative.Substring(0, $wildcard).TrimEnd('/')
+                    } else { $relative = $relative.TrimEnd('/') }
+                    if ([string]::IsNullOrWhiteSpace($relative) -or [IO.Path]::IsPathRooted($relative) -or $relative -match '(^|/)\.\.(/|$)') {
+                        throw "DHE source boundary contains an unsafe prefix: $sourceBoundaryPath"
+                    }
+                    $boundaryPaths += [IO.Path]::GetFullPath((Join-Path $boundaryBase $relative.Replace('/', [IO.Path]::DirectorySeparatorChar)))
                 }
                 foreach ($boundaryPathEntry in $boundaryPaths) {
                     if (Test-DhePathRelation $resolved $boundaryPathEntry) {
@@ -760,35 +1018,11 @@ function Assert-DheSafeOutputRoot {
                     }
                 }
             } catch {
-                if ($_.Exception.Message -like "DHE output root*") { throw }
-                # A malformed boundary is reported by the dedicated boundary
-                # gate; do not turn unrelated exploratory output creation into
-                # a parser failure here.
+                if ($_.Exception.Message -like "DHE output root*" -or
+                    $_.Exception.Message -like "DHE source boundary*") { throw }
+                throw "DHE source boundary inspection failed: $sourceBoundaryPath ($($_.Exception.Message))"
             }
         }
-    }
-
-    # Reject existing junctions/symlinks anywhere in the output path chain.
-    # This protects recursive cleanup when the leaf itself has not been created.
-    $cursor = $resolved
-    while (-not [string]::IsNullOrWhiteSpace($cursor)) {
-        if (Test-Path -LiteralPath $cursor) {
-            $item = Get-Item -LiteralPath $cursor -Force
-            if (($item.Attributes -band [IO.FileAttributes]::ReparsePoint) -ne 0) {
-                throw "DHE output root may not contain a junction or symbolic link: $cursor"
-            }
-        }
-        $cursorRoot = [IO.Path]::GetPathRoot($cursor)
-        if (-not [string]::IsNullOrWhiteSpace($cursorRoot) -and
-            $cursor.Equals($cursorRoot.TrimEnd('\', '/'), [StringComparison]::OrdinalIgnoreCase)) {
-            break
-        }
-        $parent = Split-Path -Parent $cursor
-        if ([string]::IsNullOrWhiteSpace($parent) -or
-            $parent.Equals($cursor, [StringComparison]::OrdinalIgnoreCase)) {
-            break
-        }
-        $cursor = $parent.TrimEnd('\', '/')
     }
 }
 

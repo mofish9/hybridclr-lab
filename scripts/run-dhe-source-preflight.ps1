@@ -1,7 +1,8 @@
 [CmdletBinding()]
 param(
     [string]$LabRoot = "",
-    [string]$ProjectPath = "",
+    [Parameter(Mandatory = $true)]
+    [string]$ProjectPath,
     [string]$RuntimeSource = "",
     [string]$OutputRoot = "",
     [string]$PackageLockPath = "",
@@ -25,11 +26,7 @@ $LabRoot = if ([string]::IsNullOrWhiteSpace($LabRoot)) {
 } else {
     [IO.Path]::GetFullPath($LabRoot)
 }
-$ProjectPath = if ([string]::IsNullOrWhiteSpace($ProjectPath)) {
-    Join-Path $LabRoot "unity2021-dhe-demo"
-} else {
-    [IO.Path]::GetFullPath($ProjectPath)
-}
+$ProjectPath = [IO.Path]::GetFullPath($ProjectPath)
 $OutputRoot = if ([string]::IsNullOrWhiteSpace($OutputRoot)) {
     Join-Path $LabRoot "artifacts/dhe-source-preflight"
 } else {
@@ -141,8 +138,6 @@ function Normalize-NameSet([string[]]$Values) {
 $requiredScripts = @(
     "dhe-workflow-common.ps1",
     "runtime-provenance.ps1",
-    "resolve-repos-root.ps1",
-    "assemble-runtime.ps1",
     "apply-dhe-runtime-patches.ps1",
     "generate-dhe-mv.ps1",
     "generate-dhe-batch.ps1",
@@ -152,16 +147,12 @@ $requiredScripts = @(
     "resolve-dhe-native-manifest.ps1",
     "inject-dhe-guard.ps1",
     "apply-dhe-generated-cpp.ps1",
-    "run-dhe-deterministic-player-build.ps1",
     "validate-dhe-artifacts.ps1",
     "run-dhe-release-gate.ps1",
     "run-dhe-schema-gate.ps1",
-    "run-dhe-capability-gate.ps1",
-    "run-dhe-compatibility-negative-gate.ps1",
-    "run-dhe-script-fixture-gate.ps1",
     "run-dhe-clean-checkout-gate.ps1",
-    "run-dhe-source-boundary-gate.ps1",
     "run-dhe-source-preflight.ps1",
+    "test-dhe-toolchain-package.ps1",
     "archive-dhe-artifacts.ps1",
     "run-dhe-archive-gate.ps1"
 )
@@ -186,18 +177,19 @@ $requiredSchemas = @(
     "dhe-workflow-report.schema.json",
     "dhe-release-gate.schema.json",
     "dhe-workflow-failure.schema.json",
-    "dhe-script-fixture-gate.schema.json",
     "dhe-schema-gate.schema.json",
-    "dhe-capability-gate.schema.json",
-    "dhe-compatibility-negative-gate.schema.json",
     "dhe-runtime-lock.schema.json",
     "dhe-package-lock.schema.json",
     "dhe-source-preflight.schema.json",
     "dhe-clean-checkout-gate.schema.json",
     "dhe-source-boundary.schema.json",
-    "dhe-source-boundary-gate.schema.json",
     "dhe-archive-manifest.schema.json",
-    "dhe-archive-gate.schema.json"
+    "dhe-archive-gate.schema.json",
+    "dhe-toolchain-layout.schema.json",
+    "dhe-toolchain-manifest.schema.json",
+    "dhe-toolchain-gate.schema.json",
+    "dhe-toolchain-doctor.schema.json",
+    "dhe-toolchain-install.schema.json"
 )
 foreach ($schemaName in $requiredSchemas) {
     Require-File (Join-Path $LabRoot "schemas/$schemaName") "formal DHE schema '$schemaName'" | Out-Null
@@ -206,19 +198,13 @@ foreach ($schemaName in $requiredSchemas) {
 $settingsPath = Join-Path $ProjectPath "ProjectSettings/HybridCLRSettings.asset"
 $packageRoot = Join-Path $ProjectPath "Packages/com.code-philosophy.hybridclr"
 $embeddedPackagePresent = Test-Path -LiteralPath $packageRoot -PathType Container
-$defaultPackageLockPath = Join-Path $LabRoot "manifests/dhe-package-lock.json"
-$defaultDemoProjectPath = Normalize-DhePath (Join-Path $LabRoot "unity2021-dhe-demo")
 $identityTemplatePath = if (-not [string]::IsNullOrWhiteSpace($IdentityTemplatePath)) {
     [IO.Path]::GetFullPath($IdentityTemplatePath)
-} elseif ((Normalize-DhePath $ProjectPath).Equals($defaultDemoProjectPath, [StringComparison]::OrdinalIgnoreCase)) {
-    Join-Path $ProjectPath "Assets/Runtime/HybridCLRDheBuildIdentity.cs"
 } else {
     ""
 }
 $packageLockPath = if (-not [string]::IsNullOrWhiteSpace($PackageLockPath)) {
     [IO.Path]::GetFullPath($PackageLockPath)
-} elseif ((Normalize-DhePath $ProjectPath).Equals($defaultDemoProjectPath, [StringComparison]::OrdinalIgnoreCase)) {
-    $defaultPackageLockPath
 } else {
     ""
 }
@@ -264,34 +250,26 @@ if ($null -ne $packageLock) {
     if ([int]$packageLock.schemaVersion -ne 1 -or
         [string]$packageLock.format -ne "hybridclr.dhe-package-lock.json" -or
         [string]$packageLock.repository -ne "hybridclr_unity" -or
-        [string]$packageLock.baseCommit -notmatch '^[0-9a-f]{40}$') {
-        Add-ErrorCheck "package-lock:schema" "DHE package lock has an invalid schema or repository identity."
+        [string]$packageLock.baseCommit -notmatch '^[0-9a-f]{40}$' -or
+        [string]$packageLock.pathBase -ne "project-root-v1") {
+        Add-ErrorCheck "package-lock:schema" "DHE package lock has an invalid schema, repository identity, or path base."
     } else {
-        Add-Check "package-lock:schema" $true "schemaVersion=1; baseCommit=$($packageLock.baseCommit)"
+        Add-Check "package-lock:schema" $true "schemaVersion=1; pathBase=project-root-v1; baseCommit=$($packageLock.baseCommit)"
     }
     if ($embeddedPackagePresent) {
         $packagePathProperty = $packageLock.PSObject.Properties["packagePath"]
         $lockedPackageReference = if ($null -eq $packagePathProperty) { "" } else { [string]$packagePathProperty.Value }
-        if ([string]::IsNullOrWhiteSpace($lockedPackageReference)) {
-            Add-ErrorCheck "package:path" "DHE package lock is missing packagePath for the embedded package: $packageRoot"
+        $packagePathIsSafe = -not [string]::IsNullOrWhiteSpace($lockedPackageReference) -and
+            -not [IO.Path]::IsPathRooted($lockedPackageReference) -and
+            $lockedPackageReference.Replace('\', '/') -notmatch '(^|/)\.\.(/|$)'
+        if (-not $packagePathIsSafe) {
+            Add-ErrorCheck "package:path" "DHE package lock packagePath must be a safe project-root-relative path: '$lockedPackageReference'."
         } else {
-            $packageLockDirectory = [IO.Path]::GetDirectoryName([IO.Path]::GetFullPath($packageLockPath))
-            $packagePathCandidates = if ([IO.Path]::IsPathRooted($lockedPackageReference)) {
-                @([IO.Path]::GetFullPath($lockedPackageReference))
-            } else {
-                @(
-                    [IO.Path]::GetFullPath((Join-Path $ProjectPath $lockedPackageReference)),
-                    [IO.Path]::GetFullPath((Join-Path $packageLockDirectory $lockedPackageReference)),
-                    [IO.Path]::GetFullPath((Join-Path $LabRoot $lockedPackageReference))
-                )
-            }
-            $packagePathMatches = @($packagePathCandidates | Where-Object {
-                $_.Equals([IO.Path]::GetFullPath($packageRoot), [StringComparison]::OrdinalIgnoreCase)
-            })
-            if (@($packagePathMatches).Count -eq 0) {
+            $lockedPackagePath = [IO.Path]::GetFullPath((Join-Path $ProjectPath $lockedPackageReference))
+            if (-not $lockedPackagePath.Equals([IO.Path]::GetFullPath($packageRoot), [StringComparison]::OrdinalIgnoreCase)) {
                 Add-ErrorCheck "package:path" "DHE package lock packagePath '$lockedPackageReference' does not resolve to the embedded package: $packageRoot"
             } else {
-                Add-Check "package:path" $true "embedded package path is locked"
+                Add-Check "package:path" $true "embedded package path is locked relative to project root"
             }
         }
     }

@@ -6,6 +6,7 @@ param(
     [Parameter(Mandatory = $true)]
     [string]$Output,
 
+    [Parameter(Mandatory = $true)]
     [string]$DnlibPath
 )
 
@@ -14,7 +15,7 @@ $ErrorActionPreference = "Stop"
 . (Join-Path $PSScriptRoot "dhe-workflow-common.ps1")
 
 function Resolve-DnlibPath {
-    return Resolve-DheDnlibPath -RequestedPath $DnlibPath -LabRoot (Split-Path -Parent $PSScriptRoot)
+    return Resolve-DheDnlibPath -RequestedPath $DnlibPath
 }
 
 function New-Counters {

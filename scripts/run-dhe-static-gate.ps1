@@ -78,6 +78,9 @@ $formalScriptNames = @(
     "validate-dhe-project-plan.ps1",
     "resolve-dhe-native-manifest.ps1",
     "inject-dhe-guard.ps1",
+    "install-dhe-toolchain.ps1",
+    "new-dhe-project-adapter.ps1",
+    "publish-dhe-toolchain.ps1",
     "apply-dhe-generated-cpp.ps1",
     "run-dhe-deterministic-player-build.ps1",
     "run-dhe-demo-workflow.ps1",
@@ -100,13 +103,17 @@ $formalScriptNames = @(
     "generate-test-manifest.ps1",
     "generate-metadata-stress-source.ps1",
     "run-native-tests.ps1",
-    "run-dhe-static-gate.ps1"
+    "run-dhe-static-gate.ps1",
+    "run-dhe-toolchain-doctor.ps1",
+    "run-dhe-toolchain-fixture-gate.ps1",
+    "test-dhe-toolchain-package.ps1"
 )
 $formalScripts = New-Object System.Collections.Generic.List[string]
 foreach ($scriptName in $formalScriptNames) {
     $scriptPath = Join-Path $LabRoot ("scripts/" + $scriptName)
     $formalScripts.Add($scriptPath)
 }
+$formalScripts.Add((Join-Path $LabRoot "dhe.ps1"))
 foreach ($fixtureScript in @(Get-ChildItem -LiteralPath (Join-Path $LabRoot "scripts/fixtures") -Recurse -File -Filter "*.ps1" -ErrorAction SilentlyContinue)) {
     $formalScripts.Add([string]$fixtureScript.FullName)
 }
@@ -323,11 +330,13 @@ if ($null -ne $runtimeLock) {
 if ($null -ne $packageLock) {
     $packageLockErrors = New-Object System.Collections.Generic.List[string]
     $packagePathValue = [string](Get-StaticProperty $packageLock "packagePath")
+    $packagePathBase = [string](Get-StaticProperty $packageLock "pathBase")
     if ([int](Get-StaticProperty $packageLock "schemaVersion") -ne 1 -or
         [string](Get-StaticProperty $packageLock "format") -ne "hybridclr.dhe-package-lock.json" -or
         [string](Get-StaticProperty $packageLock "repository") -ne "hybridclr_unity" -or
         [string](Get-StaticProperty $packageLock "baseCommit") -notmatch '^[0-9a-fA-F]{40}$' -or
         [string](Get-StaticProperty $packageLock "treeSha256") -notmatch '^[0-9a-fA-F]{64}$' -or
+        $packagePathBase -ne "project-root-v1" -or
         [string]::IsNullOrWhiteSpace($packagePathValue) -or
         [IO.Path]::IsPathRooted($packagePathValue) -or
         $packagePathValue.Replace('\', '/') -match '(^|/)\.\.(/|$)') {
@@ -348,7 +357,7 @@ if ($null -ne $packageLock) {
         }
     }
     $packageLockShapeDetail = if ($packageLockErrors.Count -eq 0) {
-        "schemaVersion=1; package path and patch IDs are structurally valid"
+        "schemaVersion=1; pathBase=project-root-v1; package path and patch IDs are structurally valid"
     } else {
         $packageLockErrors -join ", "
     }
@@ -356,9 +365,11 @@ if ($null -ne $packageLock) {
 
     $packagePath = $null
     if (-not [string]::IsNullOrWhiteSpace($packagePathValue) -and
+        $packagePathBase -eq "project-root-v1" -and
         -not [IO.Path]::IsPathRooted($packagePathValue) -and
         $packagePathValue.Replace('\', '/') -notmatch '(^|/)\.\.(/|$)') {
-        $packagePath = [IO.Path]::GetFullPath((Join-Path $LabRoot $packagePathValue))
+        $demoProjectPath = Join-Path $LabRoot "unity2021-dhe-demo"
+        $packagePath = [IO.Path]::GetFullPath((Join-Path $demoProjectPath $packagePathValue))
     }
     $packageHashMatches = $false
     $packageDetail = ""
@@ -401,6 +412,32 @@ $fixtureDetail = if ($fixturePassed) {
 }
 Add-Check "fixture-gate" $fixturePassed $fixtureDetail
 
+$toolchainFixtureRoot = Join-Path $OutputRoot "toolchain-fixture-gate"
+$toolchainFixtureScript = Join-Path $LabRoot "scripts/run-dhe-toolchain-fixture-gate.ps1"
+$toolchainFixtureExitCode = 1
+try {
+    & $toolchainFixtureScript -LabRoot $LabRoot -OutputRoot $toolchainFixtureRoot -ForceOutput | Out-Null
+    $toolchainFixtureExitCode = [int]$LASTEXITCODE
+} catch {
+    $errors.Add("toolchain-fixture-gate: $($_.Exception.Message)")
+}
+$toolchainFixtureReportPath = Join-Path $toolchainFixtureRoot "toolchain-fixture-gate-report.json"
+$toolchainFixtureReport = $null
+if (Test-Path -LiteralPath $toolchainFixtureReportPath -PathType Leaf) {
+    try { $toolchainFixtureReport = Get-Content -Raw -LiteralPath $toolchainFixtureReportPath | ConvertFrom-Json } catch { }
+}
+$toolchainFixturePassedValue = Get-StaticBoolean $toolchainFixtureReport "passed"
+$toolchainFixturePassed = $toolchainFixtureExitCode -eq 0 -and $null -ne $toolchainFixtureReport -and
+    $null -ne $toolchainFixturePassedValue -and $toolchainFixturePassedValue
+$toolchainFixtureDetail = if ($toolchainFixturePassed) {
+    "publish, verify, install, upgrade, doctor and installed boundary fixtures passed"
+} elseif ($null -eq $toolchainFixtureReport) {
+    "toolchain fixture gate did not produce a report"
+} else {
+    "toolchain fixture gate exit=$toolchainFixtureExitCode"
+}
+Add-Check "toolchain-fixture-gate" $toolchainFixturePassed $toolchainFixtureDetail
+
 $report = [ordered]@{
     schemaVersion = 1
     format = "hybridclr.dhe-static-gate.json"
@@ -409,6 +446,7 @@ $report = [ordered]@{
     checks = $checks.ToArray()
     sourceBoundaryReport = if ($null -eq $boundaryReport) { $null } else { $boundaryReportPath }
     fixtureReport = if ($null -eq $fixtureReport) { $null } else { $fixtureReportPath }
+    toolchainFixtureReport = if ($null -eq $toolchainFixtureReport) { $null } else { $toolchainFixtureReportPath }
     schemaGateReport = if ($null -eq $schemaGateReport) { $null } else { $schemaGateReportPath }
     errors = $errors.ToArray()
 }

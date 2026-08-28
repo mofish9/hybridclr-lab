@@ -13,6 +13,9 @@ param(
     [string]$OutputRoot,
     [ValidateSet("StandaloneWindows64")]
     [string]$Target = "StandaloneWindows64",
+    [Parameter(Mandatory = $true)]
+    [ValidateRange(1, 1)]
+    [int]$ToolchainContractVersion,
     [ValidateSet("Release", "Exploratory")]
     [string]$Mode = "Release",
     [string]$ProjectPlan = "",
@@ -54,6 +57,7 @@ $arguments = @(
     "-RuntimeSource", $runtimePath,
     "-OutputRoot", ([IO.Path]::GetFullPath($OutputRoot)),
     "-Mode", $Mode,
+    "-ToolchainContractVersion", $ToolchainContractVersion,
     "-Invocation", $(if ($Action -eq "Prepare") { "AdapterPrepare" } else { "AdapterPlayer" }),
     "-WorkflowLockAlreadyHeld"
 )

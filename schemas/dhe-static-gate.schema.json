@@ -24,6 +24,7 @@
     },
     "sourceBoundaryReport": { "type": ["string", "null"] },
     "fixtureReport": { "type": ["string", "null"] },
+    "toolchainFixtureReport": { "type": ["string", "null"] },
     "schemaGateReport": { "type": ["string", "null"] },
     "errors": { "type": "array", "items": { "type": "string" } }
   }

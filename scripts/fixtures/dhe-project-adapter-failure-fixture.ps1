@@ -11,6 +11,9 @@ param(
     [string]$RuntimeSource,
     [Parameter(Mandatory = $true)]
     [string]$OutputRoot,
+    [Parameter(Mandatory = $true)]
+    [ValidateRange(1, 1)]
+    [int]$ToolchainContractVersion,
     [string]$Target = "StandaloneWindows64",
     [string]$Mode = "Exploratory"
 )

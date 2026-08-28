@@ -18,6 +18,7 @@ Their immutable inputs are recorded in `manifests/repo-lock.json`.
 The DHE-lite workflow is maintained as a separate, explicit validation lane.
 Its formal entry points, generated-output boundary, and complete four-assembly
 Player evidence are documented in
+`docs/HybridCLR-DHE-Toolchain.md`,
 `docs/HybridCLR-DHE-Workflow-Review.md` and
 `docs/HybridCLR-DHE-Formal-Project-Validation.md`. It is not yet a production
 replacement for the existing BattleAOT path.
@@ -196,16 +197,17 @@ boundary manifest).
 
 The optimization and Android sections below preserve earlier lab results. Some
 of their historical helper commands are not part of this DHE-focused checkout;
-the commands above and the two DHE validation documents are the authoritative
+the commands above and the three DHE toolchain/validation documents are the authoritative
 current entry points.
 
 > **Scope note:** everything below this note is historical optimization and
 > compatibility evidence. It is retained for audit context, not as an executable
 > DHE release workflow. In particular, commands mentioning Candidate, benchmark,
 > or Android helper scripts may refer to files from the earlier lab checkout.
-> Use `docs/HybridCLR-DHE-Formal-Project-Validation.md` for the current DHE
-> contract and `scripts/run-dhe-project-preflight.ps1`/`scripts/run-dhe-project-workflow.ps1`
-> for the available entry points.
+> Use `docs/HybridCLR-DHE-Toolchain.md` for distribution and installation,
+> `docs/HybridCLR-DHE-Formal-Project-Validation.md` for the project contract,
+> and `scripts/run-dhe-project-preflight.ps1`/`scripts/run-dhe-project-workflow.ps1`
+> for the source-checkout entry points.
 
 ## Historical lab results
 

@@ -4,7 +4,7 @@
   "title": "HybridCLR DHE Script Fixture Gate Report",
   "type": "object",
   "additionalProperties": true,
-  "required": ["schemaVersion", "format", "passed", "guardRequested", "guardTransformed", "guardSecondPassTransformed", "abiChangedMethodCount", "abiSupportedChangedMethodCount", "abiUnsupportedChangedMethodCount", "genericChangedMethodCount", "genericSupportedChangedMethodCount", "genericGuardedMethodCount", "genericNativeEntryCount", "multiAssemblyChangedMethodCount", "multiAssemblySupportedChangedMethodCount", "multiAssemblyUnsupportedChangedMethodCount", "malformedNativeTokenRejected", "duplicateMappingRejected", "probeTransactionRollbackPassed", "outputCollisionRejected", "exploratoryReleaseRejected", "releaseDerivedOutputsIsolated", "foreignGitRootRejected", "separateGitIdentitiesValidated", "gitApplyRootIsolated", "adapterPrepareFailureTested", "adapterPrepareFailureForwarded", "adapterTargetForwarded", "schemaDuplicatePropertyRejected", "externalDnlibFallbackRejected", "workflowLockTested", "workflowLockRejected", "workflowLockReusable", "projectPreflightFailureReported"],
+  "required": ["schemaVersion", "format", "passed", "guardRequested", "guardTransformed", "guardSecondPassTransformed", "abiChangedMethodCount", "abiSupportedChangedMethodCount", "abiUnsupportedChangedMethodCount", "genericChangedMethodCount", "genericSupportedChangedMethodCount", "genericGuardedMethodCount", "genericNativeEntryCount", "multiAssemblyChangedMethodCount", "multiAssemblySupportedChangedMethodCount", "multiAssemblyUnsupportedChangedMethodCount", "malformedNativeTokenRejected", "duplicateMappingRejected", "probeTransactionRollbackPassed", "outputCollisionRejected", "exploratoryReleaseRejected", "releaseDerivedOutputsIsolated", "unsafeSourceOutputRejected", "singleTrackedOutputRejected", "foreignGitRootRejected", "separateGitIdentitiesValidated", "gitApplyRootIsolated", "prePrepareGateTested", "invalidRuntimeRejectedBeforeAdapter", "adapterTargetParameterValidated", "adapterContractMismatchRejected", "schemaDuplicatePropertyRejected", "externalDnlibFallbackRejected", "externalEmbeddedPackageLockValidated", "legacyLabRelativePackageLockRejected", "absolutePackageLockRejected", "workflowLockTested", "workflowLockRejected", "workflowLockReusable", "projectPreflightFailureReported"],
   "properties": {
     "schemaVersion": { "const": 1 },
     "format": { "const": "hybridclr.dhe-script-fixture-gate.json" },
@@ -29,14 +29,20 @@
     "outputCollisionRejected": { "type": "boolean" },
     "exploratoryReleaseRejected": { "const": true },
     "releaseDerivedOutputsIsolated": { "const": true },
+    "unsafeSourceOutputRejected": { "const": true },
+    "singleTrackedOutputRejected": { "const": true },
     "foreignGitRootRejected": { "const": true },
     "separateGitIdentitiesValidated": { "const": true },
     "gitApplyRootIsolated": { "const": true },
-    "adapterPrepareFailureTested": { "type": "boolean" },
-    "adapterPrepareFailureForwarded": { "type": ["boolean", "null"] },
-    "adapterTargetForwarded": { "type": ["boolean", "null"] },
+    "prePrepareGateTested": { "type": "boolean" },
+    "invalidRuntimeRejectedBeforeAdapter": { "type": ["boolean", "null"] },
+    "adapterTargetParameterValidated": { "type": ["boolean", "null"] },
+    "adapterContractMismatchRejected": { "const": true },
     "schemaDuplicatePropertyRejected": { "const": true },
     "externalDnlibFallbackRejected": { "const": true },
+    "externalEmbeddedPackageLockValidated": { "const": true },
+    "legacyLabRelativePackageLockRejected": { "const": true },
+    "absolutePackageLockRejected": { "const": true },
     "workflowLockTested": { "type": "boolean" },
     "workflowLockRejected": { "type": ["boolean", "null"] },
     "workflowLockReusable": { "type": ["boolean", "null"] },
@@ -49,19 +55,19 @@
   "allOf": [
     {
       "if": {
-        "properties": { "adapterPrepareFailureTested": { "const": true } },
-        "required": ["adapterPrepareFailureTested"]
+        "properties": { "prePrepareGateTested": { "const": true } },
+        "required": ["prePrepareGateTested"]
       },
       "then": {
         "properties": {
-          "adapterPrepareFailureForwarded": { "const": true },
-          "adapterTargetForwarded": { "const": true }
+          "invalidRuntimeRejectedBeforeAdapter": { "const": true },
+          "adapterTargetParameterValidated": { "const": true }
         }
       },
       "else": {
         "properties": {
-          "adapterPrepareFailureForwarded": { "type": "null" },
-          "adapterTargetForwarded": { "type": "null" }
+          "invalidRuntimeRejectedBeforeAdapter": { "type": "null" },
+          "adapterTargetParameterValidated": { "type": "null" }
         }
       }
     },

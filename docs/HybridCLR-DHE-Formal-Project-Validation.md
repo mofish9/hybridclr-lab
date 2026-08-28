@@ -54,6 +54,10 @@ runtime manifest 还记录 staged external headers 的 tree hash；预检和 nat
 `PackageLockPath` 和 `RequireEmbeddedPackage` 只在项目把 HybridCLR 作为 embedded
 package 管理时启用。使用 registry/package manager 的项目可以省略它们，通用预检
 仍会执行程序集范围、runtime 和输出目录安全检查。
+Embedded package locks use `pathBase=project-root-v1`; `packagePath` must be a
+safe relative path such as `Packages/com.code-philosophy.hybridclr`. The lock
+file itself may live outside the project because its directory is never used as
+an alternate path base.
 Release adapter 应把项目仓库传给 clean-checkout gate 的 GitRoot。门禁会分别建立
 projectGit 和 toolGit 身份：两者都必须 clean，source boundary 必须被跟踪，并记录
 HEAD、HEAD tree 与 boundary SHA-256。项目仓库与工具仓库可以是两个独立仓库；ignored
@@ -134,7 +138,9 @@ through two actions, both implemented as named PowerShell parameters:
 
 ```text
 Prepare -ProjectPath -SettingsFile -RuntimeSource -OutputRoot -Target -Mode
+        -ToolchainContractVersion
 Player  -ProjectPath -SettingsFile -RuntimeSource -OutputRoot -Target -Mode
+        -ToolchainContractVersion
         -ProjectPlan -ProjectPlanValidation -BatchReport
         -SourcePreflight -CleanCheckoutGate
 ```
@@ -153,12 +159,16 @@ The checked-in implementation is
 `scripts/adapters/dhe-demo-project-adapter.ps1`; it is the first complete
 contract example and is exercised by the manual self-hosted CI lane.
 
-The orchestrator then runs source preflight and strict MV/artifact generation,
-passing `-RequireDheEqualsHotUpdate` so every configured hot-update assembly is
-covered by DHE. `Player` receives the validated project plan and must write the
-standard `<OutputRoot>/workflow-report.json`; it owns the Unity build, generated
-C++ guard injection, runtime-plan staging, and Player assertions, but it must
-use the paths and assembly set from that plan rather than rediscovering them.
+Before calling the adapter, the orchestrator verifies the installed toolchain
+identity when applicable, then runs clean-checkout and source/runtime preflight.
+After `Prepare`, it repeats both gates so adapter or Unity generation cannot
+silently modify project/tool sources, runtime inputs, package contents, or
+settings. It then runs strict MV/artifact generation with
+`-RequireDheEqualsHotUpdate`, so every configured hot-update assembly is covered
+by DHE. `Player` receives the validated project plan and must write the standard
+`<OutputRoot>/workflow-report.json`; it owns the Unity build, generated C++ guard
+injection, runtime-plan staging, and Player assertions, but it must use the paths
+and assembly set from that plan rather than rediscovering them.
 The workflow runner independently executes the archive gate and, in `Release`
 mode, the release gate. Its summary is
 `<OutputRoot>/project-workflow-report.json` and conforms to
@@ -191,6 +201,11 @@ The production-shaped invocation is:
   -SourceBoundaryPath C:/path/to/project/manifests/dhe-source-boundary.json `
   -RequireEmbeddedPackage -RequireIdentityTemplate -ForceOutput
 ```
+
+This example runs from a clean source checkout. When invoking an installed
+toolchain, use its `dhe.ps1 workflow` entry point and supply the externally
+pinned `-ExpectedToolchainPackageId` described in
+`docs/HybridCLR-DHE-Toolchain.md`.
 
 `Release` is the default and therefore requires complete native coverage and
 matching (non-surrogate) engine external headers;
@@ -318,12 +333,14 @@ passes the same gates. The demo uses four DHE AOT assemblies. The
 AOT dispatch and cross-assembly loading:
 
 ```powershell
+$prepare = Get-Content -Raw ./artifacts/dhe-project-workflow/adapter/prepare.json | ConvertFrom-Json
 ./scripts/generate-dhe-batch.ps1 `
-  -BaselineRoot ./managed-cases/HybridCLR.ManagedCasesAot/bin/Release/netstandard2.1 `
-  -CurrentRoot ./managed-cases/HybridCLR.ManagedCasesAot/artifacts/dhe-demo/current `
-  -AssemblyNames HybridCLR.ManagedCasesAot,HybridCLR.ManagedCases,HybridCLR.MetadataStress,HybridCLR.CrossAssemblyDerived `
+  -BaselineRoot $prepare.baselineRoot `
+  -CurrentRoot $prepare.currentRoot `
+  -SettingsFile ./unity2021-dhe-demo/ProjectSettings/HybridCLRSettings.asset `
+  -ProjectRoot ./unity2021-dhe-demo `
   -OutputRoot ./artifacts/dhe-demo-batch `
-  -StrictCompatibility -FailOnIncompatible
+  -StrictCompatibility -FailOnIncompatible -RequireDheEqualsHotUpdate
 ```
 
 The generated binary is then embedded in the demo Player and the Player is

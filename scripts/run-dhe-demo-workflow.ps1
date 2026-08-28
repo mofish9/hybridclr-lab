@@ -10,6 +10,8 @@ param(
     [string]$ArchiveRoot = "",
     [ValidateSet("Standalone", "AdapterPrepare", "AdapterPlayer")]
     [string]$Invocation = "Standalone",
+    [ValidateRange(1, 1)]
+    [int]$ToolchainContractVersion = 1,
     [string]$ProjectPlan = "",
     [string]$ProjectPlanValidation = "",
     [string]$BatchReport = "",
@@ -203,10 +205,17 @@ try {
     if ([int]$packageLock.schemaVersion -ne 1 -or
         [string]$packageLock.format -ne "hybridclr.dhe-package-lock.json" -or
         [string]$packageLock.repository -ne "hybridclr_unity" -or
-        [string]$packageLock.baseCommit -notmatch '^[0-9a-f]{40}$') {
-        throw "DHE package lock has an invalid schema or repository identity."
+        [string]$packageLock.baseCommit -notmatch '^[0-9a-f]{40}$' -or
+        [string]$packageLock.pathBase -ne "project-root-v1") {
+        throw "DHE package lock has an invalid schema, repository identity, or path base."
     }
-    $expectedPackagePath = [IO.Path]::GetFullPath((Join-Path $LabRoot ([string]$packageLock.packagePath)))
+    $lockedPackageReference = [string]$packageLock.packagePath
+    if ([string]::IsNullOrWhiteSpace($lockedPackageReference) -or
+        [IO.Path]::IsPathRooted($lockedPackageReference) -or
+        $lockedPackageReference.Replace('\', '/') -match '(^|/)\.\.(/|$)') {
+        throw "DHE package lock packagePath must be a safe project-root-relative path."
+    }
+    $expectedPackagePath = [IO.Path]::GetFullPath((Join-Path $ProjectPath $lockedPackageReference))
     if (-not [IO.Path]::GetFullPath($packageRoot).Equals($expectedPackagePath, [StringComparison]::OrdinalIgnoreCase)) {
         throw "DHE package path does not match package lock: $packageRoot"
     }
@@ -462,6 +471,7 @@ if ($Invocation -eq "AdapterPrepare") {
         format = "hybridclr.dhe-project-adapter-prepare.json"
         generatedAtUtc = [DateTimeOffset]::UtcNow.ToString("O")
         passed = $true
+        toolchainContractVersion = $ToolchainContractVersion
         target = "StandaloneWindows64"
         pathSemantics = "workspace-absolute-v1"
         projectPath = $ProjectPath
