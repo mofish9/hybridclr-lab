@@ -497,18 +497,15 @@ workflow report 的 transaction 节点。
 - checked-in Demo adapter 已通过 `run-dhe-project-workflow.ps1` 的 Prepare、公共 preflight、
   Player、artifact、archive 全链路；workflow 的 plan/batch 引用在归档时改写为相对路径。
 
-## 仍需完成
+## 剩余边界
 
-1. 在目标平台继续验证 Demo 尚未覆盖的 managed ref/out、unsafe pointer/byref return、
-   任意 struct/adjustor thunk 等 ABI；当前 Windows x64 完整覆盖不能外推到 Android/小游戏。
+1. 在目标平台继续验证 Demo 尚未覆盖的 unsafe pointer/byref return、任意
+   struct/adjustor thunk 等 ABI；当前 Windows x64 完整覆盖不能外推到 Android/小游戏。
 2. 将生成后文本注入收敛为稳定的 Unity/IL2CPP generator 集成点；当前转换器仍受
    Unity 版本和生成时序影响。
-3. Player 侧已经支持按 runtime plan 批量加载 DHE 程序集、逐程序集 snapshot/hash 校验、失败回滚重试和聚合 native manifest；
-   Unity Player 证据仍受运行时与 Editor 版本匹配约束，不能用 Tuanjie 2022 runtime 在 Unity 2021 Editor
-   中代替正式 Tuanjie 构建。
-4. clean-checkout gate 已加入 `run-dhe-project-workflow.ps1` 通用 adapter orchestration；
-   Release 默认要求项目 Git clean 和 tracked-source coverage，且项目、Git top-level 与
-   tracked `SourceBoundaryPath` 必须属于同一仓库身份。
+3. 为新的 Unity/Tuanjie 版本、Android、小游戏或实际项目实现 adapter 后，必须使用
+   匹配 runtime/editor 的 clean Release Player 重新取得证据；不能沿用当前 Demo 的
+   Windows 结果，也不能用 Unity 2021 Editor 替代 Tuanjie 2022 构建。
 
 本次审查又修正了下游报告布尔字段的读取方式：clean-checkout、static gate 和 native test
 现在要求 `passed`、`runtimeReady`、`dheEnabled` 等字段实际是 JSON boolean；字符串
