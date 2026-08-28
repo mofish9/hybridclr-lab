@@ -1,0 +1,33 @@
+{
+  "schemaVersion": 1,
+  "format": "hybridclr.dhe-runtime-lock.json",
+  "patches": [
+    {
+      "id": "hybridclr-native-dhe-lite",
+      "repository": "hybridclr",
+      "baseCommit": "ae21c37ee25992c4c62c77acffaf74b59f4461a3",
+      "path": "patches/dhe-lite/hybridclr.patch",
+      "sha256": "64EF64DDD6320D8CC70DC7CE23B1933CA09BD31B904B4EF8B03D3186ED5CF0AB",
+      "applyRoot": "libil2cpp",
+      "stripComponents": 1
+    },
+    {
+      "id": "hybridclr-unity-dhe-lite",
+      "repository": "hybridclr_unity",
+      "baseCommit": "29aaaba58a44f0c0446e113807847f3ffa6fc8f9",
+      "path": "patches/dhe-lite/hybridclr_unity.patch",
+      "sha256": "41CD57FD054B84C4426DD4BDD338B25221E664ADB5EFA552B32C0EA1D9DE87AA",
+      "applyRoot": "package",
+      "stripComponents": 1
+    },
+    {
+      "id": "hybridclr-unity-dhe-method-bridge",
+      "repository": "hybridclr_unity",
+      "baseCommit": "29aaaba58a44f0c0446e113807847f3ffa6fc8f9",
+      "path": "patches/dhe-lite/hybridclr_unity-generator.patch",
+      "sha256": "517B77AA4BF640DA5F1D0A86643B2A38D92EE82608439B3AFC80AC1DBCF045C2",
+      "applyRoot": "package",
+      "stripComponents": 1
+    }
+  ]
+}

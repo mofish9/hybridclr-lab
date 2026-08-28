@@ -1,7 +1,8 @@
 param(
-    [string]$LabRoot = (Split-Path -Parent $PSScriptRoot),
+    [string]$LabRoot = "",
     [switch]$AllowDirty,
     [switch]$NoCheckout,
+    [string]$ReposRoot = "",
     [ValidateSet("hybridclr", "il2cpp_plus")]
     [string[]]$SkipDirtyCheckFor = @()
 )
@@ -24,7 +25,16 @@ function Get-MeaningfulGitStatus([string[]]$StatusLines) {
 
 function Ensure-Repository([string]$Name, $Spec, [string]$ReposRoot) {
     $repoPath = Join-Path $ReposRoot $Name
-    if (-not (Test-Path (Join-Path $repoPath ".git"))) {
+    $isRepository = $false
+    if (Test-Path -LiteralPath $repoPath -PathType Container) {
+        $null = & git -C $repoPath rev-parse --git-dir 2>$null
+        $isRepository = $LASTEXITCODE -eq 0
+    }
+    if (-not $isRepository) {
+        if ((Test-Path -LiteralPath $repoPath -PathType Container) -and
+            (@(Get-ChildItem -LiteralPath $repoPath -Force -ErrorAction SilentlyContinue).Count -gt 0)) {
+            throw "Repository path exists but is not a Git repository: $repoPath"
+        }
         Write-Host "Cloning $Name from $($Spec.fork)"
         & git clone $Spec.fork $repoPath
         if ($LASTEXITCODE -ne 0) {
@@ -66,7 +76,7 @@ function Ensure-Repository([string]$Name, $Spec, [string]$ReposRoot) {
         throw "Repository '$Name' is at '$head', expected '$($Spec.commit)'"
     }
 
-    $status = Get-MeaningfulGitStatus @(Invoke-Git $repoPath @("status", "--porcelain"))
+    $status = @(Get-MeaningfulGitStatus @(Invoke-Git $repoPath @("status", "--porcelain")))
     [PSCustomObject]@{
         name = $Name
         path = $repoPath
@@ -75,10 +85,15 @@ function Ensure-Repository([string]$Name, $Spec, [string]$ReposRoot) {
     }
 }
 
-$LabRoot = [IO.Path]::GetFullPath($LabRoot)
+$LabRoot = if ([string]::IsNullOrWhiteSpace($LabRoot)) {
+    Split-Path -Parent $PSScriptRoot
+} else {
+    [IO.Path]::GetFullPath($LabRoot)
+}
 $lockPath = Join-Path $LabRoot "manifests/repo-lock.json"
 $lock = Get-Content -Raw $lockPath | ConvertFrom-Json
-$reposRoot = [IO.Path]::GetFullPath((Join-Path $LabRoot "../repos"))
+$null = . (Join-Path $PSScriptRoot "resolve-repos-root.ps1")
+$reposRoot = Resolve-LabReposRoot -LabRoot $LabRoot -Lock $lock -RequestedRoot $ReposRoot
 New-Item -ItemType Directory -Force -Path $reposRoot | Out-Null
 
 $results = @(

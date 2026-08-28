@@ -1,0 +1,43 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://github.com/mofish9/hybridclr-lab/schemas/dhe-build-identity.schema.json",
+  "title": "HybridCLR DHE Build Identity",
+  "type": "object",
+  "additionalProperties": true,
+  "required": [
+    "schemaVersion",
+    "workflow",
+    "target",
+    "baselineAssemblySha256",
+    "aotSnapshotSha256",
+    "aotSnapshotKind",
+    "identityVersion",
+    "pathSemantics",
+    "nativeGuardSourceSha256",
+    "nativeManifestSha256",
+    "generatedCppRoot",
+    "generatedCppPaths",
+    "nativeManifestPath"
+  ],
+  "properties": {
+    "schemaVersion": { "const": 1 },
+    "workflow": { "type": "string", "minLength": 1 },
+    "target": { "enum": ["StandaloneWindows64", "Android"] },
+    "baselineAssemblySha256": { "type": "string", "pattern": "^[0-9a-fA-F]{64}$" },
+    "aotSnapshotAssembly": { "type": "string", "minLength": 1 },
+    "aotSnapshotSha256": { "type": "string", "pattern": "^[0-9a-fA-F]{64}$" },
+    "aotSnapshotKind": { "const": "managed-assembly-plus-generated-cpp-v1" },
+    "identityVersion": { "const": 2 },
+    "pathSemantics": { "enum": ["workspace-absolute-v1", "archive-relative-v1"] },
+    "nativeGuardSourceSha256": { "type": "string", "pattern": "^[0-9a-fA-F]{64}$" },
+    "nativeManifestSha256": { "type": "string", "pattern": "^[0-9a-fA-F]{64}$" },
+    "generatedCppRoot": { "type": "string", "minLength": 1 },
+    "generatedCppPaths": {
+      "type": "array",
+      "minItems": 0,
+      "items": { "type": "string", "minLength": 1 }
+    },
+    "nativeManifestPath": { "type": "string", "minLength": 1 },
+    "runtimeSource": { "type": ["string", "null"] }
+  }
+}

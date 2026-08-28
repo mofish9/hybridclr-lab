@@ -1,4 +1,4 @@
-﻿
+
 Microsoft Visual Studio Solution File, Format Version 12.00
 # Visual Studio Version 17
 VisualStudioVersion = 17.0.31903.59
@@ -10,6 +10,14 @@ EndProject
 Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "runners", "runners", "{9D2479D4-C190-4A77-A268-6B6A223BB2E0}"
 EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "HybridCLR.ReferenceRunner", "runners\dotnet-reference\HybridCLR.ReferenceRunner.csproj", "{C9F8EF4B-E660-4974-B4A7-0E9BA443B2E0}"
+EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "HybridCLR.BoundaryContracts", "managed-contracts\HybridCLR.BoundaryContracts\HybridCLR.BoundaryContracts.csproj", "{D6C8D61D-4F08-4F4C-9D6D-5DF2DBA11201}"
+EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "HybridCLR.ManagedCasesAot", "managed-cases\HybridCLR.ManagedCasesAot\HybridCLR.ManagedCasesAot.csproj", "{D7B5A8E3-6B9F-4DAA-8F6A-EEB3C1B5D202}"
+EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "HybridCLR.MetadataStress", "managed-cases\HybridCLR.MetadataStress\HybridCLR.MetadataStress.csproj", "{E8C6B9F4-7CAA-4EBB-907B-FFC4D2C6E303}"
+EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "HybridCLR.CrossAssemblyDerived", "managed-cases\HybridCLR.CrossAssemblyDerived\HybridCLR.CrossAssemblyDerived.csproj", "{F9D7CA05-8DBB-4FCC-A18C-00D5E3D7F404}"
 EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
@@ -28,9 +36,29 @@ Global
 		{C9F8EF4B-E660-4974-B4A7-0E9BA443B2E0}.Debug|Any CPU.Build.0 = Debug|Any CPU
 		{C9F8EF4B-E660-4974-B4A7-0E9BA443B2E0}.Release|Any CPU.ActiveCfg = Release|Any CPU
 		{C9F8EF4B-E660-4974-B4A7-0E9BA443B2E0}.Release|Any CPU.Build.0 = Release|Any CPU
+		{D6C8D61D-4F08-4F4C-9D6D-5DF2DBA11201}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{D6C8D61D-4F08-4F4C-9D6D-5DF2DBA11201}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{D6C8D61D-4F08-4F4C-9D6D-5DF2DBA11201}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{D6C8D61D-4F08-4F4C-9D6D-5DF2DBA11201}.Release|Any CPU.Build.0 = Release|Any CPU
+		{D7B5A8E3-6B9F-4DAA-8F6A-EEB3C1B5D202}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{D7B5A8E3-6B9F-4DAA-8F6A-EEB3C1B5D202}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{D7B5A8E3-6B9F-4DAA-8F6A-EEB3C1B5D202}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{D7B5A8E3-6B9F-4DAA-8F6A-EEB3C1B5D202}.Release|Any CPU.Build.0 = Release|Any CPU
+		{E8C6B9F4-7CAA-4EBB-907B-FFC4D2C6E303}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{E8C6B9F4-7CAA-4EBB-907B-FFC4D2C6E303}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{E8C6B9F4-7CAA-4EBB-907B-FFC4D2C6E303}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{E8C6B9F4-7CAA-4EBB-907B-FFC4D2C6E303}.Release|Any CPU.Build.0 = Release|Any CPU
+		{F9D7CA05-8DBB-4FCC-A18C-00D5E3D7F404}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{F9D7CA05-8DBB-4FCC-A18C-00D5E3D7F404}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{F9D7CA05-8DBB-4FCC-A18C-00D5E3D7F404}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{F9D7CA05-8DBB-4FCC-A18C-00D5E3D7F404}.Release|Any CPU.Build.0 = Release|Any CPU
 	EndGlobalSection
 	GlobalSection(NestedProjects) = preSolution
 		{3F5CD085-CA39-4474-81DA-FEBAFF9A4D37} = {34338C1F-825C-4C13-AAF2-4FC57DB155EE}
 		{C9F8EF4B-E660-4974-B4A7-0E9BA443B2E0} = {9D2479D4-C190-4A77-A268-6B6A223BB2E0}
+		{D6C8D61D-4F08-4F4C-9D6D-5DF2DBA11201} = {34338C1F-825C-4C13-AAF2-4FC57DB155EE}
+		{D7B5A8E3-6B9F-4DAA-8F6A-EEB3C1B5D202} = {34338C1F-825C-4C13-AAF2-4FC57DB155EE}
+		{E8C6B9F4-7CAA-4EBB-907B-FFC4D2C6E303} = {34338C1F-825C-4C13-AAF2-4FC57DB155EE}
+		{F9D7CA05-8DBB-4FCC-A18C-00D5E3D7F404} = {34338C1F-825C-4C13-AAF2-4FC57DB155EE}
 	EndGlobalSection
 EndGlobal

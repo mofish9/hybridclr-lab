@@ -1,0 +1,41 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://github.com/mofish9/hybridclr-lab/schemas/dhe-project-workflow-failure.schema.json",
+  "title": "HybridCLR DHE Project Workflow Failure Report",
+  "type": "object",
+  "additionalProperties": true,
+  "required": ["schemaVersion", "format", "passed", "adapterScript", "projectPath", "error", "stages"],
+  "properties": {
+    "schemaVersion": { "const": 1 },
+    "format": { "const": "hybridclr.dhe-project-workflow-failure.json" },
+    "generatedAtUtc": { "type": "string", "format": "date-time" },
+    "passed": { "const": false },
+    "adapterScript": { "type": "string", "minLength": 1 },
+    "projectPath": { "type": "string", "minLength": 1 },
+    "error": { "type": "string", "minLength": 1 },
+    "errors": { "type": "array", "items": { "type": "string" } },
+    "stages": {
+      "type": "object",
+      "required": ["prepare", "cleanCheckout", "sourcePreflight", "projectPreflight", "player", "archive", "release"],
+      "properties": {
+        "prepare": { "$ref": "#/$defs/stage" },
+        "cleanCheckout": { "$ref": "#/$defs/stage" },
+        "sourcePreflight": { "$ref": "#/$defs/stage" },
+        "projectPreflight": { "$ref": "#/$defs/stage" },
+        "player": { "$ref": "#/$defs/stage" },
+        "archive": { "$ref": "#/$defs/stage" },
+        "release": { "$ref": "#/$defs/stage" }
+      }
+    }
+  },
+  "$defs": {
+    "stage": {
+      "type": "object",
+      "required": ["passed", "report"],
+      "properties": {
+        "passed": { "type": "boolean" },
+        "report": { "type": ["string", "null"] }
+      }
+    }
+  }
+}

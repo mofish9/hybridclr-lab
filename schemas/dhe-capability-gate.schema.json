@@ -1,0 +1,23 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://github.com/mofish9/hybridclr-lab/schemas/dhe-capability-gate.schema.json",
+  "title": "HybridCLR DHE Capability Gate Report",
+  "type": "object",
+  "additionalProperties": true,
+  "required": ["schemaVersion", "format", "passed", "baselineAssembly", "currentAssembly", "mvJson", "mvBinary", "compatibility", "summary", "changedMethodCategories", "changedMethods", "errors"],
+  "properties": {
+    "schemaVersion": { "const": 1 },
+    "format": { "const": "hybridclr.dhe-capability-gate.json" },
+    "generatedAtUtc": { "type": "string", "format": "date-time" },
+    "passed": { "type": "boolean" },
+    "baselineAssembly": { "type": "string", "minLength": 1 },
+    "currentAssembly": { "type": "string", "minLength": 1 },
+    "mvJson": { "type": "string", "minLength": 1 },
+    "mvBinary": { "type": "string", "minLength": 1 },
+    "compatibility": { "type": "object" },
+    "summary": { "type": "object" },
+    "changedMethodCategories": { "type": "object" },
+    "changedMethods": { "type": "array" },
+    "errors": { "type": "array", "items": { "type": "string" } }
+  }
+}

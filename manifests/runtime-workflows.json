@@ -10,7 +10,8 @@
         "unityVersion": "2022.3.62t12",
         "unityVersionNumber": 20220362,
         "tuanjieVersionNumber": 11000,
-        "executablePath": "C:/Program Files/Tuanjie/Hub/Editor/2022.3.62t12/Editor/Tuanjie.exe"
+        "executablePath": "C:/Program Files/Tuanjie/Hub/Editor/2022.3.62t12/Editor/Tuanjie.exe",
+        "externalHeadersTreeSha256": "EBCDC7C61490DEFAD29B65D003FC0451F870316982A4CE75AEC4F8515A1D91D6"
       },
       "il2cppPlus": {
         "tag": "v2022-tuanjie-8.13.0",

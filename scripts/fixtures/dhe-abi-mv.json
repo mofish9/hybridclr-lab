@@ -1,0 +1,76 @@
+{
+  "schemaVersion": 1,
+  "format": "hybridclr.dhe-lite.mv.json",
+  "assemblyName": "Test.Assembly",
+  "baseline": { "sha256": "0000000000000000000000000000000000000000000000000000000000000000" },
+  "current": { "sha256": "1111111111111111111111111111111111111111111111111111111111111111" },
+  "compatibility": {
+    "status": "compatible",
+    "mode": "method-body-only"
+  },
+  "summary": {
+    "methodCount": 5,
+    "changedMethodCount": 5
+  },
+  "methods": [
+    {
+      "id": "Test.Shapes::RefOut|System.Void(Test.SmallValue&,System.Int32&)",
+      "kind": "changed",
+      "name": "RefOut",
+      "declaringType": "Test.Shapes",
+      "currentToken": 100663301,
+      "isStatic": true,
+      "isAbstract": false,
+      "isPInvoke": false,
+      "genericParameterCount": 0
+    },
+    {
+      "id": "Test.Shapes::InstanceValue|System.Void(Test.SmallValue)",
+      "kind": "changed",
+      "name": "InstanceValue",
+      "declaringType": "Test.Shapes",
+      "currentToken": 100663302,
+      "isStatic": false,
+      "isAbstract": false,
+      "isPInvoke": false,
+      "genericParameterCount": 0
+    },
+    {
+      "id": "Test.SmallValue::ValueReceiverNoArgs|System.Void ()",
+      "kind": "changed",
+      "name": "ValueReceiverNoArgs",
+      "declaringType": "Test.SmallValue",
+      "currentToken": 100663304,
+      "isStatic": false,
+      "isAbstract": false,
+      "isPInvoke": false,
+      "hasThis": true,
+      "declaringTypeIsValueType": true,
+      "genericParameterCount": 0
+    },
+    {
+      "id": "Test.SmallValue::ValueReceiverWithI4|System.Void (System.Int32)",
+      "kind": "changed",
+      "name": "ValueReceiverWithI4",
+      "declaringType": "Test.SmallValue",
+      "currentToken": 100663305,
+      "isStatic": false,
+      "isAbstract": false,
+      "isPInvoke": false,
+      "hasThis": true,
+      "declaringTypeIsValueType": true,
+      "genericParameterCount": 0
+    },
+    {
+      "id": "Test.Shapes::ArbitraryPointers|System.Void(System.Object&,System.String&)",
+      "kind": "changed",
+      "name": "ArbitraryPointers",
+      "declaringType": "Test.Shapes",
+      "currentToken": 100663303,
+      "isStatic": true,
+      "isAbstract": false,
+      "isPInvoke": false,
+      "genericParameterCount": 0
+    }
+  ]
+}

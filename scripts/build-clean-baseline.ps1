@@ -1,10 +1,11 @@
 param(
-    [string]$LabRoot = (Split-Path -Parent $PSScriptRoot),
-    [ValidateSet("Baseline-Clean", "Baseline-Instrumented", "Candidate", "Metadata-Candidate", "Metadata-Tuanjie2022", "Metadata-Instrumented", "Metadata-Unity2021", "Metadata-Unity2022", "Fgs-Diagnostic", "Fgs-Candidate", "Unity2022-Candidate", "Unity2022-Fgs-Diagnostic", "Compatibility-Tuanjie2022-Fgs", "Compatibility-Unity2022-Fgs", "Compatibility-Unity2021-Standard")]
+    [string]$LabRoot = "",
+    [ValidateSet("Baseline-Clean", "DHE-Tuanjie2022", "Baseline-Instrumented", "Candidate", "Metadata-Candidate", "Metadata-Tuanjie2022", "Metadata-Instrumented", "Metadata-Unity2021", "Metadata-Unity2022", "Fgs-Diagnostic", "Fgs-Candidate", "Unity2022-Candidate", "Unity2022-Fgs-Diagnostic", "Compatibility-Tuanjie2022-Fgs", "Compatibility-Unity2022-Fgs", "Compatibility-Unity2021-Standard")]
     [string]$Profile = "Baseline-Clean",
     [ValidateSet("Tuanjie2022Fgs", "Unity2022Fgs", "Unity2021Standard")]
     [string]$EngineWorkflow = "Tuanjie2022Fgs",
     [string]$ProjectRoot = "",
+    [string]$ReposRoot = "",
     [switch]$SkipAssembly,
     [switch]$ReuseVerifiedStagedRuntime,
     [switch]$AllowDirty,
@@ -21,9 +22,18 @@ param(
 
 $ErrorActionPreference = "Stop"
 . (Join-Path $PSScriptRoot "runtime-provenance.ps1")
-$LabRoot = [IO.Path]::GetFullPath($LabRoot)
+$LabRoot = if ([string]::IsNullOrWhiteSpace($LabRoot)) {
+    Split-Path -Parent $PSScriptRoot
+} else {
+    [IO.Path]::GetFullPath($LabRoot)
+}
 $projectRoot = if ([string]::IsNullOrWhiteSpace($ProjectRoot)) { Join-Path $LabRoot "unity-test-project" } else { [IO.Path]::GetFullPath($ProjectRoot) }
+if ($Profile -eq "DHE-Tuanjie2022") {
+    throw "Profile 'DHE-Tuanjie2022' is owned by scripts/run-dhe-demo-workflow.ps1 and requires an embedded package root; build-clean-baseline.ps1 is the non-DHE control lane."
+}
 $lock = Get-Content -Raw (Join-Path $LabRoot "manifests/repo-lock.json") | ConvertFrom-Json
+$null = . (Join-Path $PSScriptRoot "resolve-repos-root.ps1")
+$resolvedReposRoot = Resolve-LabReposRoot -LabRoot $LabRoot -Lock $lock -RequestedRoot $ReposRoot
 $workflowManifest = Get-Content -Raw (Join-Path $LabRoot "manifests/runtime-workflows.json") | ConvertFrom-Json
 $workflow = @($workflowManifest.workflows | Where-Object id -eq $EngineWorkflow)
 if ($workflow.Count -ne 1) { throw "Engine workflow '$EngineWorkflow' was not found." }
@@ -137,6 +147,7 @@ if (-not $SkipAssembly) {
         -EngineWorkflow $EngineWorkflow `
         -HybridClrSource $HybridClrSource `
         -Il2CppPlusSource $Il2CppPlusSource `
+        -ReposRoot $resolvedReposRoot `
         -AllowDirty:$AllowDirty
     if ($LASTEXITCODE -ne 0) { throw "Runtime assembly failed." }
 }
@@ -145,12 +156,12 @@ if (-not (Test-Path $runtimeSource)) { throw "Runtime source not found: $runtime
 
 $runtime = Get-Content -Raw $runtimeManifest | ConvertFrom-Json
 $requestedHybridClrPath = if ([string]::IsNullOrWhiteSpace($HybridClrSource)) {
-    [IO.Path]::GetFullPath((Join-Path $LabRoot "../repos/hybridclr"))
+    Join-Path $resolvedReposRoot "hybridclr"
 } else {
     [IO.Path]::GetFullPath($HybridClrSource)
 }
 $requestedIl2CppPlusPath = if ([string]::IsNullOrWhiteSpace($Il2CppPlusSource)) {
-    [IO.Path]::GetFullPath((Join-Path $LabRoot "../repos/il2cpp_plus"))
+    Join-Path $resolvedReposRoot "il2cpp_plus"
 } else {
     [IO.Path]::GetFullPath($Il2CppPlusSource)
 }
@@ -319,7 +330,7 @@ if (-not $SkipPlayerRun) {
     & (Join-Path $PSScriptRoot "compare-results.ps1") -LabRoot $LabRoot -Actual $resultPath -Output $diffPath
 }
 
-$packagePath = Join-Path $LabRoot "../repos/hybridclr_unity"
+$packagePath = Join-Path $resolvedReposRoot "hybridclr_unity"
 $generatedCpp = Join-Path $projectRoot "HybridCLRData/LocalIl2CppData-WindowsEditor/il2cpp/libil2cpp/hybridclr/generated/MethodBridge.cpp"
 $buildManifest = [ordered]@{
     schemaVersion = 1

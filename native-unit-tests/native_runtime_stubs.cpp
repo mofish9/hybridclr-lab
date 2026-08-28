@@ -2,6 +2,7 @@
 #include <chrono>
 #include <condition_variable>
 #include <cstdlib>
+#include <cstring>
 #include <mutex>
 
 #include "Baselib.h"
@@ -10,8 +11,13 @@
 #include "C/Baselib_Thread.h"
 
 #include "utils/Memory.h"
+#include "vm/Assembly.h"
+#include "vm/Class.h"
 #include "vm/Exception.h"
+#include "vm/Image.h"
+#include "vm/MetadataCache.h"
 #include "il2cpp-runtime-stats.h"
+#include "hybridclr/interpreter/Interpreter.h"
 #include "hybridclr/interpreter/InterpreterModule.h"
 #include "hybridclr/metadata/AOTHomologousImage.h"
 #include "hybridclr/metadata/MetadataUtil.h"
@@ -149,6 +155,9 @@ namespace
 	bool s_aotMetadataQueryPaused = false;
 	bool s_resumeAotMetadataQuery = false;
 	volatile int32_t s_interpreterStubCallCount = 0;
+	Il2CppAssembly* s_dheResolverAssembly = nullptr;
+	Il2CppImage* s_dheResolverImage = nullptr;
+	Il2CppClass* s_dheResolverClass = nullptr;
 
     void InterpreterMethodPointerStub()
     {
@@ -232,6 +241,67 @@ namespace vm
     {
         return nullptr;
     }
+
+    // The native test executable does not boot the VM. These definitions keep
+    // the resolver and direct interpreter bridge linkable while their real
+    // implementations remain covered by the Unity Player gate.
+    Il2CppImage* Assembly::GetImage(const Il2CppAssembly* assembly)
+    {
+        return assembly == s_dheResolverAssembly ? s_dheResolverImage : nullptr;
+    }
+
+    const Il2CppAssembly* Assembly::GetLoadedAssembly(const char*)
+    {
+        return nullptr;
+    }
+
+    const Il2CppAssembly* MetadataCache::GetAssemblyByName(const char* name)
+    {
+        return s_dheResolverAssembly && name && s_dheResolverAssembly->aname.name &&
+            std::strcmp(name, s_dheResolverAssembly->aname.name) == 0
+            ? s_dheResolverAssembly : nullptr;
+    }
+
+    void Image::GetTypes(const Il2CppImage* image, bool, TypeVector* target)
+    {
+        if (target)
+        {
+            target->clear();
+			if (image == s_dheResolverImage && s_dheResolverClass)
+			{
+				target->push_back(s_dheResolverClass);
+			}
+        }
+    }
+
+    Il2CppClass* Image::ClassFromName(const Il2CppImage*, const char*, const char*)
+    {
+        return nullptr;
+    }
+
+    void Class::SetupMethods(Il2CppClass*)
+    {
+    }
+
+    const MethodInfo* Class::GetMethodFromName(Il2CppClass*, const char*, int)
+    {
+        return nullptr;
+    }
+}
+}
+
+namespace hybridclr
+{
+namespace interpreter
+{
+    void Interpreter::Execute(const MethodInfo*, StackObject*, void*)
+    {
+    }
+
+    InterpMethodInfo* InterpreterModule::GetInterpMethodInfo(const MethodInfo*)
+    {
+        return nullptr;
+    }
 }
 }
 
@@ -304,6 +374,20 @@ namespace native_test
     {
 		s_aotMetadataLock.unlock();
     }
+
+	void ConfigureDheResolver(Il2CppAssembly* assembly, Il2CppImage* image, Il2CppClass* klass)
+	{
+		s_dheResolverAssembly = assembly;
+		s_dheResolverImage = image;
+		s_dheResolverClass = klass;
+	}
+
+	void ClearDheResolver()
+	{
+		s_dheResolverAssembly = nullptr;
+		s_dheResolverImage = nullptr;
+		s_dheResolverClass = nullptr;
+	}
 }
 
 namespace metadata

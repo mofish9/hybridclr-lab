@@ -1,0 +1,36 @@
+{
+  "schemaVersion": 1,
+  "format": "hybridclr.dhe-lite.mv.json",
+  "assemblyName": "Test.GenericAssembly",
+  "baseline": { "path": "fixture-baseline.dll", "sha256": "0000000000000000000000000000000000000000000000000000000000000000", "mvid": "fixture-baseline", "assemblyRefs": [] },
+  "current": { "path": "fixture-current.dll", "sha256": "1111111111111111111111111111111111111111111111111111111111111111", "mvid": "fixture-current", "assemblyRefs": [] },
+  "methods": [
+    {
+      "id": "Test.GenericCases::GenericConstrained|System.Int32 <!!0>(T,System.Int32)", "kind": "changed",
+      "name": "GenericConstrained", "declaringType": "Test.GenericCases", "signature": "System.Int32 <!!0>(T,System.Int32)",
+      "returnType": "System.Int32", "parameterTypes": ["T", "System.Int32"], "hasThis": false,
+      "declaringTypeIsValueType": false, "declaringTypeGenericParameterCount": 0, "genericParameterCount": 1,
+      "isStatic": true, "isAbstract": false, "isPInvoke": false, "currentToken": 100663501, "baselineToken": 100663501,
+      "tokenStable": true, "shapeStable": true
+    },
+    {
+      "id": "Test.GenericCases::GenericSelect|T <!!0>(T,T)", "kind": "changed",
+      "name": "GenericSelect", "declaringType": "Test.GenericCases", "signature": "T <!!0>(T,T)",
+      "returnType": "T", "parameterTypes": ["T", "T"], "hasThis": false,
+      "declaringTypeIsValueType": false, "declaringTypeGenericParameterCount": 0, "genericParameterCount": 1,
+      "isStatic": true, "isAbstract": false, "isPInvoke": false, "currentToken": 100663502, "baselineToken": 100663502,
+      "tokenStable": true, "shapeStable": true
+    },
+    {
+      "id": "Test.GenericVirtualOperation`1::Apply|System.Int32 (T,System.Int32)", "kind": "changed",
+      "name": "Apply", "declaringType": "Test.GenericVirtualOperation`1", "signature": "System.Int32 (T,System.Int32)",
+      "returnType": "System.Int32", "parameterTypes": ["T", "System.Int32"], "hasThis": true,
+      "declaringTypeIsValueType": false, "declaringTypeGenericParameterCount": 1, "genericParameterCount": 0,
+      "isStatic": false, "isAbstract": false, "isPInvoke": false, "currentToken": 100663503, "baselineToken": 100663503,
+      "tokenStable": true, "shapeStable": true
+    }
+  ],
+  "typeChanges": [],
+  "compatibility": { "mode": "method-body-only", "status": "compatible", "reasons": [] },
+  "summary": { "methodCount": 3, "changedMethodCount": 3, "unchangedMethodCount": 0, "typeChangeCount": 0, "compatibleMethodOnlyChange": true }
+}

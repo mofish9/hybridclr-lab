@@ -8,7 +8,7 @@ $LabRoot = [IO.Path]::GetFullPath($LabRoot)
 $project = Join-Path $LabRoot "runners/manifest-generator/HybridCLR.ManifestGenerator.csproj"
 $outputPath = if ([IO.Path]::IsPathRooted($Output)) { $Output } else { Join-Path $LabRoot $Output }
 
-dotnet run --project $project --configuration Release --no-restore -- $outputPath
+dotnet run --project $project --configuration Release -- $outputPath
 if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
 
 $manifest = Get-Content -Raw $outputPath | ConvertFrom-Json

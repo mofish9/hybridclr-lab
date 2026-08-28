@@ -1,0 +1,48 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://github.com/mofish9/hybridclr-lab/schemas/dhe-batch-report.schema.json",
+  "title": "HybridCLR DHE-Lite Batch Report",
+  "type": "object",
+  "additionalProperties": true,
+  "required": ["schemaVersion", "format", "baselineRoot", "currentRoot", "strictCompatibility", "requireDheEqualsHotUpdate", "configurationPassed", "configurationErrors", "hotUpdateAssemblies", "dheAotAssemblies", "assemblies", "counts"],
+  "properties": {
+    "schemaVersion": { "const": 1 },
+    "format": { "const": "hybridclr.dhe-lite.batch-report.json" },
+    "generatedAtUtc": { "type": "string", "format": "date-time" },
+    "baselineRoot": { "type": "string", "minLength": 1 },
+    "currentRoot": { "type": "string", "minLength": 1 },
+    "strictCompatibility": { "type": "boolean" },
+    "requireDheEqualsHotUpdate": { "type": "boolean" },
+    "configurationPassed": { "type": "boolean" },
+    "configurationErrors": { "type": "array", "items": { "type": "string" } },
+    "hotUpdateAssemblies": { "type": "array", "items": { "type": "string" } },
+    "dheAotAssemblies": { "type": "array", "items": { "type": "string" } },
+    "assemblies": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["assemblyName", "baseline", "current", "report", "status"],
+        "properties": {
+          "assemblyName": { "type": "string", "minLength": 1 },
+          "baseline": { "type": "string" },
+          "current": { "type": "string" },
+          "report": { "type": "string" },
+          "binary": { "type": ["string", "null"] },
+          "status": { "enum": ["compatible", "incompatible", "missing", "error"] },
+          "error": { "type": ["string", "null"] }
+        }
+      }
+    },
+    "counts": {
+      "type": "object",
+      "required": ["total", "compatible", "incompatible", "missing", "error"],
+      "properties": {
+        "total": { "type": "integer", "minimum": 0 },
+        "compatible": { "type": "integer", "minimum": 0 },
+        "incompatible": { "type": "integer", "minimum": 0 },
+        "missing": { "type": "integer", "minimum": 0 },
+        "error": { "type": "integer", "minimum": 0 }
+      }
+    }
+  }
+}

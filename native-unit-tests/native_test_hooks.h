@@ -19,5 +19,11 @@ namespace native_test
     bool WaitForAOTMetadataQueryAttemptAfter(uint64_t count, uint32_t timeoutMilliseconds);
     void AcquireAOTMetadataLock();
     void ReleaseAOTMetadataLock();
+
+    // Configure the minimal metadata lookup surface used by the native DHE
+    // transaction test. The production runtime supplies these VM services;
+    // the standalone test executable uses this explicit fixture instead.
+    void ConfigureDheResolver(Il2CppAssembly* assembly, Il2CppImage* image, Il2CppClass* klass);
+    void ClearDheResolver();
 }
 }

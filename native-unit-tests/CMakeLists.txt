@@ -28,10 +28,23 @@ else()
     set(HYBRIDCLR_TEST_HAS_ADVANCED_OPTIMIZATION_OPCODES 0)
 endif()
 
+if (HYBRIDCLR_TEST_EXPECT_DHE)
+    if (NOT EXISTS "${HYBRIDCLR_TEST_SOURCE_ROOT}/DheRuntime.cpp" OR
+        NOT EXISTS "${HYBRIDCLR_TEST_SOURCE_ROOT}/DheRuntime.h")
+        message(FATAL_ERROR "DHE test profile requires hybridclr/DheRuntime.cpp and hybridclr/DheRuntime.h")
+    endif()
+endif()
+
+set(HYBRIDCLR_DHE_SOURCES)
+if (EXISTS "${HYBRIDCLR_TEST_SOURCE_ROOT}/DheRuntime.cpp")
+    list(APPEND HYBRIDCLR_DHE_SOURCES "${HYBRIDCLR_TEST_SOURCE_ROOT}/DheRuntime.cpp")
+endif()
+
 add_executable(hybridclr_native_tests
     hybridclr_native_tests.cpp
     native_runtime_stubs.cpp
     "${HYBRIDCLR_TEST_SOURCE_ROOT}/Il2CppCompatibleDef.cpp"
+    ${HYBRIDCLR_DHE_SOURCES}
     "${HYBRIDCLR_TEST_SOURCE_ROOT}/interpreter/Instruction.cpp"
     "${HYBRIDCLR_TEST_SOURCE_ROOT}/metadata/Opcodes.cpp"
     "${HYBRIDCLR_TEST_SOURCE_ROOT}/transform/BasicBlockSpliter.cpp"
@@ -41,11 +54,17 @@ add_executable(hybridclr_native_tests
 add_library(hybridclr_metadata_compile_gate OBJECT
     "${HYBRIDCLR_RUNTIME_ROOT}/metadata/ArrayMetadata.cpp"
     "${HYBRIDCLR_RUNTIME_ROOT}/metadata/GenericMethod.cpp"
+    "${HYBRIDCLR_TEST_SOURCE_ROOT}/metadata/Assembly.cpp"
+    "${HYBRIDCLR_TEST_SOURCE_ROOT}/metadata/AOTHomologousImage.cpp"
     "${HYBRIDCLR_TEST_SOURCE_ROOT}/metadata/ClassFieldLayoutCalculator.cpp"
     "${HYBRIDCLR_TEST_SOURCE_ROOT}/metadata/InterpreterImage.cpp"
     "${HYBRIDCLR_TEST_SOURCE_ROOT}/metadata/VTableSetup.cpp"
 )
 add_dependencies(hybridclr_native_tests hybridclr_metadata_compile_gate)
+
+add_library(hybridclr_runtime_api_compile_gate OBJECT
+    "${HYBRIDCLR_TEST_SOURCE_ROOT}/RuntimeApi.cpp"
+)
 
 function(configure_hybridclr_target target)
     target_compile_features(${target} PRIVATE cxx_std_17)
@@ -95,6 +114,7 @@ endfunction()
 
 configure_hybridclr_target(hybridclr_native_tests)
 configure_hybridclr_target(hybridclr_metadata_compile_gate)
+configure_hybridclr_target(hybridclr_runtime_api_compile_gate)
 
 enable_testing()
 add_test(NAME hybridclr_native_tests COMMAND hybridclr_native_tests)

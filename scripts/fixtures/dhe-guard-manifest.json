@@ -1,0 +1,13 @@
+{
+  "schemaVersion": 1,
+  "methods": [
+    {
+      "functionName": "HybridCLRLabPlayerRunner_ParseChecksum_m4CC4CB3B8EA1E75E031592BDA02D584EC3D0017C",
+      "returnType": "int64_t",
+      "parameters": [
+        { "type": "String_t*", "name": "___0_value" },
+        { "type": "String_t*", "name": "___1_id" }
+      ]
+    }
+  ]
+}

@@ -1,0 +1,30 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://github.com/mofish9/hybridclr-lab/schemas/dhe-clean-checkout-gate.schema.json",
+  "title": "HybridCLR DHE Clean Checkout Gate Report",
+  "type": "object",
+  "additionalProperties": true,
+  "required": ["schemaVersion", "format", "passed", "cleanSourcePreflightPassed", "staleOutputRejected", "missingRuntimeRejected", "runtimeTested", "staleManifestTested", "staleManifestRejected", "gitTested", "gitCleanRequired", "trackedSourcesTested", "trackedSourcesRequired", "sourceBoundaryPath", "missingTrackedSources", "errors"],
+  "properties": {
+    "schemaVersion": { "const": 1 },
+    "format": { "const": "hybridclr.dhe-clean-checkout-gate.json" },
+    "generatedAtUtc": { "type": "string", "format": "date-time" },
+    "passed": { "type": "boolean" },
+    "cleanSourcePreflightPassed": { "type": "boolean" },
+    "staleOutputRejected": { "type": "boolean" },
+    "missingRuntimeRejected": { "type": "boolean" },
+    "runtimeTested": { "type": "boolean" },
+    "staleManifestTested": { "type": "boolean" },
+    "staleManifestRejected": { "type": ["boolean", "null"] },
+    "gitRoot": { "type": ["string", "null"] },
+    "gitTested": { "type": "boolean" },
+    "gitClean": { "type": ["boolean", "null"] },
+    "gitCleanRequired": { "type": "boolean" },
+    "trackedSourcesTested": { "type": "boolean" },
+    "trackedSourcesComplete": { "type": ["boolean", "null"] },
+    "trackedSourcesRequired": { "type": "boolean" },
+    "sourceBoundaryPath": { "type": ["string", "null"] },
+    "missingTrackedSources": { "type": "array", "items": { "type": "string" } },
+    "errors": { "type": "array", "items": { "type": "string" } }
+  }
+}

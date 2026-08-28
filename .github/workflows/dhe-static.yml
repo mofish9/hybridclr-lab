@@ -1,0 +1,52 @@
+name: DHE Static Validation
+
+on:
+  push:
+  pull_request:
+
+jobs:
+  static:
+    runs-on: windows-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Run DHE static gate
+        shell: pwsh
+        run: ./scripts/run-dhe-static-gate.ps1 -OutputRoot artifacts/dhe-static-gate -ForceOutput
+
+      - name: Run DHE static gate on Windows PowerShell 5.1
+        shell: powershell
+        run: .\scripts\run-dhe-static-gate.ps1 -OutputRoot artifacts/dhe-static-gate-ps51 -ForceOutput
+
+      - name: Build managed contracts and fixtures
+        shell: pwsh
+        run: dotnet build HybridCLR.Lab.sln --configuration Release
+
+      - name: Run DHE capability gate
+        shell: pwsh
+        run: ./scripts/run-dhe-capability-gate.ps1 -OutputRoot artifacts/dhe-capability-gate -ForceOutput
+
+      - name: Run DHE compatibility negative gate
+        shell: pwsh
+        run: ./scripts/run-dhe-compatibility-negative-gate.ps1 -OutputRoot artifacts/dhe-compatibility-negative-gate -ForceOutput
+
+      - name: Validate all DHE JSON contracts
+        shell: pwsh
+        run: >-
+          ./scripts/run-dhe-schema-gate.ps1
+          -InputRootList '["artifacts/dhe-static-gate","artifacts/dhe-static-gate-ps51","artifacts/dhe-capability-gate","artifacts/dhe-compatibility-negative-gate"]'
+          -OutputRoot artifacts/dhe-schema-gate
+          -ForceOutput
+
+      - name: Upload static report
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: dhe-static-gate-report
+          path: |
+            artifacts/dhe-static-gate/**
+            artifacts/dhe-static-gate-ps51/**
+            artifacts/dhe-capability-gate/**
+            artifacts/dhe-compatibility-negative-gate/**
+            artifacts/dhe-schema-gate/**

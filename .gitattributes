@@ -1,0 +1,6 @@
+# The DHE package tree hash and patch hashes are computed from raw checkout
+# bytes. Keep these inputs byte-for-byte stable when a user has
+# core.autocrlf=true or a different global eol setting.
+unity2021-dhe-demo/Packages/com.code-philosophy.hybridclr/** -text
+patches/dhe-lite/*.patch -text
+*.sln text eol=crlf

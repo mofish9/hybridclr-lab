@@ -1,0 +1,10 @@
+%YAML 1.1
+--- !u!114 &1
+MonoBehaviour:
+  hotUpdateAssemblies: ["Feature,Core", 'Quoted#Name'] # inline comment
+  dheAotAssemblies:
+  - "Feature,Core" # preserve the comma in the quoted scalar
+  - Quoted#Name
+  externalHotUpdateAssembliyDirs:
+  - "relative/path" # trailing comment
+  preserveHotUpdateAssemblies: []

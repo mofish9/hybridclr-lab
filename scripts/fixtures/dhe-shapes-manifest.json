@@ -1,0 +1,44 @@
+{
+  "schemaVersion": 1,
+  "methods": [
+    {
+      "functionName": "ShapeI4",
+      "returnType": "int32_t",
+      "parameters": [{ "type": "int32_t", "name": "___0_value" }],
+      "assemblyName": "Test.Assembly",
+      "declaringType": "Test.Shapes",
+      "methodName": "ShapeI4",
+      "methodToken": 100663301
+    },
+    {
+      "functionName": "ShapeI4I4",
+      "returnType": "int32_t",
+      "parameters": [
+        { "type": "int32_t", "name": "___0_left" },
+        { "type": "int32_t", "name": "___1_right" }
+      ],
+      "assemblyName": "Test.Assembly",
+      "declaringType": "Test.Shapes",
+      "methodName": "ShapeI4I4",
+      "methodToken": 100663302
+    },
+    {
+      "functionName": "ShapeI8",
+      "returnType": "int64_t",
+      "parameters": [{ "type": "int64_t", "name": "___0_value" }],
+      "assemblyName": "Test.Assembly",
+      "declaringType": "Test.Shapes",
+      "methodName": "ShapeI8",
+      "methodToken": 100663303
+    },
+    {
+      "functionName": "ShapeVoid",
+      "returnType": "void",
+      "parameters": [{ "type": "int32_t", "name": "___0_value" }],
+      "assemblyName": "Test.Assembly",
+      "declaringType": "Test.Shapes",
+      "methodName": "ShapeVoid",
+      "methodToken": 100663304
+    }
+  ]
+}

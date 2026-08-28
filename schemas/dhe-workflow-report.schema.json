@@ -1,0 +1,84 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://github.com/mofish9/hybridclr-lab/schemas/dhe-workflow-report.schema.json",
+  "title": "HybridCLR DHE Workflow Report",
+  "type": "object",
+  "additionalProperties": true,
+  "required": ["schemaVersion", "format", "passed", "validationPassed", "target", "mode", "coverageRequired", "coverageGatePassed", "releaseReady", "artifactValidationPassed", "buildIdentityReady", "identityVersion", "aotSnapshotKind", "nativeGuardSourceSha256", "nativeManifestSha256", "pathSemantics", "projectPlan", "projectPlanValidation", "batchReport", "runtimePlan", "runtimePlanProjectPath", "sourcePreflight", "cleanCheckoutGate", "transaction", "assemblyScope", "capability", "nativeGuardCoverage", "player"],
+  "properties": {
+    "schemaVersion": { "const": 1 },
+    "format": { "pattern": "^hybridclr\\.dhe-[A-Za-z0-9._-]+-workflow\\.json$" },
+    "generatedAtUtc": { "type": "string", "format": "date-time" },
+    "passed": { "type": "boolean" },
+    "validationPassed": { "type": "boolean" },
+    "target": { "const": "StandaloneWindows64" },
+    "mode": { "enum": ["Release", "Exploratory"] },
+    "coverageRequired": { "type": "boolean" },
+    "coverageGatePassed": { "type": "boolean" },
+    "releaseReady": { "type": "boolean" },
+    "artifactValidationPassed": { "type": "boolean" },
+    "buildIdentityReady": { "type": "boolean" },
+    "identityVersion": { "const": 2 },
+    "aotSnapshotKind": { "const": "managed-assembly-plus-generated-cpp-v1" },
+    "nativeGuardSourceSha256": { "type": "string", "pattern": "^[0-9a-fA-F]{64}$" },
+    "nativeManifestSha256": { "type": "string", "pattern": "^[0-9a-fA-F]{64}$" },
+    "pathSemantics": { "enum": ["workspace-absolute-v1", "archive-relative-v1"] },
+    "runtimeSource": { "type": ["string", "null"] },
+    "artifactValidation": { "type": ["string", "null"] },
+    "archiveManifest": { "type": ["string", "null"] },
+    "archiveGate": { "type": ["string", "null"] },
+    "runtimePlan": { "type": "string", "minLength": 1 },
+    "runtimePlanProjectPath": { "type": "string", "minLength": 1 },
+    "projectPlan": { "type": "string", "minLength": 1 },
+    "projectPlanValidation": { "type": "string", "minLength": 1 },
+    "batchReport": { "type": "string", "minLength": 1 },
+    "sourcePreflight": { "type": "string", "minLength": 1 },
+    "cleanCheckoutGate": { "type": "string", "minLength": 1 },
+    "transaction": {
+      "type": "object",
+      "required": ["retryValidated", "retryAssemblyName", "retryFailure"],
+      "properties": {
+        "retryValidated": { "type": "boolean" },
+        "retryAssemblyName": { "type": ["string", "null"] },
+        "retryFailure": { "type": ["string", "null"] }
+      }
+    },
+    "assemblyScope": {
+      "type": "object",
+      "required": ["strategy", "aotAssemblies", "loadedDheAssemblies", "stagedDependencies", "stagedDependenciesLoadedAsDhe"],
+      "properties": {
+        "strategy": { "type": "string", "minLength": 1 },
+        "aotAssemblies": { "type": "array", "items": { "type": "string" } },
+        "loadedDheAssemblies": { "type": "array", "items": { "type": "string" } },
+        "stagedDependencies": { "type": "array", "items": { "type": "string" } },
+        "stagedDependenciesLoadedAsDhe": { "type": "boolean" },
+        "secondaryAssemblyChangedValidated": { "type": "boolean" },
+        "secondaryAssemblyDirectValidated": { "type": "boolean" }
+      }
+    },
+    "capability": {
+      "type": "object",
+      "required": ["methodCount", "changedMethodCount", "typeChangeCount", "compatibility"],
+      "properties": {
+        "methodCount": { "type": "integer", "minimum": 0 },
+        "changedMethodCount": { "type": "integer", "minimum": 0 },
+        "typeChangeCount": { "type": "integer", "minimum": 0 },
+        "compatibility": { "enum": ["compatible", "incompatible"] }
+      }
+    },
+    "nativeGuardCoverage": {
+      "type": "object",
+      "required": ["manifestAvailable", "changedMethodCount", "supportedChangedMethodCount", "unsupportedChangedMethodCount", "nativeEntryCount", "guardedMethodCount", "complete"],
+      "properties": {
+        "manifestAvailable": { "type": "boolean" },
+        "changedMethodCount": { "type": "integer", "minimum": 0 },
+        "supportedChangedMethodCount": { "type": "integer", "minimum": 0 },
+        "unsupportedChangedMethodCount": { "type": "integer", "minimum": 0 },
+        "nativeEntryCount": { "type": "integer", "minimum": 0 },
+        "guardedMethodCount": { "type": "integer", "minimum": 0 },
+        "complete": { "type": "boolean" }
+      }
+    },
+    "player": { "type": "object", "required": ["passed", "loadError"] }
+  }
+}

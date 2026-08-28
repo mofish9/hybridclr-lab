@@ -1,0 +1,46 @@
+{
+  "schemaVersion": 1,
+  "assemblyName": "Test.Assembly",
+  "compatibility": {
+    "status": "compatible",
+    "mode": "method-body-only"
+  },
+  "methods": [
+    {
+      "id": "Test.Shapes::RefOut|System.Void(Test.SmallValue&,System.Int32&)",
+      "kind": "changed",
+      "name": "RefOut",
+      "declaringType": "Test.Shapes",
+      "currentToken": 100663301,
+      "isStatic": true,
+      "isVirtual": false,
+      "isAbstract": false,
+      "isPInvoke": false,
+      "genericParameterCount": 0
+    },
+    {
+      "id": "Test.Shapes::InstanceValue|System.Void(Test.SmallValue)",
+      "kind": "changed",
+      "name": "InstanceValue",
+      "declaringType": "Test.Shapes",
+      "currentToken": 100663302,
+      "isStatic": false,
+      "isVirtual": false,
+      "isAbstract": false,
+      "isPInvoke": false,
+      "genericParameterCount": 0
+    },
+    {
+      "id": "Test.Shapes::ArbitraryPointers|System.Void(System.Object&,System.String&)",
+      "kind": "changed",
+      "name": "ArbitraryPointers",
+      "declaringType": "Test.Shapes",
+      "currentToken": 100663303,
+      "isStatic": true,
+      "isVirtual": false,
+      "isAbstract": false,
+      "isPInvoke": false,
+      "genericParameterCount": 0
+    }
+  ]
+}

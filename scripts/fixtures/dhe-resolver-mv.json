@@ -1,0 +1,16 @@
+{
+  "schemaVersion": 1,
+  "methods": [
+    {
+      "id": "HybridCLR.Lab.HybridCLRLabPlayerRunner::ParseChecksum|System.Int64(System.String,System.String)",
+      "kind": "changed",
+      "name": "ParseChecksum",
+      "declaringType": "HybridCLR.Lab.HybridCLRLabPlayerRunner",
+      "currentToken": 100663401,
+      "isStatic": true,
+      "isVirtual": false,
+      "isAbstract": false,
+      "isPInvoke": false
+    }
+  ]
+}

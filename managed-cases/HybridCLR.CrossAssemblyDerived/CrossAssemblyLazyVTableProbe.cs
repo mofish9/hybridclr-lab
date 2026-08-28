@@ -17,6 +17,15 @@ namespace HybridCLR.Lab.CrossAssemblyDerived
 
     public static class CrossAssemblyLazyVTableProbe
     {
+        public static int Changed(int value)
+        {
+#if DHE_CURRENT
+            return value + 100;
+#else
+            return value + 10;
+#endif
+        }
+
         public static string Run()
         {
             CrossAssemblyLazyVTableBase instance = new CrossAssemblyLazyVTableDerived();

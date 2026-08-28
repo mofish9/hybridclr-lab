@@ -1,0 +1,82 @@
+name: DHE Native Validation
+
+on:
+  workflow_dispatch:
+
+jobs:
+  native:
+    # This lane needs the matching Tuanjie installation for baselib headers.
+    # It is deliberately manual so ordinary PR validation does not queue on a
+    # private editor runner, while production validation uses the same script
+    # as the local release workflow.
+    runs-on: [self-hosted, windows, dhe-tuanjie]
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Assemble locked DHE runtime
+        shell: pwsh
+        run: ./scripts/assemble-runtime.ps1 -Profile DHE-Tuanjie2022 -EngineWorkflow Tuanjie2022Fgs -PackageRoot ./unity2021-dhe-demo/Packages/com.code-philosophy.hybridclr
+
+      - name: Run project adapter preflight contract
+        shell: pwsh
+        run: >-
+          ./scripts/run-dhe-project-workflow.ps1
+          -AdapterScript ./scripts/fixtures/dhe-project-adapter-fixture.ps1
+          -ProjectPath ./unity2021-dhe-demo
+          -SettingsFile ./unity2021-dhe-demo/ProjectSettings/HybridCLRSettings.asset
+          -RuntimeSource ./staging/runtime/DHE-Tuanjie2022/libil2cpp
+          -OutputRoot ./artifacts/dhe-project-adapter-contract
+          -DnlibPath ./unity2021-dhe-demo/Packages/com.code-philosophy.hybridclr/Plugins/dnlib.dll
+          -PackageLockPath ./manifests/dhe-package-lock.json
+          -IdentityTemplatePath ./unity2021-dhe-demo/Assets/Runtime/HybridCLRDheBuildIdentity.cs
+          -Mode Exploratory
+          -RequireEmbeddedPackage
+          -RequireIdentityTemplate
+          -StopAfterPreflight
+          -ForceOutput
+
+      - name: Run native compile and tests
+        shell: pwsh
+        run: ./scripts/run-dhe-native-gate.ps1 -Profile DHE-Tuanjie2022 -OutputRoot ./artifacts/dhe-native-gate -ForceOutput
+
+      - name: Run full DHE demo through the project workflow
+        shell: pwsh
+        run: >-
+          ./scripts/run-dhe-project-workflow.ps1
+          -AdapterScript ./scripts/adapters/dhe-demo-project-adapter.ps1
+          -ProjectPath ./unity2021-dhe-demo
+          -SettingsFile ./unity2021-dhe-demo/ProjectSettings/HybridCLRSettings.asset
+          -RuntimeSource ./staging/runtime/DHE-Tuanjie2022/libil2cpp
+          -OutputRoot ./artifacts/dhe-project-workflow
+          -ArchiveRoot ./artifacts/dhe-project-workflow-archive
+          -DnlibPath ./unity2021-dhe-demo/Packages/com.code-philosophy.hybridclr/Plugins/dnlib.dll
+          -PackageLockPath ./manifests/dhe-package-lock.json
+          -IdentityTemplatePath ./unity2021-dhe-demo/Assets/Runtime/HybridCLRDheBuildIdentity.cs
+          -GitRoot .
+          -SourceBoundaryPath ./manifests/dhe-source-boundary.json
+          -Mode Release
+          -RequireEmbeddedPackage
+          -RequireIdentityTemplate
+          -ForceOutput
+
+      - name: Validate native-lane JSON contracts
+        shell: pwsh
+        run: >-
+          ./scripts/run-dhe-schema-gate.ps1
+          -InputRoot artifacts
+          -OutputRoot ./artifacts/dhe-native-schema-gate
+          -ForceOutput
+
+      - name: Upload native report
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: dhe-native-gate-report
+          path: |
+            artifacts/dhe-project-adapter-contract/**
+            artifacts/dhe-native-gate/**
+            artifacts/dhe-project-workflow/**
+            artifacts/dhe-project-workflow-archive/**
+            artifacts/dhe-project-workflow-archive.gate.json
+            artifacts/dhe-native-schema-gate/**

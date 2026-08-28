@@ -1,0 +1,50 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://github.com/mofish9/hybridclr-lab/schemas/dhe-player-result.schema.json",
+  "title": "HybridCLR DHE Player Result",
+  "type": "object",
+  "additionalProperties": true,
+  "required": ["schemaVersion", "format", "passed", "error"],
+  "properties": {
+    "schemaVersion": { "const": 1 },
+    "format": { "const": "hybridclr.dhe-player-result.json" },
+    "passed": { "type": "boolean" },
+    "error": { "type": ["string", "null"] },
+    "loadError": { "type": ["string", "null"] },
+    "plannedDheAssemblies": { "type": ["array", "null"], "items": { "type": "string", "minLength": 1 } },
+    "loadedDheAssemblies": { "type": ["array", "null"], "items": { "type": "string", "minLength": 1 } },
+    "retryValidated": { "type": "boolean" },
+    "retryAssemblyName": { "type": ["string", "null"] },
+    "retryFailure": { "type": ["string", "null"] },
+    "assemblyValidations": { "type": ["array", "null"] },
+    "multiAssemblyValidated": { "type": "boolean" },
+    "buildIdentityValidated": { "type": "boolean" },
+    "identityVersion": { "type": "integer" },
+    "aotSnapshotKind": { "type": ["string", "null"] },
+    "nativeGuardSourceSha256": { "type": ["string", "null"] },
+    "nativeManifestSha256": { "type": ["string", "null"] }
+  },
+  "allOf": [
+    {
+      "if": { "properties": { "passed": { "const": true } }, "required": ["passed"] },
+      "then": {
+        "required": ["loadError", "plannedDheAssemblies", "loadedDheAssemblies", "retryValidated", "retryAssemblyName", "retryFailure", "assemblyValidations", "multiAssemblyValidated", "buildIdentityValidated", "identityVersion", "aotSnapshotKind", "nativeGuardSourceSha256", "nativeManifestSha256"],
+        "properties": {
+          "loadError": { "const": "OK" },
+          "plannedDheAssemblies": { "type": "array", "minItems": 1, "uniqueItems": true },
+          "loadedDheAssemblies": { "type": "array", "minItems": 1, "uniqueItems": true },
+          "retryValidated": { "const": true },
+          "retryAssemblyName": { "type": "string", "minLength": 1 },
+          "retryFailure": { "const": "DHE_MV_REGISTRATION_FAILED" },
+          "assemblyValidations": { "type": "array", "minItems": 1 },
+          "multiAssemblyValidated": { "const": true },
+          "buildIdentityValidated": { "const": true },
+          "identityVersion": { "const": 2 },
+          "aotSnapshotKind": { "const": "managed-assembly-plus-generated-cpp-v1" },
+          "nativeGuardSourceSha256": { "type": "string", "pattern": "^[0-9a-fA-F]{64}$" },
+          "nativeManifestSha256": { "type": "string", "pattern": "^[0-9a-fA-F]{64}$" }
+        }
+      }
+    }
+  ]
+}

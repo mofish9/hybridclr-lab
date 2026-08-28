@@ -1,0 +1,63 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://github.com/mofish9/hybridclr-lab/schemas/dhe-native-manifest.schema.json",
+  "title": "HybridCLR DHE Native Guard Manifest",
+  "type": "object",
+  "additionalProperties": true,
+  "required": ["schemaVersion", "resolverVersion", "abiContract", "generatedCppRoot", "changedMethodCount", "supportedChangedMethodCount", "unsupportedChangedMethodCount", "nativeEntryCount", "unsupportedChangedMethods", "methods"],
+  "properties": {
+    "schemaVersion": { "const": 1 },
+    "resolverVersion": { "const": 2 },
+    "abiContract": { "const": "il2cpp-generated-cpp-signature-v2" },
+    "generatedCppRoot": { "type": "string", "minLength": 1 },
+    "changedMethodCount": { "type": "integer", "minimum": 0 },
+    "supportedChangedMethodCount": { "type": "integer", "minimum": 0 },
+    "unsupportedChangedMethodCount": { "type": "integer", "minimum": 0 },
+    "nativeEntryCount": { "type": "integer", "minimum": 0 },
+    "unsupportedChangedMethods": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["id", "name", "assemblyName", "declaringType", "methodToken", "reasons"],
+        "properties": {
+          "id": { "type": "string", "minLength": 1 },
+          "name": { "type": "string", "minLength": 1 },
+          "assemblyName": { "type": "string", "minLength": 1 },
+          "declaringType": { "type": "string" },
+          "methodToken": { "type": "integer", "minimum": 1 },
+          "reasons": { "type": "array", "items": { "type": "string", "minLength": 1 } }
+        }
+      }
+    },
+    "methods": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["functionName", "returnType", "parameters", "sourceFile", "assemblyName", "declaringType", "methodName", "methodToken", "managedId", "bridgeKind", "usesHiddenReturnBuffer", "fullySharedParameterIndexes", "isStatic", "hasThis", "managedParameterCount"],
+        "properties": {
+          "functionName": { "type": "string", "minLength": 1 },
+          "returnType": { "type": "string", "minLength": 1 },
+          "parameters": { "type": "array" },
+          "sourceFile": { "type": "string", "minLength": 1 },
+          "assemblyName": { "type": "string", "minLength": 1 },
+          "declaringType": { "type": "string" },
+          "methodName": { "type": "string", "minLength": 1 },
+          "methodToken": { "type": "integer", "minimum": 1 },
+          "managedId": { "type": "string", "minLength": 1 },
+          "managedReturnType": { "type": "string" },
+          "managedParameterTypes": { "type": "array", "items": { "type": "string" } },
+          "managedHasThis": { "type": "boolean" },
+          "declaringTypeIsValueType": { "type": "boolean" },
+          "genericParameterCount": { "type": "integer", "minimum": 0 },
+          "declaringTypeGenericParameterCount": { "type": "integer", "minimum": 0 },
+          "bridgeKind": { "enum": ["shape-helper-v1", "invoke-args-v1"] },
+          "usesHiddenReturnBuffer": { "type": "boolean" },
+          "fullySharedParameterIndexes": { "type": "array", "items": { "type": "integer", "minimum": 0 } },
+          "isStatic": { "type": "boolean" },
+          "hasThis": { "type": "boolean" },
+          "managedParameterCount": { "type": "integer", "minimum": 0 }
+        }
+      }
+    }
+  }
+}

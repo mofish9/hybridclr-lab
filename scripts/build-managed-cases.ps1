@@ -1,5 +1,5 @@
 param(
-    [string]$LabRoot = (Split-Path -Parent $PSScriptRoot),
+    [string]$LabRoot = "",
     [string]$UnityProjectRoot = "",
     [string]$Target = "StandaloneWindows64",
     [ValidateSet("Release", "Debug")]
@@ -7,12 +7,23 @@ param(
 )
 
 $ErrorActionPreference = "Stop"
-$LabRoot = [IO.Path]::GetFullPath($LabRoot)
+. (Join-Path $PSScriptRoot "dhe-workflow-common.ps1")
+$LabRoot = if ([string]::IsNullOrWhiteSpace($LabRoot)) {
+    Split-Path -Parent $PSScriptRoot
+} else {
+    [IO.Path]::GetFullPath($LabRoot)
+}
 $UnityProjectRoot = if ([string]::IsNullOrWhiteSpace($UnityProjectRoot)) {
     Join-Path $LabRoot "unity-test-project"
 } else {
     [IO.Path]::GetFullPath($UnityProjectRoot)
 }
+# The Unity project is an input/source root that this helper populates; it is
+# intentionally not treated as a deletable output root. Downstream generated
+# directories are still protected before recursive cleanup below.
+$pluginDirectory = Join-Path $UnityProjectRoot "Assets/Plugins/HybridCLRLab"
+Assert-DheSafeOutputRoot -Path $pluginDirectory
+Assert-DheOutputNotAncestor -Path $pluginDirectory -Root $UnityProjectRoot
 $manifestScript = Join-Path $LabRoot "scripts/generate-test-manifest.ps1"
 & $manifestScript -LabRoot $LabRoot
 if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
@@ -24,6 +35,11 @@ $crossAssemblyProject = Join-Path $LabRoot "managed-cases/HybridCLR.CrossAssembl
 $aotProject = Join-Path $LabRoot "managed-cases/HybridCLR.ManagedCasesAot/HybridCLR.ManagedCasesAot.csproj"
 $stressProject = Join-Path $LabRoot "managed-cases/HybridCLR.MetadataStress/HybridCLR.MetadataStress.csproj"
 $output = Join-Path $LabRoot "artifacts/managed-cases/$Target"
+$aotBuildOutput = Join-Path $LabRoot "artifacts/managed-cases-aot/$Target"
+Assert-DheSafeOutputRoot -Path $output
+Assert-DheOutputNotAncestor -Path $output -Root $LabRoot
+Assert-DheSafeOutputRoot -Path $aotBuildOutput
+Assert-DheOutputNotAncestor -Path $aotBuildOutput -Root $LabRoot
 $targetDefine = switch ($Target) {
     "StandaloneWindows64" { "HYBRIDCLR_TARGET_WINDOWS"; break }
     "Android" { "HYBRIDCLR_TARGET_ANDROID"; break }
@@ -53,10 +69,11 @@ $stressDll = Join-Path $output "HybridCLR.MetadataStress.dll"
 if (-not (Test-Path $stressDll)) { throw "Metadata stress build did not produce $stressDll" }
 $crossAssemblyDll = Join-Path $output "HybridCLR.CrossAssemblyDerived.dll"
 if (-not (Test-Path $crossAssemblyDll)) { throw "Cross-assembly probe build did not produce $crossAssemblyDll" }
-$pluginDirectory = Join-Path $UnityProjectRoot "Assets/Plugins/HybridCLRLab"
 New-Item -ItemType Directory -Force -Path $pluginDirectory | Out-Null
 Copy-Item -LiteralPath $contractDll -Destination (Join-Path $pluginDirectory "HybridCLR.BoundaryContracts.dll") -Force
-$aotBuildOutput = Join-Path $LabRoot "artifacts/managed-cases-aot/$Target"
+Copy-Item -LiteralPath $dll -Destination (Join-Path $pluginDirectory "HybridCLR.ManagedCases.dll") -Force
+Copy-Item -LiteralPath $stressDll -Destination (Join-Path $pluginDirectory "HybridCLR.MetadataStress.dll") -Force
+Copy-Item -LiteralPath $crossAssemblyDll -Destination (Join-Path $pluginDirectory "HybridCLR.CrossAssemblyDerived.dll") -Force
 if (Test-Path $aotBuildOutput) { Remove-Item -LiteralPath $aotBuildOutput -Recurse -Force }
 New-Item -ItemType Directory -Force -Path $aotBuildOutput | Out-Null
 dotnet build $aotProject --configuration $Configuration --output $aotBuildOutput --nologo -v:minimal

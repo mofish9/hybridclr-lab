@@ -1,0 +1,49 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://github.com/mofish9/hybridclr-lab/schemas/dhe-release-gate.schema.json",
+  "title": "HybridCLR DHE Release Gate Report",
+  "type": "object",
+  "additionalProperties": true,
+  "required": ["schemaVersion", "format", "passed", "target", "workflowMode", "sourcePreflight", "sourcePreflightValidated", "cleanCheckout", "cleanCheckoutValidated", "projectPlanValidation", "projectPlanRevalidation", "workflowReport", "artifactValidation", "batchReport", "runtimePlan", "artifactValidatorExitCode", "projectPlanValidatorExitCode", "errors", "warnings", "validatedAssemblyCount", "loadedDheAssemblyCount"],
+  "properties": {
+    "schemaVersion": { "const": 1 },
+    "format": { "const": "hybridclr.dhe-release-gate.json" },
+    "generatedAtUtc": { "type": "string", "format": "date-time" },
+    "passed": { "type": "boolean" },
+    "target": { "const": "StandaloneWindows64" },
+    "workflowMode": { "enum": ["Release", "Exploratory", ""] },
+    "sourcePreflight": { "type": "string" },
+    "sourcePreflightValidated": { "type": "boolean" },
+    "cleanCheckout": { "type": "string" },
+    "cleanCheckoutValidated": { "type": "boolean" },
+    "projectPlanValidation": { "type": "string", "minLength": 1 },
+    "projectPlanRevalidation": { "type": "string", "minLength": 1 },
+    "workflowReport": { "type": "string", "minLength": 1 },
+    "artifactValidation": { "type": "string", "minLength": 1 },
+    "batchReport": { "type": "string" },
+    "runtimePlan": { "type": "string", "minLength": 1 },
+    "artifactValidatorExitCode": { "type": "integer" },
+    "projectPlanValidatorExitCode": { "type": "integer" },
+    "errors": { "type": "array", "items": { "type": "string" } },
+    "warnings": { "type": "array", "items": { "type": "string" } },
+    "validatedAssemblyCount": { "type": "integer", "minimum": 0 },
+    "loadedDheAssemblyCount": { "type": "integer", "minimum": 0 }
+  },
+  "allOf": [
+    {
+      "if": { "properties": { "passed": { "const": true } }, "required": ["passed"] },
+      "then": {
+        "properties": {
+          "workflowMode": { "const": "Release" },
+          "sourcePreflight": { "minLength": 1 },
+          "sourcePreflightValidated": { "const": true },
+          "cleanCheckout": { "minLength": 1 },
+          "cleanCheckoutValidated": { "const": true },
+          "batchReport": { "minLength": 1 },
+          "artifactValidatorExitCode": { "const": 0 },
+          "projectPlanValidatorExitCode": { "const": 0 }
+        }
+      }
+    }
+  ]
+}

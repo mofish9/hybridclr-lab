@@ -1,0 +1,76 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://github.com/mofish9/hybridclr-lab/schemas/dhe-mv.schema.json",
+  "title": "HybridCLR DHE-Lite MetaVersion",
+  "type": "object",
+  "additionalProperties": true,
+  "required": ["schemaVersion", "format", "assemblyName", "baseline", "current", "methods", "typeChanges", "compatibility", "summary"],
+  "properties": {
+    "schemaVersion": { "const": 1 },
+    "format": { "const": "hybridclr.dhe-lite.mv.json" },
+    "generatedAtUtc": { "type": "string", "format": "date-time" },
+    "assemblyName": { "type": "string", "minLength": 1 },
+    "baseline": { "$ref": "#/$defs/image" },
+    "current": { "$ref": "#/$defs/image" },
+    "assemblyAttributes": { "type": "array", "items": { "type": "string" } },
+    "methods": { "type": "array", "items": { "$ref": "#/$defs/method" } },
+    "typeChanges": { "type": "array" },
+    "compatibility": {
+      "type": "object",
+      "required": ["mode", "status", "reasons"],
+      "properties": {
+        "mode": { "enum": ["analysis", "method-body-only"] },
+        "status": { "enum": ["compatible", "incompatible"] },
+        "reasons": { "type": "array", "items": { "type": "string" } }
+      }
+    },
+    "summary": {
+      "type": "object",
+      "required": ["methodCount", "changedMethodCount", "unchangedMethodCount", "typeChangeCount", "compatibleMethodOnlyChange"],
+      "properties": {
+        "methodCount": { "type": "integer", "minimum": 0 },
+        "changedMethodCount": { "type": "integer", "minimum": 0 },
+        "unchangedMethodCount": { "type": "integer", "minimum": 0 },
+        "typeChangeCount": { "type": "integer", "minimum": 0 },
+        "compatibleMethodOnlyChange": { "type": "boolean" }
+      }
+    }
+  },
+  "$defs": {
+    "sha256": { "type": "string", "pattern": "^[0-9a-fA-F]{64}$" },
+    "image": {
+      "type": "object",
+      "required": ["path", "sha256", "mvid", "assemblyRefs"],
+      "properties": {
+        "path": { "type": "string", "minLength": 1 },
+        "sha256": { "$ref": "#/$defs/sha256" },
+        "mvid": { "type": "string", "minLength": 1 },
+        "assemblyRefs": { "type": "array", "items": { "type": "string" } },
+        "identity": { "type": "string" }
+      }
+    },
+    "method": {
+      "type": "object",
+      "required": ["id", "kind", "name", "declaringType", "signature", "currentToken", "tokenStable", "shapeStable"],
+      "properties": {
+        "id": { "type": "string", "minLength": 1 },
+        "kind": { "enum": ["added", "removed", "changed", "tokenChanged", "shapeChanged", "unchanged"] },
+        "name": { "type": "string" },
+        "declaringType": { "type": "string" },
+        "signature": { "type": "string" },
+        "returnType": { "type": "string" },
+        "parameterTypes": { "type": "array", "items": { "type": "string" } },
+        "hasThis": { "type": "boolean" },
+        "declaringTypeIsValueType": { "type": "boolean" },
+        "declaringTypeGenericParameterCount": { "type": "integer", "minimum": 0 },
+        "currentToken": { "type": ["integer", "null"], "minimum": 0 },
+        "baselineToken": { "type": ["integer", "null"], "minimum": 0 },
+        "tokenStable": { "type": "boolean" },
+        "shapeStable": { "type": "boolean" },
+        "overrides": { "type": "array", "items": { "type": "string" } },
+        "baselineOverrides": { "type": ["array", "null"], "items": { "type": "string" } },
+        "currentOverrides": { "type": ["array", "null"], "items": { "type": "string" } }
+      }
+    }
+  }
+}

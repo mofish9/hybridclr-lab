@@ -1,0 +1,22 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://github.com/mofish9/hybridclr-lab/schemas/dhe-schema-gate.schema.json",
+  "title": "HybridCLR DHE Schema Gate Report",
+  "type": "object",
+  "additionalProperties": true,
+  "required": ["schemaVersion", "format", "passed", "schemaCount", "documentCount", "skippedDocumentCount", "inputRoots", "schemas", "documents", "errors", "warnings"],
+  "properties": {
+    "schemaVersion": { "const": 1 },
+    "format": { "const": "hybridclr.dhe-schema-gate.json" },
+    "generatedAtUtc": { "type": "string", "format": "date-time" },
+    "passed": { "type": "boolean" },
+    "schemaCount": { "type": "integer", "minimum": 1 },
+    "documentCount": { "type": "integer", "minimum": 0 },
+    "skippedDocumentCount": { "type": "integer", "minimum": 0 },
+    "inputRoots": { "type": "array", "items": { "type": "string", "minLength": 1 } },
+    "schemas": { "type": "array" },
+    "documents": { "type": "array" },
+    "errors": { "type": "array", "items": { "type": "string" } },
+    "warnings": { "type": "array", "items": { "type": "string" } }
+  }
+}

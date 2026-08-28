@@ -1,0 +1,22 @@
+{
+  "schemaVersion": 1,
+  "assemblyName": "Other.Assembly",
+  "compatibility": {
+    "status": "compatible",
+    "mode": "method-body-only"
+  },
+  "methods": [
+    {
+      "id": "Other.Shapes::Only|System.Int32(System.Int32)",
+      "kind": "changed",
+      "name": "Only",
+      "declaringType": "Other.Shapes",
+      "currentToken": 100663401,
+      "isStatic": true,
+      "isVirtual": false,
+      "isAbstract": false,
+      "isPInvoke": false,
+      "genericParameterCount": 0
+    }
+  ]
+}

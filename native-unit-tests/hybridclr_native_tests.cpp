@@ -12,8 +12,15 @@
 #include <vector>
 
 #include "hybridclr/Il2CppCompatibleDef.h"
+#if __has_include("hybridclr/DheRuntime.h")
+#include "hybridclr/DheRuntime.h"
+#define HYBRIDCLR_LAB_DHE_ENABLED 1
+#else
+#define HYBRIDCLR_LAB_DHE_ENABLED 0
+#endif
 #include "hybridclr/metadata/BlobReader.h"
 #include "hybridclr/metadata/MetadataUtil.h"
+#include "hybridclr/metadata/MetadataModule.h"
 #include "hybridclr/metadata/Opcodes.h"
 #include "hybridclr/transform/BasicBlockSpliter.h"
 #include "hybridclr/transform/TemporaryMemoryArena.h"
@@ -52,6 +59,29 @@ namespace
     }
 
 #define CHECK(expression) Check((expression), #expression, __FILE__, __LINE__)
+
+    int32_t InterpreterProbeMethod(int32_t value, const MethodInfo*)
+    {
+        return value + 100;
+    }
+
+#if HYBRIDCLR_LAB_DHE_ENABLED
+    using DheProbeMethod = int32_t(*)(int32_t, const MethodInfo*);
+
+    // This mirrors the ABI-sensitive shape that IL2CPP must generate at the
+    // top of a DHE AOT method. The production generator has to emit the exact
+    // return/argument types for every method rather than use this probe type.
+    int32_t GeneratedLikeDheEntry(int32_t value, const MethodInfo* method)
+    {
+        if (hybridclr::dhe::ShouldDispatchToInterpreter(method))
+        {
+            DheProbeMethod interpreterMethod = reinterpret_cast<DheProbeMethod>(
+                method->methodPointerCallByInterp);
+            return interpreterMethod(value, method);
+        }
+        return value * 2;
+    }
+#endif
 
 #if HYBRIDCLR_LAB_FGS_TESTS
     void DummyMethodPointer()
@@ -405,6 +435,188 @@ namespace
         CHECK(hybridclr::metadata::DecodeMetadataIndex(hybridclr::metadata::kInvalidIndex) == hybridclr::metadata::kInvalidIndex);
         CHECK(!hybridclr::metadata::IsInterpreterIndex(hybridclr::metadata::kInvalidIndex));
     }
+
+#if HYBRIDCLR_LAB_DHE_ENABLED
+    void TestDheMethodRegistry()
+    {
+        using DheI4I4 = int32_t(*)(const MethodInfo*, int32_t);
+        using DheI4I4I4 = int32_t(*)(const MethodInfo*, int32_t, int32_t);
+        using DheI8I8 = int64_t(*)(const MethodInfo*, int64_t);
+        using DheVoidI4 = void(*)(const MethodInfo*, int32_t);
+        using DheInstanceI4I4 = int32_t(*)(const MethodInfo*, void*, int32_t);
+        using DheInstanceI8I8 = int64_t(*)(const MethodInfo*, void*, int64_t);
+        using DheInstanceVoidI4 = void(*)(const MethodInfo*, void*, int32_t);
+        using DheValueTypeInstanceVoidNoArgs = void(*)(const MethodInfo*, void*);
+        using DheInvokeArgs = void(*)(const MethodInfo*, void*, void**, const uint8_t*, uint32_t, void*);
+        // Keep every generated Player ABI shape link-checked in the native
+        // gate even though the VM-backed execution is covered by Unity.
+        DheI4I4 i4i4 = &hybridclr::dhe::ExecuteInterpreterI4I4;
+        DheI4I4I4 i4i4i4 = &hybridclr::dhe::ExecuteInterpreterI4I4I4;
+        DheI8I8 i8i8 = &hybridclr::dhe::ExecuteInterpreterI8I8;
+        DheVoidI4 voidi4 = &hybridclr::dhe::ExecuteInterpreterVoidI4;
+        DheInstanceI4I4 instanceI4i4 = &hybridclr::dhe::ExecuteInterpreterInstanceI4I4;
+        DheInstanceI8I8 instanceI8i8 = &hybridclr::dhe::ExecuteInterpreterInstanceI8I8;
+        DheInstanceVoidI4 instanceVoidi4 = &hybridclr::dhe::ExecuteInterpreterInstanceVoidI4;
+        DheValueTypeInstanceVoidNoArgs valueTypeInstanceVoidNoArgs = &hybridclr::dhe::ExecuteInterpreterValueTypeInstanceVoidNoArgs;
+        DheInvokeArgs invokeArgs = &hybridclr::dhe::ExecuteInterpreterInvokeArgs;
+        CHECK(i4i4 != nullptr && i4i4i4 != nullptr && i8i8 != nullptr && voidi4 != nullptr &&
+            instanceI4i4 != nullptr && instanceI8i8 != nullptr && instanceVoidi4 != nullptr &&
+            valueTypeInstanceVoidNoArgs != nullptr && invokeArgs != nullptr);
+
+        std::vector<uint8_t> mvBytes;
+        const auto appendU32 = [&mvBytes](uint32_t value)
+        {
+            mvBytes.push_back(static_cast<uint8_t>(value & 0xff));
+            mvBytes.push_back(static_cast<uint8_t>((value >> 8) & 0xff));
+            mvBytes.push_back(static_cast<uint8_t>((value >> 16) & 0xff));
+            mvBytes.push_back(static_cast<uint8_t>((value >> 24) & 0xff));
+        };
+        const char magic[] = "DHEMVLT1";
+        mvBytes.insert(mvBytes.end(), magic, magic + 8);
+        const std::string assemblyName = "Test.Assembly";
+        appendU32(1);
+        appendU32(static_cast<uint32_t>(assemblyName.size()));
+        appendU32(2);
+        appendU32(hybridclr::dhe::kMetaVersionStrictCompatibilityFlag);
+        for (uint32_t i = 0; i < 64; ++i)
+        {
+            mvBytes.push_back(static_cast<uint8_t>(i + 1));
+        }
+        mvBytes.insert(mvBytes.end(), assemblyName.begin(), assemblyName.end());
+        appendU32(0x06000002);
+        appendU32(0x06000003);
+
+        hybridclr::dhe::MetaVersionData parsedMv;
+        CHECK(hybridclr::dhe::ParseMetaVersion(mvBytes.data(), static_cast<uint32_t>(mvBytes.size()), parsedMv));
+        CHECK(parsedMv.assemblyName == assemblyName);
+        CHECK(parsedMv.flags == hybridclr::dhe::kMetaVersionStrictCompatibilityFlag);
+        CHECK(parsedMv.baselineAssemblyHash[0] == 1);
+        CHECK(parsedMv.baselineAssemblyHash[31] == 32);
+        CHECK(parsedMv.currentAssemblyHash[0] == 33);
+        CHECK(parsedMv.currentAssemblyHash[31] == 64);
+        CHECK(parsedMv.changedMethodTokens.size() == 2);
+        CHECK(parsedMv.changedMethodTokens[0] == 0x06000002);
+
+        // Unknown MV feature bits must fail closed. A future producer cannot
+        // silently opt an older runtime into an incompatible wire format.
+        mvBytes[20] = 0x02;
+        hybridclr::dhe::MetaVersionData unknownFlagsMv;
+        CHECK(!hybridclr::dhe::ParseMetaVersion(mvBytes.data(), static_cast<uint32_t>(mvBytes.size()), unknownFlagsMv));
+        mvBytes[20] = static_cast<uint8_t>(hybridclr::dhe::kMetaVersionStrictCompatibilityFlag);
+
+        hybridclr::dhe::Sha256Digest abcHash{};
+        const char abc[] = "abc";
+        CHECK(hybridclr::dhe::ComputeSha256(abc, 3, abcHash));
+        const uint8_t expectedAbcHash[hybridclr::dhe::kSha256DigestSize] = {
+            0xba, 0x78, 0x16, 0xbf, 0x8f, 0x01, 0xcf, 0xea,
+            0x41, 0x41, 0x40, 0xde, 0x5d, 0xae, 0x22, 0x23,
+            0xb0, 0x03, 0x61, 0xa3, 0x96, 0x17, 0x7a, 0x9c,
+            0xb4, 0x10, 0xff, 0x61, 0xf2, 0x00, 0x15, 0xad,
+        };
+        CHECK(std::memcmp(abcHash.data(), expectedAbcHash, sizeof(expectedAbcHash)) == 0);
+
+        hybridclr::dhe::ResetForTests();
+
+        Il2CppAssembly assembly{};
+        Il2CppImage image{};
+        Il2CppClass* klass = static_cast<Il2CppClass*>(std::calloc(1, sizeof(Il2CppClass)));
+        CHECK(klass != nullptr);
+        if (!klass)
+        {
+            return;
+        }
+        image.assembly = &assembly;
+        klass->image = &image;
+		assembly.aname.name = "DheNativeResolver";
+		assembly.image = &image;
+		klass->name = "DheNativeType";
+		klass->namespaze = "";
+
+        MethodInfo changed{};
+        changed.klass = klass;
+        changed.token = 0x06000002;
+        MethodInfo unchanged{};
+        unchanged.klass = klass;
+        unchanged.token = 0x06000003;
+        changed.methodPointerCallByInterp = reinterpret_cast<Il2CppMethodPointer>(InterpreterProbeMethod);
+        unchanged.methodPointerCallByInterp = reinterpret_cast<Il2CppMethodPointer>(InterpreterProbeMethod);
+		const MethodInfo* resolverMethods[] = { &changed, &unchanged };
+		klass->methods = resolverMethods;
+		klass->method_count = 2;
+		hybridclr::native_test::ConfigureDheResolver(&assembly, &image, klass);
+
+		// Exercise the production transaction entry point. It must resolve and
+		// prepare all changed methods before publishing the assembly state.
+		CHECK(hybridclr::dhe::PrepareAndRegisterChangedMethods(&assembly, { changed.token }));
+		CHECK(changed.isInterpterImpl);
+		CHECK(hybridclr::dhe::IsDheAssembly(&assembly));
+		CHECK(hybridclr::dhe::IsChangedMethod(&changed));
+		CHECK(!hybridclr::dhe::PrepareAndRegisterChangedMethods(&assembly, { unchanged.token }));
+
+        const std::vector<uint32_t> changedTokens = { changed.token };
+		// The explicit registration API remains covered for callers that already
+		// resolved MethodInfo records outside the runtime loader.
+		hybridclr::dhe::ResetForTests();
+		changed.isInterpterImpl = false;
+		CHECK(hybridclr::dhe::RegisterChangedMethods(&assembly, changedTokens, { &changed }));
+		CHECK(hybridclr::dhe::IsDheAssembly(&assembly));
+		CHECK(hybridclr::dhe::IsChangedMethod(&changed));
+        CHECK(!hybridclr::dhe::IsChangedMethod(&unchanged));
+        CHECK(hybridclr::dhe::ShouldDispatchToInterpreter(&changed));
+        CHECK(!hybridclr::dhe::ShouldDispatchToInterpreter(&unchanged));
+
+        std::atomic<int> lookupFailures{ 0 };
+        std::vector<std::thread> lookupThreads;
+        for (int threadIndex = 0; threadIndex < 4; ++threadIndex)
+        {
+            lookupThreads.emplace_back([&changed, &unchanged, &lookupFailures]() {
+                for (int iteration = 0; iteration < 10000; ++iteration)
+                {
+                    if (!hybridclr::dhe::IsChangedMethod(&changed) ||
+                        hybridclr::dhe::IsChangedMethod(&unchanged))
+                    {
+                        lookupFailures.fetch_add(1, std::memory_order_relaxed);
+                        return;
+                    }
+                }
+            });
+        }
+        for (std::thread& thread : lookupThreads)
+        {
+            thread.join();
+        }
+        CHECK(lookupFailures.load(std::memory_order_relaxed) == 0);
+        CHECK(GeneratedLikeDheEntry(1, &changed) == 101);
+        CHECK(GeneratedLikeDheEntry(2, &unchanged) == 4);
+
+        // The metadata module keeps ordinary supplementary metadata assembly-wide,
+        // but narrows an explicitly registered DHE assembly to changed methods.
+        hybridclr::native_test::SetAOTMetadataAvailable(true);
+        CHECK(hybridclr::metadata::MetadataModule::IsImplementedByInterpreter(&changed));
+        CHECK(!hybridclr::metadata::MetadataModule::IsImplementedByInterpreter(&unchanged));
+        hybridclr::native_test::SetAOTMetadataAvailable(false);
+
+        Il2CppAssembly invalidAssembly{};
+        CHECK(!hybridclr::dhe::RegisterChangedMethods(&invalidAssembly, changedTokens, { nullptr }));
+        CHECK(!hybridclr::dhe::RegisterChangedMethods(
+            &invalidAssembly, { changed.token, changed.token }, { &changed, &changed }));
+        CHECK(!hybridclr::dhe::RegisterChangedMethods(&assembly, changedTokens, { &changed }));
+
+		// A later unresolved token must roll back preparation of an earlier token
+		// and leave the assembly unpublished.
+		hybridclr::dhe::ResetForTests();
+		changed.isInterpterImpl = false;
+		const auto previousChangedPointer = changed.methodPointerCallByInterp;
+		CHECK(!hybridclr::dhe::PrepareAndRegisterChangedMethods(&assembly, { changed.token, 0x06000099 }));
+		CHECK(!hybridclr::dhe::IsDheAssembly(&assembly));
+		CHECK(!changed.isInterpterImpl);
+		CHECK(changed.methodPointerCallByInterp == previousChangedPointer);
+		hybridclr::native_test::ClearDheResolver();
+        hybridclr::dhe::ResetForTests();
+        CHECK(!hybridclr::dhe::IsDheAssembly(&assembly));
+        std::free(klass);
+    }
+#endif
 
     void TestOpcodeDecode()
     {
@@ -1313,6 +1525,9 @@ int main()
 #endif
     TestBlobReader();
     TestMetadataUtilities();
+#if HYBRIDCLR_LAB_DHE_ENABLED
+    TestDheMethodRegistry();
+#endif
     TestOpcodeDecode();
     TestTemporaryMemoryArena();
     TestCopyHelpers();
