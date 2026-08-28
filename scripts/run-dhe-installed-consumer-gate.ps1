@@ -168,7 +168,7 @@ try {
 
     $runtimeManifestPath = Join-Path ([IO.Path]::GetDirectoryName($RuntimeSource)) "runtime-manifest.json"
     $runtimeManifest = Get-Content -Raw -LiteralPath $runtimeManifestPath | ConvertFrom-Json
-    $runtimeTreeSha256 = [string]$runtimeManifest.runtimeTreeSha256
+    $runtimeTreeSha256 = [string]$runtimeManifest.stagedRuntimeSha256
     $consumerWorkflowRoot = Join-Path $ConsumerRoot "artifacts/dhe-installed-consumer-workflow"
     $consumerArchiveRoot = Join-Path $ConsumerRoot "artifacts/dhe-installed-consumer-workflow-archive"
     $consumerArchiveGate = $consumerArchiveRoot + ".gate.json"
