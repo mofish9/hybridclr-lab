@@ -11,7 +11,7 @@
     "generatedAtUtc": { "type": "string", "format": "date-time" },
     "passed": { "type": "boolean" },
     "mode": { "enum": ["Release", "Exploratory", "Preflight"] },
-    "target": { "const": "StandaloneWindows64" },
+    "target": { "type": "string", "pattern": "^[A-Za-z0-9._-]+$" },
     "adapterScript": { "type": "string", "minLength": 1 },
     "projectPath": { "type": "string", "minLength": 1 },
     "sourcePreflight": { "type": ["string", "null"] },

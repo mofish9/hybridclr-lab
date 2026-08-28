@@ -76,6 +76,13 @@ function Get-StringProperty($Object, [string]$Name) {
     return [string]$property.Value
 }
 
+function Get-ObjectProperty($Object, [string]$Name) {
+    if ($null -eq $Object) { return $null }
+    $property = $Object.PSObject.Properties[$Name]
+    if ($null -eq $property) { return $null }
+    return $property.Value
+}
+
 function Get-IntProperty($Object, [string]$Name) {
     if ($null -eq $Object) { return $null }
     $property = $Object.PSObject.Properties[$Name]
@@ -758,6 +765,39 @@ if (-not [string]::IsNullOrWhiteSpace($WorkflowReport)) {
                 if ($workflowMode -eq "Release" -and
                     (-not $cleanRequiresTrackedSources -or -not $cleanTrackedSourcesComplete)) {
                     $cleanGateInvalid = $true
+                }
+                if ($workflowMode -eq "Release") {
+                    $formalGitIdentities = @(
+                        @("project", (Get-ObjectProperty $cleanCheckout "projectGit")),
+                        @("tool", (Get-ObjectProperty $cleanCheckout "toolGit"))
+                    )
+                    foreach ($formalGitIdentity in $formalGitIdentities) {
+                        $identityName = [string]$formalGitIdentity[0]
+                        $identity = $formalGitIdentity[1]
+                        if ($null -eq $identity -or
+                            (Get-StringProperty $identity "name") -ne $identityName -or
+                            -not (Get-BoolProperty $identity "tested") -or
+                            -not (Get-BoolProperty $identity "passed") -or
+                            -not (Get-BoolProperty $identity "cleanRequired") -or
+                            -not (Get-BoolProperty $identity "clean") -or
+                            -not (Get-BoolProperty $identity "trackedSourcesTested") -or
+                            -not (Get-BoolProperty $identity "trackedSourcesRequired") -or
+                            -not (Get-BoolProperty $identity "trackedSourcesComplete") -or
+                            (Get-StringProperty $identity "head") -notmatch '^[0-9a-fA-F]{40,64}$' -or
+                            (Get-StringProperty $identity "tree") -notmatch '^[0-9a-fA-F]{40,64}$' -or
+                            (Get-StringProperty $identity "sourceBoundarySha256") -notmatch '^[0-9a-fA-F]{64}$') {
+                            Add-Error "Release workflow $identityName Git identity is incomplete or not clean/tracked."
+                            $cleanGateInvalid = $true
+                        }
+                    }
+                    $projectGitIdentity = Get-ObjectProperty $cleanCheckout "projectGit"
+                    if ($null -eq $projectGitIdentity -or
+                        (Get-StringProperty $cleanCheckout "gitHead") -ne (Get-StringProperty $projectGitIdentity "head") -or
+                        (Get-StringProperty $cleanCheckout "gitTree") -ne (Get-StringProperty $projectGitIdentity "tree") -or
+                        (Get-StringProperty $cleanCheckout "sourceBoundarySha256") -ne (Get-StringProperty $projectGitIdentity "sourceBoundarySha256")) {
+                        Add-Error "Release workflow flat Git identity does not match projectGit."
+                        $cleanGateInvalid = $true
+                    }
                 }
                 if ($cleanGateInvalid) {
                     Add-Error "Workflow clean checkout gate did not pass all required checks."

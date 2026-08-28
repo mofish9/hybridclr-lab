@@ -11,7 +11,7 @@
     "generatedAtUtc": { "type": "string", "format": "date-time" },
     "passed": { "type": "boolean" },
     "validationPassed": { "type": "boolean" },
-    "target": { "const": "StandaloneWindows64" },
+    "target": { "type": "string", "pattern": "^[A-Za-z0-9._-]+$" },
     "mode": { "enum": ["Release", "Exploratory"] },
     "coverageRequired": { "type": "boolean" },
     "coverageGatePassed": { "type": "boolean" },

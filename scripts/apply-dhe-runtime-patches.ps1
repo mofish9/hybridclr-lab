@@ -13,6 +13,7 @@ param(
 
 Set-StrictMode -Version Latest
 $ErrorActionPreference = "Stop"
+. (Join-Path $PSScriptRoot "dhe-workflow-common.ps1")
 
 $LabRoot = if ([string]::IsNullOrWhiteSpace($LabRoot)) {
     Split-Path -Parent $PSScriptRoot
@@ -66,28 +67,16 @@ function Apply-Patch([string]$Root, [object]$Entry, [string]$PatchPath) {
         throw "DHE patch root was not found: $Root"
     }
 
-    $rootBase = $Root
-    $directory = ""
-    $labPrefix = $LabRoot.TrimEnd('\', '/') + [IO.Path]::DirectorySeparatorChar
-    if ($Root.StartsWith($labPrefix, [StringComparison]::OrdinalIgnoreCase)) {
-        $rootBase = $LabRoot
-        $directory = $Root.Substring($labPrefix.Length).Replace('\', '/')
-    }
     $stripComponents = if ($null -ne $Entry.PSObject.Properties["stripComponents"]) { [int]$Entry.stripComponents } else { 1 }
     if ($stripComponents -lt 0 -or $stripComponents -gt 8) { throw "Invalid stripComponents for DHE patch '$($Entry.id)'." }
-    $patchStrip = "-p$stripComponents"
-    $applyPrefix = @("apply", "--check", "--unsafe-paths", "--whitespace=nowarn", $patchStrip)
-    if (-not [string]::IsNullOrWhiteSpace($directory)) { $applyPrefix += "--directory=$directory" }
-    $check = & git -C $rootBase @applyPrefix $PatchPath 2>&1
-    if ($LASTEXITCODE -ne 0) {
-        $reversePrefix = @("apply", "--reverse", "--check", "--unsafe-paths", "--whitespace=nowarn", $patchStrip)
-        if (-not [string]::IsNullOrWhiteSpace($directory)) { $reversePrefix += "--directory=$directory" }
-        $reverse = & git -C $rootBase @reversePrefix $PatchPath 2>&1
-        if ($LASTEXITCODE -eq 0) {
+    $check = Invoke-DheGitApplyAtRoot -Root $Root -PatchPath $PatchPath -StripComponents $stripComponents -Check
+    if ($check.exitCode -ne 0) {
+        $reverse = Invoke-DheGitApplyAtRoot -Root $Root -PatchPath $PatchPath -StripComponents $stripComponents -Check -Reverse
+        if ($reverse.exitCode -eq 0) {
             Write-Host "DHE patch already applied: $($Entry.id)"
             return "already-applied"
         }
-        throw "DHE patch '$($Entry.id)' does not apply cleanly to '$Root': $($check -join [Environment]::NewLine)"
+        throw "DHE patch '$($Entry.id)' does not apply cleanly to '$Root': $($check.output -join [Environment]::NewLine)"
     }
     if ($VerifyOnly) {
         if ($RequireApplied) {
@@ -96,11 +85,9 @@ function Apply-Patch([string]$Root, [object]$Entry, [string]$PatchPath) {
         Write-Host "DHE patch verified: $($Entry.id)"
         return "verified"
     }
-    $applyPrefix = @("apply", "--unsafe-paths", "--whitespace=nowarn", $patchStrip)
-    if (-not [string]::IsNullOrWhiteSpace($directory)) { $applyPrefix += "--directory=$directory" }
-    & git -C $rootBase @applyPrefix $PatchPath
-    if ($LASTEXITCODE -ne 0) {
-        throw "Failed to apply DHE patch '$($Entry.id)' to '$Root'."
+    $apply = Invoke-DheGitApplyAtRoot -Root $Root -PatchPath $PatchPath -StripComponents $stripComponents
+    if ($apply.exitCode -ne 0) {
+        throw "Failed to apply DHE patch '$($Entry.id)' to '$Root': $($apply.output -join [Environment]::NewLine)"
     }
     Write-Host "Applied DHE patch: $($Entry.id)"
     return "applied"
@@ -110,18 +97,9 @@ function Undo-Patch([object]$Item) {
     $root = [string]$Item.root
     $entry = $Item.entry
     $patchPath = [string]$Item.patchPath
-    $rootBase = $root
-    $directory = ""
-    $labPrefix = $LabRoot.TrimEnd('\', '/') + [IO.Path]::DirectorySeparatorChar
-    if ($root.StartsWith($labPrefix, [StringComparison]::OrdinalIgnoreCase)) {
-        $rootBase = $LabRoot
-        $directory = $root.Substring($labPrefix.Length).Replace('\', '/')
-    }
     $stripComponents = if ($null -ne $entry.PSObject.Properties["stripComponents"]) { [int]$entry.stripComponents } else { 1 }
-    $reversePrefix = @("apply", "--reverse", "--unsafe-paths", "--whitespace=nowarn", "-p$stripComponents")
-    if (-not [string]::IsNullOrWhiteSpace($directory)) { $reversePrefix += "--directory=$directory" }
-    & git -C $rootBase @reversePrefix $patchPath 2>&1 | Out-Null
-    if ($LASTEXITCODE -ne 0) {
+    $reverse = Invoke-DheGitApplyAtRoot -Root $root -PatchPath $patchPath -StripComponents $stripComponents -Reverse
+    if ($reverse.exitCode -ne 0) {
         Write-Warning "Unable to roll back DHE patch '$($entry.id)' from '$root'."
     }
 }

@@ -10,11 +10,12 @@ The repository source boundary is itself checked by
 it rejects non-ignored untracked files outside the allowlist and verifies that
 generated output, Unity caches, and historical probes remain ignored.
 
-The checked-in Player adapter and release contract currently target
-`StandaloneWindows64` with the matching Tuanjie/Unity editor. Android is not
-claimed by this lane yet: it needs a target-specific generated-code path and a
-non-file `StreamingAssets` loader before it can be admitted to the release
-contract.
+The core orchestrator and report contracts accept an opaque, validated target
+identifier and do not encode a platform list. The checked-in Demo adapter is the
+Windows implementation and intentionally accepts only `StandaloneWindows64`
+with the matching Tuanjie/Unity editor. Android and mini-game targets are not
+claimed by this Demo lane yet: each needs an adapter that owns its generated-code
+path, asset loading, Player build, and target-specific assertions.
 
 ## Stage 0: source/runtime preflight
 
@@ -53,9 +54,10 @@ runtime manifest 还记录 staged external headers 的 tree hash；预检和 nat
 `PackageLockPath` 和 `RequireEmbeddedPackage` 只在项目把 HybridCLR 作为 embedded
 package 管理时启用。使用 registry/package manager 的项目可以省略它们，通用预检
 仍会执行程序集范围、runtime 和输出目录安全检查。
-Release adapter 应把项目仓库传给 clean-checkout gate 的 GitRoot 并启用
-RequireGitClean；这样 ignored Unity 缓存仍可保留，但任何 tracked 或 untracked
-源文件都会在构建前阻断发布。
+Release adapter 应把项目仓库传给 clean-checkout gate 的 GitRoot。门禁会分别建立
+projectGit 和 toolGit 身份：两者都必须 clean，source boundary 必须被跟踪，并记录
+HEAD、HEAD tree 与 boundary SHA-256。项目仓库与工具仓库可以是两个独立仓库；ignored
+Unity 缓存仍可保留，但任一身份范围内的 tracked 或 untracked 源文件都会阻断发布。
 
 ## Stage A: artifact preflight
 
@@ -141,11 +143,12 @@ Player  -ProjectPath -SettingsFile -RuntimeSource -OutputRoot -Target -Mode
 roots that will be compared, then write
 `<OutputRoot>/adapter/prepare.json` conforming to
 `schemas/dhe-project-adapter-prepare.schema.json`. The report must contain the
-same project/settings paths, `target=StandaloneWindows64`,
+same project/settings paths, the exact target supplied to the orchestrator,
 `pathSemantics=workspace-absolute-v1`, and `passed=true`; all four path fields
-must be absolute paths. The two roots are authoritative inputs for the shared
-project preflight and are resolved independently of the caller's current
-working directory.
+must be absolute paths. The target is an opaque safe identifier to the core
+workflow; platform support is enforced by the selected adapter. The two roots
+are authoritative inputs for the shared project preflight and are resolved
+independently of the caller's current working directory.
 The checked-in implementation is
 `scripts/adapters/dhe-demo-project-adapter.ps1`; it is the first complete
 contract example and is exercised by the manual self-hosted CI lane.
@@ -196,11 +199,14 @@ complete native coverage but never produces a passing release identity.
 
 Release also runs the clean-checkout gate before source preflight. `GitRoot`
 defaults to `ProjectPath` and can be set explicitly when the project is nested
-inside a larger repository. The resolved Git top-level must contain both the
-project and the tracked source-boundary manifest; an unrelated clean repository
-cannot supply release identity. The gate requires a clean worktree and binds the
-runtime manifest to the current workflow/repository locks, actual source
-commits, dirty state, locked external-header tree hash, and editor ProductVersion. Use `-RequireGitClean`,
+inside a larger repository. The resolved project Git top-level must contain both
+the project and its tracked source-boundary manifest; an unrelated clean
+repository cannot supply project identity. Independently, the runner resolves
+the tool Git root and `manifests/dhe-source-boundary.json`. Both `projectGit` and
+`toolGit` must be clean and tracked, and the report binds each identity to its
+HEAD commit, HEAD tree, and source-boundary SHA-256. The gate also binds the
+runtime manifest to current workflow/repository locks, actual source commits,
+dirty state, locked external-header tree hash, and editor ProductVersion. Use `-RequireGitClean`,
 `-RequireTrackedSources`, or `-RequireCleanRuntimeSources` to opt into these
 checks in Exploratory mode. An embedded package in Release must have a matching
 package lock.
@@ -219,9 +225,11 @@ under `provenance/dhe-package-lock.json`; registry-managed projects may omit
 that optional provenance file.
 The copied runtime manifest and build identity declare `archive-relative-v1`:
 workspace-only runtime/editor/source paths are removed, while commit, tree-hash,
-patch-hash, engine, and runtime-lock facts remain available as provenance. The
-archive does not contain a runnable `libil2cpp` tree; a new build must assemble
-the locked runtime in its own workspace.
+patch-hash, engine, runtime-lock, and project/tool identity hashes remain
+available as provenance. The archive gate recursively rejects Windows drive and
+UNC paths in every JSON document, so no machine-local absolute path can survive
+handoff. The archive does not contain a runnable `libil2cpp` tree; a new build
+must assemble the locked runtime in its own workspace.
 Inside `batch/dhe-batch-summary.json`, payload references use `../payload/...`
 because batch paths are relative to the batch report directory. An archive gate
 without `-RequireCompleteCoverage` is exploratory when native ABI shapes remain

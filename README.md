@@ -25,8 +25,9 @@ The workflow also emits versioned MV/native/workflow schemas and an independent
 artifact validator; it verifies the exact supported+unsupported changed-token set,
 and the versioned `il2cpp-generated-cpp-signature-v2` ABI adapter contract.
 The current Player result covers all 27 changed managed tokens through 34 real
-native entries. `releaseReady=true` additionally requires `Mode Release`, a
-Git-clean tracked source boundary, clean locked runtime sources, and matching
+native entries. `releaseReady=true` additionally requires `Mode Release`, clean
+and tracked project and tool source identities (each bound to its Git commit,
+HEAD tree, and source-boundary hash), clean locked runtime sources, and matching
 non-surrogate engine headers.
 The embedded package is locked by `manifests/dhe-package-lock.json`; the workflow
 checks its full tree hash and requires both package patches to already be applied.
@@ -124,9 +125,11 @@ under `provenance/dhe-package-lock.json`; projects using a registry-managed
 HybridCLR package can omit this optional package provenance.
 The archived runtime manifest is provenance-only: it uses `archive-relative-v1`,
 binds the runtime lock to `provenance/dhe-runtime-lock.json`, and removes local
-editor, source-repository, and staged-runtime paths. The archive is evidence for
-handoff, not a replacement for assembling the runtime on the destination build
-machine.
+editor, source-repository, and staged-runtime paths. The archive gate recursively
+rejects Windows drive and UNC paths in every archived JSON document; retained
+project/tool identities contain hashes and relative provenance only. The archive
+is evidence for handoff, not a replacement for assembling the runtime on the
+destination build machine.
 
 For a project-independent offline preflight, resolve the project's configured
 DHE AOT set from its own settings and generate strict MV artifacts in one
@@ -180,13 +183,16 @@ immediately by default; `-WorkflowLockTimeoutSeconds` can opt into a bounded
 wait. Once an output root has been created safely, preflight and workflow
 failures leave versioned top-level JSON reports rather than console-only state.
 
-Release additionally requires a clean project Git worktree (the `-GitRoot`
-argument defaults to `-ProjectPath`) and independently verifies runtime source
-commit/dirty provenance, engine workflow/ProductVersion, and embedded package
-locks. Unknown MV wire-format flags fail closed. Exploratory mode can request
-the same checks with `-RequireGitClean`, `-RequireTrackedSources`, and
-`-RequireCleanRuntimeSources`; Release also requires tracked-source coverage
-using `-SourceBoundaryPath` (or the project's default boundary manifest).
+Release additionally requires separate clean project and tool Git identities.
+The project `-GitRoot` defaults to `-ProjectPath`; the tool identity is derived
+from the orchestrator source root. Both identities must have tracked boundary
+sources and record their exact HEAD, HEAD tree, and boundary SHA-256. Runtime
+source commit/dirty provenance, engine workflow/ProductVersion, and embedded
+package locks are verified independently. Unknown MV wire-format flags fail
+closed. Exploratory mode can request the same checks with `-RequireGitClean`,
+`-RequireTrackedSources`, and `-RequireCleanRuntimeSources`; Release also requires
+tracked-source coverage using `-SourceBoundaryPath` (or the project's default
+boundary manifest).
 
 The optimization and Android sections below preserve earlier lab results. Some
 of their historical helper commands are not part of this DHE-focused checkout;

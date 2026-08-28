@@ -9,6 +9,7 @@
     "schemaVersion": { "const": 1 },
     "format": { "const": "hybridclr.dhe-lite.mv.json" },
     "generatedAtUtc": { "type": "string", "format": "date-time" },
+    "pathSemantics": { "enum": ["workspace-absolute-v1", "archive-relative-v1"] },
     "assemblyName": { "type": "string", "minLength": 1 },
     "baseline": { "$ref": "#/$defs/image" },
     "current": { "$ref": "#/$defs/image" },

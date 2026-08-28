@@ -17,12 +17,11 @@ managed baseline/current
   -> Tuanjie 2022 Player gate
 ```
 
-但它还不是“全部 hotfix 程序集均可发布”的完成态。当前主程序集能力用例有 24 个
-changed methods，其中 21 个具备 direct native guard；完整四程序集 workflow 额外
-验证了三个 secondary assembly 的 changed method，因此聚合结果为 27 个 changed、
-24 个 guarded，另外 3 个属于 generic method 或 generic-declaring-type ABI。默认的
-部分覆盖运行只证明已支持子集；发布门禁必须使用 `-RequireCompleteCoverage`，在 ABI
-补齐前应明确失败。
+当前 Demo 已经跑通“全部已配置 hotfix 程序集进入 DHE”的完整能力闭环：四程序集
+workflow 聚合结果为 27/27 supported managed tokens、0 unsupported，并解析出 34 个
+真实 native entries。这里的 34 是 concrete/gshared 等原生入口数量，不是 34 个 changed
+managed methods。该结论证明当前 Windows Demo 覆盖的 ABI 和工作流可以完整发布；它
+不能外推为任意 Unity 版本、Android/小游戏平台或尚未纳入 fixture 的 ABI 自动可用。
 
 当前工作区的未跟踪项并不等于临时产物：Tuanjie 2022 demo 源码和嵌入式
 HybridCLR package 占据绝大多数；DHE 脚本、fixture、schema 和审查文档是
@@ -59,7 +58,8 @@ HybridCLR package 占据绝大多数；DHE 脚本、fixture、schema 和审查�
 - release gate 现在按 assembly name 配对多程序集物料，并重新调用独立 artifact validator；
   workflow report 的 `passed`/`releaseReady` 等自报字段不能单独绕过门禁。
 - project preflight 增加 `-RequireDheEqualsHotUpdate`，Release 入口可强制完整 hot-update
-  集合进入 DHE；当前 Player contract 收紧为 `StandaloneWindows64`，Android 需独立 adapter。
+  集合进入 DHE；通用 orchestrator 接受安全的 opaque target，仓库内 Demo adapter 仍只
+  支持 `StandaloneWindows64`，Android/小游戏需提供各自 adapter 和 Player 证据。
 - batch 在 DHE/AOT 集合不一致时仍会写出 `dhe-batch-summary.json`，其中的
   `configurationPassed=false` 和 `configurationErrors[]` 是机器可读失败原因；project
   preflight 会把该配置失败继续带入最终报告，而不是在子进程异常处丢失上下文。
@@ -133,7 +133,8 @@ DHE native CTest；门禁运行本身没有产生额外的非 ignored 源码改�
   与 Player 报告均绑定到当前 runtime tree `A01A5B57210340CDF005F43F72BA60A3048F8DAFCBF78CC396155593A920D13A`，DheRuntime.cpp
   hash 为 `6AA3633CB836CA79C20C2BBFADEE8A55CA16E6EB9924801EB45ED754B06C4553`。
 - `run-dhe-release-gate.ps1`：完整覆盖的 Exploratory 报告仍会被拒绝；Release 必须同时
-  证明 `mode=Release`、Git clean/tracked boundary、clean runtime source 和 non-surrogate headers。
+  证明 `mode=Release`、project/tool 双 Git 身份均 clean 且 boundary tracked、clean runtime
+  source 和 non-surrogate headers。
 
 正式 Release source preflight 现在同时要求 `DheRuntime.cpp/.h`、匹配引擎的
 non-surrogate external headers，以及完整 hot-update/DHE 集合。没有匹配 Tuanjie
@@ -230,6 +231,18 @@ Player 或历史实验目录一并纳入提交。
 - project workflow、release gate、project-plan validator 和 artifact validator 对关键
   `passed`/`coverage` 字段执行 JSON boolean 类型检查，避免 PowerShell 将字符串
   `"false"` 按非空值误转为 `$true`。
+- runtime patch 的 Git apply 检查使用精确 patch root 和 `GIT_CEILING_DIRECTORIES`；即使
+  外部 runtime 目录嵌在另一个 Git 仓库内，也不会借用祖先 index 产生 forward/reverse
+  同时成功的假状态，fixture 已覆盖 applied 与 clean 两种方向。
+- clean-checkout gate 分别输出 `projectGit` 与 `toolGit`，每份身份包含 HEAD、HEAD tree、
+  clean/tracked 状态和 source-boundary SHA-256；正式项目仓库不必与工具仓库合并，但
+  Release 要求两边都可复现。
+- project adapter 的 `Prepare` 与 `Player` 失败都会透传版本化
+  `workflow-failure.json` 根因；通用 orchestrator 的 target 已从 Windows 常量改为安全的
+  opaque identifier，平台能力由 adapter 决定。
+- archive 会重写 source preflight、clean checkout、MV 和 plan-validation 中的路径，
+  并递归拒绝所有 JSON 中的 Windows drive/UNC 绝对路径；manifest 保留双 Git 身份 hash，
+  Release archive 不允许缺失 project/tool provenance。
 
 当前磁盘上的运行产物仍然很多，但都不属于提交边界：本 DHE worktree 的
 `artifacts/` 约 5.57 GB、`staging/` 约 5.37 GB、Unity demo 的缓存/Player 约

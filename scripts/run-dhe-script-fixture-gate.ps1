@@ -103,6 +103,74 @@ if ($workflowLockTested) {
 }
 $global:LASTEXITCODE = 0
 
+$adapterPrepareFailureTested = -not [bool]$WorkflowLockAlreadyHeld
+$adapterPrepareFailureForwarded = $null
+$adapterTargetForwarded = $null
+if ($adapterPrepareFailureTested) {
+    $prepareFailureRoot = Join-Path $OutputRoot "adapter-prepare-failure"
+    $prepareFailureExit = Invoke-ExpectedFailure @(
+        (Join-Path $LabRoot "scripts/run-dhe-project-workflow.ps1"),
+        "-AdapterScript", (Join-Path $fixtures "dhe-project-adapter-failure-fixture.ps1"),
+        "-ProjectPath", (Join-Path $LabRoot "unity2021-dhe-demo"),
+        "-SettingsFile", (Join-Path $LabRoot "unity2021-dhe-demo/ProjectSettings/HybridCLRSettings.asset"),
+        "-RuntimeSource", (Join-Path $LabRoot "unity2021-dhe-demo"),
+        "-OutputRoot", $prepareFailureRoot,
+        "-Target", "FixtureTarget",
+        "-Mode", "Exploratory",
+        "-ForceOutput")
+    $prepareFailureReportPath = Join-Path $prepareFailureRoot "project-workflow-failure.json"
+    $prepareFailureReport = if (Test-Path -LiteralPath $prepareFailureReportPath -PathType Leaf) {
+        Get-Content -Raw -LiteralPath $prepareFailureReportPath | ConvertFrom-Json
+    } else { $null }
+    $adapterPrepareFailureForwarded = $prepareFailureExit -ne 0 -and $null -ne $prepareFailureReport -and
+        [string]$prepareFailureReport.error -like "*fixture-prepare-root-cause*"
+    $adapterTargetForwarded = $prepareFailureExit -ne 0 -and $null -ne $prepareFailureReport -and
+        [string]$prepareFailureReport.error -like "*fixture-prepare-root-cause:FixtureTarget*"
+    Require $adapterPrepareFailureForwarded "Project workflow did not forward the adapter Prepare root cause."
+    Require $adapterTargetForwarded "Project workflow did not forward its opaque target to the adapter."
+}
+$global:LASTEXITCODE = 0
+
+# Patch checks must use the requested root even when that root is nested in an
+# unrelated Git repository. Forward and reverse checks are mutually exclusive
+# for both a clean and an already-applied tree.
+$patchIsolationRoot = Join-Path $OutputRoot "git-apply-root-isolation"
+$patchAncestorRoot = Join-Path $patchIsolationRoot "ancestor-repository"
+$patchAppliedRoot = Join-Path $patchAncestorRoot "nested/applied"
+$patchCleanRoot = Join-Path $patchAncestorRoot "nested/clean"
+New-Item -ItemType Directory -Force -Path $patchAppliedRoot,$patchCleanRoot | Out-Null
+& git -C $patchAncestorRoot init -q
+Require ($LASTEXITCODE -eq 0) "Unable to initialize the Git apply isolation fixture."
+$utf8NoBom = New-Object Text.UTF8Encoding($false)
+[IO.File]::WriteAllText((Join-Path $patchAppliedRoot "value.txt"), "after`n", $utf8NoBom)
+[IO.File]::WriteAllText((Join-Path $patchAppliedRoot "new.txt"), "new`n", $utf8NoBom)
+[IO.File]::WriteAllText((Join-Path $patchCleanRoot "value.txt"), "before`n", $utf8NoBom)
+$patchFixturePath = Join-Path $patchIsolationRoot "change.patch"
+$patchFixtureText = @(
+    "diff --git a/new.txt b/new.txt",
+    "new file mode 100644",
+    "--- /dev/null",
+    "+++ b/new.txt",
+    "@@ -0,0 +1 @@",
+    "+new",
+    "diff --git a/value.txt b/value.txt",
+    "--- a/value.txt",
+    "+++ b/value.txt",
+    "@@ -1 +1 @@",
+    "-before",
+    "+after",
+    ""
+) -join "`n"
+[IO.File]::WriteAllText($patchFixturePath, $patchFixtureText, $utf8NoBom)
+$appliedForward = Invoke-DheGitApplyAtRoot -Root $patchAppliedRoot -PatchPath $patchFixturePath -Check
+$appliedReverse = Invoke-DheGitApplyAtRoot -Root $patchAppliedRoot -PatchPath $patchFixturePath -Check -Reverse
+$cleanForward = Invoke-DheGitApplyAtRoot -Root $patchCleanRoot -PatchPath $patchFixturePath -Check
+$cleanReverse = Invoke-DheGitApplyAtRoot -Root $patchCleanRoot -PatchPath $patchFixturePath -Check -Reverse
+$gitApplyRootIsolated = $appliedForward.exitCode -ne 0 -and $appliedReverse.exitCode -eq 0 -and
+    $cleanForward.exitCode -eq 0 -and $cleanReverse.exitCode -ne 0
+Require $gitApplyRootIsolated "Git patch checks did not remain bound to the exact nested patch root."
+$global:LASTEXITCODE = 0
+
 $preflightFailureRoot = Join-Path $OutputRoot "project-preflight-failure"
 $preflightFailureInput = Join-Path $preflightFailureRoot "input"
 $preflightFailureBaseline = Join-Path $preflightFailureInput "baseline"
@@ -207,6 +275,56 @@ try {
     }
 }
 Require $foreignGitRootRejected "Clean-checkout accepted a project outside the verified Git repository."
+$global:LASTEXITCODE = 0
+
+$separateProjectRoot = Join-Path ([IO.Path]::GetTempPath()) ("dhe-separate-project-" + [Guid]::NewGuid().ToString("N"))
+$separateIdentityGateRoot = Join-Path $OutputRoot "separate-git-identities"
+$separateGitIdentitiesValidated = $false
+try {
+    $separateSettingsRoot = Join-Path $separateProjectRoot "ProjectSettings"
+    $separateManifestRoot = Join-Path $separateProjectRoot "manifests"
+    New-Item -ItemType Directory -Force -Path $separateSettingsRoot,$separateManifestRoot | Out-Null
+    Copy-Item -LiteralPath $settingsFixture -Destination (Join-Path $separateSettingsRoot "HybridCLRSettings.asset") -Force
+    $separateBoundaryPath = Join-Path $separateManifestRoot "dhe-source-boundary.json"
+    $separateBoundary = [ordered]@{
+        schemaVersion = 1
+        format = "hybridclr.dhe-source-boundary.json"
+        exactPaths = @("manifests/dhe-source-boundary.json", "ProjectSettings/HybridCLRSettings.asset")
+        prefixes = @("ProjectSettings/")
+        generatedPrefixes = @("artifacts/")
+    }
+    [IO.File]::WriteAllText($separateBoundaryPath, ($separateBoundary | ConvertTo-Json -Depth 5), (New-Object Text.UTF8Encoding($false)))
+    & git -C $separateProjectRoot init -q
+    & git -C $separateProjectRoot config user.name "DHE Fixture"
+    & git -C $separateProjectRoot config user.email "dhe-fixture@example.invalid"
+    & git -C $separateProjectRoot add -- .
+    & git -C $separateProjectRoot commit -q -m "fixture"
+    Require ($LASTEXITCODE -eq 0) "Unable to commit the separate project Git fixture."
+
+    & (Resolve-DhePowerShellHost) -NoProfile -ExecutionPolicy Bypass -File (Join-Path $LabRoot "scripts/run-dhe-clean-checkout-gate.ps1") `
+        -LabRoot $LabRoot -ProjectPath $separateProjectRoot -OutputRoot $separateIdentityGateRoot `
+        -GitRoot $separateProjectRoot -SourceBoundaryPath $separateBoundaryPath `
+        -ToolGitRoot $LabRoot -ToolSourceBoundaryPath (Join-Path $LabRoot "manifests/dhe-source-boundary.json") `
+        -RequireGitClean -RequireTrackedSources -ForceOutput 2>&1 | Out-Null
+    $separateIdentityExit = [int]$LASTEXITCODE
+    $separateIdentityReportPath = Join-Path $separateIdentityGateRoot "clean-checkout-gate-report.json"
+    $separateIdentityReport = if (Test-Path -LiteralPath $separateIdentityReportPath -PathType Leaf) {
+        Get-Content -Raw -LiteralPath $separateIdentityReportPath | ConvertFrom-Json
+    } else { $null }
+    $separateGitIdentitiesValidated = $separateIdentityExit -eq 0 -and $null -ne $separateIdentityReport -and
+        $separateIdentityReport.projectGit.passed -is [bool] -and [bool]$separateIdentityReport.projectGit.passed -and
+        $separateIdentityReport.toolGit.passed -is [bool] -and [bool]$separateIdentityReport.toolGit.passed -and
+        [string]$separateIdentityReport.projectGit.head -match '^[0-9a-f]{40,64}$' -and
+        [string]$separateIdentityReport.projectGit.tree -match '^[0-9a-f]{40,64}$' -and
+        [string]$separateIdentityReport.toolGit.head -match '^[0-9a-f]{40,64}$' -and
+        -not ([string]$separateIdentityReport.projectGit.root).Equals(
+            [string]$separateIdentityReport.toolGit.root, [StringComparison]::OrdinalIgnoreCase)
+} finally {
+    if (Test-Path -LiteralPath $separateProjectRoot) {
+        Remove-Item -LiteralPath $separateProjectRoot -Recurse -Force
+    }
+}
+Require $separateGitIdentitiesValidated "Clean-checkout did not preserve separate project/tool Git identities."
 $global:LASTEXITCODE = 0
 
 # Strict schema validation must reject duplicate JSON properties before
@@ -812,6 +930,11 @@ $report = [ordered]@{
     unsafeSourceOutputRejected = $unsafeSourceOutputRejected
     invalidBoundaryRejected = $invalidBoundaryRejected
     foreignGitRootRejected = $foreignGitRootRejected
+    separateGitIdentitiesValidated = $separateGitIdentitiesValidated
+    gitApplyRootIsolated = $gitApplyRootIsolated
+    adapterPrepareFailureTested = $adapterPrepareFailureTested
+    adapterPrepareFailureForwarded = $adapterPrepareFailureForwarded
+    adapterTargetForwarded = $adapterTargetForwarded
     schemaDuplicatePropertyRejected = $schemaDuplicatePropertyRejected
     externalDnlibFallbackRejected = $externalDnlibFallbackRejected
     workflowLockTested = $workflowLockTested

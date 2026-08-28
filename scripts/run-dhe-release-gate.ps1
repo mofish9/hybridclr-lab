@@ -4,7 +4,7 @@ param(
     [string]$ProjectPlanValidation,
     [Parameter(Mandatory = $true)]
     [string]$WorkflowReport,
-    [ValidateSet("StandaloneWindows64")]
+    [ValidatePattern("^[A-Za-z0-9._-]+$")]
     [string]$Target = "StandaloneWindows64",
     [string]$Output = ""
 )
@@ -43,6 +43,29 @@ function Test-StrictBoolean($Object, [string]$Name, [string]$Description) {
         return $false
     }
     return [bool]$property.Value
+}
+
+function Test-FormalGitIdentity($Identity, [string]$ExpectedName) {
+    if ($null -eq $Identity) {
+        $errors.Add("Release clean-checkout is missing $ExpectedName Git identity.")
+        return $false
+    }
+    $valid = [string](Get-Property $Identity "name") -eq $ExpectedName -and
+        (Test-StrictBoolean $Identity "tested" "$ExpectedName Git tested") -and
+        (Test-StrictBoolean $Identity "passed" "$ExpectedName Git passed") -and
+        (Test-StrictBoolean $Identity "cleanRequired" "$ExpectedName Git cleanRequired") -and
+        (Test-StrictBoolean $Identity "clean" "$ExpectedName Git clean") -and
+        (Test-StrictBoolean $Identity "trackedSourcesTested" "$ExpectedName Git trackedSourcesTested") -and
+        (Test-StrictBoolean $Identity "trackedSourcesRequired" "$ExpectedName Git trackedSourcesRequired") -and
+        (Test-StrictBoolean $Identity "trackedSourcesComplete" "$ExpectedName Git trackedSourcesComplete") -and
+        [string](Get-Property $Identity "head") -match '^[0-9a-fA-F]{40,64}$' -and
+        [string](Get-Property $Identity "tree") -match '^[0-9a-fA-F]{40,64}$' -and
+        [string](Get-Property $Identity "sourceBoundarySha256") -match '^[0-9a-fA-F]{64}$' -and
+        -not [string]::IsNullOrWhiteSpace([string](Get-Property $Identity "root"))
+    if (-not $valid) {
+        $errors.Add("Release $ExpectedName Git identity is incomplete or not clean/tracked.")
+    }
+    return $valid
 }
 
 function Resolve-ReportReference([string]$Value, [string]$BaseDirectory) {
@@ -228,7 +251,13 @@ if ([string]::IsNullOrWhiteSpace($cleanCheckoutPath) -or
     catch { $errors.Add($_.Exception.Message) }
 }
 $cleanCheckoutValidated = $false
+$projectGitIdentity = $null
+$toolGitIdentity = $null
 if ($null -ne $cleanCheckout) {
+    $projectGitIdentity = Get-Property $cleanCheckout "projectGit"
+    $toolGitIdentity = Get-Property $cleanCheckout "toolGit"
+    $projectGitValidated = Test-FormalGitIdentity $projectGitIdentity "project"
+    $toolGitValidated = Test-FormalGitIdentity $toolGitIdentity "tool"
     $cleanCheckoutValidated =
         [int](Get-Property $cleanCheckout "schemaVersion") -eq 1 -and
         [string](Get-Property $cleanCheckout "format") -eq "hybridclr.dhe-clean-checkout-gate.json" -and
@@ -238,7 +267,11 @@ if ($null -ne $cleanCheckout) {
         (Test-StrictBoolean $cleanCheckout "gitClean" "Clean checkout gitClean") -and
         (Test-StrictBoolean $cleanCheckout "trackedSourcesTested" "Clean checkout trackedSourcesTested") -and
         (Test-StrictBoolean $cleanCheckout "trackedSourcesRequired" "Clean checkout trackedSourcesRequired") -and
-        (Test-StrictBoolean $cleanCheckout "trackedSourcesComplete" "Clean checkout trackedSourcesComplete")
+        (Test-StrictBoolean $cleanCheckout "trackedSourcesComplete" "Clean checkout trackedSourcesComplete") -and
+        $projectGitValidated -and $toolGitValidated -and
+        [string](Get-Property $cleanCheckout "gitHead") -eq [string](Get-Property $projectGitIdentity "head") -and
+        [string](Get-Property $cleanCheckout "gitTree") -eq [string](Get-Property $projectGitIdentity "tree") -and
+        [string](Get-Property $cleanCheckout "sourceBoundarySha256") -eq [string](Get-Property $projectGitIdentity "sourceBoundarySha256")
     if (-not $cleanCheckoutValidated) {
         $errors.Add("Workflow clean-checkout evidence is not a formal Release result.")
     }
@@ -516,6 +549,12 @@ $result = [ordered]@{
     sourcePreflightValidated = $sourcePreflightValidated
     cleanCheckout = $cleanCheckoutPath
     cleanCheckoutValidated = $cleanCheckoutValidated
+    projectGitHead = [string](Get-Property $projectGitIdentity "head")
+    projectGitTree = [string](Get-Property $projectGitIdentity "tree")
+    projectSourceBoundarySha256 = [string](Get-Property $projectGitIdentity "sourceBoundarySha256")
+    toolGitHead = [string](Get-Property $toolGitIdentity "head")
+    toolGitTree = [string](Get-Property $toolGitIdentity "tree")
+    toolSourceBoundarySha256 = [string](Get-Property $toolGitIdentity "sourceBoundarySha256")
     projectPlanValidation = $planValidationPath
     workflowReport = $workflowPath
     artifactValidation = $artifactValidationPath

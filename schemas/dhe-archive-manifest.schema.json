@@ -21,7 +21,8 @@
     "files",
     "fileCount",
     "fileSetSha256",
-    "pathSemantics"
+    "pathSemantics",
+    "sourceIdentities"
   ],
   "properties": {
     "schemaVersion": { "const": 1 },
@@ -29,6 +30,15 @@
     "generatedAtUtc": { "type": "string", "format": "date-time" },
     "sourceWorkflowRoot": { "type": ["string", "null"] },
     "pathSemantics": { "const": "archive-relative-v1" },
+    "sourceIdentities": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["projectGit", "toolGit"],
+      "properties": {
+        "projectGit": { "anyOf": [{ "$ref": "#/$defs/sourceIdentity" }, { "type": "null" }] },
+        "toolGit": { "anyOf": [{ "$ref": "#/$defs/sourceIdentity" }, { "type": "null" }] }
+      }
+    },
     "workflowReport": { "type": "string", "minLength": 1 },
     "artifactValidation": { "type": "string", "minLength": 1 },
     "buildIdentity": { "type": "string", "minLength": 1 },
@@ -74,5 +84,17 @@
     },
     "fileCount": { "type": "integer", "minimum": 1 },
     "fileSetSha256": { "type": "string", "pattern": "^[0-9a-fA-F]{64}$" }
+  },
+  "$defs": {
+    "sourceIdentity": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["head", "tree", "sourceBoundarySha256"],
+      "properties": {
+        "head": { "type": "string", "pattern": "^[0-9a-fA-F]{40,64}$" },
+        "tree": { "type": "string", "pattern": "^[0-9a-fA-F]{40,64}$" },
+        "sourceBoundarySha256": { "type": "string", "pattern": "^[0-9a-fA-F]{64}$" }
+      }
+    }
   }
 }

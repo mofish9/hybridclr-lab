@@ -8,10 +8,14 @@ param(
     [string]$IdentityTemplatePath = "",
     [string]$SourceBoundaryPath = "",
     [string]$GitRoot = "",
+    [string]$ToolGitRoot = "",
+    [string]$ToolSourceBoundaryPath = "",
     [switch]$RequireIdentityTemplate,
     [switch]$RequireEmbeddedPackage,
     [switch]$RequireTrackedSources,
     [switch]$RequireGitClean,
+    [switch]$RequireToolTrackedSources,
+    [switch]$RequireToolGitClean,
     [switch]$ForceOutput
 )
 
@@ -92,6 +96,171 @@ function Test-PathWithinRoot([string]$Path, [string]$Root) {
         $resolvedPath.StartsWith($resolvedRoot + [IO.Path]::DirectorySeparatorChar, [StringComparison]::OrdinalIgnoreCase)
 }
 
+function Get-GitSourceIdentity {
+    param(
+        [Parameter(Mandatory = $true)]
+        [string]$Name,
+        [Parameter(Mandatory = $true)]
+        [string]$RequestedRoot,
+        [Parameter(Mandatory = $true)]
+        [string]$OwnedPath,
+        [string]$BoundaryPath = "",
+        [switch]$RequireClean,
+        [switch]$RequireTracked
+    )
+
+    $identityErrors = New-Object System.Collections.Generic.List[string]
+    $identityWarnings = New-Object System.Collections.Generic.List[string]
+    $missingSources = New-Object System.Collections.Generic.List[string]
+    $resolvedRequestedRoot = [IO.Path]::GetFullPath($RequestedRoot)
+    $resolvedOwnedPath = [IO.Path]::GetFullPath($OwnedPath)
+    $resolvedGitRoot = $null
+    $gitHead = $null
+    $gitTree = $null
+    $gitCleanValue = $null
+    $trackedSourcesTestedValue = $false
+    $trackedSourcesCompleteValue = $null
+    $resolvedBoundaryPath = if ([string]::IsNullOrWhiteSpace($BoundaryPath)) { $null } else { [IO.Path]::GetFullPath($BoundaryPath) }
+    $boundarySha256 = $null
+
+    if (-not (Test-Path -LiteralPath $resolvedRequestedRoot -PathType Container)) {
+        $identityErrors.Add("$Name Git source root was not found: $resolvedRequestedRoot")
+    } else {
+        $gitTop = @(& git -C $resolvedRequestedRoot rev-parse --show-toplevel 2>&1)
+        if ($LASTEXITCODE -ne 0 -or [string]::IsNullOrWhiteSpace(($gitTop -join "").Trim())) {
+            $identityErrors.Add("$Name Git source root is not a repository: $resolvedRequestedRoot")
+        } else {
+            $resolvedGitRoot = [IO.Path]::GetFullPath(($gitTop -join "").Trim())
+            if (-not (Test-PathWithinRoot -Path $resolvedOwnedPath -Root $resolvedGitRoot)) {
+                $identityErrors.Add("$Name owned path is outside the verified Git repository: ownedPath=$resolvedOwnedPath; gitRoot=$resolvedGitRoot")
+            }
+
+            $headOutput = @(& git -C $resolvedGitRoot rev-parse HEAD 2>&1)
+            if ($LASTEXITCODE -ne 0 -or ($headOutput -join "").Trim() -notmatch '^[0-9a-fA-F]{40,64}$') {
+                $identityErrors.Add("Unable to resolve $Name Git HEAD: $resolvedGitRoot")
+            } else {
+                $gitHead = ($headOutput -join "").Trim().ToLowerInvariant()
+            }
+            $treeOutput = @(& git -C $resolvedGitRoot rev-parse 'HEAD^{tree}' 2>&1)
+            if ($LASTEXITCODE -ne 0 -or ($treeOutput -join "").Trim() -notmatch '^[0-9a-fA-F]{40,64}$') {
+                $identityErrors.Add("Unable to resolve $Name Git tree: $resolvedGitRoot")
+            } else {
+                $gitTree = ($treeOutput -join "").Trim().ToLowerInvariant()
+            }
+
+            $gitStatus = @(& git -C $resolvedGitRoot status --porcelain=v1 --untracked-files=all 2>&1)
+            if ($LASTEXITCODE -ne 0) {
+                $identityErrors.Add("Unable to inspect $Name Git source status: $resolvedGitRoot")
+            } else {
+                $gitCleanValue = $gitStatus.Count -eq 0
+                if (-not $gitCleanValue) {
+                    $message = "$Name Git source root has tracked or untracked changes: $resolvedGitRoot"
+                    if ($RequireClean) { $identityErrors.Add($message) } else { $identityWarnings.Add($message) }
+                }
+            }
+
+            if ($null -ne $resolvedBoundaryPath -and (Test-Path -LiteralPath $resolvedBoundaryPath -PathType Leaf)) {
+                $boundarySha256 = (Get-FileHash -LiteralPath $resolvedBoundaryPath -Algorithm SHA256).Hash.ToLowerInvariant()
+            }
+            if ($RequireTracked) {
+                $trackedSourcesTestedValue = $true
+                if ($null -eq $resolvedBoundaryPath) {
+                    $identityErrors.Add("$Name tracked-source verification requires a source boundary manifest.")
+                } else {
+                    $boundary = $null
+                    try {
+                        $boundary = Get-Content -Raw -LiteralPath $resolvedBoundaryPath | ConvertFrom-Json
+                    } catch {
+                        $identityErrors.Add("Unable to read $Name source boundary manifest: $resolvedBoundaryPath")
+                    }
+                    if ($null -ne $boundary) {
+                        $boundaryFormat = if ($null -ne $boundary.PSObject.Properties["format"]) { [string]$boundary.format } else { "" }
+                        $boundarySchema = if ($null -ne $boundary.PSObject.Properties["schemaVersion"]) { [int]$boundary.schemaVersion } else { 0 }
+                        [object[]]$boundaryExact = if ($null -ne $boundary.PSObject.Properties["exactPaths"]) { @($boundary.exactPaths) } else { @() }
+                        [object[]]$boundaryPrefixes = if ($null -ne $boundary.PSObject.Properties["prefixes"]) { @($boundary.prefixes) } else { @() }
+                        $boundaryExactCount = if ($null -eq $boundary.PSObject.Properties["exactPaths"]) { 0 } else { @($boundary.exactPaths).Count }
+                        $boundaryPrefixCount = if ($null -eq $boundary.PSObject.Properties["prefixes"]) { 0 } else { @($boundary.prefixes).Count }
+                        if ($boundarySchema -ne 1 -or $boundaryFormat -ne "hybridclr.dhe-source-boundary.json" -or
+                            $boundaryExactCount -eq 0 -or $boundaryPrefixCount -eq 0) {
+                            $identityErrors.Add("$Name source boundary manifest has an invalid schema, format, or empty exactPaths/prefixes: $resolvedBoundaryPath")
+                            $boundary = $null
+                        } else {
+                            $boundaryValues = @($boundaryExact + $boundaryPrefixes | ForEach-Object { ([string]$_).Replace('\', '/') })
+                            $unsafeBoundaryValues = @($boundaryValues | Where-Object {
+                                [string]::IsNullOrWhiteSpace($_) -or [IO.Path]::IsPathRooted($_) -or $_ -match '(^|/)\.\.(/|$)'
+                            })
+                            $duplicateBoundaryValues = @($boundaryValues | Group-Object | Where-Object { $_.Count -gt 1 })
+                            if ($unsafeBoundaryValues.Count -gt 0 -or $duplicateBoundaryValues.Count -gt 0) {
+                                $identityErrors.Add("$Name source boundary manifest contains unsafe or duplicate paths: $resolvedBoundaryPath")
+                                $boundary = $null
+                            }
+                        }
+                    }
+                    if ($null -ne $boundary) {
+                        $trackedFiles = @(& git -C $resolvedGitRoot ls-files 2>&1)
+                        if ($LASTEXITCODE -ne 0) {
+                            $identityErrors.Add("Unable to enumerate $Name tracked source files: $resolvedGitRoot")
+                        } else {
+                            $trackedSet = New-Object 'System.Collections.Generic.HashSet[string]'([StringComparer]::OrdinalIgnoreCase)
+                            foreach ($trackedFile in @($trackedFiles)) {
+                                if (-not [string]::IsNullOrWhiteSpace([string]$trackedFile)) {
+                                    $null = $trackedSet.Add(([string]$trackedFile).Replace('\', '/'))
+                                }
+                            }
+                            if (-not (Test-PathWithinRoot -Path $resolvedBoundaryPath -Root $resolvedGitRoot)) {
+                                $missingSources.Add("source-boundary-outside-git-root:$resolvedBoundaryPath")
+                            } else {
+                                $boundaryRelativePath = $resolvedBoundaryPath.Substring(
+                                    $resolvedGitRoot.TrimEnd('\', '/').Length).TrimStart('\', '/').Replace('\', '/')
+                                if (-not $trackedSet.Contains($boundaryRelativePath)) { $missingSources.Add($boundaryRelativePath) }
+                            }
+                            foreach ($requiredPath in @($boundary.exactPaths | ForEach-Object { ([string]$_).Replace('\', '/') })) {
+                                if (-not $trackedSet.Contains($requiredPath)) { $missingSources.Add($requiredPath) }
+                            }
+                            foreach ($requiredPrefix in @($boundary.prefixes | ForEach-Object { ([string]$_).Replace('\', '/') })) {
+                                $prefixMatches = @($trackedSet | Where-Object {
+                                    if ($requiredPrefix.Contains('*')) { $_ -like $requiredPrefix }
+                                    else {
+                                        $prefix = $requiredPrefix.TrimEnd('/')
+                                        $_.Equals($prefix, [StringComparison]::OrdinalIgnoreCase) -or
+                                            $_.StartsWith($prefix + '/', [StringComparison]::OrdinalIgnoreCase)
+                                    }
+                                })
+                                if ($prefixMatches.Count -eq 0) { $missingSources.Add($requiredPrefix) }
+                            }
+                        }
+                    }
+                }
+                $trackedSourcesCompleteValue = $missingSources.Count -eq 0 -and
+                    @($identityErrors | Where-Object { $_ -like "$Name source boundary*" -or $_ -like "Unable to *$Name*source*" }).Count -eq 0
+                if (-not $trackedSourcesCompleteValue) {
+                    $identityErrors.Add("$Name formal source paths are not fully tracked by Git: $($missingSources -join ', ')")
+                }
+            }
+        }
+    }
+
+    return [pscustomobject][ordered]@{
+        name = $Name
+        tested = $true
+        root = $resolvedGitRoot
+        ownedPath = $resolvedOwnedPath
+        head = $gitHead
+        tree = $gitTree
+        clean = $gitCleanValue
+        cleanRequired = [bool]$RequireClean
+        trackedSourcesTested = $trackedSourcesTestedValue
+        trackedSourcesComplete = $trackedSourcesCompleteValue
+        trackedSourcesRequired = [bool]$RequireTracked
+        sourceBoundaryPath = $resolvedBoundaryPath
+        sourceBoundarySha256 = $boundarySha256
+        missingTrackedSources = $missingSources.ToArray()
+        passed = $identityErrors.Count -eq 0
+        errors = $identityErrors.ToArray()
+        warnings = $identityWarnings.ToArray()
+    }
+}
+
 $cleanRoot = Join-Path $OutputRoot "clean-source"
 $identityArguments = @()
 if (-not [string]::IsNullOrWhiteSpace($IdentityTemplatePath)) {
@@ -117,120 +286,35 @@ $cleanPassed = $cleanExit -eq 0 -and $null -ne $cleanReport -and
     $null -ne $cleanRuntimeReadyValue -and -not $cleanRuntimeReadyValue
 if (-not $cleanPassed) { $errors.Add("Clean source preflight did not pass in source-only mode.") }
 
-$gitTested = $false
-$gitClean = $null
-$trackedSourcesTested = $false
-$trackedSourcesComplete = $null
-$missingTrackedSources = New-Object System.Collections.Generic.List[string]
-$gitRootPath = if ([string]::IsNullOrWhiteSpace($GitRoot)) { "" } else { [IO.Path]::GetFullPath($GitRoot) }
-if ($RequireGitClean -or $RequireTrackedSources -or -not [string]::IsNullOrWhiteSpace($gitRootPath)) {
-    $gitTested = $true
-    if ([string]::IsNullOrWhiteSpace($gitRootPath)) {
-        $gitRootPath = $LabRoot
-    }
-    if (-not (Test-Path -LiteralPath $gitRootPath -PathType Container)) {
-        $errors.Add("Git source root was not found: $gitRootPath")
-    } else {
-        $gitTop = @(& git -C $gitRootPath rev-parse --show-toplevel 2>&1)
-        if ($LASTEXITCODE -ne 0 -or [string]::IsNullOrWhiteSpace(($gitTop -join "").Trim())) {
-            $errors.Add("Git source root is not a repository: $gitRootPath")
-        } else {
-            $gitRootPath = [IO.Path]::GetFullPath(($gitTop -join "").Trim())
-            if (-not (Test-PathWithinRoot -Path $ProjectPath -Root $gitRootPath)) {
-                $errors.Add("DHE project path is outside the verified Git repository: project=$ProjectPath; gitRoot=$gitRootPath")
-            }
-            $gitStatus = @(& git -C $gitRootPath status --porcelain=v1 --untracked-files=all 2>&1)
-            if ($LASTEXITCODE -ne 0) {
-                $errors.Add("Unable to inspect Git source status: $gitRootPath")
-            } else {
-                $gitClean = $gitStatus.Count -eq 0
-                if (-not $gitClean) {
-                    $message = "Git source root has tracked or untracked changes: $gitRootPath"
-                    if ($RequireGitClean) { $errors.Add($message) } else { Write-Warning $message }
-                }
-
-                if ($RequireTrackedSources) {
-                    $trackedSourcesTested = $true
-                    $boundaryPath = if ([string]::IsNullOrWhiteSpace($SourceBoundaryPath)) {
-                        Join-Path $LabRoot "manifests/dhe-source-boundary.json"
-                    } else {
-                        [IO.Path]::GetFullPath($SourceBoundaryPath)
-                    }
-                    $boundary = $null
-                    try {
-                        $boundary = Get-Content -Raw -LiteralPath $boundaryPath | ConvertFrom-Json
-                    } catch {
-                        $errors.Add("Unable to read DHE source boundary manifest for tracked-source verification: $boundaryPath")
-                    }
-                    if ($null -ne $boundary) {
-                        $boundaryFormat = if ($null -ne $boundary.PSObject.Properties["format"]) { [string]$boundary.format } else { "" }
-                        $boundarySchema = if ($null -ne $boundary.PSObject.Properties["schemaVersion"]) { [int]$boundary.schemaVersion } else { 0 }
-                        $boundaryExact = if ($null -ne $boundary.PSObject.Properties["exactPaths"]) { @($boundary.exactPaths) } else { @() }
-                        $boundaryPrefixes = if ($null -ne $boundary.PSObject.Properties["prefixes"]) { @($boundary.prefixes) } else { @() }
-                        if ($boundarySchema -ne 1 -or
-                            $boundaryFormat -ne "hybridclr.dhe-source-boundary.json" -or
-                            @($boundaryExact).Count -eq 0 -or @($boundaryPrefixes).Count -eq 0) {
-                            $errors.Add("DHE source boundary manifest has an invalid schema, format, or empty exactPaths/prefixes: $boundaryPath")
-                            $boundary = $null
-                        } else {
-                            $boundaryValues = @($boundaryExact + $boundaryPrefixes | ForEach-Object { ([string]$_).Replace('\', '/') })
-                            $unsafeBoundaryValues = @($boundaryValues | Where-Object {
-                                [string]::IsNullOrWhiteSpace($_) -or [IO.Path]::IsPathRooted($_) -or $_ -match '(^|/)\.\.(/|$)'
-                            })
-                            $duplicateBoundaryValues = @($boundaryValues | Group-Object | Where-Object { $_.Count -gt 1 })
-                            if ($unsafeBoundaryValues.Count -gt 0 -or $duplicateBoundaryValues.Count -gt 0) {
-                                $errors.Add("DHE source boundary manifest contains unsafe or duplicate paths: $boundaryPath")
-                                $boundary = $null
-                            }
-                        }
-                    }
-                    if ($null -ne $boundary) {
-                        $trackedFiles = @(& git -C $gitRootPath ls-files 2>&1)
-                        if ($LASTEXITCODE -ne 0) {
-                            $errors.Add("Unable to enumerate tracked source files: $gitRootPath")
-                        } else {
-                            $trackedSet = New-Object 'System.Collections.Generic.HashSet[string]'([StringComparer]::OrdinalIgnoreCase)
-                            foreach ($trackedFile in @($trackedFiles)) {
-                                if (-not [string]::IsNullOrWhiteSpace([string]$trackedFile)) {
-                                    $null = $trackedSet.Add(([string]$trackedFile).Replace('\', '/'))
-                                }
-                            }
-                            $boundaryFullPath = [IO.Path]::GetFullPath($boundaryPath)
-                            if (-not (Test-PathWithinRoot -Path $boundaryFullPath -Root $gitRootPath)) {
-                                $missingTrackedSources.Add("source-boundary-outside-git-root:$boundaryFullPath")
-                            } else {
-                                $boundaryRelativePath = $boundaryFullPath.Substring(
-                                    $gitRootPath.TrimEnd('\', '/').Length).TrimStart('\', '/').Replace('\', '/')
-                                if (-not $trackedSet.Contains($boundaryRelativePath)) {
-                                    $missingTrackedSources.Add($boundaryRelativePath)
-                                }
-                            }
-                            $exactSourcePaths = @($boundary.exactPaths | ForEach-Object { ([string]$_).Replace('\', '/') })
-                            foreach ($requiredPath in $exactSourcePaths) {
-                                if (-not $trackedSet.Contains($requiredPath)) {
-                                    $missingTrackedSources.Add($requiredPath)
-                                }
-                            }
-                            foreach ($requiredPrefix in @($boundary.prefixes | ForEach-Object { ([string]$_).Replace('\', '/') })) {
-                                $prefixMatches = @($trackedSet | Where-Object {
-                                    if ($requiredPrefix.Contains('*')) { $_ -like $requiredPrefix }
-                                    else { $_.StartsWith($requiredPrefix.TrimEnd('/'), [StringComparison]::OrdinalIgnoreCase) }
-                                })
-                                if ($prefixMatches.Count -eq 0) {
-                                    $missingTrackedSources.Add($requiredPrefix)
-                                }
-                            }
-                        }
-                    }
-                    $trackedSourcesComplete = $missingTrackedSources.Count -eq 0
-                    if (-not $trackedSourcesComplete) {
-                        $errors.Add("Formal DHE source paths are not fully tracked by Git: $($missingTrackedSources -join ', ')")
-                    }
-                }
-            }
-        }
-    }
+$gitTested = $RequireGitClean -or $RequireTrackedSources -or -not [string]::IsNullOrWhiteSpace($GitRoot)
+$projectGit = $null
+if ($gitTested) {
+    $projectGitRoot = if ([string]::IsNullOrWhiteSpace($GitRoot)) { $ProjectPath } else { [IO.Path]::GetFullPath($GitRoot) }
+    $projectBoundaryPath = if ([string]::IsNullOrWhiteSpace($SourceBoundaryPath)) { "" } else { [IO.Path]::GetFullPath($SourceBoundaryPath) }
+    $projectGit = Get-GitSourceIdentity -Name "project" -RequestedRoot $projectGitRoot -OwnedPath $ProjectPath `
+        -BoundaryPath $projectBoundaryPath -RequireClean:$RequireGitClean -RequireTracked:$RequireTrackedSources
+    foreach ($identityError in @($projectGit.errors)) { $errors.Add([string]$identityError) }
+    foreach ($identityWarning in @($projectGit.warnings)) { Write-Warning ([string]$identityWarning) }
 }
+
+$toolGitTested = $RequireToolGitClean -or $RequireToolTrackedSources -or -not [string]::IsNullOrWhiteSpace($ToolGitRoot)
+$toolGit = $null
+if ($toolGitTested) {
+    $resolvedToolGitRoot = if ([string]::IsNullOrWhiteSpace($ToolGitRoot)) { $LabRoot } else { [IO.Path]::GetFullPath($ToolGitRoot) }
+    $toolBoundaryPath = if ([string]::IsNullOrWhiteSpace($ToolSourceBoundaryPath)) {
+        Join-Path $LabRoot "manifests/dhe-source-boundary.json"
+    } else { [IO.Path]::GetFullPath($ToolSourceBoundaryPath) }
+    $toolGit = Get-GitSourceIdentity -Name "tool" -RequestedRoot $resolvedToolGitRoot -OwnedPath $LabRoot `
+        -BoundaryPath $toolBoundaryPath -RequireClean:$RequireToolGitClean -RequireTracked:$RequireToolTrackedSources
+    foreach ($identityError in @($toolGit.errors)) { $errors.Add([string]$identityError) }
+    foreach ($identityWarning in @($toolGit.warnings)) { Write-Warning ([string]$identityWarning) }
+}
+
+$gitRootPath = if ($null -eq $projectGit) { "" } else { [string]$projectGit.root }
+$gitClean = if ($null -eq $projectGit) { $null } else { $projectGit.clean }
+$trackedSourcesTested = $null -ne $projectGit -and [bool]$projectGit.trackedSourcesTested
+$trackedSourcesComplete = if ($null -eq $projectGit) { $null } else { $projectGit.trackedSourcesComplete }
+$missingTrackedSources = if ($null -eq $projectGit) { @() } else { @($projectGit.missingTrackedSources) }
 
 $staleOutputRoot = Join-Path $OutputRoot "stale-output"
 New-Item -ItemType Directory -Force -Path $staleOutputRoot | Out-Null
@@ -324,6 +408,8 @@ $report = [ordered]@{
     staleManifestRejected = $staleManifestRejected
     gitRoot = if ($gitTested) { $gitRootPath } else { $null }
     gitTested = $gitTested
+    gitHead = if ($null -eq $projectGit) { $null } else { $projectGit.head }
+    gitTree = if ($null -eq $projectGit) { $null } else { $projectGit.tree }
     gitClean = $gitClean
     gitCleanRequired = [bool]$RequireGitClean
     trackedSourcesTested = $trackedSourcesTested
@@ -332,7 +418,10 @@ $report = [ordered]@{
     sourceBoundaryPath = if ([string]::IsNullOrWhiteSpace($SourceBoundaryPath)) {
         Join-Path $LabRoot "manifests/dhe-source-boundary.json"
     } else { [IO.Path]::GetFullPath($SourceBoundaryPath) }
-    missingTrackedSources = $missingTrackedSources.ToArray()
+    sourceBoundarySha256 = if ($null -eq $projectGit) { $null } else { $projectGit.sourceBoundarySha256 }
+    missingTrackedSources = @($missingTrackedSources)
+    projectGit = $projectGit
+    toolGit = $toolGit
     errors = $errors.ToArray()
 }
 $reportPath = Join-Path $OutputRoot "clean-checkout-gate-report.json"

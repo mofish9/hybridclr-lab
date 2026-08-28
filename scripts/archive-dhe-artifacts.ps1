@@ -48,6 +48,38 @@ function Set-PropertyValue($Object, [string]$Name, $Value) {
     $Object | Add-Member -NotePropertyName $Name -NotePropertyValue $Value -Force
 }
 
+function Set-ArchiveValidationReferences {
+    param(
+        [Parameter(Mandatory = $true)]
+        $Document,
+        [Parameter(Mandatory = $true)]
+        [object[]]$AssemblyRecords,
+        [string]$Prefix = "",
+        [switch]$IncludeCoreReports
+    )
+
+    $mvJsons = @($AssemblyRecords | ForEach-Object { $Prefix + [string]$_.mvJson })
+    $mvBytes = @($AssemblyRecords | ForEach-Object { $Prefix + [string]$_.mvBytes })
+    $baselines = @($AssemblyRecords | ForEach-Object { $Prefix + [string]$_.baseline })
+    $currents = @($AssemblyRecords | ForEach-Object { $Prefix + [string]$_.current })
+    Set-PropertyValue $Document "mvJson" $(if ($mvJsons.Count -eq 0) { $null } else { $mvJsons[0] })
+    Set-PropertyValue $Document "mvBytes" $(if ($mvBytes.Count -eq 0) { $null } else { $mvBytes[0] })
+    Set-PropertyValue $Document "baselineAssembly" $(if ($baselines.Count -eq 0) { $null } else { $baselines[0] })
+    Set-PropertyValue $Document "currentAssembly" $(if ($currents.Count -eq 0) { $null } else { $currents[0] })
+    Set-PropertyValue $Document "mvJsons" $mvJsons
+    Set-PropertyValue $Document "mvBytesList" $mvBytes
+    Set-PropertyValue $Document "baselineAssemblies" $baselines
+    Set-PropertyValue $Document "currentAssemblies" $currents
+    Set-PropertyValue $Document "pathSemantics" "archive-relative-v1"
+    if ($IncludeCoreReports) {
+        Set-PropertyValue $Document "nativeManifest" "dhe-native-manifest.json"
+        Set-PropertyValue $Document "buildIdentity" "build-identity.json"
+        Set-PropertyValue $Document "workflowReport" "workflow-report.json"
+        Set-PropertyValue $Document "runtimePlan" "runtime-plan/dhe-runtime-plan.json"
+        Set-PropertyValue $Document "batchReport" "batch/dhe-batch-summary.json"
+    }
+}
+
 function ConvertTo-DheUtcTimestamp($Value) {
     if ($null -eq $Value) {
         return $null
@@ -260,7 +292,13 @@ foreach ($assembly in @($projectPlanDocument.assemblies)) {
     $mvJsonReference = [string](Get-PropertyValue $assembly "mvJson")
     $mvBytesReference = [string](Get-PropertyValue $assembly "mvBytes")
     if (-not [string]::IsNullOrWhiteSpace($mvJsonReference)) {
-        $mvJsonDestination = Copy-ArchiveFile (Resolve-InputFile $mvJsonReference "MV JSON '$assemblyName'") "$assemblyBaseName.mv.json"
+        $mvJsonSource = Resolve-InputFile $mvJsonReference "MV JSON '$assemblyName'"
+        $mvDocument = Get-Content -Raw -LiteralPath $mvJsonSource | ConvertFrom-Json
+        Set-PropertyValue $mvDocument.baseline "path" "baseline/$assemblyName.dll"
+        Set-PropertyValue $mvDocument.current "path" "current/$assemblyName.dll"
+        Set-PropertyValue $mvDocument "pathSemantics" "archive-relative-v1"
+        $mvJsonDestination = "$assemblyBaseName.mv.json"
+        Write-ArchiveJson $mvJsonDestination $mvDocument | Out-Null
     }
     if (-not [string]::IsNullOrWhiteSpace($mvBytesReference)) {
         $mvBytesDestination = Copy-ArchiveFile (Resolve-InputFile $mvBytesReference "MV binary '$assemblyName'") "$assemblyBaseName.mv.bytes"
@@ -410,8 +448,40 @@ foreach ($patch in @($runtimeManifestDocument.dhePatches)) {
     }
 }
 Write-ArchiveJson "runtime-manifest.json" $runtimeManifestDocument | Out-Null
-Copy-ArchiveFile $sourcePreflightPath "source-preflight-report.json" | Out-Null
-Copy-ArchiveFile $cleanCheckoutPath "clean-checkout-gate-report.json" | Out-Null
+$sourcePreflightDocument = Get-Content -Raw -LiteralPath $sourcePreflightPath | ConvertFrom-Json
+Set-PropertyValue $sourcePreflightDocument "pathSemantics" "archive-relative-v1"
+Set-PropertyValue $sourcePreflightDocument "labRoot" $null
+Set-PropertyValue $sourcePreflightDocument "projectPath" $null
+Set-PropertyValue $sourcePreflightDocument "runtimeSource" $null
+Set-PropertyValue $sourcePreflightDocument "packageLockPath" $(if ($null -eq $packageLockPath) { $null } else { "provenance/dhe-package-lock.json" })
+Set-PropertyValue $sourcePreflightDocument "identityTemplatePath" $null
+foreach ($check in @($sourcePreflightDocument.checks)) {
+    $details = [string](Get-PropertyValue $check "details")
+    if ($details -match '(?i)(?:^|[^A-Z0-9])(?:[A-Z]:[\\/]|\\\\[^\\/])') {
+        Set-PropertyValue $check "details" "workspace path omitted from archive"
+    }
+}
+Write-ArchiveJson "source-preflight-report.json" $sourcePreflightDocument | Out-Null
+
+$cleanCheckoutDocument = Get-Content -Raw -LiteralPath $cleanCheckoutPath | ConvertFrom-Json
+Set-PropertyValue $cleanCheckoutDocument "pathSemantics" "archive-relative-v1"
+Set-PropertyValue $cleanCheckoutDocument "gitRoot" $null
+Set-PropertyValue $cleanCheckoutDocument "sourceBoundaryPath" $null
+foreach ($nullableIdentityField in @("gitHead", "gitTree", "sourceBoundarySha256", "projectGit", "toolGit")) {
+    if ($null -eq $cleanCheckoutDocument.PSObject.Properties[$nullableIdentityField]) {
+        Set-PropertyValue $cleanCheckoutDocument $nullableIdentityField $null
+    }
+}
+foreach ($gitIdentityName in @("projectGit", "toolGit")) {
+    $gitIdentity = Get-PropertyValue $cleanCheckoutDocument $gitIdentityName
+    if ($null -ne $gitIdentity) {
+        Set-PropertyValue $gitIdentity "root" $null
+        Set-PropertyValue $gitIdentity "ownedPath" $null
+        Set-PropertyValue $gitIdentity "sourceBoundaryPath" $null
+        Set-PropertyValue $gitIdentity "warnings" @()
+    }
+}
+Write-ArchiveJson "clean-checkout-gate-report.json" $cleanCheckoutDocument | Out-Null
 Copy-ArchiveFile $playerResultPath "dhe-player-result.json" | Out-Null
 
 $archiveBatch = $batchReportDocument
@@ -428,13 +498,6 @@ foreach ($batchAssembly in @($archiveBatch.assemblies)) {
     Set-PropertyValue $batchAssembly "binary" ("../" + $archiveAssembly.mvBytes)
 }
 Write-ArchiveJson "batch/dhe-batch-summary.json" $archiveBatch | Out-Null
-
-foreach ($validationFile in @(Get-ChildItem -LiteralPath (Join-Path $planDirectory "validation") -File -Filter "*.json" -ErrorAction SilentlyContinue)) {
-    Copy-ArchiveFile $validationFile.FullName ("validation/" + $validationFile.Name) | Out-Null
-}
-foreach ($validationFile in @(Get-ChildItem -LiteralPath (Join-Path $planDirectory "plan-validation") -File -Filter "*.json" -ErrorAction SilentlyContinue)) {
-    Copy-ArchiveFile $validationFile.FullName ("plan-validation/" + $validationFile.Name) | Out-Null
-}
 
 Write-ArchiveJson "project-plan.json" $projectPlanDocument | Out-Null
 Set-PropertyValue $projectPlanValidationDocument "plan" "project-plan.json"
@@ -458,6 +521,26 @@ $archivedPlanValidationPath = Join-Path $archivePath "project-plan-validation.js
 if ($LASTEXITCODE -ne 0) {
     throw "Archived project plan failed independent validation. See $archivedPlanValidationPath"
 }
+$projectPlanValidationDocument = Get-Content -Raw -LiteralPath $archivedPlanValidationPath | ConvertFrom-Json
+Set-PropertyValue $projectPlanValidationDocument "plan" "project-plan.json"
+Set-PropertyValue $projectPlanValidationDocument "pathSemantics" "archive-relative-v1"
+foreach ($validationAssembly in @($projectPlanValidationDocument.assemblies)) {
+    $assemblyName = [string](Get-PropertyValue $validationAssembly "assemblyName")
+    $validationRelative = "plan-validation/$assemblyName.json"
+    $validationPath = Join-Path $archivePath $validationRelative.Replace('/', [IO.Path]::DirectorySeparatorChar)
+    if (-not [IO.File]::Exists($validationPath)) {
+        throw "Archived plan validation report was not produced for '$assemblyName': $validationPath"
+    }
+    $validationDocument = Get-Content -Raw -LiteralPath $validationPath | ConvertFrom-Json
+    $archiveAssembly = @($archiveAssemblyRecords | Where-Object { $_.assemblyName -eq $assemblyName })
+    if ($archiveAssembly.Count -ne 1) {
+        throw "Archived plan validation references an unknown assembly '$assemblyName'."
+    }
+    Set-ArchiveValidationReferences -Document $validationDocument -AssemblyRecords $archiveAssembly -Prefix "../"
+    Write-ArchiveJson $validationRelative $validationDocument | Out-Null
+    Set-PropertyValue $validationAssembly "validationReport" $validationRelative
+}
+Write-ArchiveJson "project-plan-validation.json" $projectPlanValidationDocument | Out-Null
 
 $archiveWorkflow = $workflow
 $archiveWorkflow | Add-Member -NotePropertyName projectPlan -NotePropertyValue "project-plan.json" -Force
@@ -539,6 +622,10 @@ Write-ArchiveJson "workflow-report.json" $archiveWorkflow | Out-Null
 if ($LASTEXITCODE -ne 0) {
     throw "Archived DHE workflow report failed independent validation."
 }
+$finalArtifactValidationPath = Join-Path $archivePath "artifact-validation.json"
+$finalArtifactValidation = Get-Content -Raw -LiteralPath $finalArtifactValidationPath | ConvertFrom-Json
+Set-ArchiveValidationReferences -Document $finalArtifactValidation -AssemblyRecords $archiveAssemblyRecords.ToArray() -IncludeCoreReports
+Write-ArchiveJson "artifact-validation.json" $finalArtifactValidation | Out-Null
 
 $archiveFiles = @(Get-ChildItem -LiteralPath $archivePath -Recurse -File -Force |
     Where-Object { $_.Name -ne "archive-manifest.json" })
@@ -553,6 +640,19 @@ foreach ($file in $archiveFiles) {
 }
 $archiveFileRecords = @($archiveFileRecords | Sort-Object path)
 $archiveFilePaths = @($archiveFiles | ForEach-Object { $_.FullName })
+$archiveSourceIdentities = [ordered]@{}
+foreach ($gitIdentityName in @("projectGit", "toolGit")) {
+    $gitIdentity = Get-PropertyValue $cleanCheckoutDocument $gitIdentityName
+    $archiveSourceIdentities[$gitIdentityName] = if ($null -eq $gitIdentity) {
+        $null
+    } else {
+        [ordered]@{
+            head = [string](Get-PropertyValue $gitIdentity "head")
+            tree = [string](Get-PropertyValue $gitIdentity "tree")
+            sourceBoundarySha256 = [string](Get-PropertyValue $gitIdentity "sourceBoundarySha256")
+        }
+    }
+}
 $archiveManifest = [ordered]@{
     schemaVersion = 1
     format = "hybridclr.dhe-archive-manifest.json"
@@ -561,6 +661,7 @@ $archiveManifest = [ordered]@{
     # path would make a copied handoff look locally usable when it is not.
     sourceWorkflowRoot = $null
     pathSemantics = "archive-relative-v1"
+    sourceIdentities = $archiveSourceIdentities
     workflowReport = "workflow-report.json"
     artifactValidation = "artifact-validation.json"
     buildIdentity = "build-identity.json"

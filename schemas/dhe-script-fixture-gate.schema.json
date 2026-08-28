@@ -4,7 +4,7 @@
   "title": "HybridCLR DHE Script Fixture Gate Report",
   "type": "object",
   "additionalProperties": true,
-  "required": ["schemaVersion", "format", "passed", "guardRequested", "guardTransformed", "guardSecondPassTransformed", "abiChangedMethodCount", "abiSupportedChangedMethodCount", "abiUnsupportedChangedMethodCount", "genericChangedMethodCount", "genericSupportedChangedMethodCount", "genericGuardedMethodCount", "genericNativeEntryCount", "multiAssemblyChangedMethodCount", "multiAssemblySupportedChangedMethodCount", "multiAssemblyUnsupportedChangedMethodCount", "malformedNativeTokenRejected", "duplicateMappingRejected", "probeTransactionRollbackPassed", "outputCollisionRejected", "exploratoryReleaseRejected", "releaseDerivedOutputsIsolated", "foreignGitRootRejected", "schemaDuplicatePropertyRejected", "externalDnlibFallbackRejected", "workflowLockTested", "workflowLockRejected", "workflowLockReusable", "projectPreflightFailureReported"],
+  "required": ["schemaVersion", "format", "passed", "guardRequested", "guardTransformed", "guardSecondPassTransformed", "abiChangedMethodCount", "abiSupportedChangedMethodCount", "abiUnsupportedChangedMethodCount", "genericChangedMethodCount", "genericSupportedChangedMethodCount", "genericGuardedMethodCount", "genericNativeEntryCount", "multiAssemblyChangedMethodCount", "multiAssemblySupportedChangedMethodCount", "multiAssemblyUnsupportedChangedMethodCount", "malformedNativeTokenRejected", "duplicateMappingRejected", "probeTransactionRollbackPassed", "outputCollisionRejected", "exploratoryReleaseRejected", "releaseDerivedOutputsIsolated", "foreignGitRootRejected", "separateGitIdentitiesValidated", "gitApplyRootIsolated", "adapterPrepareFailureTested", "adapterPrepareFailureForwarded", "adapterTargetForwarded", "schemaDuplicatePropertyRejected", "externalDnlibFallbackRejected", "workflowLockTested", "workflowLockRejected", "workflowLockReusable", "projectPreflightFailureReported"],
   "properties": {
     "schemaVersion": { "const": 1 },
     "format": { "const": "hybridclr.dhe-script-fixture-gate.json" },
@@ -30,6 +30,11 @@
     "exploratoryReleaseRejected": { "const": true },
     "releaseDerivedOutputsIsolated": { "const": true },
     "foreignGitRootRejected": { "const": true },
+    "separateGitIdentitiesValidated": { "const": true },
+    "gitApplyRootIsolated": { "const": true },
+    "adapterPrepareFailureTested": { "type": "boolean" },
+    "adapterPrepareFailureForwarded": { "type": ["boolean", "null"] },
+    "adapterTargetForwarded": { "type": ["boolean", "null"] },
     "schemaDuplicatePropertyRejected": { "const": true },
     "externalDnlibFallbackRejected": { "const": true },
     "workflowLockTested": { "type": "boolean" },
@@ -42,6 +47,24 @@
     "multiFileHashMutated": { "type": "string", "pattern": "^[0-9a-fA-F]{64}$" }
   },
   "allOf": [
+    {
+      "if": {
+        "properties": { "adapterPrepareFailureTested": { "const": true } },
+        "required": ["adapterPrepareFailureTested"]
+      },
+      "then": {
+        "properties": {
+          "adapterPrepareFailureForwarded": { "const": true },
+          "adapterTargetForwarded": { "const": true }
+        }
+      },
+      "else": {
+        "properties": {
+          "adapterPrepareFailureForwarded": { "type": "null" },
+          "adapterTargetForwarded": { "type": "null" }
+        }
+      }
+    },
     {
       "if": {
         "properties": { "workflowLockTested": { "const": true } },

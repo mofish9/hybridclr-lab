@@ -1,5 +1,61 @@
 Set-StrictMode -Version Latest
 
+function Invoke-DheGitApplyAtRoot {
+    param(
+        [Parameter(Mandatory = $true)]
+        [string]$Root,
+        [Parameter(Mandatory = $true)]
+        [string]$PatchPath,
+        [ValidateRange(0, 8)]
+        [int]$StripComponents = 1,
+        [switch]$Reverse,
+        [switch]$Check
+    )
+
+    $resolvedRoot = [IO.Path]::GetFullPath($Root).TrimEnd('\', '/')
+    $resolvedPatch = [IO.Path]::GetFullPath($PatchPath)
+    if (-not [IO.Directory]::Exists($resolvedRoot)) {
+        throw "DHE patch root was not found: $resolvedRoot"
+    }
+    if (-not [IO.File]::Exists($resolvedPatch)) {
+        throw "DHE patch was not found: $resolvedPatch"
+    }
+
+    $rootParent = [IO.Path]::GetDirectoryName($resolvedRoot)
+    if ([string]::IsNullOrWhiteSpace($rootParent)) {
+        throw "DHE patch root may not be a filesystem root: $resolvedRoot"
+    }
+
+    $arguments = @("apply")
+    if ($Reverse) { $arguments += "--reverse" }
+    if ($Check) { $arguments += "--check" }
+    $arguments += @("--unsafe-paths", "--whitespace=nowarn", "-p$StripComponents", $resolvedPatch)
+
+    $oldCeiling = [Environment]::GetEnvironmentVariable("GIT_CEILING_DIRECTORIES", "Process")
+    $oldErrorActionPreference = $ErrorActionPreference
+    try {
+        # git apply works outside a repository. Prevent a copied/staged patch
+        # root from borrowing an unrelated ancestor repository and changing
+        # the path semantics of forward/reverse checks.
+        [Environment]::SetEnvironmentVariable("GIT_CEILING_DIRECTORIES", $rootParent, "Process")
+        # Windows PowerShell 5.1 promotes redirected native stderr to a
+        # terminating NativeCommandError under Stop. Non-zero is an expected
+        # result for one side of every forward/reverse probe, so preserve it as
+        # output and let callers decide from exitCode.
+        $ErrorActionPreference = "Continue"
+        $output = @(& git -C $resolvedRoot @arguments 2>&1)
+        $exitCode = [int]$LASTEXITCODE
+    } finally {
+        $ErrorActionPreference = $oldErrorActionPreference
+        [Environment]::SetEnvironmentVariable("GIT_CEILING_DIRECTORIES", $oldCeiling, "Process")
+    }
+
+    return [pscustomobject]@{
+        exitCode = $exitCode
+        output = @($output)
+    }
+}
+
 function Resolve-DheDnlibPath {
     param(
         [string]$RequestedPath = "",

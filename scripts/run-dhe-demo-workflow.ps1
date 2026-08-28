@@ -254,6 +254,8 @@ try {
             RuntimeSource = $runtimeSourcePath
             OutputRoot = $cleanCheckoutRoot
             IdentityTemplatePath = $identitySourcePath
+            ToolGitRoot = $LabRoot
+            ToolSourceBoundaryPath = (Join-Path $LabRoot "manifests/dhe-source-boundary.json")
             RequireIdentityTemplate = $true
             RequireEmbeddedPackage = $true
             ForceOutput = $true
@@ -262,6 +264,8 @@ try {
             $cleanCheckoutParameters.GitRoot = $LabRoot
             $cleanCheckoutParameters.RequireGitClean = $true
             $cleanCheckoutParameters.RequireTrackedSources = $true
+            $cleanCheckoutParameters.RequireToolGitClean = $true
+            $cleanCheckoutParameters.RequireToolTrackedSources = $true
         }
         & (Join-Path $LabRoot "scripts/run-dhe-clean-checkout-gate.ps1") @cleanCheckoutParameters
         if ($LASTEXITCODE -ne 0) { throw "DHE clean-checkout gate failed. See $cleanCheckoutRoot" }

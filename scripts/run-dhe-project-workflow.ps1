@@ -16,6 +16,8 @@ param(
     [string]$IdentityTemplatePath = "",
     [string]$GitRoot = "",
     [string]$SourceBoundaryPath = "",
+    [ValidatePattern("^[A-Za-z0-9._-]+$")]
+    [string]$Target = "StandaloneWindows64",
     [ValidateSet("Release", "Exploratory")]
     [string]$Mode = "Release",
     [switch]$RequireCompleteCoverage,
@@ -103,7 +105,7 @@ function Invoke-Adapter([string]$Action, [hashtable]$AdditionalParameters) {
         "-SettingsFile", $settingsPath,
         "-RuntimeSource", $runtimePath,
         "-OutputRoot", $outputPath,
-        "-Target", "StandaloneWindows64"
+        "-Target", $Target
     )
     foreach ($key in @($AdditionalParameters.Keys)) {
         $value = $AdditionalParameters[$key]
@@ -155,6 +157,21 @@ function Require-BooleanProperty($Object, [string]$Name, [string]$Description) {
     return [bool]$property.Value
 }
 
+function Get-AdapterFailureDetail {
+    $adapterFailurePath = Join-Path $outputPath "workflow-failure.json"
+    if (-not (Test-Path -LiteralPath $adapterFailurePath -PathType Leaf)) {
+        return "no adapter failure report was produced"
+    }
+    try {
+        $adapterFailure = Read-JsonFile $adapterFailurePath "DHE adapter failure report"
+        $detail = [string](Get-PropertyValue $adapterFailure "error")
+        if ([string]::IsNullOrWhiteSpace($detail)) { return "adapter failure report has no error detail" }
+        return $detail
+    } catch {
+        return $_.Exception.Message
+    }
+}
+
 try {
     $workflowLock = Enter-DheWorkflowLock -LabRoot $labRoot -TimeoutSeconds $WorkflowLockTimeoutSeconds
     $null = Assert-DheSafeOutputRoot -Path $outputPath -ProtectedPaths @($projectPath, $runtimePath)
@@ -179,6 +196,9 @@ try {
         Mode = $Mode
     }
     $preparePath = Join-Path $outputPath "adapter/prepare.json"
+    if ($prepareExitCode -ne 0 -and -not (Test-Path -LiteralPath $preparePath -PathType Leaf)) {
+        throw "DHE adapter Prepare action exited with code ${prepareExitCode}: $(Get-AdapterFailureDetail)"
+    }
     Require-File $preparePath "DHE adapter prepare report"
     $prepare = Read-JsonFile $preparePath "DHE adapter prepare report"
     $stages.prepare.report = $preparePath
@@ -186,7 +206,7 @@ try {
         [string](Get-PropertyValue $prepare "format") -ne "hybridclr.dhe-project-adapter-prepare.json") {
         throw "DHE adapter prepare report has an invalid schema or format."
     }
-    if ([string](Get-PropertyValue $prepare "target") -ne "StandaloneWindows64" -or
+    if ([string](Get-PropertyValue $prepare "target") -ne $Target -or
         [string](Get-PropertyValue $prepare "pathSemantics") -ne "workspace-absolute-v1") {
         throw "DHE adapter prepare report has an unsupported target or path semantics."
     }
@@ -222,6 +242,8 @@ try {
             LabRoot = $labRoot
             ProjectPath = $projectPath
             OutputRoot = $cleanCheckoutRoot
+            ToolGitRoot = $labRoot
+            ToolSourceBoundaryPath = (Join-Path $labRoot "manifests/dhe-source-boundary.json")
             ForceOutput = $true
         }
         if ($gitVerificationRequested) { $cleanCheckoutArgs.GitRoot = $gitRootPath }
@@ -230,6 +252,10 @@ try {
         }
         if ($RequireGitClean -or $Mode -eq "Release") { $cleanCheckoutArgs.RequireGitClean = $true }
         if ($trackedSourcesRequired) { $cleanCheckoutArgs.RequireTrackedSources = $true }
+        if ($Mode -eq "Release") {
+            $cleanCheckoutArgs.RequireToolGitClean = $true
+            $cleanCheckoutArgs.RequireToolTrackedSources = $true
+        }
         if (-not [string]::IsNullOrWhiteSpace($SourceBoundaryPath)) {
             $cleanCheckoutArgs.SourceBoundaryPath = [IO.Path]::GetFullPath($SourceBoundaryPath)
         }
@@ -311,7 +337,7 @@ try {
             generatedAtUtc = [DateTimeOffset]::UtcNow.ToString("O")
             passed = $true
             mode = "Preflight"
-            target = "StandaloneWindows64"
+            target = $Target
             adapterScript = $adapterPath
             projectPath = $projectPath
             sourcePreflight = $stages.sourcePreflight.report
@@ -342,14 +368,7 @@ try {
     $playerExitCode = Invoke-Adapter "Player" $playerParameters
     $workflowPath = Join-Path $outputPath "workflow-report.json"
     if ($playerExitCode -ne 0 -and -not (Test-Path -LiteralPath $workflowPath -PathType Leaf)) {
-        $adapterFailurePath = Join-Path $outputPath "workflow-failure.json"
-        $adapterFailureDetail = if (Test-Path -LiteralPath $adapterFailurePath -PathType Leaf) {
-            try {
-                $adapterFailure = Read-JsonFile $adapterFailurePath "DHE adapter failure report"
-                [string](Get-PropertyValue $adapterFailure "error")
-            } catch { $_.Exception.Message }
-        } else { "no adapter failure report was produced" }
-        throw "DHE adapter Player action exited with code ${playerExitCode}: $adapterFailureDetail"
+        throw "DHE adapter Player action exited with code ${playerExitCode}: $(Get-AdapterFailureDetail)"
     }
     Require-File $workflowPath "DHE adapter workflow report"
     $workflow = Read-JsonFile $workflowPath "DHE adapter workflow report"
@@ -360,7 +379,7 @@ try {
     if (-not $stages.player.passed) {
         throw "DHE adapter Player action did not produce a passing workflow report. See $workflowPath"
     }
-    if ([string](Get-PropertyValue $workflow "target") -ne "StandaloneWindows64" -or
+    if ([string](Get-PropertyValue $workflow "target") -ne $Target -or
         [string](Get-PropertyValue $workflow "pathSemantics") -ne "workspace-absolute-v1") {
         throw "DHE adapter workflow report has an unsupported target or path semantics."
     }
@@ -430,7 +449,7 @@ try {
         & (Join-Path $labRoot "scripts/run-dhe-release-gate.ps1") `
             -ProjectPlanValidation $projectPlanValidationPath `
             -WorkflowReport $workflowPath `
-            -Target StandaloneWindows64 `
+            -Target $Target `
             -Output $releaseGatePath | Out-Null
         $releaseExitCode = [int]$LASTEXITCODE
         Require-File $releaseGatePath "DHE release gate report"
@@ -450,7 +469,7 @@ try {
         passed = [bool]$stages.player.passed -and [bool]$stages.archive.passed -and
             ($Mode -ne "Release" -and -not $RequireCompleteCoverage -or [bool]$stages.release.passed)
         mode = $Mode
-        target = "StandaloneWindows64"
+        target = $Target
         adapterScript = $adapterPath
         projectPath = $projectPath
         sourcePreflight = $stages.sourcePreflight.report

@@ -43,6 +43,34 @@ function Get-PropertyValue($Object, [string]$Name) {
     return $property.Value
 }
 
+function Find-MachineLocalJsonPaths($Value, [string]$Location, [System.Collections.Generic.List[string]]$Findings) {
+    if ($null -eq $Value) { return }
+    if ($Value -is [string]) {
+        if ([string]$Value -match '(?i)(?:^|[^A-Z0-9])(?:[A-Z]:[\\/]|\\\\[^\\/])') {
+            $Findings.Add($Location)
+        }
+        return
+    }
+    if ($Value -is [ValueType]) { return }
+    if ($Value -is [System.Collections.IDictionary]) {
+        foreach ($key in $Value.Keys) {
+            Find-MachineLocalJsonPaths $Value[$key] "$Location.$key" $Findings
+        }
+        return
+    }
+    if ($Value -is [System.Collections.IEnumerable]) {
+        $index = 0
+        foreach ($item in $Value) {
+            Find-MachineLocalJsonPaths $item "${Location}[$index]" $Findings
+            $index++
+        }
+        return
+    }
+    foreach ($property in @($Value.PSObject.Properties)) {
+        Find-MachineLocalJsonPaths $property.Value "$Location.$($property.Name)" $Findings
+    }
+}
+
 function Resolve-ArchivePath([string]$Relative, [string]$Description) {
     if ([string]::IsNullOrWhiteSpace($Relative) -or [IO.Path]::IsPathRooted($Relative) -or
         $Relative.Replace('\', '/') -match '(^|/)\.\.(/|$)') {
@@ -176,6 +204,12 @@ try {
                 throw "Archive JSON has a non-ISO generatedAtUtc: $($jsonFile.Substring($archivePath.Length).TrimStart([char]92, [char]47))"
             }
         }
+        $machineLocalPaths = New-Object System.Collections.Generic.List[string]
+        Find-MachineLocalJsonPaths $jsonDocument '$' $machineLocalPaths
+        if ($machineLocalPaths.Count -gt 0) {
+            $relativeJsonPath = $jsonFile.Substring($archivePath.Length).TrimStart([char]92, [char]47)
+            throw "Archive JSON retains machine-local paths: $relativeJsonPath ($($machineLocalPaths -join ', '))"
+        }
     }
 
     # An archive is a portable evidence handoff, not a second workspace. The
@@ -232,6 +266,34 @@ try {
     if ([string](Get-PropertyValue $workflowArchive "pathSemantics") -ne "archive-relative-v1" -or
         ($null -ne $workflowArchive.PSObject.Properties["runtimeSource"] -and $null -ne $workflowArchive.runtimeSource)) {
         throw "Archived workflow report retains workspace path semantics."
+    }
+    $sourcePreflightArchivePath = Resolve-ArchivePath "source-preflight-report.json" "Source preflight"
+    $sourcePreflightArchive = Get-Content -Raw -LiteralPath $sourcePreflightArchivePath | ConvertFrom-Json
+    if ([string](Get-PropertyValue $sourcePreflightArchive "pathSemantics") -ne "archive-relative-v1") {
+        throw "Archived source preflight does not declare archive-relative-v1 path semantics."
+    }
+    $cleanCheckoutArchivePath = Resolve-ArchivePath "clean-checkout-gate-report.json" "Clean checkout"
+    $cleanCheckoutArchive = Get-Content -Raw -LiteralPath $cleanCheckoutArchivePath | ConvertFrom-Json
+    if ([string](Get-PropertyValue $cleanCheckoutArchive "pathSemantics") -ne "archive-relative-v1") {
+        throw "Archived clean checkout does not declare archive-relative-v1 path semantics."
+    }
+    $archiveSourceIdentities = Get-PropertyValue $archiveManifest "sourceIdentities"
+    foreach ($gitIdentityName in @("projectGit", "toolGit")) {
+        $cleanGitIdentity = Get-PropertyValue $cleanCheckoutArchive $gitIdentityName
+        $manifestGitIdentity = Get-PropertyValue $archiveSourceIdentities $gitIdentityName
+        if ([string](Get-PropertyValue $workflowArchive "mode") -eq "Release" -and
+            ($null -eq $cleanGitIdentity -or $null -eq $manifestGitIdentity)) {
+            throw "Release archive is missing $gitIdentityName source identity."
+        }
+        if (($null -eq $cleanGitIdentity) -ne ($null -eq $manifestGitIdentity)) {
+            throw "Archive manifest $gitIdentityName identity does not match clean checkout."
+        }
+        if ($null -ne $cleanGitIdentity -and (
+                [string](Get-PropertyValue $cleanGitIdentity "head") -ne [string](Get-PropertyValue $manifestGitIdentity "head") -or
+                [string](Get-PropertyValue $cleanGitIdentity "tree") -ne [string](Get-PropertyValue $manifestGitIdentity "tree") -or
+                [string](Get-PropertyValue $cleanGitIdentity "sourceBoundarySha256") -ne [string](Get-PropertyValue $manifestGitIdentity "sourceBoundarySha256"))) {
+            throw "Archive manifest $gitIdentityName identity does not match clean checkout."
+        }
     }
 
     $archiveAssemblies = @($archiveManifest.assemblies)
