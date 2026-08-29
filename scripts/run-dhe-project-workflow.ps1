@@ -60,7 +60,8 @@ $archivePath = if ([string]::IsNullOrWhiteSpace($ArchiveRoot)) {
     [IO.Path]::GetFullPath($ArchiveRoot)
 }
 $gitVerificationRequested = $Mode -eq "Release" -or [bool]$RequireGitClean -or
-    [bool]$RequireTrackedSources -or -not [string]::IsNullOrWhiteSpace($GitRoot)
+    [bool]$RequireTrackedSources -or -not [string]::IsNullOrWhiteSpace($GitRoot) -or
+    $ProjectVcs -ne "Auto"
 $coverageRequired = $Mode -eq "Release" -or [bool]$RequireCompleteCoverage
 $baselineRequired = $Mode -eq "Release"
 $trackedSourcesRequired = $Mode -eq "Release" -or [bool]$RequireTrackedSources

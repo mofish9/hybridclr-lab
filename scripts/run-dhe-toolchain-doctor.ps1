@@ -74,7 +74,7 @@ if ($projectTested) {
         if ($LASTEXITCODE -eq 0 -and -not [string]::IsNullOrWhiteSpace(($gitRootOutput -join "").Trim())) {
             $projectGitRoot = [IO.Path]::GetFullPath(($gitRootOutput -join "").Trim())
         } else {
-            $warnings.Add("Project is not currently inside a Git repository; Release mode will reject it.")
+            $warnings.Add("Project is not inside a Git repository; use -ProjectVcs Svn for an SVN project or let the workflow auto-detect its VCS.")
         }
     }
 }

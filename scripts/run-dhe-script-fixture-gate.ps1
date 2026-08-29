@@ -180,6 +180,7 @@ $global:LASTEXITCODE = 0
 $prePrepareGateTested = -not [bool]$WorkflowLockAlreadyHeld
 $invalidRuntimeRejectedBeforeAdapter = $null
 $adapterTargetParameterValidated = $null
+$explicitProjectVcsValidated = $null
 if ($prePrepareGateTested) {
     $prepareFailureRoot = Join-Path $OutputRoot "adapter-prepare-failure"
     $prepareFailureExit = Invoke-ExpectedFailure @(
@@ -219,6 +220,29 @@ if ($prePrepareGateTested) {
     $adapterTargetParameterValidated = $directAdapterExit -ne 0 -and $null -ne $directAdapterFailure -and
         [string]$directAdapterFailure.error -eq "fixture-prepare-root-cause:FixtureTarget"
     Require $adapterTargetParameterValidated "Adapter contract did not preserve its opaque target parameter."
+
+    # An explicit VCS selection must activate the project identity check even
+    # when the caller does not separately provide -GitRoot. Otherwise
+    # -ProjectVcs Svn would be silently ignored in exploratory preflight.
+    $explicitVcsRoot = Join-Path $OutputRoot "explicit-project-vcs"
+    $explicitVcsExit = Invoke-ExpectedFailure @(
+        (Join-Path $LabRoot "scripts/run-dhe-project-workflow.ps1"),
+        "-AdapterScript", (Join-Path $fixtures "dhe-project-adapter-failure-fixture.ps1"),
+        "-ProjectPath", (Join-Path $LabRoot "unity2021-dhe-demo"),
+        "-SettingsFile", (Join-Path $LabRoot "unity2021-dhe-demo/ProjectSettings/HybridCLRSettings.asset"),
+        "-RuntimeSource", (Join-Path $LabRoot "unity2021-dhe-demo"),
+        "-OutputRoot", $explicitVcsRoot,
+        "-ProjectVcs", "Svn",
+        "-Mode", "Exploratory",
+        "-ForceOutput"
+    )
+    $explicitVcsFailurePath = Join-Path $explicitVcsRoot "project-workflow-failure.json"
+    $explicitVcsFailure = if (Test-Path -LiteralPath $explicitVcsFailurePath -PathType Leaf) {
+        Get-Content -Raw -LiteralPath $explicitVcsFailurePath | ConvertFrom-Json
+    } else { $null }
+    $explicitProjectVcsValidated = $explicitVcsExit -ne 0 -and $null -ne $explicitVcsFailure -and
+        [string]$explicitVcsFailure.error -like "*project SVN source root is not a working copy*"
+    Require $explicitProjectVcsValidated "Explicit ProjectVcs selection did not activate project VCS verification."
 }
 $global:LASTEXITCODE = 0
 
@@ -1163,6 +1187,7 @@ $report = [ordered]@{
     prePrepareGateTested = $prePrepareGateTested
     invalidRuntimeRejectedBeforeAdapter = $invalidRuntimeRejectedBeforeAdapter
     adapterTargetParameterValidated = $adapterTargetParameterValidated
+    explicitProjectVcsValidated = $explicitProjectVcsValidated
     adapterContractMismatchRejected = $adapterContractMismatchRejected
     schemaDuplicatePropertyRejected = $schemaDuplicatePropertyRejected
     customSchemaUnregisteredRejected = $customSchemaUnregisteredRejected
