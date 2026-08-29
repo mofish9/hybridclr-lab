@@ -11,22 +11,22 @@
     "hybridclr_unity": {
       "upstream": "https://github.com/focus-creative-games/hybridclr_unity.git",
       "fork": "https://github.com/mofish9/hybridclr_unity.git",
-      "tag": "v8.13.0",
-      "commit": "29aaaba58a44f0c0446e113807847f3ffa6fc8f9",
+      "tag": "optimize/v8.13.0",
+      "commit": "fc00c1caeb253f9b712bf6dbe38f6fcd660ef300",
       "localBranch": "optimize/v8.13.0"
     },
     "hybridclr": {
       "upstream": "https://github.com/focus-creative-games/hybridclr.git",
       "fork": "https://github.com/mofish9/hybridclr.git",
-      "tag": "v8.13.0",
-      "commit": "ae21c37ee25992c4c62c77acffaf74b59f4461a3",
+      "tag": "v8.13.0-opt4",
+      "commit": "9e4fc7219724a3c63ff845e0b2acaa7d10c2430b",
       "localBranch": "optimize/v8.13.0"
     },
     "il2cpp_plus": {
       "upstream": "https://github.com/focus-creative-games/il2cpp_plus.git",
       "fork": "https://github.com/mofish9/il2cpp_plus.git",
-      "tag": "v2022-tuanjie-8.13.0",
-      "commit": "68fbca2345d6c781c3f3d7ea2495942617cde277",
+      "tag": "v2022-tuanjie-8.13.0-opt3",
+      "commit": "82162cb681f1564807d2ab5e7f3a9312271d0a73",
       "localBranch": "optimize/tuanjie-1.10-v8.13.0"
     }
   },

@@ -9,10 +9,21 @@
     "schemaVersion": { "const": 1 },
     "format": { "const": "hybridclr.dhe-package-lock.json" },
     "repository": { "const": "hybridclr_unity" },
+    "sourceMode": { "enum": ["overlay", "integrated"] },
     "baseCommit": { "type": "string", "pattern": "^[0-9a-f]{40}$" },
+    "integratedCommit": { "type": "string", "pattern": "^[0-9a-f]{40}$" },
     "pathBase": { "const": "project-root-v1" },
     "packagePath": { "const": "Packages/com.code-philosophy.hybridclr" },
     "treeSha256": { "type": "string", "pattern": "^[0-9A-Fa-f]{64}$" },
     "patches": { "type": "array", "minItems": 1, "items": { "type": "string", "minLength": 1 } }
-  }
+  },
+  "allOf": [
+    {
+      "if": {
+        "required": ["sourceMode"],
+        "properties": { "sourceMode": { "const": "integrated" } }
+      },
+      "then": { "required": ["integratedCommit"] }
+    }
+  ]
 }

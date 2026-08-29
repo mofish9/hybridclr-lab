@@ -259,8 +259,12 @@ try {
 
 if ($null -ne $runtimeLock) {
     $runtimeLockErrors = New-Object System.Collections.Generic.List[string]
+    $runtimeSourceMode = if ($null -ne $runtimeLock.PSObject.Properties["sourceMode"]) {
+        [string](Get-StaticProperty $runtimeLock "sourceMode")
+    } else { "overlay" }
     if ([int](Get-StaticProperty $runtimeLock "schemaVersion") -ne 1 -or
-        [string](Get-StaticProperty $runtimeLock "format") -ne "hybridclr.dhe-runtime-lock.json") {
+        [string](Get-StaticProperty $runtimeLock "format") -ne "hybridclr.dhe-runtime-lock.json" -or
+        $runtimeSourceMode -notin @("overlay", "integrated")) {
         $runtimeLockErrors.Add("invalid schemaVersion or format")
     }
     $runtimePatchProperty = $runtimeLock.PSObject.Properties["patches"]
@@ -279,12 +283,23 @@ if ($null -ne $runtimeLock) {
             $entryApplyRoot = [string](Get-StaticProperty $entry "applyRoot")
             $entryBaseCommit = [string](Get-StaticProperty $entry "baseCommit")
             $entryHash = [string](Get-StaticProperty $entry "sha256")
+            $entrySourceMode = if ($null -ne $entry.PSObject.Properties["sourceMode"]) {
+                [string](Get-StaticProperty $entry "sourceMode")
+            } else { $runtimeSourceMode }
+            $integratedCommit = if ($null -ne $entry.PSObject.Properties["integratedCommit"]) {
+                [string](Get-StaticProperty $entry "integratedCommit")
+            } else { "" }
+            $expectedTreeSha256 = if ($null -ne $entry.PSObject.Properties["expectedTreeSha256"]) {
+                [string](Get-StaticProperty $entry "expectedTreeSha256")
+            } else { "" }
             $entryStrip = $null
             if ($null -ne $entry.PSObject.Properties["stripComponents"]) {
                 try { $entryStrip = [int]$entry.stripComponents } catch { }
             }
             if ([string]::IsNullOrWhiteSpace($entryId) -or
                 [string]::IsNullOrWhiteSpace($entryRepository) -or
+                $entrySourceMode -notin @("overlay", "integrated") -or
+                $entrySourceMode -ne $runtimeSourceMode -or
                 [string]::IsNullOrWhiteSpace($entryPath) -or
                 $entryBaseCommit -notmatch '^[0-9a-fA-F]{40}$' -or
                 $entryHash -notmatch '^[0-9a-fA-F]{64}$' -or
@@ -293,6 +308,11 @@ if ($null -ne $runtimeLock) {
                 $entryPath.Replace('\', '/') -match '(^|/)\.\.(/|$)' -or
                 [IO.Path]::IsPathRooted($entryPath)) {
                 $runtimeLockErrors.Add("invalid patch entry '$entryId'")
+            }
+            if ($runtimeSourceMode -eq "integrated" -and
+                ($integratedCommit -notmatch '^[0-9a-fA-F]{40}$' -or
+                 $expectedTreeSha256 -notmatch '^[0-9a-fA-F]{64}$')) {
+                $runtimeLockErrors.Add("integrated entry '$entryId' must lock integratedCommit and expectedTreeSha256")
             }
             $expectedRepository = if ($entryApplyRoot -eq "package") { "hybridclr_unity" } else { "" }
             if ($entryApplyRoot -eq "libil2cpp" -and $entryRepository -notin @("hybridclr", "il2cpp_plus")) {
@@ -303,7 +323,7 @@ if ($null -ne $runtimeLock) {
         }
     }
     $runtimeLockShapeDetail = if ($runtimeLockErrors.Count -eq 0) {
-        "schemaVersion=1; patch entries are structurally valid"
+        "schemaVersion=1; sourceMode=$runtimeSourceMode; patch entries are structurally valid"
     } else {
         $runtimeLockErrors -join ", "
     }
@@ -331,6 +351,12 @@ if ($null -ne $runtimeLock) {
 
 if ($null -ne $packageLock) {
     $packageLockErrors = New-Object System.Collections.Generic.List[string]
+    $packageSourceMode = if ($null -ne $packageLock.PSObject.Properties["sourceMode"]) {
+        [string](Get-StaticProperty $packageLock "sourceMode")
+    } else { "overlay" }
+    $packageIntegratedCommit = if ($null -ne $packageLock.PSObject.Properties["integratedCommit"]) {
+        [string](Get-StaticProperty $packageLock "integratedCommit")
+    } else { "" }
     $packagePathValue = [string](Get-StaticProperty $packageLock "packagePath")
     $packagePathBase = [string](Get-StaticProperty $packageLock "pathBase")
     if ([int](Get-StaticProperty $packageLock "schemaVersion") -ne 1 -or
@@ -338,6 +364,8 @@ if ($null -ne $packageLock) {
         [string](Get-StaticProperty $packageLock "repository") -ne "hybridclr_unity" -or
         [string](Get-StaticProperty $packageLock "baseCommit") -notmatch '^[0-9a-fA-F]{40}$' -or
         [string](Get-StaticProperty $packageLock "treeSha256") -notmatch '^[0-9a-fA-F]{64}$' -or
+        $packageSourceMode -notin @("overlay", "integrated") -or
+        ($packageSourceMode -eq "integrated" -and $packageIntegratedCommit -notmatch '^[0-9a-fA-F]{40}$') -or
         $packagePathBase -ne "project-root-v1" -or
         [string]::IsNullOrWhiteSpace($packagePathValue) -or
         [IO.Path]::IsPathRooted($packagePathValue) -or
@@ -351,6 +379,10 @@ if ($null -ne $packageLock) {
     }
     if ($null -ne $runtimeLock -and $null -ne $runtimeLock.PSObject.Properties["patches"] -and
         $null -ne $packagePatchProperty) {
+        $runtimeModeForPackage = if ($null -ne $runtimeLock.PSObject.Properties["sourceMode"]) { [string]$runtimeLock.sourceMode } else { "overlay" }
+        if ($runtimeModeForPackage -ne $packageSourceMode) {
+            $packageLockErrors.Add("runtime and package locks use different sourceMode values")
+        }
         $runtimePackageIds = @($runtimePatches | Where-Object { [string](Get-StaticProperty $_ "applyRoot") -eq "package" } |
             ForEach-Object { [string](Get-StaticProperty $_ "id") } | Sort-Object)
         $lockedPackageIds = @($packagePatches | ForEach-Object { [string]$_ } | Sort-Object)

@@ -238,23 +238,40 @@ $packageLock = if ($packageLockAvailable) {
 }
 $runtimeLock = Read-Json $runtimeLockPath "DHE runtime lock"
 if ($null -ne $runtimeLock) {
+    $runtimeSourceMode = if ($null -ne $runtimeLock.PSObject.Properties["sourceMode"]) {
+        [string]$runtimeLock.sourceMode
+    } else { "overlay" }
     if ([int]$runtimeLock.schemaVersion -ne 1 -or
         [string]$runtimeLock.format -ne "hybridclr.dhe-runtime-lock.json" -or
+        $runtimeSourceMode -notin @("overlay", "integrated") -or
         @($runtimeLock.patches).Count -eq 0) {
         Add-ErrorCheck "runtime-lock:schema" "DHE runtime lock has an invalid schema or empty patch set."
     } else {
-        Add-Check "runtime-lock:schema" $true "schemaVersion=1; patches=$(@($runtimeLock.patches).Count)"
+        $modeMismatches = @($runtimeLock.patches | Where-Object {
+            $entryMode = if ($null -ne $_.PSObject.Properties["sourceMode"]) { [string]$_.sourceMode } else { $runtimeSourceMode }
+            $entryMode -ne $runtimeSourceMode
+        })
+        if ($modeMismatches.Count -gt 0) {
+            Add-ErrorCheck "runtime-lock:schema" "DHE runtime lock mixes overlay and integrated patch entries."
+        } else {
+            Add-Check "runtime-lock:schema" $true "schemaVersion=1; sourceMode=$runtimeSourceMode; patches=$(@($runtimeLock.patches).Count)"
+        }
     }
 }
 if ($null -ne $packageLock) {
+    $packageSourceMode = if ($null -ne $packageLock.PSObject.Properties["sourceMode"]) {
+        [string]$packageLock.sourceMode
+    } else { "overlay" }
     if ([int]$packageLock.schemaVersion -ne 1 -or
         [string]$packageLock.format -ne "hybridclr.dhe-package-lock.json" -or
         [string]$packageLock.repository -ne "hybridclr_unity" -or
         [string]$packageLock.baseCommit -notmatch '^[0-9a-f]{40}$' -or
-        [string]$packageLock.pathBase -ne "project-root-v1") {
+        [string]$packageLock.pathBase -ne "project-root-v1" -or
+        $packageSourceMode -notin @("overlay", "integrated") -or
+        ($packageSourceMode -eq "integrated" -and [string]$packageLock.integratedCommit -notmatch '^[0-9a-fA-F]{40}$')) {
         Add-ErrorCheck "package-lock:schema" "DHE package lock has an invalid schema, repository identity, or path base."
     } else {
-        Add-Check "package-lock:schema" $true "schemaVersion=1; pathBase=project-root-v1; baseCommit=$($packageLock.baseCommit)"
+        Add-Check "package-lock:schema" $true "schemaVersion=1; sourceMode=$packageSourceMode; pathBase=project-root-v1; baseCommit=$($packageLock.baseCommit)"
     }
     if ($embeddedPackagePresent) {
         $packagePathProperty = $packageLock.PSObject.Properties["packagePath"]
@@ -276,6 +293,13 @@ if ($null -ne $packageLock) {
 }
 
 if ($null -ne $runtimeLock -and $null -ne $packageLock) {
+    $runtimeSourceMode = if ($null -ne $runtimeLock.PSObject.Properties["sourceMode"]) { [string]$runtimeLock.sourceMode } else { "overlay" }
+    $packageSourceMode = if ($null -ne $packageLock.PSObject.Properties["sourceMode"]) { [string]$packageLock.sourceMode } else { "overlay" }
+    if ($runtimeSourceMode -ne $packageSourceMode) {
+        Add-ErrorCheck "locks:source-mode" "Runtime and package locks must use the same sourceMode."
+    } else {
+        Add-Check "locks:source-mode" $true "sourceMode=$runtimeSourceMode"
+    }
     $runtimePackageIds = @($runtimeLock.patches |
         Where-Object { [string]$_.applyRoot -eq "package" } |
         ForEach-Object { [string]$_.id } | Sort-Object)
@@ -483,6 +507,18 @@ if (-not [string]::IsNullOrWhiteSpace($RuntimeSource)) {
         } else {
             Add-Check "runtime:lock" $true $lockHash
         }
+        $manifestSourceMode = if ($null -ne $runtimeManifest.PSObject.Properties["dheRuntimeSourceMode"]) {
+            [string]$runtimeManifest.dheRuntimeSourceMode
+        } else { "overlay" }
+        $lockedSourceMode = if ($null -ne $runtimeLock.PSObject.Properties["sourceMode"]) {
+            [string]$runtimeLock.sourceMode
+        } else { "overlay" }
+        if ($manifestSourceMode -ne $lockedSourceMode) {
+            Add-ErrorCheck "runtime:source-mode" "Runtime manifest source mode '$manifestSourceMode' does not match the locked mode '$lockedSourceMode'."
+            $runtimeReady = $false
+        } else {
+            Add-Check "runtime:source-mode" $true "sourceMode=$lockedSourceMode"
+        }
 
         $externalHeadersMetadataValid = $null -ne $runtimeManifest.PSObject.Properties["externalHeaders"] -and
             $null -ne $runtimeManifest.externalHeaders -and
@@ -607,6 +643,29 @@ if (-not [string]::IsNullOrWhiteSpace($RuntimeSource)) {
                     $runtimeReady = $false
                 } else {
                     Add-Check "runtime:source-$sourceName" $true ("commit={0}; dirty={1}" -f $actualCommit, $actualDirty)
+                }
+                if ($lockedSourceMode -eq "integrated") {
+                    $integratedEntries = @($runtimeLock.patches | Where-Object {
+                        [string]$_.repository -eq $sourceName
+                    })
+                    foreach ($integratedEntry in $integratedEntries) {
+                        $integratedCommit = if ($null -ne $integratedEntry.PSObject.Properties["integratedCommit"]) {
+                            [string]$integratedEntry.integratedCommit
+                        } else { "" }
+                        $expectedTree = if ($null -ne $integratedEntry.PSObject.Properties["expectedTreeSha256"]) {
+                            [string]$integratedEntry.expectedTreeSha256
+                        } else { "" }
+                        $manifestTree = if ($null -ne $sourceValue.PSObject.Properties["treeSha256"]) {
+                            [string]$sourceValue.treeSha256
+                        } else { "" }
+                        if (-not $actualCommit.Equals($integratedCommit, [StringComparison]::OrdinalIgnoreCase) -or
+                            -not $manifestTree.Equals($expectedTree, [StringComparison]::OrdinalIgnoreCase)) {
+                            Add-ErrorCheck "runtime:integrated-$($integratedEntry.id)" "Integrated DHE source provenance does not match the locked commit/tree hash."
+                            $runtimeReady = $false
+                        } else {
+                            Add-Check "runtime:integrated-$($integratedEntry.id)" $true ("commit={0}; tree={1}" -f $actualCommit, $manifestTree)
+                        }
+                    }
                 }
             }
             $workflowExternalHashProperty = $workflowEntry.PSObject.Properties["externalHeadersTreeSha256"]

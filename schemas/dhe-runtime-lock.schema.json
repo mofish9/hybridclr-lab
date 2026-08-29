@@ -8,6 +8,7 @@
   "properties": {
     "schemaVersion": { "const": 1 },
     "format": { "const": "hybridclr.dhe-runtime-lock.json" },
+    "sourceMode": { "enum": ["overlay", "integrated"] },
     "patches": {
       "type": "array",
       "minItems": 1,
@@ -18,13 +19,33 @@
         "properties": {
           "id": { "type": "string", "minLength": 1 },
           "repository": { "enum": ["hybridclr", "hybridclr_unity", "il2cpp_plus"] },
+          "sourceMode": { "enum": ["overlay", "integrated"] },
           "baseCommit": { "type": "string", "pattern": "^[0-9a-f]{40}$" },
           "path": { "type": "string", "minLength": 1 },
           "sha256": { "type": "string", "pattern": "^[0-9A-Fa-f]{64}$" },
           "applyRoot": { "enum": ["libil2cpp", "package"] },
-          "stripComponents": { "type": "integer", "minimum": 0, "maximum": 8 }
+          "stripComponents": { "type": "integer", "minimum": 0, "maximum": 8 },
+          "integratedCommit": { "type": "string", "pattern": "^[0-9a-f]{40}$" },
+          "expectedTreeSha256": { "type": "string", "pattern": "^[0-9A-Fa-f]{64}$" }
         }
       }
     }
-  }
+  },
+  "allOf": [
+    {
+      "if": {
+        "required": ["sourceMode"],
+        "properties": { "sourceMode": { "const": "integrated" } }
+      },
+      "then": {
+        "properties": {
+          "patches": {
+            "items": {
+              "required": ["sourceMode", "integratedCommit", "expectedTreeSha256"]
+            }
+          }
+        }
+      }
+    }
+  ]
 }

@@ -1,6 +1,6 @@
 param(
     [string]$LabRoot = "",
-    [ValidateSet("Baseline-Clean", "DHE-Tuanjie2022", "Baseline-Instrumented", "Candidate", "Metadata-Candidate", "Metadata-Tuanjie2022", "Metadata-Instrumented", "Metadata-Unity2021", "Metadata-Unity2022", "Fgs-Diagnostic", "Fgs-Candidate", "Unity2022-Candidate", "Unity2022-Fgs-Diagnostic", "Compatibility-Tuanjie2022-Fgs", "Compatibility-Unity2022-Fgs", "Compatibility-Unity2021-Standard")]
+    [ValidateSet("Baseline-Clean", "DHE-Tuanjie2022", "DHE-Unity2022", "DHE-Unity2021", "Baseline-Instrumented", "Candidate", "Metadata-Candidate", "Metadata-Tuanjie2022", "Metadata-Instrumented", "Metadata-Unity2021", "Metadata-Unity2022", "Fgs-Diagnostic", "Fgs-Candidate", "Unity2022-Candidate", "Unity2022-Fgs-Diagnostic", "Compatibility-Tuanjie2022-Fgs", "Compatibility-Unity2022-Fgs", "Compatibility-Unity2021-Standard")]
     [string]$Profile = "Baseline-Clean",
     [string]$Configuration = "Release",
     [string]$Generator = "Visual Studio 17 2022",
@@ -72,7 +72,7 @@ if (-not (Test-Path (Join-Path $runtimeRoot "hybridclr/metadata/Opcodes.cpp"))) 
 }
 $dheRuntimeCpp = Join-Path $runtimeRoot "hybridclr/DheRuntime.cpp"
 $dheRuntimeHeader = Join-Path $runtimeRoot "hybridclr/DheRuntime.h"
-$dheExpected = $Profile -eq "DHE-Tuanjie2022"
+$dheExpected = $Profile -in @("DHE-Tuanjie2022", "DHE-Unity2022", "DHE-Unity2021")
 if ($dheExpected -and (-not (Test-Path -LiteralPath $dheRuntimeCpp -PathType Leaf) -or
         -not (Test-Path -LiteralPath $dheRuntimeHeader -PathType Leaf))) {
     throw "DHE profile '$Profile' requires both hybridclr/DheRuntime.cpp and hybridclr/DheRuntime.h: $runtimeRoot"

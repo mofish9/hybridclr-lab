@@ -1,6 +1,6 @@
 param(
     [string]$LabRoot = "",
-    [ValidateSet("DHE-Tuanjie2022")]
+    [ValidateSet("DHE-Tuanjie2022", "DHE-Unity2022", "DHE-Unity2021")]
     [string]$Profile = "DHE-Tuanjie2022",
     [string]$OutputRoot = "",
     [switch]$AllowSurrogateExternalHeaders,

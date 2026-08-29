@@ -6,16 +6,18 @@ HybridCLR community runtime on Tuanjie 1.10.0.
 ## Fixed baseline
 
 - Tuanjie: `1.10.0` (`2022.3.62t12`)
-- HybridCLR package: `v8.13.0`
-- HybridCLR runtime: `v8.13.0`
-- il2cpp_plus: `v2022-tuanjie-8.13.0`
+- HybridCLR package: `v8.13.0` (`optimize/v8.13.0`, DHE opt4 commit)
+- HybridCLR runtime: `v8.13.0-opt4`
+- il2cpp_plus: `v2022-tuanjie-8.13.0-opt3`
 
 The runtime source repositories live beside this repository under `../repos`.
 Their immutable inputs are recorded in `manifests/repo-lock.json`.
 
 ## Current phase
 
-The DHE-lite workflow is maintained as a separate, explicit validation lane.
+The DHE-lite workflow is maintained as a separate, explicit validation lane;
+the integrated opt4 source line is documented in
+`docs/HybridCLR-DHE-Opt4-Integrated-Design.md`.
 Its formal entry points, generated-output boundary, and complete four-assembly
 Player evidence are documented in
 `docs/HybridCLR-DHE-Toolchain.md`,
@@ -31,7 +33,8 @@ and tracked project and tool source identities (each bound to its Git commit,
 HEAD tree, and source-boundary hash), clean locked runtime sources, and matching
 non-surrogate engine headers.
 The embedded package is locked by `manifests/dhe-package-lock.json`; the workflow
-checks its full tree hash and requires both package patches to already be applied.
+checks its full tree hash and, in opt4 integrated mode, verifies the package
+commit without applying the historical patch files.
 `assemble-runtime.ps1 -Profile DHE-Tuanjie2022` requires an explicit
 `-PackageRoot`; a native-only runtime manifest cannot be mistaken for a
 publishable DHE runtime.
@@ -67,7 +70,7 @@ locked runtime (the `-ReposRoot` path may point at a new checkout), then run the
 Demo through the reusable project orchestrator:
 
 ```powershell
-./scripts/assemble-runtime.ps1 -Profile DHE-Tuanjie2022 -EngineWorkflow Tuanjie2022Fgs -ReposRoot ../dhe-locked-repos -PackageRoot ./unity2021-dhe-demo/Packages/com.code-philosophy.hybridclr
+./scripts/assemble-runtime.ps1 -Profile DHE-Tuanjie2022 -EngineWorkflow Tuanjie2022Fgs -ReposRoot ../repos -PackageRoot ./unity2021-dhe-demo/Packages/com.code-philosophy.hybridclr
 ./scripts/run-dhe-native-gate.ps1 `
   -Profile DHE-Tuanjie2022 `
   -OutputRoot ./artifacts/dhe-native-gate `

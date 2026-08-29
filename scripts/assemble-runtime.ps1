@@ -1,5 +1,5 @@
 param(
-    [ValidateSet("Baseline-Clean", "DHE-Tuanjie2022", "Baseline-Instrumented", "Candidate", "Metadata-Candidate", "Metadata-Tuanjie2022", "Metadata-Instrumented", "Metadata-Unity2021", "Metadata-Unity2022", "Fgs-Diagnostic", "Fgs-Candidate", "Unity2022-Candidate", "Unity2022-Fgs-Diagnostic", "Compatibility-Tuanjie2022-Fgs", "Compatibility-Unity2022-Fgs", "Compatibility-Unity2021-Standard")]
+    [ValidateSet("Baseline-Clean", "DHE-Tuanjie2022", "DHE-Unity2022", "DHE-Unity2021", "Baseline-Instrumented", "Candidate", "Metadata-Candidate", "Metadata-Tuanjie2022", "Metadata-Instrumented", "Metadata-Unity2021", "Metadata-Unity2022", "Fgs-Diagnostic", "Fgs-Candidate", "Unity2022-Candidate", "Unity2022-Fgs-Diagnostic", "Compatibility-Tuanjie2022-Fgs", "Compatibility-Unity2022-Fgs", "Compatibility-Unity2021-Standard")]
     [string]$Profile = "Baseline-Clean",
     [ValidateSet("Tuanjie2022Fgs", "Unity2022Fgs", "Unity2021Standard")]
     [string]$EngineWorkflow = "Tuanjie2022Fgs",
@@ -61,14 +61,19 @@ $stagingPath = Join-Path $outputRootPath $Profile
 $stagedLibil2cpp = Join-Path $stagingPath "libil2cpp"
 $stagedExternal = Join-Path $stagingPath "external"
 
-$dheEnabled = $Profile -eq "DHE-Tuanjie2022"
-if ($dheEnabled -and $EngineWorkflow -ne "Tuanjie2022Fgs") {
-    throw "Profile '$Profile' currently supports only the Tuanjie2022Fgs engine workflow; got '$EngineWorkflow'."
+$dheEnabled = $Profile -in @("DHE-Tuanjie2022", "DHE-Unity2022", "DHE-Unity2021")
+$expectedDheWorkflow = @{
+    "DHE-Tuanjie2022" = "Tuanjie2022Fgs"
+    "DHE-Unity2022" = "Unity2022Fgs"
+    "DHE-Unity2021" = "Unity2021Standard"
+}
+if ($dheEnabled -and $expectedDheWorkflow[$Profile] -ne $EngineWorkflow) {
+    throw "Profile '$Profile' requires engine workflow '$($expectedDheWorkflow[$Profile])'; got '$EngineWorkflow'."
 }
 if ($dheEnabled -and $AllowDirty) {
     throw "Profile '$Profile' is a publishable DHE runtime and cannot be assembled with -AllowDirty. Use a diagnostic/non-DHE profile for dirty source experiments."
 }
-$noCheckout = $Profile -notin @("Baseline-Clean", "DHE-Tuanjie2022")
+$noCheckout = $Profile -notin @("Baseline-Clean", "DHE-Tuanjie2022", "DHE-Unity2022", "DHE-Unity2021")
 $bootstrapNoCheckout = $noCheckout -or
     -not [string]::IsNullOrWhiteSpace($HybridClrSource) -or
     -not [string]::IsNullOrWhiteSpace($Il2CppPlusSource)
@@ -104,7 +109,9 @@ foreach ($item in @(@("hybridclr", $hybridclrPath, $hybridclrSpec.commit), @("il
     $path = $item[1]
     $expected = $item[2]
     $actual = (Invoke-Git $path @("rev-parse", "HEAD")).Trim()
-    if (-not $noCheckout -and $actual -ne $expected) { throw "$name is at $actual, expected $expected" }
+    $sourceWasExplicit = ($name -eq "hybridclr" -and -not [string]::IsNullOrWhiteSpace($HybridClrSource)) -or
+        ($name -eq "il2cpp_plus" -and -not [string]::IsNullOrWhiteSpace($Il2CppPlusSource))
+    if (-not $noCheckout -and -not $sourceWasExplicit -and $actual -ne $expected) { throw "$name is at $actual, expected $expected" }
     $dirty = @(Get-MeaningfulGitStatus @(Invoke-Git $path @("status", "--porcelain"))).Count -gt 0
     if ($dirty -and -not $AllowDirty) { throw "$name is dirty; pass -AllowDirty only for an explicit local profile." }
 }
@@ -206,17 +213,29 @@ $manifest = [ordered]@{
     source = [ordered]@{
         hybridclr = [ordered]@{ url = $hybridclrSpec.fork; path = $hybridclrPath; commit = (Invoke-Git $hybridclrPath @("rev-parse", "HEAD")).Trim(); dirty = (@(Get-MeaningfulGitStatus @(Invoke-Git $hybridclrPath @("status", "--porcelain"))).Count -gt 0); treeSha256 = (Get-TreeHash (Join-Path $hybridclrPath "hybridclr")) }
         il2cpp_plus = [ordered]@{ url = $il2cppSpec.fork; path = $il2cppPath; commit = (Invoke-Git $il2cppPath @("rev-parse", "HEAD")).Trim(); dirty = (@(Get-MeaningfulGitStatus @(Invoke-Git $il2cppPath @("status", "--porcelain"))).Count -gt 0); treeSha256 = (Get-TreeHash (Join-Path $il2cppPath "libil2cpp")) }
-        hybridclr_unity = [ordered]@{ url = $lock.repositories.hybridclr_unity.fork; path = (Join-Path $reposRoot "hybridclr_unity"); commit = (Invoke-Git (Join-Path $reposRoot "hybridclr_unity") @("rev-parse", "HEAD")).Trim(); dirty = (@(Get-MeaningfulGitStatus @(Invoke-Git (Join-Path $reposRoot "hybridclr_unity") @("status", "--porcelain"))).Count -gt 0) }
+        hybridclr_unity = [ordered]@{ url = $lock.repositories.hybridclr_unity.fork; path = (Join-Path $reposRoot "hybridclr_unity"); commit = (Invoke-Git (Join-Path $reposRoot "hybridclr_unity") @("rev-parse", "HEAD")).Trim(); dirty = (@(Get-MeaningfulGitStatus @(Invoke-Git (Join-Path $reposRoot "hybridclr_unity") @("status", "--porcelain"))).Count -gt 0); treeSha256 = (Get-TreeHashExcludingGit (Join-Path $reposRoot "hybridclr_unity")) }
     }
     stagedLibil2cpp = $stagedLibil2cpp
     stagedRuntimeSha256 = $runtimeHash
     dheRuntimeLock = Join-Path $LabRoot "manifests/dhe-runtime-lock.json"
     dheRuntimeLockSha256 = $dheRuntimeLockHash
+    dheRuntimeSourceMode = if ($null -ne $dheRuntimeLock.PSObject.Properties["sourceMode"]) {
+        [string]$dheRuntimeLock.sourceMode
+    } else { "overlay" }
     dhePatches = @($dheRuntimeLock.patches | ForEach-Object {
         [ordered]@{
             id = [string]$_.id
             repository = [string]$_.repository
+            sourceMode = if ($null -ne $_.PSObject.Properties["sourceMode"]) {
+                [string]$_.sourceMode
+            } else { "overlay" }
             baseCommit = [string]$_.baseCommit
+            integratedCommit = if ($null -ne $_.PSObject.Properties["integratedCommit"]) {
+                [string]$_.integratedCommit
+            } else { $null }
+            expectedTreeSha256 = if ($null -ne $_.PSObject.Properties["expectedTreeSha256"]) {
+                [string]$_.expectedTreeSha256
+            } else { $null }
             path = [string]$_.path
             sha256 = [string]$_.sha256
             applyRoot = [string]$_.applyRoot
