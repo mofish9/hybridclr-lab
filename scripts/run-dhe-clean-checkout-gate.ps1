@@ -13,6 +13,7 @@ param(
     [string]$GitRoot = "",
     [string]$ToolGitRoot = "",
     [string]$ToolSourceBoundaryPath = "",
+    [string]$ToolPackageManifestPath = "",
     [switch]$RequireIdentityTemplate,
     [switch]$RequireEmbeddedPackage,
     [switch]$RequireTrackedSources,
@@ -546,7 +547,58 @@ if ($gitTested) {
 
 $toolGitTested = $RequireToolGitClean -or $RequireToolTrackedSources -or -not [string]::IsNullOrWhiteSpace($ToolGitRoot)
 $toolGit = $null
-if ($toolGitTested) {
+if (-not [string]::IsNullOrWhiteSpace($ToolPackageManifestPath)) {
+    $toolPackageManifestPathResolved = [IO.Path]::GetFullPath($ToolPackageManifestPath)
+    if (-not (Test-Path -LiteralPath $toolPackageManifestPathResolved -PathType Leaf)) {
+        $errors.Add("Installed toolchain package manifest was not found: $toolPackageManifestPathResolved")
+    } else {
+        try {
+            $toolPackageManifest = Get-Content -Raw -LiteralPath $toolPackageManifestPathResolved | ConvertFrom-Json
+            $sourceIdentity = $toolPackageManifest.sourceIdentity
+            $boundaryPath = Join-Path (Split-Path -Parent $toolPackageManifestPathResolved) "dhe-source-boundary.json"
+            $sourceIdentityValid = $null -ne $sourceIdentity -and
+                [int]$toolPackageManifest.schemaVersion -eq 1 -and
+                [string]$toolPackageManifest.format -eq "hybridclr.dhe-toolchain-manifest.json" -and
+                [bool]$toolPackageManifest.releaseReady -and
+                [string]$sourceIdentity.head -match '^[0-9a-fA-F]{40,64}$' -and
+                [string]$sourceIdentity.tree -match '^[0-9a-fA-F]{40,64}$' -and
+                [bool]$sourceIdentity.clean -and [bool]$sourceIdentity.tracked -and
+                (Test-Path -LiteralPath $boundaryPath -PathType Leaf)
+            if (-not $sourceIdentityValid) {
+                $errors.Add("Installed toolchain package manifest is not a complete Release identity: $toolPackageManifestPathResolved")
+            } else {
+                $toolGitTested = $true
+                $toolGit = [pscustomobject][ordered]@{
+                    name = "tool"
+                    vcs = "git"
+                    tested = $true
+                    root = [IO.Path]::GetDirectoryName($toolPackageManifestPathResolved)
+                    ownedPath = [IO.Path]::GetDirectoryName($toolPackageManifestPathResolved)
+                    head = ([string]$sourceIdentity.head).ToLowerInvariant()
+                    tree = ([string]$sourceIdentity.tree).ToLowerInvariant()
+                    revision = $null
+                    revisionSpec = $null
+                    repository = $null
+                    clean = [bool]$sourceIdentity.clean
+                    cleanRequired = [bool]$RequireToolGitClean
+                    trackedSourcesTested = $true
+                    trackedSourcesComplete = $true
+                    trackedSourcesRequired = [bool]$RequireToolTrackedSources
+                    sourceBoundaryPath = $boundaryPath
+                    sourceBoundarySha256 = (Get-FileHash -LiteralPath $boundaryPath -Algorithm SHA256).Hash.ToLowerInvariant()
+                    sourceBoundaryPathBase = "manifest-directory-v1"
+                    missingTrackedSources = @()
+                    passed = $true
+                    errors = @()
+                    warnings = @("Tool identity is bound to the verified installed package manifest.")
+                }
+            }
+        } catch {
+            $errors.Add("Unable to read installed toolchain package manifest: $toolPackageManifestPathResolved ($($_.Exception.Message))")
+        }
+    }
+}
+if ($null -eq $toolGit -and $toolGitTested) {
     $resolvedToolGitRoot = if ([string]::IsNullOrWhiteSpace($ToolGitRoot)) { $LabRoot } else { [IO.Path]::GetFullPath($ToolGitRoot) }
     $toolBoundaryPath = if ([string]::IsNullOrWhiteSpace($ToolSourceBoundaryPath)) {
         Join-Path $LabRoot "manifests/dhe-source-boundary.json"

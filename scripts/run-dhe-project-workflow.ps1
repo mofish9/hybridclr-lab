@@ -262,10 +262,14 @@ function Invoke-CleanCheckoutStage {
         ProjectPath = $projectPath
         RuntimeSource = $runtimePath
         OutputRoot = $cleanCheckoutRoot
-        ToolGitRoot = $labRoot
         ToolSourceBoundaryPath = [IO.Path]::GetFullPath([string]$toolBoundaryPath[0])
         ProjectVcs = $ProjectVcs
         ForceOutput = $true
+    }
+    if ($installedToolchain) {
+        $cleanCheckoutArgs.ToolPackageManifestPath = $toolchainManifestPath
+    } else {
+        $cleanCheckoutArgs.ToolGitRoot = $labRoot
     }
     if ($gitVerificationRequested) { $cleanCheckoutArgs.GitRoot = $gitRootPath }
     if (-not [string]::IsNullOrWhiteSpace($PackageLockPath)) {
@@ -274,8 +278,10 @@ function Invoke-CleanCheckoutStage {
     if ($RequireGitClean -or $Mode -eq "Release") { $cleanCheckoutArgs.RequireGitClean = $true }
     if ($trackedSourcesRequired) { $cleanCheckoutArgs.RequireTrackedSources = $true }
     if ($Mode -eq "Release") {
-        $cleanCheckoutArgs.RequireToolGitClean = $true
-        $cleanCheckoutArgs.RequireToolTrackedSources = $true
+        if (-not $installedToolchain) {
+            $cleanCheckoutArgs.RequireToolGitClean = $true
+            $cleanCheckoutArgs.RequireToolTrackedSources = $true
+        }
     }
     if (-not [string]::IsNullOrWhiteSpace($resolvedProjectBoundaryPath)) {
         $cleanCheckoutArgs.SourceBoundaryPath = $resolvedProjectBoundaryPath
