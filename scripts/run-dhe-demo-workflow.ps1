@@ -263,6 +263,7 @@ try {
             RuntimeSource = $runtimeSourcePath
             OutputRoot = $cleanCheckoutRoot
             IdentityTemplatePath = $identitySourcePath
+            PackageLockPath = $packageLockPath
             ToolGitRoot = $LabRoot
             ToolSourceBoundaryPath = (Join-Path $LabRoot "manifests/dhe-source-boundary.json")
             RequireIdentityTemplate = $true
