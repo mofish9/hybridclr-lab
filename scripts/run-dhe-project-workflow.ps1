@@ -339,6 +339,7 @@ try {
     }
 
     $toolchainManifestPath = Join-Path $labRoot "dhe-toolchain-manifest.json"
+    $installedToolchain = Test-Path -LiteralPath $toolchainManifestPath -PathType Leaf
     $toolchainGatePath = $null
     if (Test-Path -LiteralPath $toolchainManifestPath -PathType Leaf) {
         if ($Mode -eq "Release" -and [string]::IsNullOrWhiteSpace($ExpectedToolchainPackageId)) {
