@@ -193,6 +193,7 @@ $packageId = "<64-hex-package-id>"
   -SettingsFile C:/project/ProjectSettings/HybridCLRSettings.asset `
   -RuntimeSource C:/runtime/DHE/libil2cpp `
   -OutputRoot C:/build-artifacts/dhe-workflow `
+  -BaselineAotRoot C:/releases/previous/stripped-aot `
   -ExpectedToolchainPackageId $packageId `
   -Mode Release -ForceOutput
 ```

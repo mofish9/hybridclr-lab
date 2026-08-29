@@ -384,6 +384,7 @@ transformer 在显式开启诊断的验证构建中间接调用；它只写入�
   -RuntimeSource ./staging/runtime/DHE-Tuanjie2022/libil2cpp `
   -OutputRoot ./artifacts/dhe-project-workflow `
   -ArchiveRoot ./artifacts/dhe-project-workflow-archive `
+  -BaselineAotRoot ./releases/previous/stripped-aot `
   -DnlibPath ./unity2021-dhe-demo/Packages/com.code-philosophy.hybridclr/Plugins/dnlib.dll `
   -PackageLockPath ./manifests/dhe-package-lock.json `
   -IdentityTemplatePath ./unity2021-dhe-demo/Assets/Runtime/HybridCLRDheBuildIdentity.cs `

@@ -18,6 +18,7 @@ param(
     [int]$ToolchainContractVersion,
     [ValidateSet("Release", "Exploratory")]
     [string]$Mode = "Release",
+    [string]$BaselineAotRoot = "",
     [string]$ProjectPlan = "",
     [string]$ProjectPlanValidation = "",
     [string]$BatchReport = "",
@@ -59,6 +60,7 @@ $arguments = @(
     "-Mode", $Mode,
     "-ToolchainContractVersion", $ToolchainContractVersion,
     "-Invocation", $(if ($Action -eq "Prepare") { "AdapterPrepare" } else { "AdapterPlayer" }),
+    "-BaselineAotRoot", $BaselineAotRoot,
     "-WorkflowLockAlreadyHeld"
 )
 if ($Action -eq "Player") {

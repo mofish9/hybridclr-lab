@@ -91,6 +91,8 @@ if ($Action -eq "Prepare") {
         settingsFile = [IO.Path]::GetFullPath($SettingsFile)
         baselineRoot = $baselineRoot
         currentRoot = $currentRoot
+        baselineGeneratedFromCurrent = $true
+        baselineSourceRoot = $baselineRoot
         aotAssemblies = @()
         errors = @()
     }

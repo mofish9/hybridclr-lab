@@ -4,7 +4,7 @@
   "title": "HybridCLR DHE Project Adapter Prepare Report",
   "type": "object",
   "additionalProperties": true,
-  "required": ["schemaVersion", "format", "generatedAtUtc", "passed", "toolchainContractVersion", "target", "pathSemantics", "projectPath", "settingsFile", "baselineRoot", "currentRoot"],
+  "required": ["schemaVersion", "format", "generatedAtUtc", "passed", "toolchainContractVersion", "target", "pathSemantics", "projectPath", "settingsFile", "baselineRoot", "currentRoot", "baselineGeneratedFromCurrent", "baselineSourceRoot"],
   "properties": {
     "schemaVersion": { "const": 1 },
     "format": { "const": "hybridclr.dhe-project-adapter-prepare.json" },
@@ -17,6 +17,8 @@
     "settingsFile": { "type": "string", "minLength": 1 },
     "baselineRoot": { "type": "string", "minLength": 1 },
     "currentRoot": { "type": "string", "minLength": 1 },
+    "baselineGeneratedFromCurrent": { "type": "boolean" },
+    "baselineSourceRoot": { "type": "string", "minLength": 1 },
     "aotAssemblies": { "type": "array", "items": { "type": "string" } },
     "errors": { "type": "array", "items": { "type": "string" } }
   }

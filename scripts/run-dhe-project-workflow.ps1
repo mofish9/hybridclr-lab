@@ -14,6 +14,7 @@ param(
     [string]$DnlibPath = "",
     [string]$PackageLockPath = "",
     [string]$IdentityTemplatePath = "",
+    [string]$BaselineAotRoot = "",
     [string]$GitRoot = "",
     [string]$SourceBoundaryPath = "",
     [ValidatePattern("^$|^[0-9a-fA-F]{64}$")]
@@ -45,6 +46,7 @@ $projectPath = [IO.Path]::GetFullPath($ProjectPath)
 $settingsPath = [IO.Path]::GetFullPath($SettingsFile)
 $runtimePath = [IO.Path]::GetFullPath($RuntimeSource)
 $outputPath = [IO.Path]::GetFullPath($OutputRoot)
+$baselineAotPath = if ([string]::IsNullOrWhiteSpace($BaselineAotRoot)) { "" } else { [IO.Path]::GetFullPath($BaselineAotRoot) }
 $gitRootPath = if ([string]::IsNullOrWhiteSpace($GitRoot)) {
     $projectPath
 } else {
@@ -58,6 +60,7 @@ $archivePath = if ([string]::IsNullOrWhiteSpace($ArchiveRoot)) {
 $gitVerificationRequested = $Mode -eq "Release" -or [bool]$RequireGitClean -or
     [bool]$RequireTrackedSources -or -not [string]::IsNullOrWhiteSpace($GitRoot)
 $coverageRequired = $Mode -eq "Release" -or [bool]$RequireCompleteCoverage
+$baselineRequired = $Mode -eq "Release"
 $trackedSourcesRequired = $Mode -eq "Release" -or [bool]$RequireTrackedSources
 $packageLockPathResolved = if ([string]::IsNullOrWhiteSpace($PackageLockPath)) {
     ""
@@ -125,8 +128,19 @@ function Invoke-Adapter([string]$Action, [hashtable]$AdditionalParameters) {
             $arguments += @("-$key", [string]$value)
         }
     }
-    & $scriptHost @arguments | Out-Null
-    return [int]$LASTEXITCODE
+    $previousToolRoot = $env:DHE_TOOL_ROOT
+    $previousWorkflowRoot = $env:DHE_WORKFLOW_ROOT
+    $env:DHE_TOOL_ROOT = $labRoot
+    $env:DHE_WORKFLOW_ROOT = $labRoot
+    try {
+        & $scriptHost @arguments | Out-Null
+        return [int]$LASTEXITCODE
+    } finally {
+        if ($null -eq $previousToolRoot) { Remove-Item Env:DHE_TOOL_ROOT -ErrorAction SilentlyContinue }
+        else { $env:DHE_TOOL_ROOT = $previousToolRoot }
+        if ($null -eq $previousWorkflowRoot) { Remove-Item Env:DHE_WORKFLOW_ROOT -ErrorAction SilentlyContinue }
+        else { $env:DHE_WORKFLOW_ROOT = $previousWorkflowRoot }
+    }
 }
 
 function Require-Directory([string]$Path, [string]$Description) {
@@ -283,7 +297,15 @@ function Invoke-CleanCheckoutStage {
 
 try {
     $workflowLock = Enter-DheWorkflowLock -LabRoot $labRoot -TimeoutSeconds $WorkflowLockTimeoutSeconds
-    $null = Assert-DheSafeOutputRoot -Path $outputPath -ProtectedPaths @($projectPath, $runtimePath)
+    if ($baselineRequired -and [string]::IsNullOrWhiteSpace($baselineAotPath)) {
+        throw "DHE Release requires -BaselineAotRoot from a previous stripped-AOT release."
+    }
+    if (-not [string]::IsNullOrWhiteSpace($baselineAotPath) -and -not [IO.Directory]::Exists($baselineAotPath)) {
+        throw "DHE baseline AOT root was not found: $baselineAotPath"
+    }
+    $protectedInputs = @($projectPath, $runtimePath)
+    if (-not [string]::IsNullOrWhiteSpace($baselineAotPath)) { $protectedInputs += $baselineAotPath }
+    $null = Assert-DheSafeOutputRoot -Path $outputPath -ProtectedPaths $protectedInputs
     $null = Assert-DheOutputNotAncestor -Path $outputPath -Root $labRoot
     $null = Assert-DheSafeOutputRoot -Path $archivePath -ProtectedPaths @($projectPath, $runtimePath, $outputPath)
     $null = Assert-DheOutputNotAncestor -Path $archivePath -Root $labRoot
@@ -347,6 +369,7 @@ try {
 
     $prepareExitCode = Invoke-Adapter "Prepare" @{
         Mode = $Mode
+        BaselineAotRoot = $BaselineAotRoot
     }
     $preparePath = Join-Path $outputPath "adapter/prepare.json"
     if ($prepareExitCode -ne 0 -and -not (Test-Path -LiteralPath $preparePath -PathType Leaf)) {
@@ -357,7 +380,8 @@ try {
     $stages.prepare.report = $preparePath
     $prepareBinding = Assert-DheAdapterPrepareReport -Report $prepare `
         -ToolchainContractVersion $toolchainContractVersion -Target $Target `
-        -ProjectPath $projectPath -SettingsFile $settingsPath
+        -ProjectPath $projectPath -SettingsFile $settingsPath -Mode $Mode `
+        -BaselineAotRoot $baselineAotPath
     if ($prepareExitCode -ne 0) {
         throw "DHE adapter Prepare action failed. See $preparePath"
     }

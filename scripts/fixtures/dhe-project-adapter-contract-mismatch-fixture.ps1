@@ -28,6 +28,8 @@ $prepare = [ordered]@{
     settingsFile = [IO.Path]::GetFullPath($SettingsFile)
     baselineRoot = [IO.Path]::GetFullPath($ProjectPath)
     currentRoot = [IO.Path]::GetFullPath($ProjectPath)
+    baselineGeneratedFromCurrent = $true
+    baselineSourceRoot = [IO.Path]::GetFullPath($ProjectPath)
     errors = @()
 }
 [IO.File]::WriteAllText($preparePath, ($prepare | ConvertTo-Json -Depth 6), (New-Object Text.UTF8Encoding($false)))

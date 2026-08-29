@@ -273,6 +273,11 @@ if ($null -ne $packageLock) {
     } else {
         Add-Check "package-lock:schema" $true "schemaVersion=1; sourceMode=$packageSourceMode; pathBase=project-root-v1; baseCommit=$($packageLock.baseCommit)"
     }
+    if (-not (Test-DhePackageHashPolicy $packageLock)) {
+        Add-ErrorCheck "package-lock:tree-hash-policy" "DHE package lock treeHashIgnoredPaths does not match the toolchain package hash policy."
+    } else {
+        Add-Check "package-lock:tree-hash-policy" $true "package hash ignore policy is explicitly locked"
+    }
     if ($embeddedPackagePresent) {
         $packagePathProperty = $packageLock.PSObject.Properties["packagePath"]
         $lockedPackageReference = if ($null -eq $packagePathProperty) { "" } else { [string]$packagePathProperty.Value }
@@ -312,7 +317,7 @@ if ($null -ne $runtimeLock -and $null -ne $packageLock) {
 }
 
 if ($embeddedPackagePresent -and $null -ne $packageLock) {
-    $packageTreeHash = Get-TreeHash $packageRoot
+    $packageTreeHash = Get-DhePackageTreeHash $packageRoot
     if ($null -eq $packageLock -or
         -not [StringComparer]::OrdinalIgnoreCase.Equals($packageTreeHash, [string]$packageLock.treeSha256)) {
         Add-ErrorCheck "package:tree-hash" "Embedded HybridCLR package tree hash does not match dhe-package-lock.json."

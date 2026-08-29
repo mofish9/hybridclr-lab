@@ -78,7 +78,8 @@ function Get-EntrySourceMode([object]$Entry) {
     return $lockSourceMode
 }
 
-function Assert-IntegratedSource([string]$RepositoryPath, [object]$Entry, [string]$Name, [string]$TreeRoot) {
+function Assert-IntegratedSource([string]$RepositoryPath, [object]$Entry, [string]$Name, [string]$TreeRoot,
+    [switch]$UsePackageHashPolicy) {
     $integratedCommitProperty = $Entry.PSObject.Properties["integratedCommit"]
     $expectedTreeProperty = $Entry.PSObject.Properties["expectedTreeSha256"]
     if ($null -eq $integratedCommitProperty -or
@@ -88,7 +89,11 @@ function Assert-IntegratedSource([string]$RepositoryPath, [object]$Entry, [strin
         throw "Integrated DHE entry '$($Entry.id)' is missing integratedCommit or expectedTreeSha256."
     }
     Assert-Commit $RepositoryPath ([string]$integratedCommitProperty.Value) $Name
-    $actualTree = Get-TreeHashExcludingGit $TreeRoot
+    $actualTree = if ($UsePackageHashPolicy) {
+        Get-DhePackageSourceTreeHash $TreeRoot
+    } else {
+        Get-TreeHashExcludingGit $TreeRoot
+    }
     if (-not [StringComparer]::OrdinalIgnoreCase.Equals($actualTree, [string]$expectedTreeProperty.Value)) {
         throw "$Name integrated tree hash mismatch. Expected $($expectedTreeProperty.Value), got $actualTree."
     }
@@ -208,8 +213,9 @@ if (-not [string]::IsNullOrWhiteSpace($PackageRoot)) {
             throw "DHE runtime lock mixes source modes: lock=$lockSourceMode, entry=$($entry.id) mode=$entrySourceMode."
         }
         if ($entrySourceMode -eq "integrated") {
-            $sourceTree = Assert-IntegratedSource $HybridClrUnitySource $entry "hybridclr_unity" $HybridClrUnitySource
-            $packageTree = Get-TreeHash $PackageRoot
+            $sourceTree = Assert-IntegratedSource $HybridClrUnitySource $entry "hybridclr_unity" $HybridClrUnitySource `
+                -UsePackageHashPolicy
+            $packageTree = Get-DhePackageTreeHash $PackageRoot
             if (-not [StringComparer]::OrdinalIgnoreCase.Equals($packageTree, $sourceTree)) {
                 throw "Integrated DHE package tree differs from hybridclr_unity: expected $sourceTree, got $packageTree."
             }

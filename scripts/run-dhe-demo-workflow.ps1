@@ -19,6 +19,7 @@ param(
     [string]$CleanCheckoutGate = "",
     [ValidateSet("Release", "Exploratory")]
     [string]$Mode = "Release",
+    [string]$BaselineAotRoot = "",
     [switch]$RequireCompleteCoverage,
     [switch]$ForceOutput,
     [ValidateRange(1, 3600)]
@@ -209,6 +210,9 @@ try {
         [string]$packageLock.pathBase -ne "project-root-v1") {
         throw "DHE package lock has an invalid schema, repository identity, or path base."
     }
+    if (-not (Test-DhePackageHashPolicy $packageLock)) {
+        throw "DHE package lock treeHashIgnoredPaths does not match the toolchain package hash policy."
+    }
     $lockedPackageReference = [string]$packageLock.packagePath
     if ([string]::IsNullOrWhiteSpace($lockedPackageReference) -or
         [IO.Path]::IsPathRooted($lockedPackageReference) -or
@@ -219,7 +223,7 @@ try {
     if (-not [IO.Path]::GetFullPath($packageRoot).Equals($expectedPackagePath, [StringComparison]::OrdinalIgnoreCase)) {
         throw "DHE package path does not match package lock: $packageRoot"
     }
-    $packageTreeHash = Get-TreeHash $packageRoot
+    $packageTreeHash = Get-DhePackageTreeHash $packageRoot
     if ($null -eq $packageLock.PSObject.Properties["treeSha256"] -or
         -not [StringComparer]::OrdinalIgnoreCase.Equals($packageTreeHash, [string]$packageLock.treeSha256)) {
         throw "Embedded HybridCLR package does not match its package lock: $packageRoot"
@@ -348,6 +352,7 @@ $runtimeManifestOutput = Join-Path $OutputRoot "runtime-manifest.json"
 $strippedRoot = Join-Path $OutputRoot "stripped"
 $baselineStrippedRoot = Join-Path $strippedRoot "baseline"
 $currentStrippedRoot = Join-Path $strippedRoot "current"
+$baselineGeneratedFromCurrent = [string]::IsNullOrWhiteSpace($BaselineAotRoot)
 $baselineRawPaths = @($dheAssemblyNames | ForEach-Object { Join-Path $capabilityRoot ("baseline/{0}.dll" -f $_) })
 $currentRawPaths = @($dheAssemblyNames | ForEach-Object { Join-Path $capabilityRoot ("current/{0}.dll" -f $_) })
 
@@ -436,7 +441,24 @@ function Generate-Stripped([string[]]$inputAssemblies, [string]$destinationRoot,
     return $result.ToArray()
 }
 
-$baselineStrippedPaths = Generate-Stripped $baselineRawPaths $baselineStrippedRoot "unity-dhe-workflow-baseline.log"
+if (-not $baselineGeneratedFromCurrent) {
+    $resolvedBaselineAotRoot = [IO.Path]::GetFullPath($BaselineAotRoot)
+    if (-not (Test-Path -LiteralPath $resolvedBaselineAotRoot -PathType Container)) {
+        throw "DHE baseline AOT root was not found: $resolvedBaselineAotRoot"
+    }
+    $baselineStrippedPaths = @($dheAssemblyNames | ForEach-Object {
+        $source = Join-Path $resolvedBaselineAotRoot (($_.ToString()) + ".dll")
+        Require-File $source "DHE previous-release baseline assembly '$($_)'"
+        $destination = Join-Path $baselineStrippedRoot (($_.ToString()) + ".dll")
+        Copy-Item -LiteralPath $source -Destination $destination -Force
+        $destination
+    })
+} else {
+    if ($Mode -eq "Release") {
+        throw "DHE demo Release requires -BaselineAotRoot from a previous stripped-AOT release."
+    }
+    $baselineStrippedPaths = Generate-Stripped $baselineRawPaths $baselineStrippedRoot "unity-dhe-workflow-baseline.log"
+}
 $currentStrippedPaths = Generate-Stripped $currentRawPaths $currentStrippedRoot "unity-dhe-workflow-current.log"
 $baselineStripped = $baselineStrippedPaths[0]
 
@@ -449,6 +471,8 @@ $identityJson | Add-Member -NotePropertyName aotInputAssemblySha256 -NotePropert
 $identityJson | Add-Member -NotePropertyName baselineAssemblySha256 -NotePropertyValue $baselineSnapshotHash -Force
 $identityJson | Add-Member -NotePropertyName aotSnapshotSha256 -NotePropertyValue $baselineSnapshotHash -Force
 $identityJson | Add-Member -NotePropertyName aotSnapshotKind -NotePropertyValue "stripped-managed-assembly-sha256" -Force
+$identityJson | Add-Member -NotePropertyName baselineGeneratedFromCurrent -NotePropertyValue $baselineGeneratedFromCurrent -Force
+$identityJson | Add-Member -NotePropertyName baselineSourceRoot -NotePropertyValue $(if ($baselineGeneratedFromCurrent) { $baselineStrippedRoot } else { [IO.Path]::GetFullPath($BaselineAotRoot) }) -Force
 [IO.File]::WriteAllText($identityPath, ($identityJson | ConvertTo-Json -Depth 8), (New-Object Text.UTF8Encoding($false)))
 } else {
     Require-File $identityPath "Prepared DHE build identity"
@@ -480,6 +504,8 @@ if ($Invocation -eq "AdapterPrepare") {
         settingsFile = $settingsPath
         baselineRoot = $baselineStrippedRoot
         currentRoot = $currentStrippedRoot
+        baselineGeneratedFromCurrent = $baselineGeneratedFromCurrent
+        baselineSourceRoot = if ($baselineGeneratedFromCurrent) { $baselineStrippedRoot } else { [IO.Path]::GetFullPath($BaselineAotRoot) }
         aotAssemblies = $dheAssemblyNames
         errors = @()
     }

@@ -213,7 +213,7 @@ $manifest = [ordered]@{
     source = [ordered]@{
         hybridclr = [ordered]@{ url = $hybridclrSpec.fork; path = $hybridclrPath; commit = (Invoke-Git $hybridclrPath @("rev-parse", "HEAD")).Trim(); dirty = (@(Get-MeaningfulGitStatus @(Invoke-Git $hybridclrPath @("status", "--porcelain"))).Count -gt 0); treeSha256 = (Get-TreeHash (Join-Path $hybridclrPath "hybridclr")) }
         il2cpp_plus = [ordered]@{ url = $il2cppSpec.fork; path = $il2cppPath; commit = (Invoke-Git $il2cppPath @("rev-parse", "HEAD")).Trim(); dirty = (@(Get-MeaningfulGitStatus @(Invoke-Git $il2cppPath @("status", "--porcelain"))).Count -gt 0); treeSha256 = (Get-TreeHash (Join-Path $il2cppPath "libil2cpp")) }
-        hybridclr_unity = [ordered]@{ url = $lock.repositories.hybridclr_unity.fork; path = (Join-Path $reposRoot "hybridclr_unity"); commit = (Invoke-Git (Join-Path $reposRoot "hybridclr_unity") @("rev-parse", "HEAD")).Trim(); dirty = (@(Get-MeaningfulGitStatus @(Invoke-Git (Join-Path $reposRoot "hybridclr_unity") @("status", "--porcelain"))).Count -gt 0); treeSha256 = (Get-TreeHashExcludingGit (Join-Path $reposRoot "hybridclr_unity")) }
+        hybridclr_unity = [ordered]@{ url = $lock.repositories.hybridclr_unity.fork; path = (Join-Path $reposRoot "hybridclr_unity"); commit = (Invoke-Git (Join-Path $reposRoot "hybridclr_unity") @("rev-parse", "HEAD")).Trim(); dirty = (@(Get-MeaningfulGitStatus @(Invoke-Git (Join-Path $reposRoot "hybridclr_unity") @("status", "--porcelain"))).Count -gt 0); treeSha256 = (Get-DhePackageSourceTreeHash (Join-Path $reposRoot "hybridclr_unity")) }
     }
     stagedLibil2cpp = $stagedLibil2cpp
     stagedRuntimeSha256 = $runtimeHash

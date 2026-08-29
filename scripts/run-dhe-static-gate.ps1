@@ -372,6 +372,9 @@ if ($null -ne $packageLock) {
         $packagePathValue.Replace('\', '/') -match '(^|/)\.\.(/|$)') {
         $packageLockErrors.Add("invalid schema, repository, path, commit, or tree hash")
     }
+    if (-not (Test-DhePackageHashPolicy $packageLock)) {
+        $packageLockErrors.Add("treeHashIgnoredPaths does not match the package hash policy")
+    }
     $packagePatchProperty = $packageLock.PSObject.Properties["patches"]
     $packagePatches = @((Get-StaticProperty $packageLock "patches"))
     if ($null -eq $packagePatchProperty -or $packagePatches.Count -eq 0) {
@@ -412,7 +415,7 @@ if ($null -ne $packageLock) {
     } elseif (-not (Test-Path -LiteralPath $packagePath -PathType Container)) {
         $packageDetail = "embedded package was not found: $packagePath"
     } else {
-        $actualPackageHash = Get-TreeHash $packagePath
+        $actualPackageHash = Get-DhePackageTreeHash $packagePath
         $packageHashMatches = [StringComparer]::OrdinalIgnoreCase.Equals(
             $actualPackageHash, [string](Get-StaticProperty $packageLock "treeSha256"))
         $packageDetail = "expected=$([string](Get-StaticProperty $packageLock 'treeSha256')), actual=$actualPackageHash"

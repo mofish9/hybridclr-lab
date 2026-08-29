@@ -19,6 +19,7 @@ param(
     [Parameter(Mandatory = $true)]
     [ValidateSet("Release", "Exploratory")]
     [string]$Mode,
+    [string]$BaselineAotRoot = "",
     [string]$ProjectPlan = "",
     [string]$ProjectPlanValidation = "",
     [string]$BatchReport = "",
@@ -36,7 +37,7 @@ if ($Action -eq "Prepare") {
     # roots, then write <OutputRoot>/adapter/prepare.json using
     # schemas/dhe-project-adapter-prepare.schema.json. The report must echo
     # toolchainContractVersion so incompatible adapters fail before preflight.
-    throw "Implement the DHE adapter Prepare action for target '$Target'."
+    throw "Implement the DHE adapter Prepare action for target '$Target' (baseline root: '$BaselineAotRoot')."
 }
 
 foreach ($requiredPath in @($ProjectPlan, $ProjectPlanValidation, $BatchReport, $SourcePreflight, $CleanCheckoutGate)) {

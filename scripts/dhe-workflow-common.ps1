@@ -476,7 +476,10 @@ function Assert-DheAdapterPrepareReport {
         [Parameter(Mandatory = $true)]
         [string]$ProjectPath,
         [Parameter(Mandatory = $true)]
-        [string]$SettingsFile
+        [string]$SettingsFile,
+        [ValidateSet("Release", "Exploratory")]
+        [string]$Mode = "Exploratory",
+        [string]$BaselineAotRoot = ""
     )
 
     if ([int]$Report.schemaVersion -ne 1 -or
@@ -503,6 +506,29 @@ function Assert-DheAdapterPrepareReport {
         }
         $references[$propertyName] = [IO.Path]::GetFullPath($value)
     }
+    foreach ($propertyName in @("baselineSourceRoot")) {
+        $property = $Report.PSObject.Properties[$propertyName]
+        $value = if ($null -eq $property) { "" } else { [string]$property.Value }
+        if ([string]::IsNullOrWhiteSpace($value) -or -not [IO.Path]::IsPathRooted($value)) {
+            throw "DHE adapter prepare $propertyName must be an absolute path under workspace-absolute-v1."
+        }
+        $references[$propertyName] = [IO.Path]::GetFullPath($value)
+    }
+    $baselineGeneratedProperty = $Report.PSObject.Properties["baselineGeneratedFromCurrent"]
+    if ($null -eq $baselineGeneratedProperty -or $baselineGeneratedProperty.Value -isnot [bool]) {
+        throw "DHE adapter prepare baselineGeneratedFromCurrent must be a JSON boolean."
+    }
+    $baselineGenerated = [bool]$baselineGeneratedProperty.Value
+    if ($Mode -eq "Release") {
+        if ([string]::IsNullOrWhiteSpace($BaselineAotRoot)) {
+            throw "DHE Release requires an explicit BaselineAotRoot from a previous stripped-AOT release."
+        }
+        $expectedBaselineRoot = Normalize-DhePath ([IO.Path]::GetFullPath($BaselineAotRoot))
+        if ($baselineGenerated -or (Normalize-DhePath $references.baselineSourceRoot) -ne $expectedBaselineRoot) {
+            throw "DHE Release adapter prepare did not bind baselineSourceRoot to the supplied previous release baseline."
+        }
+    }
+    $references.baselineGeneratedFromCurrent = $baselineGenerated
     if ((Normalize-DhePath $references.projectPath) -ne (Normalize-DhePath $ProjectPath) -or
         (Normalize-DhePath $references.settingsFile) -ne (Normalize-DhePath $SettingsFile)) {
         throw "DHE adapter prepare report is bound to a different project or settings file."

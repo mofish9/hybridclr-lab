@@ -4,7 +4,7 @@
   "title": "HybridCLR DHE Embedded Package Lock",
   "type": "object",
   "additionalProperties": false,
-  "required": ["schemaVersion", "format", "repository", "baseCommit", "pathBase", "packagePath", "treeSha256", "patches"],
+  "required": ["schemaVersion", "format", "repository", "baseCommit", "pathBase", "packagePath", "treeSha256", "treeHashIgnoredPaths", "patches"],
   "properties": {
     "schemaVersion": { "const": 1 },
     "format": { "const": "hybridclr.dhe-package-lock.json" },
@@ -13,8 +13,18 @@
     "baseCommit": { "type": "string", "pattern": "^[0-9a-f]{40}$" },
     "integratedCommit": { "type": "string", "pattern": "^[0-9a-f]{40}$" },
     "pathBase": { "const": "project-root-v1" },
-    "packagePath": { "const": "Packages/com.code-philosophy.hybridclr" },
+    "packagePath": {
+      "type": "string",
+      "pattern": "^Packages/com\\.code-philosophy\\.hybridclr(?:@[A-Za-z0-9._-]+)?$"
+    },
     "treeSha256": { "type": "string", "pattern": "^[0-9A-Fa-f]{64}$" },
+    "treeHashIgnoredPaths": {
+      "type": "array",
+      "items": {
+        "type": "string",
+        "pattern": "^[^/].*$"
+      }
+    },
     "patches": { "type": "array", "minItems": 1, "items": { "type": "string", "minLength": 1 } }
   },
   "allOf": [

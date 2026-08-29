@@ -494,6 +494,7 @@ $releaseUnpinnedWorkflowExit = Invoke-Child @(
     "-SettingsFile", (Join-Path $projectRoot "ProjectSettings/HybridCLRSettings.asset"),
     "-RuntimeSource", $projectRoot,
     "-OutputRoot", $releaseUnpinnedWorkflowRoot,
+    "-BaselineAotRoot", $projectRoot,
     "-Mode", "Release",
     "-ForceOutput"
 )
