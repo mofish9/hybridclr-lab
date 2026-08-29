@@ -140,6 +140,12 @@ verify the existing installation before swapping directories and roll back an
 in-process failure. The destination shares a mutex with installed workflows, so
 an upgrade cannot replace scripts while a build is using them.
 
+An installed toolchain directory is a verified package, not a Git checkout.
+Installed project workflows bind the tool identity from the package manifest's
+`sourceIdentity` and `dhe-source-boundary.json`; source-checkout workflows use
+the live tool Git identity instead. Both forms are represented by the same
+clean-checkout report contract.
+
 Commit the installed directory before a Release workflow. The tool identity gate
 then binds the installed boundary to the consumer repository's clean HEAD/tree.
 Installed `doctor -RequireRelease` and `workflow -Mode Release` commands reject
