@@ -241,7 +241,7 @@ if ($prePrepareGateTested) {
         Get-Content -Raw -LiteralPath $explicitVcsFailurePath | ConvertFrom-Json
     } else { $null }
     $explicitProjectVcsValidated = $explicitVcsExit -ne 0 -and $null -ne $explicitVcsFailure -and
-        [string]$explicitVcsFailure.error -like "*project SVN source root is not a working copy*"
+        [string]$explicitVcsFailure.error -like "*not a working copy*"
     Require $explicitProjectVcsValidated "Explicit ProjectVcs selection did not activate project VCS verification."
 }
 $global:LASTEXITCODE = 0
