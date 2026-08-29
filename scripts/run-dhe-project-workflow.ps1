@@ -59,7 +59,13 @@ $gitVerificationRequested = $Mode -eq "Release" -or [bool]$RequireGitClean -or
     [bool]$RequireTrackedSources -or -not [string]::IsNullOrWhiteSpace($GitRoot)
 $coverageRequired = $Mode -eq "Release" -or [bool]$RequireCompleteCoverage
 $trackedSourcesRequired = $Mode -eq "Release" -or [bool]$RequireTrackedSources
-$embeddedPackagePresent = Test-Path -LiteralPath (Join-Path $projectPath "Packages/com.code-philosophy.hybridclr") -PathType Container
+$packageLockPathResolved = if ([string]::IsNullOrWhiteSpace($PackageLockPath)) {
+    ""
+} else {
+    [IO.Path]::GetFullPath($PackageLockPath)
+}
+$embeddedPackageRoot = Resolve-DheEmbeddedPackageRoot -ProjectRoot $projectPath -PackageLockPath $packageLockPathResolved -AllowMissing
+$embeddedPackagePresent = $null -ne $embeddedPackageRoot -and (Test-Path -LiteralPath $embeddedPackageRoot -PathType Container)
 $embeddedPackageRequired = [bool]$RequireEmbeddedPackage -or ($Mode -eq "Release" -and $embeddedPackagePresent)
 $outputRootSafe = $false
 $workflowLock = $null

@@ -59,7 +59,7 @@ foreach ($item in @(@($settingsPath, "HybridCLR settings", "Leaf"), @($baselineP
         throw "$($item[1]) was not found: $($item[0])"
     }
 }
-$resolvedDnlibPath = Resolve-DheDnlibPath -RequestedPath $DnlibPath -ProjectRoot $projectRootPath
+$resolvedDnlibPath = Resolve-DheDnlibPath -RequestedPath $DnlibPath -ProjectRoot $projectRootPath -PackageLockPath $PackageLockPath
 $scriptHost = Resolve-DhePowerShellHost
 $runSourcePreflight = $RequireRuntime -or $RequireEmbeddedPackage -or $RequireIdentityTemplate -or
     $RequireCleanRuntimeSources -or
@@ -118,6 +118,7 @@ if ($RequireCompleteCoverage) { $batchArgs += "-FailOnIncompatible" }
 if ($RequireDheEqualsHotUpdate) { $batchArgs += "-RequireDheEqualsHotUpdate" }
 if (-not [string]::IsNullOrWhiteSpace($DnlibPath)) { $batchArgs += @("-DnlibPath", [IO.Path]::GetFullPath($DnlibPath)) }
 if ([string]::IsNullOrWhiteSpace($DnlibPath)) { $batchArgs += @("-DnlibPath", $resolvedDnlibPath) }
+if (-not [string]::IsNullOrWhiteSpace($PackageLockPath)) { $batchArgs += @("-PackageLockPath", [IO.Path]::GetFullPath($PackageLockPath)) }
 & $scriptHost -ExecutionPolicy Bypass @batchArgs | Out-Null
 $batchExitCode = $LASTEXITCODE
 $batchReportPath = Join-Path $batchPath "dhe-batch-summary.json"

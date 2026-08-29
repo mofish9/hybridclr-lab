@@ -21,7 +21,7 @@ to the project adapter.
 
 ## Requirements
 
-- Windows with PowerShell 7 (`pwsh`) on `PATH`;
+- Windows or macOS with PowerShell 7 (`pwsh`) on `PATH`;
 - Git on `PATH` for publish, install provenance, and Release workflows;
 - a Unity project with HybridCLR settings;
 - `dnlib.dll` from the project's embedded HybridCLR package, or an explicit
@@ -31,6 +31,13 @@ to the project adapter.
 
 Windows PowerShell 5.1 can launch validation in CI when `pwsh` is also installed,
 but it is not the runtime implementation host for the formal CLI.
+
+The core CLI and project-independent gates use PowerShell 7/.NET APIs that are
+available on Windows and macOS. The project adapter owns Unity executable
+discovery, generated-C++ locations, and target-specific Player output. An iOS
+adapter must run on macOS with the Unity iOS module and may export an Xcode
+project; signing, Xcode compilation, device launch, and the runtime smoke test
+remain adapter-owned assertions.
 
 ## Publish
 

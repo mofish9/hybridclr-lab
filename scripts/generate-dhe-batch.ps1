@@ -17,6 +17,8 @@ param(
 
     [string]$ProjectRoot,
 
+    [string]$PackageLockPath,
+
     [string]$DnlibPath,
 
     [switch]$StrictCompatibility,
@@ -123,7 +125,7 @@ if ($AssemblyNames.Count -eq 0) {
 $dnlibProjectRoot = if (-not [string]::IsNullOrWhiteSpace($resolvedSettingsProjectRoot)) {
     $resolvedSettingsProjectRoot
 } else { $ProjectRoot }
-$resolvedDnlibPath = Resolve-DheDnlibPath -RequestedPath $DnlibPath -ProjectRoot $dnlibProjectRoot
+$resolvedDnlibPath = Resolve-DheDnlibPath -RequestedPath $DnlibPath -ProjectRoot $dnlibProjectRoot -PackageLockPath $PackageLockPath
 
 $records = New-Object System.Collections.Generic.List[object]
 $failOnIncompatibleDetected = $false

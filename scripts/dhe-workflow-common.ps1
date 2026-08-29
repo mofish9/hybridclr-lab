@@ -56,10 +56,71 @@ function Invoke-DheGitApplyAtRoot {
     }
 }
 
+function Resolve-DheEmbeddedPackageRoot {
+    param(
+        [Parameter(Mandatory = $true)][string]$ProjectRoot,
+        [string]$PackageLockPath = "",
+        [switch]$AllowMissing
+    )
+
+    $projectPath = [IO.Path]::GetFullPath($ProjectRoot)
+    if (-not [IO.Directory]::Exists($projectPath)) {
+        if ($AllowMissing) { return $null }
+        throw "Unity project root was not found: $projectPath"
+    }
+
+    # A project DHE package lock owns the package path. This is intentionally
+    # resolved relative to the project root, so a lock can live under Assets
+    # or in an external build-artifact directory without changing semantics.
+    if (-not [string]::IsNullOrWhiteSpace($PackageLockPath)) {
+        $lockPath = [IO.Path]::GetFullPath($PackageLockPath)
+        if (-not [IO.File]::Exists($lockPath)) {
+            throw "DHE package lock was not found: $lockPath"
+        }
+        try {
+            $lock = Get-Content -Raw -LiteralPath $lockPath | ConvertFrom-Json
+        } catch {
+            throw "DHE package lock is not valid JSON: $lockPath ($($_.Exception.Message))"
+        }
+        $packageReferenceProperty = $lock.PSObject.Properties["packagePath"]
+        $packageReference = if ($null -eq $packageReferenceProperty) { "" } else {
+            [string]$packageReferenceProperty.Value
+        }
+        if ([string]::IsNullOrWhiteSpace($packageReference) -or
+            [IO.Path]::IsPathRooted($packageReference) -or
+            $packageReference.Replace('\', '/') -match '(^|/)\.\.(/|$)') {
+            throw "DHE package lock packagePath must be a safe project-root-relative path: '$packageReference'."
+        }
+        return [IO.Path]::GetFullPath((Join-Path $projectPath $packageReference))
+    }
+
+    $packagesPath = Join-Path $projectPath "Packages"
+    $unversionedPath = Join-Path $packagesPath "com.code-philosophy.hybridclr"
+    if ([IO.Directory]::Exists($unversionedPath)) {
+        return [IO.Path]::GetFullPath($unversionedPath)
+    }
+    $versionedPaths = @(
+        if ([IO.Directory]::Exists($packagesPath)) {
+            Get-ChildItem -LiteralPath $packagesPath -Directory -Force -ErrorAction SilentlyContinue |
+                Where-Object { $_.Name.StartsWith("com.code-philosophy.hybridclr@", [StringComparison]::OrdinalIgnoreCase) } |
+                ForEach-Object { [IO.Path]::GetFullPath($_.FullName) }
+        }
+    )
+    if ($versionedPaths.Count -eq 1) {
+        return $versionedPaths[0]
+    }
+    if ($versionedPaths.Count -gt 1) {
+        throw "Multiple embedded HybridCLR package directories were found under $packagesPath. Supply -PackageLockPath to select one."
+    }
+    if ($AllowMissing) { return $null }
+    throw "An embedded HybridCLR package was not found under $packagesPath."
+}
+
 function Resolve-DheDnlibPath {
     param(
         [string]$RequestedPath = "",
-        [string]$ProjectRoot = ""
+        [string]$ProjectRoot = "",
+        [string]$PackageLockPath = ""
     )
 
     if (-not [string]::IsNullOrWhiteSpace($RequestedPath)) {
@@ -72,8 +133,11 @@ function Resolve-DheDnlibPath {
 
     if (-not [string]::IsNullOrWhiteSpace($ProjectRoot)) {
         $projectPath = [IO.Path]::GetFullPath($ProjectRoot)
-        $resolvedCandidate = [IO.Path]::GetFullPath((Join-Path $projectPath "Packages/com.code-philosophy.hybridclr/Plugins/dnlib.dll"))
-        if ([IO.File]::Exists($resolvedCandidate)) {
+        $packageRoot = Resolve-DheEmbeddedPackageRoot -ProjectRoot $projectPath -PackageLockPath $PackageLockPath -AllowMissing
+        $resolvedCandidate = if ($null -eq $packageRoot) { "" } else {
+            [IO.Path]::GetFullPath((Join-Path $packageRoot "Plugins/dnlib.dll"))
+        }
+        if (-not [string]::IsNullOrWhiteSpace($resolvedCandidate) -and [IO.File]::Exists($resolvedCandidate)) {
             return $resolvedCandidate
         }
         throw "dnlib.dll was not found in the project embedded HybridCLR package. Pass -DnlibPath explicitly for registry or externally managed packages: $projectPath"

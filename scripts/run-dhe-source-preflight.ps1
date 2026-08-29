@@ -196,15 +196,15 @@ foreach ($schemaName in $requiredSchemas) {
 }
 
 $settingsPath = Join-Path $ProjectPath "ProjectSettings/HybridCLRSettings.asset"
-$packageRoot = Join-Path $ProjectPath "Packages/com.code-philosophy.hybridclr"
-$embeddedPackagePresent = Test-Path -LiteralPath $packageRoot -PathType Container
-$identityTemplatePath = if (-not [string]::IsNullOrWhiteSpace($IdentityTemplatePath)) {
-    [IO.Path]::GetFullPath($IdentityTemplatePath)
+$packageLockPath = if (-not [string]::IsNullOrWhiteSpace($PackageLockPath)) {
+    [IO.Path]::GetFullPath($PackageLockPath)
 } else {
     ""
 }
-$packageLockPath = if (-not [string]::IsNullOrWhiteSpace($PackageLockPath)) {
-    [IO.Path]::GetFullPath($PackageLockPath)
+$packageRoot = Resolve-DheEmbeddedPackageRoot -ProjectRoot $ProjectPath -PackageLockPath $packageLockPath -AllowMissing
+$embeddedPackagePresent = $null -ne $packageRoot -and (Test-Path -LiteralPath $packageRoot -PathType Container)
+$identityTemplatePath = if (-not [string]::IsNullOrWhiteSpace($IdentityTemplatePath)) {
+    [IO.Path]::GetFullPath($IdentityTemplatePath)
 } else {
     ""
 }
@@ -341,21 +341,41 @@ if ($null -ne $runtimeLock) {
     }
 }
 
+function Resolve-UnityPackageFileReference([string]$Reference) {
+    if ([string]::IsNullOrWhiteSpace($Reference) -or
+        -not $Reference.StartsWith("file:", [StringComparison]::OrdinalIgnoreCase)) {
+        return ""
+    }
+    $relative = $Reference.Substring(5)
+    if ([string]::IsNullOrWhiteSpace($relative)) { return "" }
+    if ([IO.Path]::IsPathRooted($relative)) {
+        return [IO.Path]::GetFullPath($relative)
+    }
+    return [IO.Path]::GetFullPath((Join-Path (Join-Path $ProjectPath "Packages") $relative))
+}
+
 if ($embeddedPackagePresent) {
     $manifest = Read-Json $packageManifestPath "Unity package manifest"
-    if ($null -ne $manifest -and $null -ne $manifest.dependencies -and
-        $null -ne $manifest.dependencies.PSObject.Properties["com.code-philosophy.hybridclr"] -and
-        [string]$manifest.dependencies."com.code-philosophy.hybridclr" -eq "file:com.code-philosophy.hybridclr") {
+    $manifestReference = if ($null -ne $manifest -and $null -ne $manifest.dependencies -and
+        $null -ne $manifest.dependencies.PSObject.Properties["com.code-philosophy.hybridclr"]) {
+        [string]$manifest.dependencies."com.code-philosophy.hybridclr"
+    } else { "" }
+    $manifestPackagePath = Resolve-UnityPackageFileReference $manifestReference
+    if (-not [string]::IsNullOrWhiteSpace($manifestPackagePath) -and
+        $manifestPackagePath.Equals([IO.Path]::GetFullPath($packageRoot), [StringComparison]::OrdinalIgnoreCase)) {
         Add-Check "package:manifest" $true "embedded package reference"
     } else {
-        Add-ErrorCheck "package:manifest" "Unity package manifest does not reference the embedded HybridCLR package."
+        Add-ErrorCheck "package:manifest" "Unity package manifest does not reference the resolved embedded HybridCLR package: $packageRoot"
     }
     $packagesLock = Read-Json $packagePackagesLockPath "Unity packages lock"
     $packageLockEntry = if ($null -eq $packagesLock) { $null } else { $packagesLock.dependencies."com.code-philosophy.hybridclr" }
-    if ($null -ne $packageLockEntry -and [string]$packageLockEntry.source -eq "embedded") {
+    $packagesLockReference = if ($null -eq $packageLockEntry) { "" } else { [string]$packageLockEntry.version }
+    $packagesLockPackagePath = Resolve-UnityPackageFileReference $packagesLockReference
+    if ($null -ne $packageLockEntry -and [string]$packageLockEntry.source -eq "embedded" -and
+        $packagesLockPackagePath.Equals([IO.Path]::GetFullPath($packageRoot), [StringComparison]::OrdinalIgnoreCase)) {
         Add-Check "package:packages-lock" $true "embedded package lock entry"
     } else {
-        Add-ErrorCheck "package:packages-lock" "Unity packages-lock.json has no embedded HybridCLR package entry."
+        Add-ErrorCheck "package:packages-lock" "Unity packages-lock.json has no embedded HybridCLR package entry for: $packageRoot"
     }
 } else {
     Add-Check "package:manifest" $true "embedded package checks not applicable"
