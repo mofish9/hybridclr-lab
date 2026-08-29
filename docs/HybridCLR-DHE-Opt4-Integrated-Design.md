@@ -1,7 +1,7 @@
 # HybridCLR DHE opt4 Integrated Design
 
 This document defines the first formal opt4 integration of the community DHE
-workflow. The earlier `dhe-toolchain-0.1.1` package remains a workflow proof;
+workflow. The earlier `dhe-toolchain-0.1.1` package remains a historical workflow proof;
 this opt4 line binds the same behavior to the opt3 maintenance sources.
 
 ## Runtime boundary
@@ -11,7 +11,7 @@ implementation:
 
 - `hybridclr@9e4fc7219724a3c63ff845e0b2acaa7d10c2430b` is the formal
   `optimize/v8.13.0` commit and annotated tag `v8.13.0-opt4`.
-- `hybridclr_unity@b39ba78bfab50f04b9724c603d3007c2afc3393b` is the formal
+- `hybridclr_unity@9a9b703463a453e7cfa75957f17cbcb28acb21dc` is the formal
   `optimize/v8.13.0` package commit. The package does not receive an opt tag.
 - `il2cpp_plus` has no DHE source change in this round and continues to use the
   three opt3 engine tags.

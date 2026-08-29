@@ -3,7 +3,7 @@
 ## Distribution contract
 
 The formal distribution is a versioned source toolchain, not a copy of the lab
-workspace. Version `0.1.1` uses toolchain and adapter contract version `1`.
+workspace. Version `0.1.2` uses toolchain and adapter contract version `1`.
 
 The package contains:
 
@@ -39,13 +39,31 @@ adapter must run on macOS with the Unity iOS module and may export an Xcode
 project; signing, Xcode compilation, device launch, and the runtime smoke test
 remain adapter-owned assertions.
 
+## Unity Package API
+
+The embedded `HybridCLR.Editor` package exposes the project-independent DHE
+primitives through `HybridCLR.Editor.Commands.DheBuildPipeline`:
+
+- `ValidateAssemblyScope` validates `hotUpdateAssemblies` and
+  `dheAotAssemblies` without depending on a project build framework.
+- `StageRuntimePlan` stages current DLLs, MV binaries, baseline snapshots and
+  runtime indexes from `DheRuntimePlanOptions`. Adapters can supply callbacks
+  for encrypted bytes, dependency ordering and project-specific dependency
+  maps.
+- `BuildPlayer` binds the previous stripped-AOT directory to
+  `HYBRIDCLR_DHE_AOT_BASELINE_ROOT` and builds the configured target using
+  `DhePlayerBuildOptions`.
+
+YooAsset, resource encryption, load-order policy and device assertions remain
+adapter callbacks/configuration. The package does not reference Cat types.
+
 ## Publish
 
 Publish only from a clean Git checkout in which every layout input is tracked:
 
 ```powershell
 ./scripts/publish-dhe-toolchain.ps1 `
-  -OutputRoot ./artifacts/dhe-toolchain-0.1.1 `
+  -OutputRoot ./artifacts/dhe-toolchain-0.1.2 `
   -Mode Release -ForceOutput
 ```
 
@@ -73,7 +91,7 @@ trusted tool root:
 ```powershell
 $packageId = "<64-hex-package-id>"
 $trustedTool = "C:/trusted/HybridCLRDhe"
-$candidate = "C:/releases/dhe-toolchain-0.1.1"
+$candidate = "C:/releases/dhe-toolchain-0.1.2"
 
 & "$trustedTool/scripts/test-dhe-toolchain-package.ps1" `
   -PackageRoot $candidate `
@@ -105,7 +123,7 @@ the runtime tree and passing installed-consumer gate:
 
 ```powershell
 ./scripts/publish-dhe-toolchain-release.ps1 `
-  -PackageRoot C:/releases/dhe-toolchain-0.1.1 `
+  -PackageRoot C:/releases/dhe-toolchain-0.1.2 `
   -RuntimeManifest ./staging/runtime/DHE-Tuanjie2022/runtime-manifest.json `
   -InstalledConsumerGate ./artifacts/dhe-installed-consumer-gate/installed-consumer-gate-report.json `
   -ForceOutput
