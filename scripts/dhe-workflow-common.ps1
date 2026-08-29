@@ -609,7 +609,13 @@ function Exit-DheWorkflowLock {
 }
 
 function Normalize-DhePath([string]$Path) {
-    return [IO.Path]::GetFullPath($Path).TrimEnd('\', '/')
+    $resolved = [IO.Path]::GetFullPath($Path)
+    $root = [IO.Path]::GetPathRoot($resolved)
+    if (-not [string]::IsNullOrWhiteSpace($root) -and
+        $resolved.Equals($root, [StringComparison]::OrdinalIgnoreCase)) {
+        return $resolved
+    }
+    return $resolved.TrimEnd('\', '/')
 }
 
 function Sort-DheOrdinal([object[]]$Values) {
@@ -829,7 +835,8 @@ function Find-DheContainingGitRoot([string]$Path) {
         }
         $cursorRoot = [IO.Path]::GetPathRoot($cursor)
         if (-not [string]::IsNullOrWhiteSpace($cursorRoot) -and
-            $cursor.Equals($cursorRoot.TrimEnd('\', '/'), [StringComparison]::OrdinalIgnoreCase)) {
+            ($cursor.Equals($cursorRoot, [StringComparison]::OrdinalIgnoreCase) -or
+             $cursor.Equals($cursorRoot.TrimEnd('\', '/'), [StringComparison]::OrdinalIgnoreCase))) {
             break
         }
         $parent = Split-Path -Parent $cursor
@@ -837,7 +844,7 @@ function Find-DheContainingGitRoot([string]$Path) {
             $parent.Equals($cursor, [StringComparison]::OrdinalIgnoreCase)) {
             break
         }
-        $cursor = $parent.TrimEnd('\', '/')
+        $cursor = Normalize-DhePath $parent
     }
     return $null
 }
@@ -876,7 +883,8 @@ function Find-DheContainingSvnRoot([string]$Path) {
         }
         $cursorRoot = [IO.Path]::GetPathRoot($cursor)
         if (-not [string]::IsNullOrWhiteSpace($cursorRoot) -and
-            $cursor.Equals($cursorRoot.TrimEnd('\', '/'), [StringComparison]::OrdinalIgnoreCase)) {
+            ($cursor.Equals($cursorRoot, [StringComparison]::OrdinalIgnoreCase) -or
+             $cursor.Equals($cursorRoot.TrimEnd('\', '/'), [StringComparison]::OrdinalIgnoreCase))) {
             break
         }
         $parent = Split-Path -Parent $cursor
@@ -884,7 +892,7 @@ function Find-DheContainingSvnRoot([string]$Path) {
             $parent.Equals($cursor, [StringComparison]::OrdinalIgnoreCase)) {
             break
         }
-        $cursor = $parent.TrimEnd('\', '/')
+        $cursor = Normalize-DhePath $parent
     }
     return $null
 }
@@ -899,7 +907,8 @@ function Assert-DheBasicOutputRootSafety {
     $resolved = Normalize-DhePath $Path
     $pathRoot = [IO.Path]::GetPathRoot($resolved)
     if (-not [string]::IsNullOrWhiteSpace($pathRoot) -and
-        $resolved.Equals($pathRoot.TrimEnd('\', '/'), [StringComparison]::OrdinalIgnoreCase)) {
+        ($resolved.Equals($pathRoot, [StringComparison]::OrdinalIgnoreCase) -or
+         $resolved.Equals($pathRoot.TrimEnd('\', '/'), [StringComparison]::OrdinalIgnoreCase))) {
         throw "DHE output root may not be a filesystem root: $resolved"
     }
     foreach ($protected in @($ProtectedPaths | Where-Object { -not [string]::IsNullOrWhiteSpace($_) })) {
@@ -920,7 +929,8 @@ function Assert-DheBasicOutputRootSafety {
         }
         $cursorRoot = [IO.Path]::GetPathRoot($cursor)
         if (-not [string]::IsNullOrWhiteSpace($cursorRoot) -and
-            $cursor.Equals($cursorRoot.TrimEnd('\', '/'), [StringComparison]::OrdinalIgnoreCase)) {
+            ($cursor.Equals($cursorRoot, [StringComparison]::OrdinalIgnoreCase) -or
+             $cursor.Equals($cursorRoot.TrimEnd('\', '/'), [StringComparison]::OrdinalIgnoreCase))) {
             break
         }
         $parent = Split-Path -Parent $cursor
@@ -928,7 +938,7 @@ function Assert-DheBasicOutputRootSafety {
             $parent.Equals($cursor, [StringComparison]::OrdinalIgnoreCase)) {
             break
         }
-        $cursor = $parent.TrimEnd('\', '/')
+        $cursor = Normalize-DhePath $parent
     }
 }
 
@@ -1162,7 +1172,7 @@ function Assert-DheSafeOutputRoot {
             $parent = Split-Path -Parent $boundaryCursor
             if ([string]::IsNullOrWhiteSpace($parent) -or
                 $parent.Equals($boundaryCursor, [StringComparison]::OrdinalIgnoreCase)) { break }
-            $boundaryCursor = $parent.TrimEnd('\', '/')
+            $boundaryCursor = Normalize-DhePath $parent
         }
         foreach ($sourceBoundaryPath in $boundaryCandidates) {
             if (-not (Test-Path -LiteralPath $sourceBoundaryPath -PathType Leaf)) { continue }

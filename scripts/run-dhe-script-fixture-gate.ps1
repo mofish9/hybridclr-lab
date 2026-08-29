@@ -333,6 +333,23 @@ try {
 }
 Require $unsafeSourceOutputRejected "Output safety accepted a formal tracked source directory."
 
+# Filesystem roots must remain roots during normalization. Trimming the root
+# separator turns `C:\` into `C:` on Windows, which SVN interprets as the
+# current working copy and can make an external output directory look unsafe
+# or cause the wrong repository boundary to be inspected.
+$filesystemRoot = [IO.Path]::GetPathRoot((Get-Location).Path)
+$normalizedFilesystemRoot = Normalize-DhePath $filesystemRoot
+$filesystemRootPreserved = $normalizedFilesystemRoot.Equals(
+    $filesystemRoot, [StringComparison]::OrdinalIgnoreCase)
+$filesystemRootRejected = $false
+try {
+    Assert-DheSafeOutputRoot -Path $filesystemRoot
+} catch {
+    $filesystemRootRejected = $_.Exception.Message -like "DHE output root may not be a filesystem root*"
+}
+Require $filesystemRootPreserved "Path normalization stripped the filesystem root separator."
+Require $filesystemRootRejected "Output safety accepted the filesystem root."
+
 # PowerShell unwraps a one-item native-command result to a scalar. Prove that
 # the tracked-source guard still rejects a directory containing exactly one
 # tracked file and does not swallow StrictMode property-access failures.
@@ -1136,6 +1153,8 @@ $report = [ordered]@{
     exploratoryReleaseRejected = $exploratoryReleaseRejected
     releaseDerivedOutputsIsolated = $releaseDerivedOutputsIsolated
     unsafeSourceOutputRejected = $unsafeSourceOutputRejected
+    filesystemRootPreserved = $filesystemRootPreserved
+    filesystemRootRejected = $filesystemRootRejected
     singleTrackedOutputRejected = $singleTrackedOutputRejected
     invalidBoundaryRejected = $invalidBoundaryRejected
     foreignGitRootRejected = $foreignGitRootRejected
