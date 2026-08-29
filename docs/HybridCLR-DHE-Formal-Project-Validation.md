@@ -215,7 +215,9 @@ complete native coverage but never produces a passing release identity.
 
 Release also runs the clean-checkout gate before source preflight. `GitRoot`
 defaults to `ProjectPath` and can be set explicitly when the project is nested
-inside a larger repository. Use `-ProjectVcs Svn` for an SVN project. The resolved
+inside a larger repository. Use `-ProjectVcs Svn` for an SVN project; an explicit
+`Git` or `Svn` selection also enables the project identity check in Exploratory
+mode, even when `GitRoot` is omitted. The resolved
 project Git top-level (or SVN working-copy root) must contain both the project and
 its tracked source-boundary manifest; an unrelated clean repository cannot supply
 project identity. Independently, the runner resolves the tool Git root and

@@ -152,6 +152,10 @@ Installed `doctor -RequireRelease` and `workflow -Mode Release` commands reject
 missing external package-ID pins.
 Generated command reports default to the system temporary report directory and
 cannot be written inside either source or installed package roots.
+The doctor verifies the installed package and optional project inputs; project
+Git/SVN cleanliness and tracked-source coverage are owned by the workflow gate.
+For an SVN project, pass `-ProjectVcs Svn` to the workflow and keep the installed
+tool directory outside the SVN working copy or explicitly ignored.
 
 ## Upgrade and downgrade
 
