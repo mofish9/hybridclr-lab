@@ -22,7 +22,8 @@ to the project adapter.
 ## Requirements
 
 - Windows or macOS with PowerShell 7 (`pwsh`) on `PATH`;
-- Git on `PATH` for publish, install provenance, and Release workflows;
+- Git on `PATH` for publishing the toolchain and tool-source provenance;
+- Git or SVN on `PATH` for the project source checkout (`-ProjectVcs Svn` selects SVN explicitly);
 - a Unity project with HybridCLR settings;
 - `dnlib.dll` from the project's embedded HybridCLR package, or an explicit
   `-DnlibPath` for registry/external packages;

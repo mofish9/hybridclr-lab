@@ -215,12 +215,14 @@ complete native coverage but never produces a passing release identity.
 
 Release also runs the clean-checkout gate before source preflight. `GitRoot`
 defaults to `ProjectPath` and can be set explicitly when the project is nested
-inside a larger repository. The resolved project Git top-level must contain both
-the project and its tracked source-boundary manifest; an unrelated clean
-repository cannot supply project identity. Independently, the runner resolves
-the tool Git root and `manifests/dhe-source-boundary.json`. Both `projectGit` and
-`toolGit` must be clean and tracked, and the report binds each identity to its
-HEAD commit, HEAD tree, and source-boundary SHA-256. The gate also binds the
+inside a larger repository. Use `-ProjectVcs Svn` for an SVN project. The resolved
+project Git top-level (or SVN working-copy root) must contain both the project and
+its tracked source-boundary manifest; an unrelated clean repository cannot supply
+project identity. Independently, the runner resolves the tool Git root and
+`manifests/dhe-source-boundary.json`. Both `projectGit` and
+`toolGit` must be clean and tracked, and the report binds Git identities to their
+HEAD commit/HEAD tree and SVN identities to their concrete URL, numeric revision,
+and `svnversion` spec, together with the source-boundary SHA-256. The gate also binds the
 runtime manifest to current workflow/repository locks, actual source commits,
 dirty state, locked external-header tree hash, and editor ProductVersion. Use `-RequireGitClean`,
 `-RequireTrackedSources`, or `-RequireCleanRuntimeSources` to opt into these

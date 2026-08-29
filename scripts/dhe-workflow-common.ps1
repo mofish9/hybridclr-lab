@@ -842,6 +842,53 @@ function Find-DheContainingGitRoot([string]$Path) {
     return $null
 }
 
+function Find-DheContainingSvnRoot([string]$Path) {
+    $svnCommand = Get-Command svn -ErrorAction SilentlyContinue
+    if ($null -eq $svnCommand) { return $null }
+    $cursor = Normalize-DhePath $Path
+    while (-not [string]::IsNullOrWhiteSpace($cursor)) {
+        if (Test-Path -LiteralPath $cursor) {
+            $oldErrorActionPreference = $ErrorActionPreference
+            try {
+                $ErrorActionPreference = "Continue"
+                $info = @(& $svnCommand.Source info --xml --non-interactive $cursor 2>&1)
+                $infoExitCode = [int]$LASTEXITCODE
+            } finally {
+                $ErrorActionPreference = $oldErrorActionPreference
+            }
+            if ($infoExitCode -eq 0) {
+                try {
+                    $document = [xml](($info -join [Environment]::NewLine))
+                    $entry = $document.info.entry
+                    if ($null -ne $entry) {
+                        $wcRoot = $entry.'wc-info'.'wcroot-abspath'
+                        if ($null -ne $wcRoot -and -not [string]::IsNullOrWhiteSpace([string]$wcRoot)) {
+                            return [IO.Path]::GetFullPath([string]$wcRoot)
+                        }
+                        return $cursor
+                    }
+                } catch {
+                    # A malformed SVN probe is not proof that the path is
+                    # unversioned; continue climbing and let callers fail
+                    # closed only when a tracked path is actually found.
+                }
+            }
+        }
+        $cursorRoot = [IO.Path]::GetPathRoot($cursor)
+        if (-not [string]::IsNullOrWhiteSpace($cursorRoot) -and
+            $cursor.Equals($cursorRoot.TrimEnd('\', '/'), [StringComparison]::OrdinalIgnoreCase)) {
+            break
+        }
+        $parent = Split-Path -Parent $cursor
+        if ([string]::IsNullOrWhiteSpace($parent) -or
+            $parent.Equals($cursor, [StringComparison]::OrdinalIgnoreCase)) {
+            break
+        }
+        $cursor = $parent.TrimEnd('\', '/')
+    }
+    return $null
+}
+
 function Assert-DheBasicOutputRootSafety {
     param(
         [Parameter(Mandatory = $true)]
@@ -1054,6 +1101,50 @@ function Assert-DheSafeOutputRoot {
         }
         if (@($tracked).Count -gt 0) {
             throw "DHE output root overlaps Git-tracked source content; refusing recursive cleanup: $resolved"
+        }
+    }
+
+    # SVN projects do not have a .git marker, so the Git-only check above does
+    # not protect an output root placed inside an SVN working copy. Reject a
+    # versioned root, and reject any tracked descendants when the root itself
+    # is an unversioned directory containing generated output.
+    $svnRoot = Find-DheContainingSvnRoot $resolved
+    if (-not [string]::IsNullOrWhiteSpace([string]$svnRoot) -and
+        (Test-Path -LiteralPath $resolved)) {
+        $svnCommand = Get-Command svn -ErrorAction SilentlyContinue
+        if ($null -ne $svnCommand) {
+            $oldErrorActionPreference = $ErrorActionPreference
+            try {
+                $ErrorActionPreference = "Continue"
+                $svnInfo = @(& $svnCommand.Source info --xml --non-interactive $resolved 2>&1)
+                $svnInfoExitCode = [int]$LASTEXITCODE
+                if ($svnInfoExitCode -eq 0) {
+                    throw "DHE output root overlaps SVN-tracked source content; refusing recursive cleanup: $resolved"
+                }
+                if (Test-Path -LiteralPath $resolved -PathType Container) {
+                    $svnStatus = @(& $svnCommand.Source status --xml --ignore-externals --depth infinity $resolved 2>&1)
+                    $svnStatusExitCode = [int]$LASTEXITCODE
+                    if ($svnStatusExitCode -eq 0) {
+                        try {
+                            $svnStatusDocument = [xml](($svnStatus -join [Environment]::NewLine))
+                            $trackedDescendants = @($svnStatusDocument.status.target.entry | Where-Object {
+                                $item = [string]$_.'wc-status'.item
+                                $item -and $item -notin @("unversioned", "ignored", "none")
+                            })
+                            if ($trackedDescendants.Count -gt 0) {
+                                throw "DHE output root contains SVN-tracked content; refusing recursive cleanup: $resolved"
+                            }
+                        } catch {
+                            if ($_.Exception.Message -like "DHE output root*") { throw }
+                            throw "DHE SVN output-root inspection failed: $resolved ($($_.Exception.Message))"
+                        }
+                    } else {
+                        throw "DHE SVN output-root inspection failed: $resolved (status exit=$svnStatusExitCode)"
+                    }
+                }
+            } finally {
+                $ErrorActionPreference = $oldErrorActionPreference
+            }
         }
     }
 

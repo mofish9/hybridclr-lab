@@ -278,21 +278,34 @@ try {
         throw "Archived clean checkout does not declare archive-relative-v1 path semantics."
     }
     $archiveSourceIdentities = Get-PropertyValue $archiveManifest "sourceIdentities"
-    foreach ($gitIdentityName in @("projectGit", "toolGit")) {
-        $cleanGitIdentity = Get-PropertyValue $cleanCheckoutArchive $gitIdentityName
-        $manifestGitIdentity = Get-PropertyValue $archiveSourceIdentities $gitIdentityName
+    foreach ($identityName in @("projectGit", "toolGit")) {
+        $cleanGitIdentity = Get-PropertyValue $cleanCheckoutArchive $identityName
+        $manifestGitIdentity = Get-PropertyValue $archiveSourceIdentities $identityName
         if ([string](Get-PropertyValue $workflowArchive "mode") -eq "Release" -and
             ($null -eq $cleanGitIdentity -or $null -eq $manifestGitIdentity)) {
-            throw "Release archive is missing $gitIdentityName source identity."
+            throw "Release archive is missing $identityName source identity."
         }
         if (($null -eq $cleanGitIdentity) -ne ($null -eq $manifestGitIdentity)) {
-            throw "Archive manifest $gitIdentityName identity does not match clean checkout."
+            throw "Archive manifest $identityName identity does not match clean checkout."
         }
-        if ($null -ne $cleanGitIdentity -and (
-                [string](Get-PropertyValue $cleanGitIdentity "head") -ne [string](Get-PropertyValue $manifestGitIdentity "head") -or
-                [string](Get-PropertyValue $cleanGitIdentity "tree") -ne [string](Get-PropertyValue $manifestGitIdentity "tree") -or
-                [string](Get-PropertyValue $cleanGitIdentity "sourceBoundarySha256") -ne [string](Get-PropertyValue $manifestGitIdentity "sourceBoundarySha256"))) {
-            throw "Archive manifest $gitIdentityName identity does not match clean checkout."
+        if ($null -ne $cleanGitIdentity) {
+            $cleanVcs = [string](Get-PropertyValue $cleanGitIdentity "vcs")
+            if ([string]::IsNullOrWhiteSpace($cleanVcs)) { $cleanVcs = "git" }
+            $identityMatches = [string](Get-PropertyValue $manifestGitIdentity "vcs") -eq $cleanVcs -and
+                [string](Get-PropertyValue $cleanGitIdentity "sourceBoundarySha256") -eq [string](Get-PropertyValue $manifestGitIdentity "sourceBoundarySha256")
+            if ($cleanVcs -eq "svn") {
+                $identityMatches = $identityMatches -and
+                    [string](Get-PropertyValue $cleanGitIdentity "revision") -eq [string](Get-PropertyValue $manifestGitIdentity "revision") -and
+                    [string](Get-PropertyValue $cleanGitIdentity "revisionSpec") -eq [string](Get-PropertyValue $manifestGitIdentity "revisionSpec") -and
+                    [string](Get-PropertyValue $cleanGitIdentity "repository") -eq [string](Get-PropertyValue $manifestGitIdentity "repository")
+            } else {
+                $identityMatches = $identityMatches -and
+                    [string](Get-PropertyValue $cleanGitIdentity "head") -eq [string](Get-PropertyValue $manifestGitIdentity "head") -and
+                    [string](Get-PropertyValue $cleanGitIdentity "tree") -eq [string](Get-PropertyValue $manifestGitIdentity "tree")
+            }
+            if (-not $identityMatches) {
+                throw "Archive manifest $identityName identity does not match clean checkout."
+            }
         }
     }
 

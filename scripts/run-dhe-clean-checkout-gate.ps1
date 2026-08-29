@@ -8,6 +8,8 @@ param(
     [string]$PackageLockPath = "",
     [string]$IdentityTemplatePath = "",
     [string]$SourceBoundaryPath = "",
+    [ValidateSet("Auto", "Git", "Svn")]
+    [string]$ProjectVcs = "Auto",
     [string]$GitRoot = "",
     [string]$ToolGitRoot = "",
     [string]$ToolSourceBoundaryPath = "",
@@ -262,12 +264,221 @@ function Get-GitSourceIdentity {
 
     return [pscustomobject][ordered]@{
         name = $Name
+        vcs = "git"
         tested = $true
         root = $resolvedGitRoot
         ownedPath = $resolvedOwnedPath
         head = $gitHead
         tree = $gitTree
         clean = $gitCleanValue
+        cleanRequired = [bool]$RequireClean
+        trackedSourcesTested = $trackedSourcesTestedValue
+        trackedSourcesComplete = $trackedSourcesCompleteValue
+        trackedSourcesRequired = [bool]$RequireTracked
+        sourceBoundaryPath = $resolvedBoundaryPath
+        sourceBoundarySha256 = $boundarySha256
+        sourceBoundaryPathBase = $boundaryPathBaseValue
+        revision = $null
+        revisionSpec = $null
+        repository = $null
+        missingTrackedSources = $missingSources.ToArray()
+        passed = $identityErrors.Count -eq 0
+        errors = $identityErrors.ToArray()
+        warnings = $identityWarnings.ToArray()
+    }
+}
+
+function Get-SvnSourceIdentity {
+    param(
+        [Parameter(Mandatory = $true)]
+        [string]$Name,
+        [Parameter(Mandatory = $true)]
+        [string]$RequestedRoot,
+        [Parameter(Mandatory = $true)]
+        [string]$OwnedPath,
+        [string]$BoundaryPath = "",
+        [switch]$RequireClean,
+        [switch]$RequireTracked
+    )
+
+    $identityErrors = New-Object System.Collections.Generic.List[string]
+    $identityWarnings = New-Object System.Collections.Generic.List[string]
+    $missingSources = New-Object System.Collections.Generic.List[string]
+    $resolvedRequestedRoot = [IO.Path]::GetFullPath($RequestedRoot)
+    $resolvedOwnedPath = [IO.Path]::GetFullPath($OwnedPath)
+    $resolvedBoundaryPath = if ([string]::IsNullOrWhiteSpace($BoundaryPath)) {
+        $null
+    } else { [IO.Path]::GetFullPath($BoundaryPath) }
+    $revision = $null
+    $revisionSpec = $null
+    $repository = $null
+    $resolvedRoot = $null
+    $cleanValue = $null
+    $trackedSourcesTestedValue = $false
+    $trackedSourcesCompleteValue = $null
+    $boundarySha256 = $null
+    $boundaryPathBaseValue = $null
+
+    $svnCommand = Get-Command svn -ErrorAction SilentlyContinue
+    if ($null -eq $svnCommand) {
+        $identityErrors.Add("$Name SVN source requires svn on PATH.")
+    } elseif (-not (Test-Path -LiteralPath $resolvedRequestedRoot -PathType Container)) {
+        $identityErrors.Add("$Name SVN source root was not found: $resolvedRequestedRoot")
+    } else {
+        $infoOutput = @(& $svnCommand.Source info --xml --non-interactive $resolvedRequestedRoot 2>&1)
+        $infoExitCode = [int]$LASTEXITCODE
+        $infoDocument = $null
+        if ($infoExitCode -ne 0) {
+            $identityErrors.Add("$Name SVN source root is not a working copy: $resolvedRequestedRoot")
+        } else {
+            try { $infoDocument = [xml](($infoOutput -join [Environment]::NewLine)) }
+            catch { $identityErrors.Add("Unable to parse $Name SVN info: $resolvedRequestedRoot") }
+        }
+        if ($null -ne $infoDocument -and $null -ne $infoDocument.info.entry) {
+            $entry = $infoDocument.info.entry
+            $resolvedRoot = if ($null -ne $entry.'wc-info'.'wcroot-abspath') {
+                [IO.Path]::GetFullPath([string]$entry.'wc-info'.'wcroot-abspath')
+            } else { $resolvedRequestedRoot }
+            $revision = [string]$entry.revision
+            # The repository root alone cannot distinguish SVN branches. Keep
+            # the concrete working-copy URL as the release identity.
+            $repository = if ($null -ne $entry.url) {
+                [string]$entry.url
+            } elseif ($null -ne $entry.repository.root) {
+                [string]$entry.repository.root
+            } else { $null }
+
+        }
+
+        # svnversion reports mixed/sparse working copies as a range or with a
+        # suffix. A single numeric root revision is not a reproducible source
+        # identity in that case, so Release must reject it.
+        $svnVersionCommand = Get-Command svnversion -ErrorAction SilentlyContinue
+        if ($null -eq $svnVersionCommand) {
+            $message = "$Name SVN source requires svnversion for a reproducible working-copy identity."
+            if ($RequireClean) { $identityErrors.Add($message) }
+            else { $identityWarnings.Add($message) }
+        } else {
+            $svnVersionProbe = @(& $svnVersionCommand.Source -n $resolvedRequestedRoot 2>&1)
+            $svnVersionExitCode = [int]$LASTEXITCODE
+            if ($svnVersionExitCode -eq 0) {
+                $revisionSpec = ($svnVersionProbe -join "").Trim()
+                if ([string]::IsNullOrWhiteSpace($revisionSpec)) {
+                    $identityErrors.Add("$Name SVN working copy returned an empty svnversion identity: $resolvedRequestedRoot")
+                } elseif ($revisionSpec -notmatch '^[0-9]+$') {
+                    $message = "$Name SVN working copy has a mixed or non-reproducible revision '$revisionSpec': $resolvedRequestedRoot"
+                    if ($RequireClean) { $identityErrors.Add($message) }
+                    else { $identityWarnings.Add($message) }
+                }
+            } else {
+                $message = "Unable to resolve $Name SVN working-copy revision: $resolvedRequestedRoot"
+                if ($RequireClean) { $identityErrors.Add($message) }
+                else { $identityWarnings.Add($message) }
+            }
+        }
+
+        if ($null -ne $resolvedRoot -and -not (Test-PathWithinRoot -Path $resolvedOwnedPath -Root $resolvedRoot)) {
+            $identityErrors.Add("$Name owned path is outside the verified SVN working copy: ownedPath=$resolvedOwnedPath; svnRoot=$resolvedRoot")
+        }
+
+        $statusOutput = @(& $svnCommand.Source status --xml --ignore-externals $resolvedRequestedRoot 2>&1)
+        $statusExitCode = [int]$LASTEXITCODE
+        if ($statusExitCode -ne 0) {
+            $identityErrors.Add("Unable to inspect $Name SVN status: $resolvedRequestedRoot")
+        } else {
+            try {
+                $statusDocument = [xml](($statusOutput -join [Environment]::NewLine))
+                $statusEntries = @($statusDocument.status.target.entry)
+                $cleanValue = $statusEntries.Count -eq 0
+                if (-not $cleanValue) {
+                    $message = "$Name SVN working copy has tracked or untracked changes: $resolvedRequestedRoot"
+                    if ($RequireClean) { $identityErrors.Add($message) }
+                    else { $identityWarnings.Add($message) }
+                }
+            } catch {
+                $identityErrors.Add("Unable to parse $Name SVN status: $resolvedRequestedRoot")
+            }
+        }
+
+        if ($RequireTracked) {
+            $trackedSourcesTestedValue = $true
+            if ($null -eq $resolvedBoundaryPath -or -not (Test-Path -LiteralPath $resolvedBoundaryPath -PathType Leaf)) {
+                $identityErrors.Add("$Name tracked-source verification requires a source boundary manifest.")
+            } else {
+                $boundary = $null
+                try { $boundary = Get-Content -Raw -LiteralPath $resolvedBoundaryPath | ConvertFrom-Json }
+                catch { $identityErrors.Add("Unable to read $Name source boundary manifest: $resolvedBoundaryPath") }
+                if ($null -ne $boundary) {
+                    $boundaryFormat = if ($null -ne $boundary.PSObject.Properties["format"]) { [string]$boundary.format } else { "" }
+                    $boundarySchema = if ($null -ne $boundary.PSObject.Properties["schemaVersion"]) { [int]$boundary.schemaVersion } else { 0 }
+                    $boundaryPathBaseValue = if ($null -ne $boundary.PSObject.Properties["pathBase"]) { [string]$boundary.pathBase } else { $null }
+                    [object[]]$boundaryExact = if ($null -ne $boundary.PSObject.Properties["exactPaths"]) { @($boundary.exactPaths) } else { @() }
+                    [object[]]$boundaryPrefixes = if ($null -ne $boundary.PSObject.Properties["prefixes"]) { @($boundary.prefixes) } else { @() }
+                    if ($boundarySchema -ne 1 -or $boundaryFormat -ne "hybridclr.dhe-source-boundary.json" -or
+                        $boundaryPathBaseValue -notin @("git-root-v1", "manifest-directory-v1") -or
+                        $boundaryExact.Count -eq 0 -or $boundaryPrefixes.Count -eq 0) {
+                        $identityErrors.Add("$Name source boundary manifest has an invalid schema, format, pathBase, or empty exactPaths/prefixes: $resolvedBoundaryPath")
+                        $boundary = $null
+                    } else {
+                        $boundarySha256 = (Get-FileHash -LiteralPath $resolvedBoundaryPath -Algorithm SHA256).Hash.ToLowerInvariant()
+                    }
+                }
+
+                function Test-SvnVersionedPath([string]$Path) {
+                    $probe = @(& $svnCommand.Source info --xml --non-interactive $Path 2>&1)
+                    return [int]$LASTEXITCODE -eq 0
+                }
+
+                if ($null -ne $boundary) {
+                    $boundaryBasePath = if ($boundaryPathBaseValue -eq "manifest-directory-v1") {
+                        [IO.Path]::GetDirectoryName($resolvedBoundaryPath)
+                    } else { $resolvedRoot }
+                    if (-not (Test-PathWithinRoot -Path $boundaryBasePath -Root $resolvedRoot)) {
+                        $identityErrors.Add("$Name source boundary pathBase resolves outside the SVN working copy: $boundaryBasePath")
+                    } else {
+                        if (-not (Test-SvnVersionedPath $resolvedBoundaryPath)) {
+                            $missingSources.Add("source-boundary:$resolvedBoundaryPath")
+                        }
+                        foreach ($exact in @($boundary.exactPaths)) {
+                            $relative = ([string]$exact).Replace('\', '/').TrimStart('/')
+                            $candidate = [IO.Path]::GetFullPath((Join-Path $boundaryBasePath $relative.Replace('/', [IO.Path]::DirectorySeparatorChar)))
+                            if (-not (Test-SvnVersionedPath $candidate)) { $missingSources.Add($relative) }
+                        }
+                        foreach ($prefix in @($boundary.prefixes)) {
+                            $relative = ([string]$prefix).Replace('\', '/').TrimStart('/')
+                            $wildcard = $relative.IndexOf('*')
+                            if ($wildcard -ge 0) { $relative = $relative.Substring(0, $wildcard).TrimEnd('/') }
+                            $candidate = [IO.Path]::GetFullPath((Join-Path $boundaryBasePath $relative.Replace('/', [IO.Path]::DirectorySeparatorChar)))
+                            if (-not (Test-SvnVersionedPath $candidate)) {
+                                $missingSources.Add($relative)
+                            } else {
+                                $listed = @(& $svnCommand.Source list --recursive --non-interactive $candidate 2>&1)
+                                if ([int]$LASTEXITCODE -ne 0 -or $listed.Count -eq 0) { $missingSources.Add($relative) }
+                            }
+                        }
+                    }
+                }
+            }
+            $trackedSourcesCompleteValue = $missingSources.Count -eq 0 -and
+                @($identityErrors | Where-Object { $_ -like "$Name tracked-source*" -or $_ -like "$Name source boundary*" -or $_ -like "Unable to *$Name*source*" }).Count -eq 0
+            if (-not $trackedSourcesCompleteValue) {
+                $identityErrors.Add("$Name formal source paths are not fully tracked by SVN: $($missingSources -join ', ')")
+            }
+        }
+    }
+
+    return [pscustomobject][ordered]@{
+        name = $Name
+        vcs = "svn"
+        tested = $true
+        root = $resolvedRoot
+        ownedPath = $resolvedOwnedPath
+        head = $null
+        tree = $null
+        revision = $revision
+        revisionSpec = $revisionSpec
+        repository = $repository
+        clean = $cleanValue
         cleanRequired = [bool]$RequireClean
         trackedSourcesTested = $trackedSourcesTestedValue
         trackedSourcesComplete = $trackedSourcesCompleteValue
@@ -312,8 +523,23 @@ $projectGit = $null
 if ($gitTested) {
     $projectGitRoot = if ([string]::IsNullOrWhiteSpace($GitRoot)) { $ProjectPath } else { [IO.Path]::GetFullPath($GitRoot) }
     $projectBoundaryPath = if ([string]::IsNullOrWhiteSpace($SourceBoundaryPath)) { "" } else { [IO.Path]::GetFullPath($SourceBoundaryPath) }
-    $projectGit = Get-GitSourceIdentity -Name "project" -RequestedRoot $projectGitRoot -OwnedPath $ProjectPath `
-        -BoundaryPath $projectBoundaryPath -RequireClean:$RequireGitClean -RequireTracked:$RequireTrackedSources
+    $resolvedProjectVcs = $ProjectVcs
+    if ($resolvedProjectVcs -eq "Auto") {
+        $gitCommand = Get-Command git -ErrorAction SilentlyContinue
+        if ($null -ne $gitCommand) {
+            $gitProbe = @(& $gitCommand.Source -C $projectGitRoot rev-parse --show-toplevel 2>&1)
+            $resolvedProjectVcs = if ($LASTEXITCODE -eq 0 -and -not [string]::IsNullOrWhiteSpace(($gitProbe -join "").Trim())) { "Git" } else { "Svn" }
+        } else {
+            $resolvedProjectVcs = "Svn"
+        }
+    }
+    $projectGit = if ($resolvedProjectVcs -eq "Svn") {
+        Get-SvnSourceIdentity -Name "project" -RequestedRoot $projectGitRoot -OwnedPath $ProjectPath `
+            -BoundaryPath $projectBoundaryPath -RequireClean:$RequireGitClean -RequireTracked:$RequireTrackedSources
+    } else {
+        Get-GitSourceIdentity -Name "project" -RequestedRoot $projectGitRoot -OwnedPath $ProjectPath `
+            -BoundaryPath $projectBoundaryPath -RequireClean:$RequireGitClean -RequireTracked:$RequireTrackedSources
+    }
     foreach ($identityError in @($projectGit.errors)) { $errors.Add([string]$identityError) }
     foreach ($identityWarning in @($projectGit.warnings)) { Write-Warning ([string]$identityWarning) }
 }
@@ -428,6 +654,11 @@ $report = [ordered]@{
     staleManifestTested = $staleManifestTested
     staleManifestRejected = $staleManifestRejected
     gitRoot = if ($gitTested) { $gitRootPath } else { $null }
+    vcs = if ($null -eq $projectGit) { $null } else { $projectGit.vcs }
+    vcsRoot = if ($null -eq $projectGit) { $null } else { $projectGit.root }
+    vcsRevision = if ($null -eq $projectGit) { $null } else { $projectGit.revision }
+    vcsRevisionSpec = if ($null -eq $projectGit) { $null } else { $projectGit.revisionSpec }
+    vcsRepository = if ($null -eq $projectGit) { $null } else { $projectGit.repository }
     gitTested = $gitTested
     gitHead = if ($null -eq $projectGit) { $null } else { $projectGit.head }
     gitTree = if ($null -eq $projectGit) { $null } else { $projectGit.tree }

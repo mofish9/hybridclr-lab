@@ -44,6 +44,12 @@ function Get-PropertyValue($Object, [string]$Name) {
     return $property.Value
 }
 
+function Get-NullableStringProperty($Object, [string]$Name) {
+    $property = if ($null -eq $Object) { $null } else { $Object.PSObject.Properties[$Name] }
+    if ($null -eq $property -or $null -eq $property.Value) { return $null }
+    return [string]$property.Value
+}
+
 function Set-PropertyValue($Object, [string]$Name, $Value) {
     $Object | Add-Member -NotePropertyName $Name -NotePropertyValue $Value -Force
 }
@@ -467,18 +473,18 @@ $cleanCheckoutDocument = Get-Content -Raw -LiteralPath $cleanCheckoutPath | Conv
 Set-PropertyValue $cleanCheckoutDocument "pathSemantics" "archive-relative-v1"
 Set-PropertyValue $cleanCheckoutDocument "gitRoot" $null
 Set-PropertyValue $cleanCheckoutDocument "sourceBoundaryPath" $null
-foreach ($nullableIdentityField in @("gitHead", "gitTree", "sourceBoundarySha256", "projectGit", "toolGit")) {
+foreach ($nullableIdentityField in @("gitHead", "gitTree", "sourceBoundarySha256", "vcs", "vcsRoot", "vcsRevision", "vcsRepository", "projectGit", "toolGit")) {
     if ($null -eq $cleanCheckoutDocument.PSObject.Properties[$nullableIdentityField]) {
         Set-PropertyValue $cleanCheckoutDocument $nullableIdentityField $null
     }
 }
-foreach ($gitIdentityName in @("projectGit", "toolGit")) {
-    $gitIdentity = Get-PropertyValue $cleanCheckoutDocument $gitIdentityName
-    if ($null -ne $gitIdentity) {
-        Set-PropertyValue $gitIdentity "root" $null
-        Set-PropertyValue $gitIdentity "ownedPath" $null
-        Set-PropertyValue $gitIdentity "sourceBoundaryPath" $null
-        Set-PropertyValue $gitIdentity "warnings" @()
+foreach ($identityName in @("projectGit", "toolGit")) {
+    $identity = Get-PropertyValue $cleanCheckoutDocument $identityName
+    if ($null -ne $identity) {
+        Set-PropertyValue $identity "root" $null
+        Set-PropertyValue $identity "ownedPath" $null
+        Set-PropertyValue $identity "sourceBoundaryPath" $null
+        Set-PropertyValue $identity "warnings" @()
     }
 }
 Write-ArchiveJson "clean-checkout-gate-report.json" $cleanCheckoutDocument | Out-Null
@@ -641,15 +647,19 @@ foreach ($file in $archiveFiles) {
 $archiveFileRecords = @($archiveFileRecords | Sort-Object path)
 $archiveFilePaths = @($archiveFiles | ForEach-Object { $_.FullName })
 $archiveSourceIdentities = [ordered]@{}
-foreach ($gitIdentityName in @("projectGit", "toolGit")) {
-    $gitIdentity = Get-PropertyValue $cleanCheckoutDocument $gitIdentityName
-    $archiveSourceIdentities[$gitIdentityName] = if ($null -eq $gitIdentity) {
+foreach ($identityName in @("projectGit", "toolGit")) {
+    $identity = Get-PropertyValue $cleanCheckoutDocument $identityName
+    $archiveSourceIdentities[$identityName] = if ($null -eq $identity) {
         $null
     } else {
         [ordered]@{
-            head = [string](Get-PropertyValue $gitIdentity "head")
-            tree = [string](Get-PropertyValue $gitIdentity "tree")
-            sourceBoundarySha256 = [string](Get-PropertyValue $gitIdentity "sourceBoundarySha256")
+            vcs = Get-NullableStringProperty $identity "vcs"
+            head = Get-NullableStringProperty $identity "head"
+            tree = Get-NullableStringProperty $identity "tree"
+            revision = Get-NullableStringProperty $identity "revision"
+            revisionSpec = Get-NullableStringProperty $identity "revisionSpec"
+            repository = Get-NullableStringProperty $identity "repository"
+            sourceBoundarySha256 = Get-NullableStringProperty $identity "sourceBoundarySha256"
         }
     }
 }

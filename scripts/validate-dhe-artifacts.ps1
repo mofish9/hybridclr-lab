@@ -749,7 +749,7 @@ if (-not [string]::IsNullOrWhiteSpace($WorkflowReport)) {
                 if (-not $cleanTrackedSourcesTested -and $null -ne $cleanTrackedSourcesComplete) {
                     Add-Error "Clean checkout trackedSourcesTested=false requires trackedSourcesComplete to be null."
                 }
-                $cleanGateInvalid = -not (Get-BoolProperty $cleanCheckout "passed") -or
+                    $cleanGateInvalid = -not (Get-BoolProperty $cleanCheckout "passed") -or
                     -not (Get-BoolProperty $cleanCheckout "cleanSourcePreflightPassed") -or
                     -not (Get-BoolProperty $cleanCheckout "staleOutputRejected") -or
                     -not (Get-BoolProperty $cleanCheckout "missingRuntimeRejected") -or
@@ -774,6 +774,15 @@ if (-not [string]::IsNullOrWhiteSpace($WorkflowReport)) {
                     foreach ($formalGitIdentity in $formalGitIdentities) {
                         $identityName = [string]$formalGitIdentity[0]
                         $gitIdentity = $formalGitIdentity[1]
+                        $identityVcs = Get-StringProperty $gitIdentity "vcs"
+                        if ([string]::IsNullOrWhiteSpace($identityVcs)) { $identityVcs = "git" }
+                        $identityVcsValid = if ($identityVcs -eq "svn") {
+                            (Get-StringProperty $gitIdentity "revision") -match '^[0-9]+$' -and
+                                -not [string]::IsNullOrWhiteSpace((Get-StringProperty $gitIdentity "repository"))
+                        } elseif ($identityVcs -eq "git") {
+                            (Get-StringProperty $gitIdentity "head") -match '^[0-9a-fA-F]{40,64}$' -and
+                                (Get-StringProperty $gitIdentity "tree") -match '^[0-9a-fA-F]{40,64}$'
+                        } else { $false }
                         if ($null -eq $gitIdentity -or
                             (Get-StringProperty $gitIdentity "name") -ne $identityName -or
                             -not (Get-BoolProperty $gitIdentity "tested") -or
@@ -783,19 +792,27 @@ if (-not [string]::IsNullOrWhiteSpace($WorkflowReport)) {
                             -not (Get-BoolProperty $gitIdentity "trackedSourcesTested") -or
                             -not (Get-BoolProperty $gitIdentity "trackedSourcesRequired") -or
                             -not (Get-BoolProperty $gitIdentity "trackedSourcesComplete") -or
-                            (Get-StringProperty $gitIdentity "head") -notmatch '^[0-9a-fA-F]{40,64}$' -or
-                            (Get-StringProperty $gitIdentity "tree") -notmatch '^[0-9a-fA-F]{40,64}$' -or
+                            -not $identityVcsValid -or
                             (Get-StringProperty $gitIdentity "sourceBoundarySha256") -notmatch '^[0-9a-fA-F]{64}$') {
-                            Add-Error "Release workflow $identityName Git identity is incomplete or not clean/tracked."
+                            Add-Error "Release workflow $identityName VCS identity is incomplete or not clean/tracked."
                             $cleanGateInvalid = $true
                         }
                     }
                     $projectGitIdentity = Get-ObjectProperty $cleanCheckout "projectGit"
-                    if ($null -eq $projectGitIdentity -or
-                        (Get-StringProperty $cleanCheckout "gitHead") -ne (Get-StringProperty $projectGitIdentity "head") -or
-                        (Get-StringProperty $cleanCheckout "gitTree") -ne (Get-StringProperty $projectGitIdentity "tree") -or
-                        (Get-StringProperty $cleanCheckout "sourceBoundarySha256") -ne (Get-StringProperty $projectGitIdentity "sourceBoundarySha256")) {
-                        Add-Error "Release workflow flat Git identity does not match projectGit."
+                    $projectVcs = Get-StringProperty $projectGitIdentity "vcs"
+                    if ([string]::IsNullOrWhiteSpace($projectVcs)) { $projectVcs = "git" }
+                    $flatProjectIdentityMatches = if ($projectVcs -eq "svn") {
+                        (Get-StringProperty $cleanCheckout "vcs") -eq "svn" -and
+                            (Get-StringProperty $cleanCheckout "vcsRevision") -eq (Get-StringProperty $projectGitIdentity "revision") -and
+                            (Get-StringProperty $cleanCheckout "vcsRepository") -eq (Get-StringProperty $projectGitIdentity "repository") -and
+                            (Get-StringProperty $cleanCheckout "sourceBoundarySha256") -eq (Get-StringProperty $projectGitIdentity "sourceBoundarySha256")
+                    } else {
+                        (Get-StringProperty $cleanCheckout "gitHead") -eq (Get-StringProperty $projectGitIdentity "head") -and
+                            (Get-StringProperty $cleanCheckout "gitTree") -eq (Get-StringProperty $projectGitIdentity "tree") -and
+                            (Get-StringProperty $cleanCheckout "sourceBoundarySha256") -eq (Get-StringProperty $projectGitIdentity "sourceBoundarySha256")
+                    }
+                    if ($null -eq $projectGitIdentity -or -not $flatProjectIdentityMatches) {
+                        Add-Error "Release workflow flat VCS identity does not match project identity."
                         $cleanGateInvalid = $true
                     }
                 }

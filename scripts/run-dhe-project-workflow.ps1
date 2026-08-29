@@ -15,6 +15,8 @@ param(
     [string]$PackageLockPath = "",
     [string]$IdentityTemplatePath = "",
     [string]$BaselineAotRoot = "",
+    [ValidateSet("Auto", "Git", "Svn")]
+    [string]$ProjectVcs = "Auto",
     [string]$GitRoot = "",
     [string]$SourceBoundaryPath = "",
     [ValidatePattern("^$|^[0-9a-fA-F]{64}$")]
@@ -262,6 +264,7 @@ function Invoke-CleanCheckoutStage {
         OutputRoot = $cleanCheckoutRoot
         ToolGitRoot = $labRoot
         ToolSourceBoundaryPath = [IO.Path]::GetFullPath([string]$toolBoundaryPath[0])
+        ProjectVcs = $ProjectVcs
         ForceOutput = $true
     }
     if ($gitVerificationRequested) { $cleanCheckoutArgs.GitRoot = $gitRootPath }

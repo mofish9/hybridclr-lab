@@ -188,13 +188,14 @@ immediately by default; `-WorkflowLockTimeoutSeconds` can opt into a bounded
 wait. Once an output root has been created safely, preflight and workflow
 failures leave versioned top-level JSON reports rather than console-only state.
 
-Release additionally requires separate clean project and tool Git identities.
-The project `-GitRoot` defaults to `-ProjectPath`; the tool identity is derived
-from the orchestrator source root. Both identities must have tracked boundary
-sources and record their exact HEAD, HEAD tree, and boundary SHA-256. Runtime
-source commit/dirty provenance, engine workflow/ProductVersion, and embedded
-package locks are verified independently. Unknown MV wire-format flags fail
-closed. Exploratory mode can request the same checks with `-RequireGitClean`,
+Release additionally requires separate clean project and tool source identities.
+The project `-GitRoot` defaults to `-ProjectPath`; use `-ProjectVcs Svn` for an
+SVN working copy. Git identities record HEAD/HEAD tree; SVN identities record the
+concrete working-copy URL, numeric revision, and `svnversion` spec. Both identities
+must have tracked boundary sources and boundary SHA-256. Runtime source
+commit/dirty provenance, engine workflow/ProductVersion, and embedded package
+locks are verified independently. Unknown MV wire-format flags fail closed.
+Exploratory mode can request the same checks with `-RequireGitClean`,
 `-RequireTrackedSources`, and `-RequireCleanRuntimeSources`; Release also requires
 tracked-source coverage using `-SourceBoundaryPath` (or the project's default
 boundary manifest).

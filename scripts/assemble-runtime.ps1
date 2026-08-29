@@ -36,6 +36,27 @@ function Copy-DirectoryContents([string]$Source, [string]$Destination) {
     Get-ChildItem -LiteralPath $Source -Force | Copy-Item -Destination $Destination -Recurse -Force
 }
 
+function Resolve-WorkflowSourcePath([string]$RawPath) {
+    if ([string]::IsNullOrWhiteSpace($RawPath)) { return "" }
+    if ([IO.Path]::IsPathRooted($RawPath)) { return [IO.Path]::GetFullPath($RawPath) }
+
+    # Older manifests were authored from the repository root while the lab is
+    # now commonly executed from a worktree. Try both bases, but keep the
+    # first existing candidate deterministic for the checked-in layout.
+    $candidateBases = @(
+        $LabRoot,
+        (Split-Path -Parent $LabRoot),
+        (Split-Path -Parent (Split-Path -Parent $LabRoot))
+    )
+    foreach ($base in $candidateBases) {
+        $candidate = [IO.Path]::GetFullPath((Join-Path $base $RawPath))
+        if (Test-Path -LiteralPath $candidate -PathType Container) {
+            return $candidate
+        }
+    }
+    return [IO.Path]::GetFullPath((Join-Path $LabRoot $RawPath))
+}
+
 $LabRoot = if ([string]::IsNullOrWhiteSpace($LabRoot)) {
     Split-Path -Parent $PSScriptRoot
 } else {
@@ -96,15 +117,32 @@ $hybridclrPath = if ([string]::IsNullOrWhiteSpace($HybridClrSource)) {
 } else {
     [IO.Path]::GetFullPath($HybridClrSource)
 }
+$workflowIl2CppPath = ""
+if ($null -ne $workflow.PSObject.Properties["il2cppPlus"] -and
+    $null -ne $workflow.il2cppPlus.PSObject.Properties["path"] -and
+    -not [string]::IsNullOrWhiteSpace([string]$workflow.il2cppPlus.path)) {
+    $workflowIl2CppPath = Resolve-WorkflowSourcePath ([string]$workflow.il2cppPlus.path)
+}
 $il2cppPath = if ([string]::IsNullOrWhiteSpace($Il2CppPlusSource)) {
-    Join-Path $reposRoot "il2cpp_plus"
+    if (-not [string]::IsNullOrWhiteSpace($workflowIl2CppPath)) {
+        $workflowIl2CppPath
+    } else {
+        Join-Path $reposRoot "il2cpp_plus"
+    }
 } else {
     [IO.Path]::GetFullPath($Il2CppPlusSource)
 }
 $hybridclrSpec = $lock.repositories.hybridclr
 $il2cppSpec = $lock.repositories.il2cpp_plus
+$il2cppExpectedCommit = if ($null -ne $workflow.PSObject.Properties["il2cppPlus"] -and
+    $null -ne $workflow.il2cppPlus.PSObject.Properties["commit"] -and
+    -not [string]::IsNullOrWhiteSpace([string]$workflow.il2cppPlus.commit)) {
+    [string]$workflow.il2cppPlus.commit
+} else {
+    [string]$il2cppSpec.commit
+}
 
-foreach ($item in @(@("hybridclr", $hybridclrPath, $hybridclrSpec.commit), @("il2cpp_plus", $il2cppPath, $il2cppSpec.commit))) {
+foreach ($item in @(@("hybridclr", $hybridclrPath, $hybridclrSpec.commit), @("il2cpp_plus", $il2cppPath, $il2cppExpectedCommit))) {
     $name = $item[0]
     $path = $item[1]
     $expected = $item[2]
