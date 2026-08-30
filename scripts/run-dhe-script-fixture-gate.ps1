@@ -236,6 +236,7 @@ $prePrepareGateTested = -not [bool]$WorkflowLockAlreadyHeld
 $invalidRuntimeRejectedBeforeAdapter = $null
 $adapterTargetParameterValidated = $null
 $explicitProjectVcsValidated = $null
+$malformedWorkflowPackageLockReported = $null
 if ($prePrepareGateTested) {
     $prepareFailureRoot = Join-Path $OutputRoot "adapter-prepare-failure"
     $prepareFailureExit = Invoke-ExpectedFailure @(
@@ -298,6 +299,35 @@ if ($prePrepareGateTested) {
     $explicitProjectVcsValidated = $explicitVcsExit -ne 0 -and $null -ne $explicitVcsFailure -and
         [string]$explicitVcsFailure.error -like "*not a working copy*"
     Require $explicitProjectVcsValidated "Explicit ProjectVcs selection did not activate project VCS verification."
+
+    # Package-lock parsing belongs to the guarded workflow transaction. A
+    # malformed lock must leave a normal project-workflow-failure.json before
+    # any adapter code is invoked.
+    $malformedWorkflowLockRoot = Join-Path $OutputRoot "malformed-workflow-package-lock"
+    $malformedWorkflowLockPath = Join-Path $externalEmbeddedLockRoot "malformed-workflow-package-lock.json"
+    $workflowMalformedLock = $checkedPackageLock | ConvertTo-Json -Depth 8 | ConvertFrom-Json
+    $workflowMalformedLock.PSObject.Properties.Remove("packagePath")
+    [IO.File]::WriteAllText($malformedWorkflowLockPath, ($workflowMalformedLock | ConvertTo-Json -Depth 8), $fixtureUtf8NoBom)
+    $malformedWorkflowLockExit = Invoke-ExpectedFailure @(
+        (Join-Path $LabRoot "scripts/run-dhe-project-workflow.ps1"),
+        "-AdapterScript", (Join-Path $fixtures "dhe-project-adapter-failure-fixture.ps1"),
+        "-ProjectPath", $externalEmbeddedProject,
+        "-SettingsFile", (Join-Path $externalEmbeddedSettings "HybridCLRSettings.asset"),
+        "-RuntimeSource", (Join-Path $LabRoot "unity2021-dhe-demo"),
+        "-OutputRoot", $malformedWorkflowLockRoot,
+        "-PackageLockPath", $malformedWorkflowLockPath,
+        "-Mode", "Exploratory",
+        "-ForceOutput")
+    $malformedWorkflowFailurePath = Join-Path $malformedWorkflowLockRoot "project-workflow-failure.json"
+    $malformedWorkflowFailure = if (Test-Path -LiteralPath $malformedWorkflowFailurePath -PathType Leaf) {
+        Get-Content -Raw -LiteralPath $malformedWorkflowFailurePath | ConvertFrom-Json
+    } else { $null }
+    $malformedWorkflowPackageLockReported = $malformedWorkflowLockExit -ne 0 -and
+        $null -ne $malformedWorkflowFailure -and
+        [string]$malformedWorkflowFailure.format -eq "hybridclr.dhe-project-workflow-failure.json" -and
+        [string]$malformedWorkflowFailure.error -like "*packagePath*"
+    Require $malformedWorkflowPackageLockReported `
+        "Malformed workflow package lock did not produce a machine-readable failure report."
 }
 $global:LASTEXITCODE = 0
 
@@ -470,6 +500,14 @@ Require (-not (Test-DheMachineLocalPath "https://example.invalid/runtime.json"))
     "Machine-local path detection incorrectly rejected a URL."
 Require (-not (Test-DheMachineLocalPath "a / b")) `
     "Machine-local path detection incorrectly rejected slash-separated prose."
+Require (-not (Test-DheMachineLocalPath "../payload/assemblies/Example.mv.json")) `
+    "Machine-local path detection incorrectly rejected a parent-relative archive reference."
+Require (-not (Test-DheMachineLocalPath "./payload/assemblies/Example.mv.json")) `
+    "Machine-local path detection incorrectly rejected a current-directory archive reference."
+Require (Test-DheMachineLocalPath "path=/tmp/build") `
+    "Machine-local path detection missed an embedded POSIX absolute path."
+Require (Test-DheMachineLocalPath "workspace: C:\\build\\output") `
+    "Machine-local path detection missed an embedded Windows absolute path."
 
 $projectBoundaryProbeRoot = Join-Path $OutputRoot "project-root-boundary-probe"
 $projectBoundaryProbePath = Join-Path $projectBoundaryProbeRoot "Assets/Editor/DHE/dhe-source-boundary.json"
@@ -1300,6 +1338,7 @@ $report = [ordered]@{
     invalidRuntimeRejectedBeforeAdapter = $invalidRuntimeRejectedBeforeAdapter
     adapterTargetParameterValidated = $adapterTargetParameterValidated
     explicitProjectVcsValidated = $explicitProjectVcsValidated
+    malformedWorkflowPackageLockReported = $malformedWorkflowPackageLockReported
     adapterContractMismatchRejected = $adapterContractMismatchRejected
     schemaDuplicatePropertyRejected = $schemaDuplicatePropertyRejected
     customSchemaUnregisteredRejected = $customSchemaUnregisteredRejected

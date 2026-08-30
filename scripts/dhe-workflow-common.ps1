@@ -144,16 +144,25 @@ function Test-DheMachineLocalPath {
     param([AllowNull()][string]$Value)
     if ([string]::IsNullOrWhiteSpace($Value)) { return $false }
 
-    # Reject drive/UNC paths and POSIX absolute paths, while allowing URLs such
-    # as https://... (the slash in a URL is preceded by a colon or another
-    # slash). A POSIX implementation may assign network semantics to //host,
-    # so reject that form too unless it is part of a URL scheme. Keep the POSIX
-    # expression broad enough to catch root and one-part paths such as / and
-    # /tmp, but require a path-like first component so schema regexes (for
-    # example ^[^/].*$) and text such as "a / b" are not treated as paths.
-    return $Value -match '(?i)(?:^|[^A-Z0-9])(?:[A-Z]:[\\/]|\\\\[^\\/])' -or
-        $Value -match '(?i)(?:^|[^A-Za-z0-9:/#])//(?:[^/\s]|$)' -or
-        $Value -match '(?i)(?:^|[^A-Za-z0-9:/#])/(?!/)(?:[\p{L}\p{N}._~-][^\s]*|$)'
+    # Inspect the value itself before looking for an embedded path. Archive
+    # evidence deliberately uses parent-relative references such as
+    # `../payload/...`; those are portable and must not be mistaken for a
+    # POSIX absolute path merely because a slash follows a dot. URLs are also
+    # portable references and are excluded from the filesystem checks.
+    $candidate = $Value.Trim()
+    if ($candidate -match '(?i)^[A-Za-z][A-Za-z0-9+.-]*://') { return $false }
+    if ($candidate -match '(?i)^[A-Z]:[\\/]' -or
+        $candidate -match '^\\\\' -or
+        $candidate.StartsWith('/')) {
+        return $true
+    }
+
+    # JSON values are normally complete paths, but a diagnostic string may
+    # contain one after a structural delimiter. Keep this expression narrow:
+    # whitespace/slashes in prose (for example `a / b`) are not path evidence,
+    # while `path=/tmp` and `workspace: C:\\build` remain detectable.
+    return $candidate -match '(?i)(?:^|[\s=:,"''(\[])' +
+        '(?:[A-Z]:[\\/]|\\\\|/(?!/)(?=[\p{L}\p{N}._~-]|$))'
 }
 
 function Get-DheEngineProductVersion {
@@ -456,6 +465,177 @@ function Get-DheStrictBooleanProperty {
         throw "$Description must be a JSON boolean."
     }
     return [bool]$property.Value
+}
+
+function Assert-DhePlayerResultContract {
+    param(
+        [Parameter(Mandatory = $true)][object]$Report,
+        [Parameter(Mandatory = $true)][ValidateRange(0, [int]::MaxValue)][int]$ExpectedChangedMethodCount,
+        [Parameter(Mandatory = $true)][ValidatePattern('^[0-9a-fA-F]{64}$')][string]$NativeManifestHash,
+        [Parameter(Mandatory = $true)][ValidatePattern('^[0-9a-fA-F]{64}$')][string]$NativeGuardHash,
+        [string]$Target = "",
+        [switch]$RequireDispatchEvidence
+    )
+
+    # A project adapter may launch a device runner written in PowerShell, bash,
+    # C#, or another language. Validate the language-neutral result object here
+    # after the runner exits, instead of trusting only its exit code or a
+    # single `passed` flag.
+    if ($null -eq $Report) { throw "DHE Player result is null." }
+    $formatProperty = $Report.PSObject.Properties["format"]
+    if ($null -eq $formatProperty -or [string]$formatProperty.Value -ne "hybridclr.dhe-player-result.json") {
+        throw "DHE Player result format is invalid."
+    }
+    if (-not (Get-DheStrictBooleanProperty $Report "passed" "DHE Player result passed")) {
+        $errorProperty = $Report.PSObject.Properties["error"]
+        throw "DHE Player result did not pass: $([string]$(if ($null -eq $errorProperty) { $null } else { $errorProperty.Value }))"
+    }
+    $loadErrorProperty = $Report.PSObject.Properties["loadError"]
+    if ($null -eq $loadErrorProperty -or [string]$loadErrorProperty.Value -ne "OK") {
+        throw "DHE Player result loadError is not OK."
+    }
+    $changedMethodProperty = $Report.PSObject.Properties["changedMethodCount"]
+    if ($null -eq $changedMethodProperty -or
+        ($changedMethodProperty.Value -isnot [int] -and $changedMethodProperty.Value -isnot [long]) -or
+        [int]$changedMethodProperty.Value -ne $ExpectedChangedMethodCount) {
+        throw "DHE Player result changedMethodCount does not match MV evidence."
+    }
+
+    $plannedProperty = $Report.PSObject.Properties["plannedDheAssemblies"]
+    $loadedProperty = $Report.PSObject.Properties["loadedDheAssemblies"]
+    $planned = if ($null -eq $plannedProperty) { $null } else { $plannedProperty.Value }
+    $loaded = if ($null -eq $loadedProperty) { $null } else { $loadedProperty.Value }
+    if ($null -eq $planned -or $planned -is [string] -or $planned -isnot [System.Collections.IEnumerable] -or
+        $null -eq $loaded -or $loaded -is [string] -or $loaded -isnot [System.Collections.IEnumerable]) {
+        throw "DHE Player result must include plannedDheAssemblies and loadedDheAssemblies arrays."
+    }
+    $plannedNames = @($planned | ForEach-Object { [string]$_ })
+    $loadedNames = @($loaded | ForEach-Object { [string]$_ })
+    if ($plannedNames.Count -eq 0 -or @($plannedNames | Where-Object { [string]::IsNullOrWhiteSpace($_) }).Count -gt 0 -or
+        @($loadedNames | Where-Object { [string]::IsNullOrWhiteSpace($_) }).Count -gt 0) {
+        throw "DHE Player result assembly arrays are empty or contain an unnamed assembly."
+    }
+    $plannedSorted = @($plannedNames | Sort-Object)
+    $plannedUnique = @($plannedNames | Sort-Object -Unique)
+    $loadedSorted = @($loadedNames | Sort-Object)
+    $loadedUnique = @($loadedNames | Sort-Object -Unique)
+    if (($plannedSorted -join ',') -ne ($plannedUnique -join ',') -or
+        ($loadedSorted -join ',') -ne ($loadedUnique -join ',')) {
+        throw "DHE Player result assembly arrays contain duplicate names."
+    }
+    if (($plannedSorted -join ',') -ne ($loadedSorted -join ',')) {
+        throw "DHE Player result planned and loaded assembly sets differ."
+    }
+
+    foreach ($booleanName in @("multiAssemblyValidated", "buildIdentityValidated", "retryValidated")) {
+        $null = Get-DheStrictBooleanProperty $Report $booleanName "DHE Player result $booleanName"
+    }
+    if (-not (Get-DheStrictBooleanProperty $Report "multiAssemblyValidated" "DHE Player result multiAssemblyValidated") -or
+        -not (Get-DheStrictBooleanProperty $Report "buildIdentityValidated" "DHE Player result buildIdentityValidated")) {
+        throw "DHE Player result did not validate assembly loading or build identity."
+    }
+    $identityProperty = $Report.PSObject.Properties["identityVersion"]
+    $identityVersion = if ($null -eq $identityProperty) { $null } else { $identityProperty.Value }
+    if (($identityVersion -isnot [int] -and $identityVersion -isnot [long]) -or [int]$identityVersion -ne 2) {
+        throw "DHE Player result identityVersion is invalid."
+    }
+    $snapshotProperty = $Report.PSObject.Properties["aotSnapshotKind"]
+    if ($null -eq $snapshotProperty -or [string]$snapshotProperty.Value -ne "managed-assembly-plus-generated-cpp-v1") {
+        throw "DHE Player result aotSnapshotKind is invalid."
+    }
+    $manifestHashProperty = $Report.PSObject.Properties["nativeManifestSha256"]
+    $guardHashProperty = $Report.PSObject.Properties["nativeGuardSourceSha256"]
+    if ($null -eq $manifestHashProperty -or $null -eq $guardHashProperty -or
+        [string]$manifestHashProperty.Value -notmatch '^[0-9a-fA-F]{64}$' -or
+        [string]$guardHashProperty.Value -notmatch '^[0-9a-fA-F]{64}$') {
+        throw "DHE Player result native manifest/guard hashes are invalid."
+    }
+    if ($RequireDispatchEvidence -and
+        (-not [StringComparer]::OrdinalIgnoreCase.Equals([string]$manifestHashProperty.Value, $NativeManifestHash) -or
+         -not [StringComparer]::OrdinalIgnoreCase.Equals([string]$guardHashProperty.Value, $NativeGuardHash))) {
+        throw "External DHE Player result native manifest/guard hashes do not match orchestrator evidence."
+    }
+
+    $transactionProperty = $Report.PSObject.Properties["transactionStatus"]
+    $transactionStatus = if ($null -eq $transactionProperty) { "" } else { [string]$transactionProperty.Value }
+    $retryValidated = Get-DheStrictBooleanProperty $Report "retryValidated" "DHE Player result retryValidated"
+    $retryAssemblyProperty = $Report.PSObject.Properties["retryAssemblyName"]
+    $retryFailureProperty = $Report.PSObject.Properties["retryFailure"]
+    $retryAssembly = if ($null -eq $retryAssemblyProperty) { $null } else { $retryAssemblyProperty.Value }
+    $retryFailure = if ($null -eq $retryFailureProperty) { $null } else { $retryFailureProperty.Value }
+    if ($ExpectedChangedMethodCount -gt 0) {
+        if ($transactionStatus -ne "validated" -or -not $retryValidated -or
+            [string]::IsNullOrWhiteSpace([string]$retryAssembly) -or
+            [string]$retryFailure -ne "DHE_MV_REGISTRATION_FAILED") {
+            throw "DHE Player result is missing successful transaction retry evidence."
+        }
+    } elseif ($transactionStatus -ne "notApplicable" -or $retryValidated -or
+        $null -ne $retryAssembly -or $null -ne $retryFailure) {
+        throw "DHE no-op Player result has invalid transaction evidence."
+    }
+
+    $expectedChangedProperty = $Report.PSObject.Properties["expectedChangedMethodCount"]
+    if ($null -ne $expectedChangedProperty) {
+        if (($expectedChangedProperty.Value -isnot [int] -and $expectedChangedProperty.Value -isnot [long]) -or
+            [int]$expectedChangedProperty.Value -ne $ExpectedChangedMethodCount) {
+            throw "DHE Player result expectedChangedMethodCount does not match MV evidence."
+        }
+    } elseif ($RequireDispatchEvidence) {
+        throw "External DHE Player runner must report expectedChangedMethodCount."
+    }
+    $dispatchProperty = $Report.PSObject.Properties["dispatchProbeValidated"]
+    if ($null -ne $dispatchProperty) {
+        if ($dispatchProperty.Value -isnot [bool] -or
+            ($ExpectedChangedMethodCount -gt 0 -and -not [bool]$dispatchProperty.Value)) {
+            throw "DHE Player result dispatchProbeValidated is invalid."
+        }
+        foreach ($probeName in @("changedProbeChanged", "unchangedProbeChanged")) {
+            $probeProperty = $Report.PSObject.Properties[$probeName]
+            if ($null -eq $probeProperty -or $probeProperty.Value -isnot [bool]) {
+                throw "DHE Player result is missing boolean $probeName evidence."
+            }
+        }
+        if ($ExpectedChangedMethodCount -gt 0 -and
+            (-not [bool]$Report.changedProbeChanged -or [bool]$Report.unchangedProbeChanged)) {
+            throw "DHE Player result changed/unchanged dispatch evidence is inconsistent."
+        }
+    } elseif ($RequireDispatchEvidence) {
+        throw "External DHE Player runner must report dispatchProbeValidated evidence."
+    }
+    if ($RequireDispatchEvidence -and -not [string]::IsNullOrWhiteSpace($Target)) {
+        $targetProperty = $Report.PSObject.Properties["target"]
+        if ($null -ne $targetProperty -and [string]$targetProperty.Value -ne $Target) {
+            throw "DHE Player result target does not match the orchestrator target."
+        }
+    }
+    $validationsProperty = $Report.PSObject.Properties["assemblyValidations"]
+    $validations = if ($null -eq $validationsProperty) { $null } else { $validationsProperty.Value }
+    if ($null -eq $validations -or $validations -is [string] -or @($validations).Count -eq 0) {
+        throw "DHE Player result assemblyValidations is missing or empty."
+    }
+    $validationNames = @($validations | ForEach-Object {
+        $assemblyNameProperty = $_.PSObject.Properties["assemblyName"]
+        if ($null -eq $assemblyNameProperty -or [string]::IsNullOrWhiteSpace([string]$assemblyNameProperty.Value)) {
+            throw "DHE Player result assemblyValidations contains an unnamed assembly."
+        }
+        $hashValidatedProperty = $_.PSObject.Properties["hashValidated"]
+        if ($null -eq $hashValidatedProperty -or $hashValidatedProperty.Value -isnot [bool] -or
+            -not [bool]$hashValidatedProperty.Value) {
+            throw "DHE Player result assembly validation did not validate its assembly hash."
+        }
+        $assemblyLoadErrorProperty = $_.PSObject.Properties["loadError"]
+        if ($null -eq $assemblyLoadErrorProperty -or [string]$assemblyLoadErrorProperty.Value -ne "OK") {
+            throw "DHE Player result assembly validation loadError is not OK."
+        }
+        [string]$assemblyNameProperty.Value
+    })
+    $validationSorted = @($validationNames | Sort-Object)
+    $validationUnique = @($validationNames | Sort-Object -Unique)
+    if (($validationSorted -join ',') -ne ($validationUnique -join ',') -or
+        ($validationSorted -join ',') -ne ($loadedSorted -join ',')) {
+        throw "DHE Player result assemblyValidations do not exactly match loadedDheAssemblies."
+    }
+    return $true
 }
 
 # Child PowerShell processes receive a single string for an array-valued

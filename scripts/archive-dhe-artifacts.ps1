@@ -488,6 +488,21 @@ Set-PropertyValue $sourcePreflightDocument "projectPath" $null
 Set-PropertyValue $sourcePreflightDocument "runtimeSource" $null
 Set-PropertyValue $sourcePreflightDocument "packageLockPath" $(if ($null -eq $packageLockPath) { $null } else { "provenance/dhe-package-lock.json" })
 Set-PropertyValue $sourcePreflightDocument "identityTemplatePath" $null
+# Warnings/errors are free-form diagnostics and may embed a local project or
+# package path even when the structured path fields above have been cleared.
+# Keep their useful non-path text, but remove machine-local references before
+# writing the portable report into the archive.
+foreach ($diagnosticField in @("warnings", "errors")) {
+    $diagnostics = @((Get-PropertyValue $sourcePreflightDocument $diagnosticField) | ForEach-Object {
+        $diagnostic = [string]$_
+        if (Test-DheMachineLocalPath $diagnostic) {
+            "workspace path omitted from archive"
+        } else {
+            $diagnostic
+        }
+    })
+    Set-PropertyValue $sourcePreflightDocument $diagnosticField $diagnostics
+}
 foreach ($check in @($sourcePreflightDocument.checks)) {
     $details = [string](Get-PropertyValue $check "details")
     if (Test-DheMachineLocalPath $details) {

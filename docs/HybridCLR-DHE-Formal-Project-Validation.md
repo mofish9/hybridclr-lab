@@ -138,11 +138,14 @@ through two actions, both implemented as named PowerShell parameters:
 
 ```text
 Prepare -ProjectPath -SettingsFile -RuntimeSource -OutputRoot -Target -Mode
-        -ToolchainContractVersion
+        -ToolchainContractVersion [-BaselineAotRoot] [-BaselineManifestPath]
+        [-AdapterOptionsPath] [-PlayerSmokeRunner]
 Player  -ProjectPath -SettingsFile -RuntimeSource -OutputRoot -Target -Mode
         -ToolchainContractVersion
+        [-BaselineAotRoot] [-BaselineManifestPath] [-AdapterOptionsPath]
         -ProjectPlan -ProjectPlanValidation -BatchReport
         -SourcePreflight -CleanCheckoutGate [-RequireCompleteCoverage]
+        [-PlayerSmokeRunner]
 ```
 
 `Prepare` must build the exact stripped-AOT baseline and current hot-update DLL
@@ -177,6 +180,15 @@ by DHE. `Player` receives the validated project plan and must write the standard
 `<OutputRoot>/workflow-report.json`; it owns the Unity build, generated C++ guard
 injection, runtime-plan staging, and Player assertions, but it must use the paths
 and assembly set from that plan rather than rediscovering them.
+The nested `player` result must use `hybridclr.dhe-player-result.json`, report
+`loadError=OK`, exact planned/loaded DHE assembly sets, identity version 2,
+the generated-C++ snapshot kind, the MV-derived `changedMethodCount`, matching
+native manifest/guard hashes, and one successful hash/load validation for every
+loaded assembly. An external `PlayerSmokeRunner` must additionally echo the
+expected changed-method count, matching native manifest/guard hashes, and
+boolean changed/unchanged dispatch probe evidence. A built-in adapter may
+report the embedded Player identity hash separately from the post-Bee source
+audit hash; both values must still be valid SHA-256 values.
 When complete coverage is requested, the core also passes
 `-RequireCompleteCoverage` to the adapter so project-specific transforms and
 artifact checks use the same policy as preflight and release gates.

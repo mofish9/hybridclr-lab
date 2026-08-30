@@ -4,7 +4,7 @@
   "title": "HybridCLR DHE Script Fixture Gate Report",
   "type": "object",
   "additionalProperties": true,
-  "required": ["schemaVersion", "format", "passed", "guardRequested", "guardTransformed", "guardSecondPassTransformed", "abiChangedMethodCount", "abiSupportedChangedMethodCount", "abiUnsupportedChangedMethodCount", "genericChangedMethodCount", "genericSupportedChangedMethodCount", "genericGuardedMethodCount", "genericNativeEntryCount", "multiAssemblyChangedMethodCount", "multiAssemblySupportedChangedMethodCount", "multiAssemblyUnsupportedChangedMethodCount", "malformedNativeTokenRejected", "duplicateMappingRejected", "probeTransactionRollbackPassed", "outputCollisionRejected", "exploratoryReleaseRejected", "releaseDerivedOutputsIsolated", "unsafeSourceOutputRejected", "singleTrackedOutputRejected", "foreignGitRootRejected", "separateGitIdentitiesValidated", "gitApplyRootIsolated", "prePrepareGateTested", "invalidRuntimeRejectedBeforeAdapter", "adapterTargetParameterValidated", "adapterContractMismatchRejected", "schemaDuplicatePropertyRejected", "customSchemaUnregisteredRejected", "additionalSchemaRegistered", "externalDnlibFallbackRejected", "externalEmbeddedPackageLockValidated", "legacyLabRelativePackageLockRejected", "absolutePackageLockRejected", "workflowLockTested", "workflowLockRejected", "workflowLockReusable", "projectPreflightFailureReported"],
+  "required": ["schemaVersion", "format", "passed", "guardRequested", "guardTransformed", "guardSecondPassTransformed", "abiChangedMethodCount", "abiSupportedChangedMethodCount", "abiUnsupportedChangedMethodCount", "genericChangedMethodCount", "genericSupportedChangedMethodCount", "genericGuardedMethodCount", "genericNativeEntryCount", "multiAssemblyChangedMethodCount", "multiAssemblySupportedChangedMethodCount", "multiAssemblyUnsupportedChangedMethodCount", "malformedNativeTokenRejected", "duplicateMappingRejected", "probeTransactionRollbackPassed", "outputCollisionRejected", "exploratoryReleaseRejected", "releaseDerivedOutputsIsolated", "unsafeSourceOutputRejected", "singleTrackedOutputRejected", "foreignGitRootRejected", "separateGitIdentitiesValidated", "gitApplyRootIsolated", "prePrepareGateTested", "invalidRuntimeRejectedBeforeAdapter", "adapterTargetParameterValidated", "malformedWorkflowPackageLockReported", "adapterContractMismatchRejected", "schemaDuplicatePropertyRejected", "customSchemaUnregisteredRejected", "additionalSchemaRegistered", "externalDnlibFallbackRejected", "externalEmbeddedPackageLockValidated", "legacyLabRelativePackageLockRejected", "absolutePackageLockRejected", "workflowLockTested", "workflowLockRejected", "workflowLockReusable", "projectPreflightFailureReported"],
   "properties": {
     "schemaVersion": { "const": 1 },
     "format": { "const": "hybridclr.dhe-script-fixture-gate.json" },
@@ -37,6 +37,7 @@
     "prePrepareGateTested": { "type": "boolean" },
     "invalidRuntimeRejectedBeforeAdapter": { "type": ["boolean", "null"] },
     "adapterTargetParameterValidated": { "type": ["boolean", "null"] },
+    "malformedWorkflowPackageLockReported": { "type": ["boolean", "null"] },
     "adapterContractMismatchRejected": { "const": true },
     "schemaDuplicatePropertyRejected": { "const": true },
     "customSchemaUnregisteredRejected": { "const": true },
@@ -63,13 +64,15 @@
       "then": {
         "properties": {
           "invalidRuntimeRejectedBeforeAdapter": { "const": true },
-          "adapterTargetParameterValidated": { "const": true }
+          "adapterTargetParameterValidated": { "const": true },
+          "malformedWorkflowPackageLockReported": { "const": true }
         }
       },
       "else": {
         "properties": {
           "invalidRuntimeRejectedBeforeAdapter": { "type": "null" },
-          "adapterTargetParameterValidated": { "type": "null" }
+          "adapterTargetParameterValidated": { "type": "null" },
+          "malformedWorkflowPackageLockReported": { "type": "null" }
         }
       }
     },

@@ -82,9 +82,13 @@ $packageLockPathResolved = if ([string]::IsNullOrWhiteSpace($PackageLockPath)) {
 } else {
     [IO.Path]::GetFullPath($PackageLockPath)
 }
-$embeddedPackageRoot = Resolve-DheEmbeddedPackageRoot -ProjectRoot $projectPath -PackageLockPath $packageLockPathResolved -AllowMissing
-$embeddedPackagePresent = $null -ne $embeddedPackageRoot -and (Test-Path -LiteralPath $embeddedPackageRoot -PathType Container)
-$embeddedPackageRequired = [bool]$RequireEmbeddedPackage -or ($Mode -eq "Release" -and $embeddedPackagePresent)
+# Resolve package provenance inside the guarded workflow transaction below so a
+# malformed/missing project lock produces project-workflow-failure.json instead
+# of terminating before the output directory and failure report exist.
+$embeddedPackageRoot = $null
+$embeddedPackagePresent = $false
+$embeddedPackageRequired = [bool]$RequireEmbeddedPackage
+$externalPlayerRunnerRequested = -not [string]::IsNullOrWhiteSpace($PlayerSmokeRunner)
 $outputRootSafe = $false
 $workflowLock = $null
 $summaryPath = Join-Path $outputPath "project-workflow-report.json"
@@ -342,6 +346,28 @@ try {
     New-Item -ItemType Directory -Force -Path $outputPath | Out-Null
     $outputRootSafe = $true
 
+    $embeddedPackageRoot = Resolve-DheEmbeddedPackageRoot -ProjectRoot $projectPath `
+        -PackageLockPath $packageLockPathResolved -AllowMissing
+    $embeddedPackagePresent = $null -ne $embeddedPackageRoot -and
+        (Test-Path -LiteralPath $embeddedPackageRoot -PathType Container)
+    $embeddedPackageRequired = [bool]$RequireEmbeddedPackage -or
+        ($Mode -eq "Release" -and $embeddedPackagePresent)
+    if (-not $externalPlayerRunnerRequested -and
+        -not [string]::IsNullOrWhiteSpace($adapterOptionsPath)) {
+        try {
+            $adapterOptionsDocument = Get-Content -Raw -LiteralPath $adapterOptionsPath | ConvertFrom-Json
+            $runnerProperty = $adapterOptionsDocument.PSObject.Properties["playerSmokeRunner"]
+            $externalPlayerRunnerRequested = $null -ne $runnerProperty -and
+                -not [string]::IsNullOrWhiteSpace([string]$runnerProperty.Value)
+        } catch {
+            throw "DHE adapter options are not valid JSON: $adapterOptionsPath ($($_.Exception.Message))"
+        }
+    }
+    if (-not $externalPlayerRunnerRequested -and
+        -not [string]::IsNullOrWhiteSpace($env:DHE_PLAYER_SMOKE_RUNNER)) {
+        $externalPlayerRunnerRequested = $true
+    }
+
     # Establish trust in an installed Release toolchain before validating any
     # project inputs or invoking project-owned code. This keeps a missing
     # external package pin fail-closed even when other inputs are incomplete.
@@ -508,6 +534,10 @@ try {
     Require-File $projectPlanPath "DHE project plan"
     Require-File $projectPlanValidationPath "DHE project plan validation"
     Require-File $batchReportPath "DHE batch report"
+    $projectPlanDocument = Read-JsonFile $projectPlanPath "DHE project plan"
+    $expectedChangedMethodCount = [int]((@($projectPlanDocument.assemblies | ForEach-Object {
+        [int](Get-PropertyValue $_ "changedMethodCount")
+    }) | Measure-Object -Sum).Sum)
 
     if ($StopAfterPreflight) {
         $summary = [ordered]@{
@@ -542,6 +572,7 @@ try {
 
     $playerParameters = @{
         Mode = $Mode
+        BaselineAotRoot = $baselineAotPath
         ProjectPlan = $projectPlanPath
         ProjectPlanValidation = $projectPlanValidationPath
         BatchReport = $batchReportPath
@@ -568,6 +599,11 @@ try {
     if (-not $stages.player.passed) {
         throw "DHE adapter Player action did not produce a passing workflow report. See $workflowPath"
     }
+    Assert-DhePlayerResultContract -Report (Get-PropertyValue $workflow "player") `
+        -ExpectedChangedMethodCount $expectedChangedMethodCount `
+        -NativeManifestHash ([string](Get-PropertyValue $workflow "nativeManifestSha256")) `
+        -NativeGuardHash ([string](Get-PropertyValue $workflow "nativeGuardSourceSha256")) `
+        -Target $Target -RequireDispatchEvidence:$externalPlayerRunnerRequested
     $yooAssetBuildReference = Get-PropertyValue $workflow "yooAssetBuild"
     $yooAssetBuildPath = if ($null -eq $yooAssetBuildReference -or
         [string]::IsNullOrWhiteSpace([string]$yooAssetBuildReference)) {

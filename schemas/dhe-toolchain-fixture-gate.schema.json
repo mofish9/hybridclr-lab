@@ -4,7 +4,7 @@
   "title": "HybridCLR DHE Toolchain Fixture Gate",
   "type": "object",
   "additionalProperties": false,
-  "required": ["schemaVersion", "format", "generatedAtUtc", "passed", "packagePublished", "portableAttributesSanitized", "packageValidated", "publishedPackageReplaceValidated", "tamperRejected", "extraFileRejected", "missingFileRejected", "reparsePackageRejected", "packageReportCollisionRejected", "packageIdPinRejected", "untrustedPackageCodeInert", "installed", "upgradeValidated", "installLockRejected", "trackedAdapterUpdated", "corruptInstallRejected", "doctorReportCollisionRejected", "installReportCollisionRejected", "doctorPassed", "defaultReportsExternal", "adapterCreated", "adapterParsed", "workflowPackageGatePassed", "manifestBoundaryTracked", "releasePackagePublished", "releasePackageDeterministic", "crossAutocrlfDeterministic", "releasePackageValidated", "releaseIdentityTamperRejected", "releaseInstallPinRequired", "releaseInstalled", "releaseDoctorPinRequired", "releaseWorkflowPinRequired", "releaseDoctorPassed", "downgradeRejected", "explicitDowngradeValidated", "downgradeRecoveryValidated", "errors"],
+  "required": ["schemaVersion", "format", "generatedAtUtc", "passed", "packagePublished", "portableAttributesSanitized", "packageValidated", "publishedPackageReplaceValidated", "tamperRejected", "extraFileRejected", "missingFileRejected", "reparsePackageRejected", "packageReportCollisionRejected", "packageIdPinRejected", "untrustedPackageCodeInert", "installed", "upgradeValidated", "installLockRejected", "trackedAdapterUpdated", "corruptInstallRejected", "doctorReportCollisionRejected", "installReportCollisionRejected", "doctorPassed", "defaultReportsExternal", "adapterCreated", "adapterParsed", "adapterPlayerSmokeParameter", "workflowPackageGatePassed", "manifestBoundaryTracked", "releasePackagePublished", "releasePackageDeterministic", "crossAutocrlfDeterministic", "releasePackageValidated", "releaseIdentityTamperRejected", "releaseInstallPinRequired", "releaseInstalled", "releaseDoctorPinRequired", "releaseWorkflowPinRequired", "releaseDoctorPassed", "downgradeRejected", "explicitDowngradeValidated", "downgradeRecoveryValidated", "errors"],
   "properties": {
     "schemaVersion": { "const": 1 },
     "format": { "const": "hybridclr.dhe-toolchain-fixture-gate.json" },
@@ -32,6 +32,7 @@
     "defaultReportsExternal": { "const": true },
     "adapterCreated": { "const": true },
     "adapterParsed": { "const": true },
+    "adapterPlayerSmokeParameter": { "const": true },
     "workflowPackageGatePassed": { "const": true },
     "manifestBoundaryTracked": { "const": true },
     "releasePackagePublished": { "const": true },

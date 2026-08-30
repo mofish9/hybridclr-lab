@@ -234,6 +234,9 @@ if ($adapterCreated) {
 }
 $adapterParsed = $adapterCreated -and $parseErrors.Count -eq 0
 if (-not $adapterParsed) { $errors.Add("Generated project adapter did not parse.") }
+$adapterPlayerSmokeParameter = $adapterCreated -and
+    (Get-Content -Raw -LiteralPath $adapterPath).Contains('[string]$PlayerSmokeRunner')
+if (-not $adapterPlayerSmokeParameter) { $errors.Add("Generated project adapter omitted the PlayerSmokeRunner contract parameter.") }
 
 & git -C $consumerRoot add -- Tools Project Build
 & git -C $consumerRoot commit -q -m "test: install DHE toolchain"
@@ -589,6 +592,7 @@ $report = [ordered]@{
     defaultReportsExternal = $defaultReportsExternal
     adapterCreated = $adapterCreated
     adapterParsed = $adapterParsed
+    adapterPlayerSmokeParameter = $adapterPlayerSmokeParameter
     workflowPackageGatePassed = $workflowPackageGatePassed
     manifestBoundaryTracked = $manifestBoundaryTracked
     releasePackagePublished = $releasePackagePublished

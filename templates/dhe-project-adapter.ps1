@@ -27,7 +27,11 @@ param(
     [string]$BatchReport = "",
     [string]$SourcePreflight = "",
     [string]$CleanCheckoutGate = "",
-    [switch]$RequireCompleteCoverage
+    [switch]$RequireCompleteCoverage,
+    # Optional project-owned device runner for Android/iOS (or a replacement
+    # for the default Windows process runner). The runner must write a passing
+    # dhe-player-result.json to -ResultPath and exit zero.
+    [string]$PlayerSmokeRunner = ""
 )
 
 Set-StrictMode -Version Latest

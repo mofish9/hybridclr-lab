@@ -3,7 +3,7 @@
 ## Distribution contract
 
 The formal distribution is a versioned source toolchain, not a copy of the lab
-workspace. Version `0.1.3` uses toolchain and adapter contract version `1`.
+workspace. Version `0.1.4` uses toolchain and adapter contract version `1`.
 
 The package contains:
 
@@ -96,7 +96,7 @@ Publish only from a clean Git checkout in which every layout input is tracked:
 
 ```powershell
 ./scripts/publish-dhe-toolchain.ps1 `
-  -OutputRoot ./artifacts/dhe-toolchain-0.1.3 `
+  -OutputRoot ./artifacts/dhe-toolchain-0.1.4 `
   -Mode Release -ForceOutput
 ```
 
@@ -124,7 +124,7 @@ trusted tool root:
 ```powershell
 $packageId = "<64-hex-package-id>"
 $trustedTool = "C:/trusted/HybridCLRDhe"
-$candidate = "C:/releases/dhe-toolchain-0.1.3"
+$candidate = "C:/releases/dhe-toolchain-0.1.4"
 
 & "$trustedTool/scripts/test-dhe-toolchain-package.ps1" `
   -PackageRoot $candidate `
@@ -156,7 +156,7 @@ the runtime tree and passing installed-consumer gate:
 
 ```powershell
 ./scripts/publish-dhe-toolchain-release.ps1 `
-  -PackageRoot C:/releases/dhe-toolchain-0.1.3 `
+  -PackageRoot C:/releases/dhe-toolchain-0.1.4 `
   -RuntimeManifest ./staging/runtime/DHE-Tuanjie2022/runtime-manifest.json `
   -InstalledConsumerGate ./artifacts/dhe-installed-consumer-gate/installed-consumer-gate-report.json `
   -ForceOutput
@@ -225,11 +225,15 @@ The orchestrator rejects a different contract before project preflight.
 
 `Player` receives only orchestrator-validated paths:
 
+- `BaselineAotRoot` and `BaselineManifestPath` when a previous stripped-AOT
+  Release baseline is supplied
 - `ProjectPlan`
 - `ProjectPlanValidation`
 - `BatchReport`
 - `SourcePreflight`
 - `CleanCheckoutGate`
+- `AdapterOptionsPath` for project-owned options
+- `PlayerSmokeRunner` for an Android/iOS (or custom Windows) smoke runner
 - `RequireCompleteCoverage` when complete native/MV coverage is required
 
 It builds and runs the target Player, loads every planned DHE assembly with its
