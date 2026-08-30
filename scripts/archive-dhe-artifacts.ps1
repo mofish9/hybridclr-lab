@@ -444,7 +444,8 @@ foreach ($record in @($runtimePlanDocument.assemblies)) {
     $archiveRuntimeRecords.Add($archiveRecord)
 }
 $archiveAotMetadataRecords = New-Object System.Collections.Generic.List[object]
-foreach ($record in @($runtimePlanDocument.aotMetadata)) {
+$runtimePlanAotMetadata = Get-PropertyValue $runtimePlanDocument "aotMetadata"
+foreach ($record in @($runtimePlanAotMetadata)) {
     $assemblyName = [string](Get-PropertyValue $record "assemblyName")
     Assert-SafeAssemblyName $assemblyName
     $reference = [string](Get-PropertyValue $record "path")
