@@ -19,6 +19,9 @@ param(
     [ValidateSet("Release", "Exploratory")]
     [string]$Mode = "Release",
     [string]$BaselineAotRoot = "",
+    [string]$BaselineManifestPath = "",
+    [string]$AdapterOptionsPath = "",
+    [string]$PlayerSmokeRunner = "",
     [string]$ProjectPlan = "",
     [string]$ProjectPlanValidation = "",
     [string]$BatchReport = "",
@@ -81,4 +84,19 @@ if ($Action -eq "Player") {
 }
 
 & (Resolve-DhePowerShellHost) @arguments
-exit [int]$LASTEXITCODE
+$adapterExitCode = [int]$LASTEXITCODE
+if ($Action -eq "Prepare" -and -not [string]::IsNullOrWhiteSpace($BaselineManifestPath)) {
+    $prepareReportPath = Join-Path ([IO.Path]::GetFullPath($OutputRoot)) "adapter/prepare.json"
+    if (Test-Path -LiteralPath $prepareReportPath -PathType Leaf) {
+        try {
+            $prepareReport = Get-Content -Raw -LiteralPath $prepareReportPath | ConvertFrom-Json
+            $prepareReport | Add-Member -NotePropertyName baselineManifestPath `
+                -NotePropertyValue ([IO.Path]::GetFullPath($BaselineManifestPath)) -Force
+            $prepareJson = ($prepareReport | ConvertTo-Json -Depth 20).Replace("`r`n", "`n").Replace("`r", "`n")
+            [IO.File]::WriteAllText($prepareReportPath, $prepareJson, (New-Object Text.UTF8Encoding($false)))
+        } catch {
+            throw "Unable to bind DHE baseline manifest in demo adapter prepare report: $($_.Exception.Message)"
+        }
+    }
+}
+exit $adapterExitCode
