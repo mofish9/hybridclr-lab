@@ -505,12 +505,12 @@ foreach ($nullableIdentityField in @("gitHead", "gitTree", "sourceBoundarySha256
     }
 }
 foreach ($identityName in @("projectGit", "toolGit")) {
-    $identity = Get-PropertyValue $cleanCheckoutDocument $identityName
-    if ($null -ne $identity) {
-        Set-PropertyValue $identity "root" $null
-        Set-PropertyValue $identity "ownedPath" $null
-        Set-PropertyValue $identity "sourceBoundaryPath" $null
-        Set-PropertyValue $identity "warnings" @()
+    $cleanIdentity = Get-PropertyValue $cleanCheckoutDocument $identityName
+    if ($null -ne $cleanIdentity) {
+        Set-PropertyValue $cleanIdentity "root" $null
+        Set-PropertyValue $cleanIdentity "ownedPath" $null
+        Set-PropertyValue $cleanIdentity "sourceBoundaryPath" $null
+        Set-PropertyValue $cleanIdentity "warnings" @()
     }
 }
 Write-ArchiveJson "clean-checkout-gate-report.json" $cleanCheckoutDocument | Out-Null
@@ -613,6 +613,9 @@ $sourceValidationPassed = Get-DheStrictBooleanProperty $workflow "validationPass
 $sourceCoverageGatePassed = Get-DheStrictBooleanProperty $workflow "coverageGatePassed" "Workflow coverageGatePassed"
 Set-PropertyValue $archiveWorkflow "artifactValidationPassed" $true
 Set-PropertyValue $archiveWorkflow "passed" ($sourceValidationPassed -and $sourceCoverageGatePassed)
+Set-PropertyValue $archiveWorkflow "releaseReady" (
+    [string](Get-PropertyValue $archiveWorkflow "mode") -eq "Release" -and
+    $sourceValidationPassed -and $sourceCoverageGatePassed)
 Write-ArchiveJson "workflow-report.json" $archiveWorkflow | Out-Null
 
 $validator = Join-Path $labPath "scripts/validate-dhe-artifacts.ps1"
@@ -675,18 +678,18 @@ $archiveFileRecords = @($archiveFileRecords | Sort-Object path)
 $archiveFilePaths = @($archiveFiles | ForEach-Object { $_.FullName })
 $archiveSourceIdentities = [ordered]@{}
 foreach ($identityName in @("projectGit", "toolGit")) {
-    $identity = Get-PropertyValue $cleanCheckoutDocument $identityName
-    $archiveSourceIdentities[$identityName] = if ($null -eq $identity) {
+    $cleanIdentity = Get-PropertyValue $cleanCheckoutDocument $identityName
+    $archiveSourceIdentities[$identityName] = if ($null -eq $cleanIdentity) {
         $null
     } else {
         [ordered]@{
-            vcs = Get-NullableStringProperty $identity "vcs"
-            head = Get-NullableStringProperty $identity "head"
-            tree = Get-NullableStringProperty $identity "tree"
-            revision = Get-NullableStringProperty $identity "revision"
-            revisionSpec = Get-NullableStringProperty $identity "revisionSpec"
-            repository = Get-NullableStringProperty $identity "repository"
-            sourceBoundarySha256 = Get-NullableStringProperty $identity "sourceBoundarySha256"
+            vcs = Get-NullableStringProperty $cleanIdentity "vcs"
+            head = Get-NullableStringProperty $cleanIdentity "head"
+            tree = Get-NullableStringProperty $cleanIdentity "tree"
+            revision = Get-NullableStringProperty $cleanIdentity "revision"
+            revisionSpec = Get-NullableStringProperty $cleanIdentity "revisionSpec"
+            repository = Get-NullableStringProperty $cleanIdentity "repository"
+            sourceBoundarySha256 = Get-NullableStringProperty $cleanIdentity "sourceBoundarySha256"
         }
     }
 }
