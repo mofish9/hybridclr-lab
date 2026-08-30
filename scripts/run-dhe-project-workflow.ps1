@@ -291,10 +291,12 @@ function Invoke-CleanCheckoutStage {
     if ($RequireGitClean -or $Mode -eq "Release") { $cleanCheckoutArgs.RequireGitClean = $true }
     if ($trackedSourcesRequired) { $cleanCheckoutArgs.RequireTrackedSources = $true }
     if ($Mode -eq "Release") {
-        if (-not $installedToolchain) {
-            $cleanCheckoutArgs.RequireToolGitClean = $true
-            $cleanCheckoutArgs.RequireToolTrackedSources = $true
-        }
+        # A verified installed package is the tool identity for Release just
+        # like a source checkout. Keep the required fields true in both forms;
+        # the package-manifest path supplies the already-authenticated values,
+        # while a source checkout performs the live Git checks below.
+        $cleanCheckoutArgs.RequireToolGitClean = $true
+        $cleanCheckoutArgs.RequireToolTrackedSources = $true
     }
     if (-not [string]::IsNullOrWhiteSpace($resolvedProjectBoundaryPath)) {
         $cleanCheckoutArgs.SourceBoundaryPath = $resolvedProjectBoundaryPath
