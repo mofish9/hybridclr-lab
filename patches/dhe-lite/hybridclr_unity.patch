@@ -1,5 +1,5 @@
 diff --git a/Editor/Commands/DheBuildPipeline.cs b/Editor/Commands/DheBuildPipeline.cs
-index 2947fe9..0077b41 100644
+index 2947fe9..cb3f8c7 100644
 --- a/Editor/Commands/DheBuildPipeline.cs
 +++ b/Editor/Commands/DheBuildPipeline.cs
 @@ -96,6 +96,8 @@ namespace HybridCLR.Editor.Commands
@@ -297,7 +297,7 @@ index 2947fe9..0077b41 100644
              public DheRuntimePlanHandoffAssembly[] assemblies;
          }
  
-@@ -439,6 +648,54 @@ namespace HybridCLR.Editor.Commands
+@@ -439,6 +648,55 @@ namespace HybridCLR.Editor.Commands
              public string snapshot;
          }
  
@@ -329,6 +329,7 @@ index 2947fe9..0077b41 100644
 +        [Serializable]
 +        private sealed class DheAotMetadataEngine
 +        {
++            public string family;
 +            public string version;
 +            public string unityVersion;
 +        }
@@ -352,7 +353,7 @@ index 2947fe9..0077b41 100644
          [Serializable]
          private sealed class DheRuntimePlanHandoffAssembly
          {
-@@ -459,6 +716,18 @@ namespace HybridCLR.Editor.Commands
+@@ -459,6 +717,18 @@ namespace HybridCLR.Editor.Commands
          public string RuntimeAssetRoot;
          public string OutputRoot;
          public string StrippedAotRoot;
@@ -371,7 +372,7 @@ index 2947fe9..0077b41 100644
          public string[] AotMetadataAssemblyNames;
          public Func<string, byte[], byte[]> CurrentAssemblyTransform;
          public Func<string[], string[]> HotfixLoadOrderResolver;
-@@ -482,5 +751,11 @@ namespace HybridCLR.Editor.Commands
+@@ -482,5 +752,11 @@ namespace HybridCLR.Editor.Commands
          public BuildTarget Target;
          public BuildOptions BuildOptions;
          public string[] Scenes;
