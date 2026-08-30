@@ -3,6 +3,8 @@ param(
     [switch]$AllowDirty,
     [switch]$NoCheckout,
     [string]$ReposRoot = "",
+    [ValidatePattern("^$|^[0-9a-fA-F]{40}$")]
+    [string]$Il2CppPlusCommit = "",
     [ValidateSet("hybridclr", "il2cpp_plus")]
     [string[]]$SkipDirtyCheckFor = @()
 )
@@ -96,10 +98,14 @@ $null = . (Join-Path $PSScriptRoot "resolve-repos-root.ps1")
 $reposRoot = Resolve-LabReposRoot -LabRoot $LabRoot -Lock $lock -RequestedRoot $ReposRoot
 New-Item -ItemType Directory -Force -Path $reposRoot | Out-Null
 
+$il2cppSpec = $lock.repositories.il2cpp_plus
+if (-not [string]::IsNullOrWhiteSpace($Il2CppPlusCommit)) {
+    $il2cppSpec.commit = $Il2CppPlusCommit.ToLowerInvariant()
+}
 $results = @(
     (Ensure-Repository "hybridclr_unity" $lock.repositories.hybridclr_unity $reposRoot)
     (Ensure-Repository "hybridclr" $lock.repositories.hybridclr $reposRoot)
-    (Ensure-Repository "il2cpp_plus" $lock.repositories.il2cpp_plus $reposRoot)
+    (Ensure-Repository "il2cpp_plus" $il2cppSpec $reposRoot)
 )
 
 $results | ConvertTo-Json -Depth 5 | Write-Host

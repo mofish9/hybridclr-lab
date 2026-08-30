@@ -82,6 +82,10 @@ $workflowManifest = Get-Content -Raw $workflowPath | ConvertFrom-Json
 $workflow = @($workflowManifest.workflows | Where-Object id -eq $EngineWorkflow)
 if ($workflow.Count -ne 1) { throw "Engine workflow '$EngineWorkflow' was not found in $workflowPath" }
 $workflow = $workflow[0]
+$workflowIl2CppCommit = if ($null -ne $workflow.PSObject.Properties["il2cppPlus"] -and
+    $null -ne $workflow.il2cppPlus.PSObject.Properties["commit"]) {
+    [string]$workflow.il2cppPlus.commit
+} else { "" }
 $null = . (Join-Path $PSScriptRoot "resolve-repos-root.ps1")
 $reposRoot = Resolve-LabReposRoot -LabRoot $LabRoot -Lock $lock -RequestedRoot $ReposRoot
 $outputRootPath = if ([IO.Path]::IsPathRooted($OutputRoot)) {
@@ -116,6 +120,9 @@ $bootstrapParameters = @{
     ReposRoot = $reposRoot
     AllowDirty = [bool]$AllowDirty
     NoCheckout = $bootstrapNoCheckout
+}
+if (-not [string]::IsNullOrWhiteSpace($workflowIl2CppCommit)) {
+    $bootstrapParameters.Il2CppPlusCommit = $workflowIl2CppCommit
 }
 $skipBootstrapDirtyCheck = @()
 if (-not [string]::IsNullOrWhiteSpace($HybridClrSource)) { $skipBootstrapDirtyCheck += "hybridclr" }
