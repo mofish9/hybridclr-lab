@@ -839,6 +839,22 @@ $releaseReady = $Mode -eq "Release" -and $validationPassed -and $coverageComplet
     @($mvs | Where-Object { [string]$_.compatibility.status -ne "compatible" }).Count -eq 0 -and
     [int]$finalBuildIdentity.identityVersion -eq 2 -and
     [string]$finalBuildIdentity.aotSnapshotKind -eq "managed-assembly-plus-generated-cpp-v1"
+$resourceEvidencePath = Join-Path $OutputRoot "resource/dhe-resource-evidence.json"
+[IO.Directory]::CreateDirectory([IO.Path]::GetDirectoryName($resourceEvidencePath)) | Out-Null
+$resourceEvidence = [ordered]@{
+    schemaVersion = 1
+    format = "hybridclr.dhe-resource-evidence.json"
+    generatedAtUtc = [DateTimeOffset]::UtcNow.ToString("O")
+    passed = $true
+    target = "StandaloneWindows64"
+    strategy = "demo-no-resource-assets"
+    pathSemantics = "workspace-absolute-v1"
+    assetCount = 0
+    bundleCount = 0
+}
+[IO.File]::WriteAllText($resourceEvidencePath,
+    ($resourceEvidence | ConvertTo-Json -Depth 8),
+    (New-Object Text.UTF8Encoding($false)))
 $report = [ordered]@{
     schemaVersion = 1
     format = "hybridclr.dhe-demo-workflow.json"
@@ -882,6 +898,8 @@ $report = [ordered]@{
     runtimeDheRuntimeSha256 = $runtimeDheRuntimeSha256
     packageTreeSha256 = $packageTreeHash
     packageLock = $packageLockPath
+    resourceBuildPolicy = "skip"
+    resourceEvidence = $resourceEvidencePath
     runtimeManifest = if (Test-Path -LiteralPath $runtimeManifestOutput -PathType Leaf) {
         $runtimeManifestOutput
     } else { $null }
