@@ -288,6 +288,58 @@ try {
             }
         }
     }
+    $archiveAotMetadataReference = Get-PropertyValue $workflowArchive "aotMetadataFallbackManifest"
+    if ($null -ne $archiveAotMetadataReference -and
+        -not [string]::IsNullOrWhiteSpace([string]$archiveAotMetadataReference)) {
+        $archiveAotMetadataPath = Resolve-ArchivePath ([string]$archiveAotMetadataReference) "Archived AOT metadata manifest"
+        $archiveAotMetadata = Get-Content -Raw -LiteralPath $archiveAotMetadataPath | ConvertFrom-Json
+        if ([int](Get-PropertyValue $archiveAotMetadata "schemaVersion") -ne 1 -or
+            [string](Get-PropertyValue $archiveAotMetadata "format") -ne "hybridclr.dhe-aot-metadata-manifest.json" -or
+            [string](Get-PropertyValue $archiveAotMetadata "pathSemantics") -ne "archive-relative-v1" -or
+            [string](Get-PropertyValue $archiveAotMetadata "kind") -ne "patch-aot-metadata" -or
+            [string](Get-PropertyValue $archiveAotMetadata "target") -ne [string](Get-PropertyValue $workflowArchive "target")) {
+            throw "Archived AOT metadata manifest is invalid or bound to a different target."
+        }
+        $archiveAotSourceRoot = [string](Get-PropertyValue $archiveAotMetadata "sourceRoot")
+        $archiveAotSourcePath = Resolve-ArchivePath $archiveAotSourceRoot "Archived AOT metadata sourceRoot"
+        $archiveAotRecords = @((Get-PropertyValue $archiveAotMetadata "assemblies"))
+        if ($archiveAotRecords.Count -eq 0) {
+            throw "Archived AOT metadata manifest contains no assembly records."
+        }
+        $archiveAotNames = New-Object System.Collections.Generic.HashSet[string]([StringComparer]::OrdinalIgnoreCase)
+        foreach ($archiveAotRecord in $archiveAotRecords) {
+            $archiveAotName = [string](Get-PropertyValue $archiveAotRecord "assemblyName")
+            Assert-SafeAssemblyName $archiveAotName
+            if (-not $archiveAotNames.Add($archiveAotName)) {
+                throw "Archived AOT metadata manifest contains a duplicate assembly: $archiveAotName"
+            }
+            $archiveAotRecordPath = [string](Get-PropertyValue $archiveAotRecord "path")
+            if ([string]::IsNullOrWhiteSpace($archiveAotRecordPath)) {
+                throw "Archived AOT metadata record has no path: $archiveAotName"
+            }
+            $archiveAotPayloadPath = Resolve-ArchivePath $archiveAotRecordPath "Archived AOT metadata '$archiveAotName'"
+            if (-not $archiveAotPayloadPath.StartsWith($archiveAotSourcePath.TrimEnd('\\', '/') + [IO.Path]::DirectorySeparatorChar,
+                    [StringComparison]::OrdinalIgnoreCase)) {
+                throw "Archived AOT metadata payload is outside sourceRoot: $archiveAotName"
+            }
+            $archiveAotHash = [string](Get-PropertyValue $archiveAotRecord "sha256")
+            if ($archiveAotHash -notmatch '^[0-9a-fA-F]{64}$' -or -not [IO.File]::Exists($archiveAotPayloadPath)) {
+                throw "Archived AOT metadata payload is missing or has an invalid hash: $archiveAotName"
+            }
+            $archiveAotActualHash = (Get-FileHash -LiteralPath $archiveAotPayloadPath -Algorithm SHA256).Hash.ToLowerInvariant()
+            if ($archiveAotActualHash -ne $archiveAotHash.ToLowerInvariant()) {
+                throw "Archived AOT metadata hash mismatch: $archiveAotName"
+            }
+        }
+        $archiveRuntimePlanPath = Resolve-ArchivePath ([string](Get-PropertyValue $archiveManifest "runtimePlan")) "Runtime plan"
+        $archiveRuntimePlanDocument = Get-Content -Raw -LiteralPath $archiveRuntimePlanPath | ConvertFrom-Json
+        $archiveManifestHash = (Get-FileHash -LiteralPath $archiveAotMetadataPath -Algorithm SHA256).Hash.ToLowerInvariant()
+        $archivePlanManifestHash = [string](Get-PropertyValue $archiveRuntimePlanDocument "aotMetadataManifestSha256")
+        if ($archivePlanManifestHash -notmatch '^[0-9a-fA-F]{64}$' -or
+            $archivePlanManifestHash.ToLowerInvariant() -ne $archiveManifestHash) {
+            throw "Archived runtime plan does not bind the archived AOT metadata manifest hash."
+        }
+    }
     $sourcePreflightArchivePath = Resolve-ArchivePath "source-preflight-report.json" "Source preflight"
     $sourcePreflightArchive = Get-Content -Raw -LiteralPath $sourcePreflightArchivePath | ConvertFrom-Json
     if ([string](Get-PropertyValue $sourcePreflightArchive "pathSemantics") -ne "archive-relative-v1") {

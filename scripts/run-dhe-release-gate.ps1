@@ -166,6 +166,40 @@ if ($null -eq $player -or -not (Test-StrictBoolean $player "passed" "DHE Player 
     [string](Get-Property $player "loadError") -ne "OK") {
     $errors.Add("DHE Player report is not a successful load/dispatch result.")
 }
+$resourcePolicy = [string](Get-Property $workflow "resourceBuildPolicy")
+$yooAssetReference = [string](Get-Property $workflow "yooAssetBuild")
+$resourceEvidenceReference = [string](Get-Property $workflow "resourceEvidence")
+if ($resourcePolicy -eq "required") {
+    if ([string]::IsNullOrWhiteSpace($yooAssetReference)) {
+        $errors.Add("DHE Release resourceBuildPolicy=required has no YooAsset evidence.")
+    }
+} elseif ($resourcePolicy -eq "skip") {
+    $resourceEvidencePath = if ([string]::IsNullOrWhiteSpace($resourceEvidenceReference)) {
+        ""
+    } elseif ([IO.Path]::IsPathRooted($resourceEvidenceReference)) {
+        [IO.Path]::GetFullPath($resourceEvidenceReference)
+    } else {
+        [IO.Path]::GetFullPath((Join-Path $workflowDirectory $resourceEvidenceReference))
+    }
+    if ([string]::IsNullOrWhiteSpace($resourceEvidencePath) -or
+        -not [IO.File]::Exists($resourceEvidencePath)) {
+        $errors.Add("DHE Release resourceBuildPolicy=skip requires resourceEvidence.")
+    } else {
+        try {
+            $resourceEvidence = Read-Json $resourceEvidencePath "DHE alternate resource evidence"
+            if ([int](Get-Property $resourceEvidence "schemaVersion") -ne 1 -or
+                [string](Get-Property $resourceEvidence "format") -ne "hybridclr.dhe-resource-evidence.json" -or
+                -not (Test-StrictBoolean $resourceEvidence "passed" "DHE alternate resource evidence passed") -or
+                [string](Get-Property $resourceEvidence "target") -ne $Target -or
+                [string](Get-Property $resourceEvidence "pathSemantics") -ne "workspace-absolute-v1" -or
+                [string]::IsNullOrWhiteSpace([string](Get-Property $resourceEvidence "strategy"))) {
+                $errors.Add("DHE alternate resource evidence is invalid or bound to a different target.")
+            }
+        } catch { $errors.Add($_.Exception.Message) }
+    }
+} else {
+    $errors.Add("DHE Release workflow has unsupported or missing resourceBuildPolicy: $resourcePolicy")
+}
 $transaction = Get-Property $workflow "transaction"
 $capability = Get-Property $workflow "capability"
 $changedMethodValue = Get-Property $capability "changedMethodCount"

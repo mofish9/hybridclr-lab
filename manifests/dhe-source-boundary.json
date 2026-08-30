@@ -48,6 +48,7 @@
     "scripts/generate-test-manifest.ps1",
     "scripts/dhe-workflow-common.ps1",
     "scripts/generate-dhe-batch.ps1",
+    "scripts/new-dhe-aot-metadata-manifest.ps1",
     "scripts/new-dhe-baseline-manifest.ps1",
     "scripts/generate-dhe-mv.ps1",
     "scripts/inject-dhe-aot-probe.ps1",

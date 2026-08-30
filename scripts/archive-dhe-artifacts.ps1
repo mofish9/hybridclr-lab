@@ -287,6 +287,63 @@ if (-not [string]::IsNullOrWhiteSpace($yooAssetBuildReference)) {
     Set-PropertyValue $yooAssetBuildDocument "pathSemantics" "archive-relative-v1"
     $archiveYooAssetBuildRelative = Write-ArchiveJson "yooasset/dhe-yooasset-build.json" $yooAssetBuildDocument
 }
+$archiveResourceEvidenceRelative = $null
+$resourceEvidenceReference = Get-NullableStringProperty $workflow "resourceEvidence"
+if (-not [string]::IsNullOrWhiteSpace($resourceEvidenceReference)) {
+    $resourceEvidencePath = Resolve-InputFile $resourceEvidenceReference "alternate resource evidence" $workflowDirectory
+    $resourceEvidenceDocument = Read-JsonFile $resourceEvidencePath "alternate resource evidence"
+    if ($null -eq $resourceEvidenceDocument -or $resourceEvidenceDocument.passed -ne $true) {
+        throw "Alternate resource evidence did not pass: $resourceEvidencePath"
+    }
+    # Resource adapters are allowed to carry project-specific fields, but an
+    # archive cannot retain workspace paths in those fields. Preserve the
+    # binding facts while removing the two conventional path fields and free
+    # form diagnostics; any other absolute value is rejected by the archive
+    # gate's recursive machine-path scan.
+    Set-PropertyValue $resourceEvidenceDocument "packageDirectory" $null
+    Set-PropertyValue $resourceEvidenceDocument "buildReport" $null
+    Set-PropertyValue $resourceEvidenceDocument "details" $null
+    Set-PropertyValue $resourceEvidenceDocument "pathSemantics" "archive-relative-v1"
+    $archiveResourceEvidenceRelative = Write-ArchiveJson "resource/dhe-resource-evidence.json" $resourceEvidenceDocument
+}
+$archiveAotMetadataManifestRelative = $null
+$archiveAotMetadataManifestHash = $null
+$aotMetadataManifestReference = Get-NullableStringProperty $workflow "aotMetadataFallbackManifest"
+if (-not [string]::IsNullOrWhiteSpace($aotMetadataManifestReference)) {
+    $aotMetadataManifestPath = Resolve-InputFile $aotMetadataManifestReference "AOT metadata fallback manifest" $workflowDirectory
+    $aotMetadataManifestDocument = Read-JsonFile $aotMetadataManifestPath "AOT metadata fallback manifest"
+    if ([string](Get-PropertyValue $aotMetadataManifestDocument "pathSemantics") -ne "workspace-absolute-v1" -or
+        [string](Get-PropertyValue $aotMetadataManifestDocument "kind") -ne "patch-aot-metadata") {
+        throw "AOT metadata fallback manifest is not a workspace patch-aot-metadata document: $aotMetadataManifestPath"
+    }
+    $aotSourceRoot = [string](Get-PropertyValue $aotMetadataManifestDocument "sourceRoot")
+    if ([string]::IsNullOrWhiteSpace($aotSourceRoot) -or -not [IO.Path]::IsPathRooted($aotSourceRoot)) {
+        throw "AOT metadata fallback manifest sourceRoot must be an absolute workspace path: $aotSourceRoot"
+    }
+    $aotSourceRoot = [IO.Path]::GetFullPath($aotSourceRoot)
+    if (-not [IO.Directory]::Exists($aotSourceRoot)) {
+        throw "AOT metadata fallback sourceRoot was not found: $aotSourceRoot"
+    }
+    $archiveAotSourceRoot = "provenance/aot-metadata"
+    foreach ($aotRecord in @((Get-PropertyValue $aotMetadataManifestDocument "assemblies"))) {
+        $aotAssemblyName = [string](Get-PropertyValue $aotRecord "assemblyName")
+        Assert-SafeAssemblyName $aotAssemblyName
+        $aotSource = Join-Path $aotSourceRoot ($aotAssemblyName + ".dll")
+        if (-not [IO.File]::Exists($aotSource)) {
+            throw "AOT metadata fallback payload was not found: $aotSource"
+        }
+        $aotDestination = $archiveAotSourceRoot + "/" + $aotAssemblyName + ".dll"
+        Copy-ArchiveFile $aotSource $aotDestination | Out-Null
+        Set-PropertyValue $aotRecord "path" $aotDestination
+        if ((Get-DheSha256 $aotSource) -ne ([string](Get-PropertyValue $aotRecord "sha256")).ToLowerInvariant()) {
+            throw "AOT metadata fallback payload hash does not match its manifest: $aotAssemblyName"
+        }
+    }
+    Set-PropertyValue $aotMetadataManifestDocument "pathSemantics" "archive-relative-v1"
+    Set-PropertyValue $aotMetadataManifestDocument "sourceRoot" $archiveAotSourceRoot
+    $archiveAotMetadataManifestRelative = Write-ArchiveJson "provenance/dhe-aot-metadata-manifest.json" $aotMetadataManifestDocument
+    $archiveAotMetadataManifestHash = Get-DheSha256 (Join-Path $archivePath $archiveAotMetadataManifestRelative)
+}
 
 $archiveAssemblyRecords = New-Object System.Collections.Generic.List[object]
 $archiveAssemblyByName = @{}
@@ -386,9 +443,35 @@ foreach ($record in @($runtimePlanDocument.assemblies)) {
     $archiveRecord.assemblyName = $assemblyName
     $archiveRuntimeRecords.Add($archiveRecord)
 }
+$archiveAotMetadataRecords = New-Object System.Collections.Generic.List[object]
+foreach ($record in @($runtimePlanDocument.aotMetadata)) {
+    $assemblyName = [string](Get-PropertyValue $record "assemblyName")
+    Assert-SafeAssemblyName $assemblyName
+    $reference = [string](Get-PropertyValue $record "path")
+    if ([string]::IsNullOrWhiteSpace($reference)) {
+        throw "Runtime plan AOT metadata has no path for '$assemblyName'."
+    }
+    $source = Resolve-InputFile $reference "Runtime plan AOT metadata '$assemblyName'" ([IO.Path]::GetDirectoryName($runtimePlanPath))
+    $destination = Copy-ArchiveFile $source ("runtime-plan/aot/" + $assemblyName + ".bytes")
+    $archiveAotMetadataRecords.Add([ordered]@{
+        assemblyName = $assemblyName
+        sourceKind = [string](Get-PropertyValue $record "sourceKind")
+        sha256 = [string](Get-PropertyValue $record "sha256")
+        manifestSha256 = if ($null -eq $archiveAotMetadataManifestHash) {
+            [string](Get-PropertyValue $record "manifestSha256")
+        } else { $archiveAotMetadataManifestHash }
+        # Runtime-plan paths are resolved relative to runtime-plan/ by the
+        # independent validator, so omit that archive directory prefix.
+        path = "aot/" + $assemblyName + ".bytes"
+    })
+}
 $archiveRuntimePlan = [ordered]@{
     schemaVersion = [int](Get-PropertyValue $runtimePlanDocument "schemaVersion")
     format = [string](Get-PropertyValue $runtimePlanDocument "format")
+    aotMetadataManifestSha256 = if ($null -eq $archiveAotMetadataManifestHash) {
+        [string](Get-PropertyValue $runtimePlanDocument "aotMetadataManifestSha256")
+    } else { $archiveAotMetadataManifestHash }
+    aotMetadata = $archiveAotMetadataRecords.ToArray()
     assemblies = $archiveRuntimeRecords.ToArray()
 }
 Write-ArchiveJson "runtime-plan/dhe-runtime-plan.json" $archiveRuntimePlan | Out-Null
@@ -605,6 +688,11 @@ Set-PropertyValue $archiveWorkflow "runtimePlanProjectPath" "runtime-plan/dhe-ru
 Set-PropertyValue $archiveWorkflow "archiveManifest" "archive-manifest.json"
 Set-PropertyValue $archiveWorkflow "archiveGate" $null
 Set-PropertyValue $archiveWorkflow "yooAssetBuild" $archiveYooAssetBuildRelative
+Set-PropertyValue $archiveWorkflow "resourceEvidence" $archiveResourceEvidenceRelative
+Set-PropertyValue $archiveWorkflow "aotMetadataFallbackManifest" $archiveAotMetadataManifestRelative
+if ($null -ne $archiveAotMetadataManifestHash) {
+    Set-PropertyValue $archiveWorkflow "aotMetadataFallbackManifestSha256" $archiveAotMetadataManifestHash
+}
 Set-PropertyValue $archiveWorkflow "mvJson" @($archiveAssemblyRecords | ForEach-Object { $_.mvJson })
 Set-PropertyValue $archiveWorkflow "mvBytes" @($archiveAssemblyRecords | ForEach-Object { $_.mvBytes })
 Set-PropertyValue $archiveWorkflow "artifactValidation" "artifact-validation.json"

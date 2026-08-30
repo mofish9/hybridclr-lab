@@ -1,7 +1,7 @@
 {
   "schemaVersion": 1,
   "format": "hybridclr.dhe-toolchain-layout.json",
-  "toolchainVersion": "0.1.5",
+  "toolchainVersion": "0.1.6",
   "contractVersion": 1,
   "exactPaths": [
     ".gitattributes",
@@ -12,6 +12,8 @@
     "manifests/dhe-toolchain-layout.json",
     "schemas/dhe-archive-gate.schema.json",
     "schemas/dhe-archive-manifest.schema.json",
+    "schemas/dhe-aot-metadata-manifest.schema.json",
+    "schemas/dhe-resource-evidence.schema.json",
     "schemas/dhe-artifact-validation.schema.json",
     "schemas/dhe-baseline-manifest.schema.json",
     "schemas/dhe-batch-report.schema.json",
@@ -50,6 +52,7 @@
     "scripts/dhe-workflow-common.ps1",
     "scripts/generate-dhe-batch.ps1",
     "scripts/new-dhe-baseline-manifest.ps1",
+    "scripts/new-dhe-aot-metadata-manifest.ps1",
     "scripts/generate-dhe-mv.ps1",
     "scripts/inject-dhe-aot-probe.ps1",
     "scripts/inject-dhe-guard.ps1",

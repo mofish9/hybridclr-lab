@@ -360,7 +360,7 @@ if (-not [string]::IsNullOrWhiteSpace($RuntimePlan)) {
             Add-Error "Complete coverage requires one runtime-plan assembly per MV JSON ($mvJsonCount expected, got $($planAssemblies.Count))."
         }
         $seenPlanAssemblies = @{}
-        foreach ($assemblyPlan in $planAssemblies) {
+            foreach ($assemblyPlan in $planAssemblies) {
             $assemblyName = Get-StringProperty $assemblyPlan "assemblyName"
             if ([string]::IsNullOrWhiteSpace($assemblyName) -or $seenPlanAssemblies.ContainsKey($assemblyName)) {
                 Add-Error "Runtime plan contains a missing or duplicate assembly name: $runtimePlanPath"
@@ -411,9 +411,55 @@ if (-not [string]::IsNullOrWhiteSpace($RuntimePlan)) {
                         }
                     }
                 }
+                }
             }
-        }
-        $mvAssemblyNames = @($mvDocuments | ForEach-Object { Get-StringProperty $_ "assemblyName" } | Sort-Object -Unique)
+            $aotMetadataProperty = $runtimePlanDocument.PSObject.Properties["aotMetadata"]
+            $aotMetadataRecords = if ($null -eq $aotMetadataProperty) { @() } else { @($aotMetadataProperty.Value) }
+            $aotManifestHash = Get-StringProperty $runtimePlanDocument "aotMetadataManifestSha256"
+            if ([string]::IsNullOrWhiteSpace($aotManifestHash)) {
+                $aotManifestHash = ""
+            } elseif ($aotManifestHash -notmatch '^[0-9a-fA-F]{64}$') {
+                Add-Error "Runtime plan aotMetadataManifestSha256 is invalid."
+            }
+            $seenAotMetadata = @{}
+            foreach ($aotMetadata in $aotMetadataRecords) {
+                $aotAssemblyName = Get-StringProperty $aotMetadata "assemblyName"
+                $aotSourceKind = Get-StringProperty $aotMetadata "sourceKind"
+                $aotPath = Get-StringProperty $aotMetadata "path"
+                $aotHash = Get-StringProperty $aotMetadata "sha256"
+                $aotRecordManifestHash = Get-StringProperty $aotMetadata "manifestSha256"
+                if ([string]::IsNullOrWhiteSpace($aotAssemblyName) -or
+                    $seenAotMetadata.ContainsKey($aotAssemblyName)) {
+                    Add-Error "Runtime plan AOT metadata contains a missing or duplicate assembly name."
+                    continue
+                }
+                $seenAotMetadata[$aotAssemblyName] = $true
+                if ($aotSourceKind -notin @("current-stripped", "fallback-root") -or
+                    [string]::IsNullOrWhiteSpace($aotPath) -or [IO.Path]::IsPathRooted($aotPath) -or
+                    $aotPath -match '(^|[\\/])\.\.([\\/]|$)' -or
+                    $aotHash -notmatch '^[0-9a-fA-F]{64}$' -or
+                    $aotRecordManifestHash -notmatch '^$|^[0-9a-fA-F]{64}$') {
+                    Add-Error "Runtime plan AOT metadata record is invalid for '$aotAssemblyName'."
+                    continue
+                }
+                if (-not [string]::IsNullOrWhiteSpace($aotManifestHash) -and
+                    $aotRecordManifestHash.ToLowerInvariant() -ne $aotManifestHash.ToLowerInvariant()) {
+                    Add-Error "Runtime plan AOT metadata manifest hash does not match record '$aotAssemblyName'."
+                }
+                $aotPayloadPath = [IO.Path]::GetFullPath((Join-Path $planDirectory ($aotPath.Replace('/', [IO.Path]::DirectorySeparatorChar))))
+                $planPrefix = $planDirectory.TrimEnd('\\', '/') + [IO.Path]::DirectorySeparatorChar
+                if (-not $aotPayloadPath.StartsWith($planPrefix, [StringComparison]::OrdinalIgnoreCase)) {
+                    Add-Error "Runtime plan AOT metadata path escapes its plan directory for '$aotAssemblyName'."
+                } elseif (-not [IO.File]::Exists($aotPayloadPath)) {
+                    Add-Error "Runtime plan AOT metadata payload is missing for '$aotAssemblyName': $aotPayloadPath"
+                } else {
+                    $actualAotHash = (Get-FileHash -LiteralPath $aotPayloadPath -Algorithm SHA256).Hash.ToLowerInvariant()
+                    if ($actualAotHash -ne $aotHash.ToLowerInvariant()) {
+                        Add-Error "Runtime plan AOT metadata hash mismatch for '$aotAssemblyName'."
+                    }
+                }
+            }
+            $mvAssemblyNames = @($mvDocuments | ForEach-Object { Get-StringProperty $_ "assemblyName" } | Sort-Object -Unique)
         $planAssemblyNames = @($planAssemblies | ForEach-Object { Get-StringProperty $_ "assemblyName" } | Sort-Object -Unique)
         if (($mvAssemblyNames -join ',') -ne ($planAssemblyNames -join ',')) {
             Add-Error "Runtime plan assembly set does not match MV JSON inputs."
@@ -949,6 +995,20 @@ if (-not [string]::IsNullOrWhiteSpace($WorkflowReport)) {
                                 if (-not [StringComparer]::OrdinalIgnoreCase.Equals($assetFileName, $expectedFileName)) {
                                     Add-Error "YooAsset payload '$payloadKey' has an unexpected asset filename '$assetFileName'."
                                 }
+                            }
+                        }
+                        foreach ($aotMetadata in $aotMetadataRecords) {
+                            $aotAssemblyName = Get-StringProperty $aotMetadata "assemblyName"
+                            $payloadKey = $aotAssemblyName + "|aot-metadata"
+                            if (-not $yooAssetByKey.ContainsKey($payloadKey)) {
+                                Add-Error "YooAsset evidence is missing DHE payload '$payloadKey'."
+                                continue
+                            }
+                            $payloadRecord = $yooAssetByKey[$payloadKey]
+                            $assetFileName = [IO.Path]::GetFileName((Get-StringProperty $payloadRecord "assetPath").Replace('/', [IO.Path]::DirectorySeparatorChar))
+                            $expectedFileName = $aotAssemblyName + ".bytes"
+                            if (-not [StringComparer]::OrdinalIgnoreCase.Equals($assetFileName, $expectedFileName)) {
+                                Add-Error "YooAsset payload '$payloadKey' has an unexpected asset filename '$assetFileName'."
                             }
                         }
                     }

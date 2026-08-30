@@ -620,6 +620,40 @@ try {
             throw "DHE adapter YooAsset evidence did not pass: $yooAssetBuildPath"
         }
     }
+    $resourcePolicy = [string](Get-PropertyValue $workflow "resourceBuildPolicy")
+    if ([string]::IsNullOrWhiteSpace($resourcePolicy)) {
+        throw "DHE adapter workflow must declare resourceBuildPolicy."
+    }
+    if ($Mode -eq "Release") {
+        if ($resourcePolicy -eq "required" -and $null -eq $yooAssetBuildPath) {
+            throw "DHE Release requires yooAssetBuild evidence when resourceBuildPolicy=required."
+        }
+        if ($resourcePolicy -eq "skip") {
+            $resourceEvidenceReference = [string](Get-PropertyValue $workflow "resourceEvidence")
+            $resourceEvidencePath = if ([string]::IsNullOrWhiteSpace($resourceEvidenceReference)) {
+                ""
+            } elseif ([IO.Path]::IsPathRooted($resourceEvidenceReference)) {
+                [IO.Path]::GetFullPath($resourceEvidenceReference)
+            } else {
+                [IO.Path]::GetFullPath((Join-Path ([IO.Path]::GetDirectoryName($workflowPath)) $resourceEvidenceReference))
+            }
+            if ([string]::IsNullOrWhiteSpace($resourceEvidencePath) -or
+                -not [IO.File]::Exists($resourceEvidencePath)) {
+                throw "DHE Release resourceBuildPolicy=skip requires resourceEvidence: $resourceEvidencePath"
+            }
+            $resourceEvidence = Read-JsonFile $resourceEvidencePath "DHE alternate resource evidence"
+            if ([int](Get-PropertyValue $resourceEvidence "schemaVersion") -ne 1 -or
+                [string](Get-PropertyValue $resourceEvidence "format") -ne "hybridclr.dhe-resource-evidence.json" -or
+                -not (Require-BooleanProperty $resourceEvidence "passed" "DHE alternate resource evidence passed") -or
+                [string](Get-PropertyValue $resourceEvidence "target") -ne $Target -or
+                [string](Get-PropertyValue $resourceEvidence "pathSemantics") -ne "workspace-absolute-v1" -or
+                [string]::IsNullOrWhiteSpace([string](Get-PropertyValue $resourceEvidence "strategy"))) {
+                throw "DHE alternate resource evidence is invalid or bound to a different target: $resourceEvidencePath"
+            }
+        } elseif ($resourcePolicy -ne "required") {
+            throw "Unsupported Release resourceBuildPolicy: $resourcePolicy"
+        }
+    }
 
     # Player generation can touch tracked Unity/HybridCLR outputs (and an
     # adapter may install or rewrite project-owned sources). Release evidence

@@ -726,6 +726,14 @@ function Resolve-DheSettingsAssemblySets {
     $configuredDhe = @($configuredDheRaw |
         ForEach-Object { $_.Trim() } | Where-Object { $_.Length -gt 0 } | Select-Object -Unique)
     $resolvedDhe = if ($configuredDhe.Count -gt 0) { $configuredDhe } else { @($resolvedHotUpdate) }
+    $patchAot = @(Get-DheYamlList $settingsPath "patchAOTAssemblies" |
+        ForEach-Object { $_.Trim() } | Where-Object { $_.Length -gt 0 } |
+        ForEach-Object {
+            $value = [string]$_
+            if ($value.EndsWith(".dll", [StringComparison]::OrdinalIgnoreCase)) {
+                [IO.Path]::GetFileNameWithoutExtension($value)
+            } else { $value }
+        } | Select-Object -Unique)
     return [ordered]@{
         settingsPath = $settingsPath
         projectRoot = $projectRootPath
@@ -734,6 +742,7 @@ function Resolve-DheSettingsAssemblySets {
         dheAotConfigured = $configuredDhe.Count -gt 0
         hotUpdateDuplicates = ConvertTo-DheStringArray (Get-DheDuplicateNames $hotUpdate.ToArray())
         dheAotDuplicates = ConvertTo-DheStringArray (Get-DheDuplicateNames $configuredDheRaw)
+        patchAotAssemblies = ConvertTo-DheStringArray $patchAot
         externalHotUpdateAssemblyDirs = ConvertTo-DheStringArray (Get-DheYamlList $settingsPath "externalHotUpdateAssembliyDirs")
     }
 }
@@ -951,6 +960,107 @@ function Assert-DheAdapterPrepareReport {
         throw "DHE adapter prepare report is bound to a different project or settings file."
     }
     return [pscustomobject]$references
+}
+
+function Assert-DheAotMetadataManifestBinding {
+    param(
+        [Parameter(Mandatory = $true)][string]$ManifestPath,
+        [Parameter(Mandatory = $true)][string]$Root,
+        [Parameter(Mandatory = $true)][string]$Target,
+        [Parameter(Mandatory = $true)][string]$RuntimeManifestPath,
+        [string]$PackageLockPath = "",
+        [Parameter(Mandatory = $true)][string[]]$AssemblyNames
+    )
+
+    $manifestPathResolved = [IO.Path]::GetFullPath($ManifestPath)
+    $rootResolved = [IO.Path]::GetFullPath($Root)
+    $runtimeManifestResolved = [IO.Path]::GetFullPath($RuntimeManifestPath)
+    if (-not [IO.File]::Exists($manifestPathResolved)) {
+        throw "DHE AOT metadata manifest was not found: $manifestPathResolved"
+    }
+    if (-not [IO.Directory]::Exists($rootResolved)) {
+        throw "DHE AOT metadata root was not found: $rootResolved"
+    }
+    if (-not [IO.File]::Exists($runtimeManifestResolved)) {
+        throw "DHE runtime manifest was not found: $runtimeManifestResolved"
+    }
+    try { $manifest = Get-Content -Raw -LiteralPath $manifestPathResolved | ConvertFrom-Json }
+    catch { throw "DHE AOT metadata manifest is not valid JSON: $manifestPathResolved ($($_.Exception.Message))" }
+    try { $runtime = Get-Content -Raw -LiteralPath $runtimeManifestResolved | ConvertFrom-Json }
+    catch { throw "DHE runtime manifest is not valid JSON: $runtimeManifestResolved ($($_.Exception.Message))" }
+
+    if ([int]$manifest.schemaVersion -ne 1 -or
+        [string]$manifest.format -ne "hybridclr.dhe-aot-metadata-manifest.json" -or
+        [string]$manifest.pathSemantics -ne "workspace-absolute-v1" -or
+        [string]$manifest.kind -ne "patch-aot-metadata" -or
+        [string]$manifest.target -ne $Target) {
+        throw "DHE AOT metadata manifest has an unsupported schema, kind, path semantics, or target: $manifestPathResolved"
+    }
+    if ($null -eq $manifest.sourceRoot -or
+        (Normalize-DhePath ([IO.Path]::GetFullPath([string]$manifest.sourceRoot))) -ne (Normalize-DhePath $rootResolved)) {
+        throw "DHE AOT metadata manifest sourceRoot does not match the supplied root."
+    }
+    if ($null -eq $manifest.engine -or $null -eq $runtime.engine -or
+        [string]$manifest.engineWorkflow -ne [string]$runtime.engineWorkflow) {
+        throw "DHE AOT metadata manifest engine identity does not match the runtime manifest."
+    }
+    foreach ($propertyName in @("family", "version", "unityVersion", "unityVersionNumber", "tuanjieVersionNumber")) {
+        if ([string]$manifest.engine.$propertyName -ne [string]$runtime.engine.$propertyName) {
+            throw "DHE AOT metadata manifest engine identity '$propertyName' does not match the runtime manifest."
+        }
+    }
+    if ($null -eq $manifest.runtime -or
+        [string]$manifest.runtime.profile -ne [string]$runtime.profile -or
+        [string]$manifest.runtime.stagedRuntimeSha256 -ne [string]$runtime.stagedRuntimeSha256 -or
+        [string]$manifest.runtime.runtimeManifestSha256 -ne (Get-DheSha256 $runtimeManifestResolved)) {
+        throw "DHE AOT metadata manifest runtime identity does not match the runtime manifest."
+    }
+    if (-not [string]::IsNullOrWhiteSpace($PackageLockPath)) {
+        $lockPath = [IO.Path]::GetFullPath($PackageLockPath)
+        if (-not [IO.File]::Exists($lockPath)) { throw "DHE package lock was not found: $lockPath" }
+        try { $lock = Get-Content -Raw -LiteralPath $lockPath | ConvertFrom-Json }
+        catch { throw "DHE package lock is not valid JSON: $lockPath ($($_.Exception.Message))" }
+        if ($null -eq $manifest.package -or
+            [string]$manifest.package.repository -ne [string]$lock.repository -or
+            [string]$manifest.package.baseCommit -ne [string]$lock.baseCommit -or
+            [string]$manifest.package.integratedCommit -ne [string]$lock.integratedCommit -or
+            [string]$manifest.package.treeSha256 -ne [string]$lock.treeSha256 -or
+            [string]$manifest.runtime.packageTreeSha256 -ne [string]$lock.treeSha256) {
+            throw "DHE AOT metadata manifest package identity does not match the supplied package lock."
+        }
+    }
+
+    $expectedNames = @($AssemblyNames | ForEach-Object {
+        $value = ([string]$_).Trim()
+        if ($value.EndsWith(".dll", [StringComparison]::OrdinalIgnoreCase)) {
+            [IO.Path]::GetFileNameWithoutExtension($value)
+        } else { $value }
+    } | Where-Object { $_.Length -gt 0 } | Sort-Object -Unique)
+    $records = @($manifest.assemblies)
+    $actualNames = @($records | ForEach-Object { [string]$_.assemblyName } | Sort-Object -Unique)
+    if ($expectedNames.Count -eq 0 -or $records.Count -ne $expectedNames.Count -or
+        ($expectedNames -join "`n") -ne ($actualNames -join "`n")) {
+        throw "DHE AOT metadata manifest assembly set does not match patchAOTAssemblies."
+    }
+    foreach ($record in $records) {
+        $name = ([string]$record.assemblyName).Trim()
+        if ([string]::IsNullOrWhiteSpace($name) -or $name.Contains("/") -or $name.Contains("\\") -or
+            $name.Contains("..", [StringComparison]::Ordinal)) {
+            throw "DHE AOT metadata manifest contains an unsafe assembly name: $name"
+        }
+        $hash = [string]$record.sha256
+        if ($hash -notmatch '^[0-9a-fA-F]{64}$') {
+            throw "DHE AOT metadata manifest contains an invalid hash: $name"
+        }
+        $assemblyPath = Join-Path $rootResolved ($name + ".dll")
+        if (-not [IO.File]::Exists($assemblyPath)) {
+            throw "DHE AOT metadata assembly was not found: $assemblyPath"
+        }
+        if ((Get-DheSha256 $assemblyPath) -ne $hash.ToLowerInvariant()) {
+            throw "DHE AOT metadata assembly hash does not match manifest: $name"
+        }
+    }
+    return $true
 }
 
 function Resolve-DhePowerShellHost {
