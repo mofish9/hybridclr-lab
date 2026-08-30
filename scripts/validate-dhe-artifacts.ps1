@@ -801,7 +801,16 @@ if (-not [string]::IsNullOrWhiteSpace($WorkflowReport)) {
                     $projectGitIdentity = Get-ObjectProperty $cleanCheckout "projectGit"
                     $projectVcs = Get-StringProperty $projectGitIdentity "vcs"
                     if ([string]::IsNullOrWhiteSpace($projectVcs)) { $projectVcs = "git" }
-                    $flatProjectIdentityMatches = if ($projectVcs -eq "svn") {
+                    $cleanPathSemantics = Get-StringProperty $cleanCheckout "pathSemantics"
+                    $flatProjectIdentityMatches = if ($cleanPathSemantics -eq "archive-relative-v1") {
+                        # Archive handoffs intentionally remove workspace-level
+                        # VCS roots and flat hashes. The nested identities are
+                        # retained and checked above, then bound again by the
+                        # archive manifest gate.
+                        [string]::IsNullOrWhiteSpace((Get-StringProperty $cleanCheckout "gitHead")) -and
+                            [string]::IsNullOrWhiteSpace((Get-StringProperty $cleanCheckout "gitTree")) -and
+                            [string]::IsNullOrWhiteSpace((Get-StringProperty $cleanCheckout "sourceBoundarySha256"))
+                    } elseif ($projectVcs -eq "svn") {
                         (Get-StringProperty $cleanCheckout "vcs") -eq "svn" -and
                             (Get-StringProperty $cleanCheckout "vcsRevision") -eq (Get-StringProperty $projectGitIdentity "revision") -and
                             (Get-StringProperty $cleanCheckout "vcsRepository") -eq (Get-StringProperty $projectGitIdentity "repository") -and
