@@ -159,6 +159,14 @@ The checked-in implementation is
 `scripts/adapters/dhe-demo-project-adapter.ps1`; it is the first complete
 contract example and is exercised by the manual self-hosted CI lane.
 
+For `Release`, `BaselineAotRoot` must be supplied explicitly to the
+orchestrator and the adapter must prove that its `baselineSourceRoot` is that
+exact previous-release root. The adapter should also bind the root to the
+requested target and matching Unity/engine/package identity; checking DLL names
+alone is not sufficient for a cross-platform release. The environment variable
+used by the Unity package is only an adapter implementation detail and cannot
+replace the orchestrator argument.
+
 Before calling the adapter, the orchestrator verifies the installed toolchain
 identity when applicable, then runs clean-checkout and source/runtime preflight.
 After `Prepare`, it repeats both gates so adapter or Unity generation cannot
@@ -245,6 +253,12 @@ omitted, the runner looks for `manifests/dhe-source-boundary.json` inside the
 project and otherwise fails closed. Exploratory `-RequireTrackedSources` uses
 the same resolution rules.
 
+Project boundary manifests may use `pathBase=project-root-v1` when they are
+stored below a Unity project (for example under `Assets/Editor/DHE`); exact and
+prefix paths are then resolved from the directory passed as `ProjectPath`.
+`git-root-v1` remains the default for the tool repository, and
+`manifest-directory-v1` is used by the distributed toolchain package.
+
 Use `scripts/archive-dhe-artifacts.ps1` (or the archive gate) to hand the
 evidence to another machine. The archive copies the settings file, managed
 assemblies, MV files, generated C++, and reports, then rewrites the project plan
@@ -255,9 +269,9 @@ that optional provenance file.
 The copied runtime manifest and build identity declare `archive-relative-v1`:
 workspace-only runtime/editor/source paths are removed, while commit, tree-hash,
 patch-hash, engine, runtime-lock, and project/tool identity hashes remain
-available as provenance. The archive gate recursively rejects Windows drive and
-UNC paths in every JSON document, so no machine-local absolute path can survive
-handoff. The archive does not contain a runnable `libil2cpp` tree; a new build
+available as provenance. The archive gate recursively rejects Windows drive/UNC
+and POSIX absolute paths in every JSON document, so no machine-local absolute
+path can survive handoff. The archive does not contain a runnable `libil2cpp` tree; a new build
 must assemble the locked runtime in its own workspace.
 Inside `batch/dhe-batch-summary.json`, payload references use `../payload/...`
 because batch paths are relative to the batch report directory. An archive gate

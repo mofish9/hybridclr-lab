@@ -61,7 +61,7 @@ function Find-MachineLocalJsonString($Value, [string]$JsonPath, [System.Collecti
     if ($null -eq $Value) { return }
     if ($Value -is [string]) {
         $text = [string]$Value
-        if ($text -match '^[A-Za-z]:[\\/]' -or $text -match '^(\\\\|//)[^\\/]') {
+        if (Test-DheMachineLocalPath $text) {
             $Matches.Add("${JsonPath}=$text")
         }
         return

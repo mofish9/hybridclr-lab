@@ -181,7 +181,7 @@ function Get-GitSourceIdentity {
                         $boundaryExactCount = if ($null -eq $boundary.PSObject.Properties["exactPaths"]) { 0 } else { @($boundary.exactPaths).Count }
                         $boundaryPrefixCount = if ($null -eq $boundary.PSObject.Properties["prefixes"]) { 0 } else { @($boundary.prefixes).Count }
                         if ($boundarySchema -ne 1 -or $boundaryFormat -ne "hybridclr.dhe-source-boundary.json" -or
-                            $boundaryPathBaseValue -notin @("git-root-v1", "manifest-directory-v1") -or
+                            $boundaryPathBaseValue -notin @("git-root-v1", "manifest-directory-v1", "project-root-v1") -or
                             $boundaryExactCount -eq 0 -or $boundaryPrefixCount -eq 0) {
                             $identityErrors.Add("$Name source boundary manifest has an invalid schema, format, pathBase, or empty exactPaths/prefixes: $resolvedBoundaryPath")
                             $boundary = $null
@@ -215,10 +215,10 @@ function Get-GitSourceIdentity {
                                     $resolvedGitRoot.TrimEnd('\', '/').Length).TrimStart('\', '/').Replace('\', '/')
                                 if (-not $trackedSet.Contains($boundaryRelativePath)) { $missingSources.Add($boundaryRelativePath) }
                             }
-                            $boundaryBasePath = if ($boundaryPathBaseValue -eq "manifest-directory-v1") {
-                                [IO.Path]::GetDirectoryName($resolvedBoundaryPath)
-                            } else {
-                                $resolvedGitRoot
+                            $boundaryBasePath = switch ($boundaryPathBaseValue) {
+                                "manifest-directory-v1" { [IO.Path]::GetDirectoryName($resolvedBoundaryPath); break }
+                                "project-root-v1" { $resolvedOwnedPath; break }
+                                default { $resolvedGitRoot }
                             }
                             if (-not (Test-PathWithinRoot -Path $boundaryBasePath -Root $resolvedGitRoot)) {
                                 $identityErrors.Add("$Name source boundary pathBase resolves outside the Git repository: $boundaryBasePath")
@@ -416,7 +416,7 @@ function Get-SvnSourceIdentity {
                     [object[]]$boundaryExact = if ($null -ne $boundary.PSObject.Properties["exactPaths"]) { @($boundary.exactPaths) } else { @() }
                     [object[]]$boundaryPrefixes = if ($null -ne $boundary.PSObject.Properties["prefixes"]) { @($boundary.prefixes) } else { @() }
                     if ($boundarySchema -ne 1 -or $boundaryFormat -ne "hybridclr.dhe-source-boundary.json" -or
-                        $boundaryPathBaseValue -notin @("git-root-v1", "manifest-directory-v1") -or
+                            $boundaryPathBaseValue -notin @("git-root-v1", "manifest-directory-v1", "project-root-v1") -or
                         $boundaryExact.Count -eq 0 -or $boundaryPrefixes.Count -eq 0) {
                         $identityErrors.Add("$Name source boundary manifest has an invalid schema, format, pathBase, or empty exactPaths/prefixes: $resolvedBoundaryPath")
                         $boundary = $null
@@ -431,9 +431,11 @@ function Get-SvnSourceIdentity {
                 }
 
                 if ($null -ne $boundary) {
-                    $boundaryBasePath = if ($boundaryPathBaseValue -eq "manifest-directory-v1") {
-                        [IO.Path]::GetDirectoryName($resolvedBoundaryPath)
-                    } else { $resolvedRoot }
+                    $boundaryBasePath = switch ($boundaryPathBaseValue) {
+                        "manifest-directory-v1" { [IO.Path]::GetDirectoryName($resolvedBoundaryPath); break }
+                        "project-root-v1" { $resolvedOwnedPath; break }
+                        default { $resolvedRoot }
+                    }
                     if (-not (Test-PathWithinRoot -Path $boundaryBasePath -Root $resolvedRoot)) {
                         $identityErrors.Add("$Name source boundary pathBase resolves outside the SVN working copy: $boundaryBasePath")
                     } else {

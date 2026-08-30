@@ -34,11 +34,20 @@ Windows PowerShell 5.1 can launch validation in CI when `pwsh` is also installed
 but it is not the runtime implementation host for the formal CLI.
 
 The core CLI and project-independent gates use PowerShell 7/.NET APIs that are
-available on Windows and macOS. The project adapter owns Unity executable
+available on Windows and macOS. Runtime assembly accepts explicit editor and
+external-header paths for each host platform; the project adapter owns Unity executable
 discovery, generated-C++ locations, and target-specific Player output. An iOS
 adapter must run on macOS with the Unity iOS module and may export an Xcode
 project; signing, Xcode compilation, device launch, and the runtime smoke test
 remain adapter-owned assertions.
+
+The previous-release stripped-AOT baseline is a target-bound input, not merely
+a directory containing files. A Release adapter must bind it to the same
+target, Unity/engine version, package/runtime identity, and previous Player
+release used to produce the current build. The core workflow requires the
+explicit `-BaselineAotRoot` argument; an environment variable alone is not a
+substitute. Projects should persist these facts in their own baseline manifest
+and reject a target or engine mismatch before Unity generation starts.
 
 ## Unity Package API
 

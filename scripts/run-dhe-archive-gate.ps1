@@ -46,7 +46,7 @@ function Get-PropertyValue($Object, [string]$Name) {
 function Find-MachineLocalJsonPaths($Value, [string]$Location, [System.Collections.Generic.List[string]]$Findings) {
     if ($null -eq $Value) { return }
     if ($Value -is [string]) {
-        if ([string]$Value -match '(?i)(?:^|[^A-Z0-9])(?:[A-Z]:[\\/]|\\\\[^\\/])') {
+        if (Test-DheMachineLocalPath ([string]$Value)) {
             $Findings.Add($Location)
         }
         return
@@ -84,29 +84,31 @@ function Resolve-ArchivePath([string]$Relative, [string]$Description) {
     return $resolved
 }
 
-foreach ($protectedPath in @(
-        $inputPath,
-        $archivePath,
-        $WorkflowReport,
-        $BuildIdentity,
-        $NativeManifest,
-        $RuntimePlan,
-        $ProjectPlan,
-        $ProjectPlanValidation,
-        $BatchReport)) {
-    if ([string]::IsNullOrWhiteSpace([string]$protectedPath)) { continue }
-    $candidatePath = if ([IO.Path]::IsPathRooted([string]$protectedPath)) {
-        [IO.Path]::GetFullPath([string]$protectedPath)
-    } else {
-        [IO.Path]::GetFullPath((Join-Path $inputPath ([string]$protectedPath)))
-    }
-    if ((Test-DhePathRelation $reportPath $candidatePath) -and
-        -not $reportPath.Equals($archivePath + ".gate.json", [StringComparison]::OrdinalIgnoreCase)) {
-        throw "DHE archive gate output overlaps protected input or archive content: $reportPath"
-    }
-}
-
 try {
+    # Keep output-overlap failures inside the reporting transaction. Callers
+    # must receive a machine-readable gate report even when validation fails
+    # before archive creation starts.
+    foreach ($protectedPath in @(
+            $inputPath,
+            $archivePath,
+            $WorkflowReport,
+            $BuildIdentity,
+            $NativeManifest,
+            $RuntimePlan,
+            $ProjectPlan,
+            $ProjectPlanValidation,
+            $BatchReport)) {
+        if ([string]::IsNullOrWhiteSpace([string]$protectedPath)) { continue }
+        $candidatePath = if ([IO.Path]::IsPathRooted([string]$protectedPath)) {
+            [IO.Path]::GetFullPath([string]$protectedPath)
+        } else {
+            [IO.Path]::GetFullPath((Join-Path $inputPath ([string]$protectedPath)))
+        }
+        if ((Test-DhePathRelation $reportPath $candidatePath) -and
+            -not $reportPath.Equals($archivePath + ".gate.json", [StringComparison]::OrdinalIgnoreCase)) {
+            throw "DHE archive gate output overlaps protected input or archive content: $reportPath"
+        }
+    }
     if (-not [IO.Directory]::Exists($inputPath)) { throw "DHE workflow input root was not found: $inputPath" }
     # The archive creator may recursively replace ArchiveRoot under
     # -ForceOutput. Reject LabRoot itself and its ancestors even when the

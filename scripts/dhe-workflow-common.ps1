@@ -116,6 +116,99 @@ function Resolve-DheEmbeddedPackageRoot {
     throw "An embedded HybridCLR package was not found under $packagesPath."
 }
 
+function Resolve-DheProjectRootFromBoundary {
+    param(
+        [Parameter(Mandatory = $true)][string]$BoundaryPath,
+        [Parameter(Mandatory = $true)][string]$RepositoryRoot
+    )
+
+    $cursor = [IO.Path]::GetDirectoryName([IO.Path]::GetFullPath($BoundaryPath))
+    $repository = [IO.Path]::GetFullPath($RepositoryRoot).TrimEnd('\', '/')
+    while (-not [string]::IsNullOrWhiteSpace($cursor) -and
+        (Test-DhePathWithinRoot $cursor $repository)) {
+        $assets = Join-Path $cursor "Assets"
+        $settings = Join-Path $cursor "ProjectSettings"
+        if ([IO.Directory]::Exists($assets) -and [IO.Directory]::Exists($settings)) {
+            return [IO.Path]::GetFullPath($cursor)
+        }
+        if ($cursor.Equals($repository, [StringComparison]::OrdinalIgnoreCase)) { break }
+        $parent = [IO.Path]::GetDirectoryName($cursor)
+        if ([string]::IsNullOrWhiteSpace($parent) -or
+            $parent.Equals($cursor, [StringComparison]::OrdinalIgnoreCase)) { break }
+        $cursor = $parent
+    }
+    throw "DHE project-root-v1 boundary must be under a directory containing Assets and ProjectSettings: $BoundaryPath"
+}
+
+function Test-DheMachineLocalPath {
+    param([AllowNull()][string]$Value)
+    if ([string]::IsNullOrWhiteSpace($Value)) { return $false }
+
+    # Reject drive/UNC paths and POSIX absolute paths, while allowing URLs such
+    # as https://... (the slash in a URL is preceded by a colon or another
+    # slash). A POSIX implementation may assign network semantics to //host,
+    # so reject that form too unless it is part of a URL scheme. Keep the POSIX
+    # expression broad enough to catch root and one-part paths such as / and
+    # /tmp, but require a path-like first component so schema regexes (for
+    # example ^[^/].*$) and text such as "a / b" are not treated as paths.
+    return $Value -match '(?i)(?:^|[^A-Z0-9])(?:[A-Z]:[\\/]|\\\\[^\\/])' -or
+        $Value -match '(?i)(?:^|[^A-Za-z0-9:/#])//(?:[^/\s]|$)' -or
+        $Value -match '(?i)(?:^|[^A-Za-z0-9:/#])/(?!/)(?:[\p{L}\p{N}._~-][^\s]*|$)'
+}
+
+function Get-DheEngineProductVersion {
+    param([Parameter(Mandatory = $true)][string]$EditorExecutable)
+    if (-not (Test-Path -LiteralPath $EditorExecutable -PathType Leaf)) { return $null }
+
+    # PowerShell 7 exposes a read-only automatic variable named $IsMacOS.
+    # Variable names are case-insensitive, so use a local name that cannot
+    # collide with the host variable on either Windows or macOS.
+    $editorIsMacOS = $false
+    try {
+        $editorIsMacOS = [Runtime.InteropServices.RuntimeInformation]::IsOSPlatform(
+            [Runtime.InteropServices.OSPlatform]::OSX)
+    } catch {
+        $editorIsMacOS = $false
+    }
+    if ($editorIsMacOS) {
+        $cursor = [IO.Path]::GetDirectoryName([IO.Path]::GetFullPath($EditorExecutable))
+        while (-not [string]::IsNullOrWhiteSpace($cursor)) {
+            if ($cursor.EndsWith('.app', [StringComparison]::OrdinalIgnoreCase)) {
+                $plistPath = Join-Path $cursor 'Contents/Info.plist'
+                if (Test-Path -LiteralPath $plistPath -PathType Leaf) {
+                    try {
+                        $xml = New-Object System.Xml.XmlDocument
+                        $xml.Load($plistPath)
+                        foreach ($key in @($xml.SelectNodes('/plist/dict/key'))) {
+                            if ([string]$key.InnerText -notin @('CFBundleShortVersionString', 'CFBundleVersion')) { continue }
+                            $node = $key.NextSibling
+                            while ($null -ne $node -and $node.NodeType -ne [Xml.XmlNodeType]::Element) {
+                                $node = $node.NextSibling
+                            }
+                            if ($null -ne $node -and $node.Name -eq 'string' -and
+                                -not [string]::IsNullOrWhiteSpace([string]$node.InnerText)) {
+                                return ([string]$node.InnerText).Trim()
+                            }
+                        }
+                    } catch {
+                        return $null
+                    }
+                }
+                break
+            }
+            $parent = [IO.Path]::GetDirectoryName($cursor)
+            if ([string]::IsNullOrWhiteSpace($parent) -or
+                $parent.Equals($cursor, [StringComparison]::OrdinalIgnoreCase)) { break }
+            $cursor = $parent
+        }
+    }
+    try {
+        return [string](Get-Item -LiteralPath $EditorExecutable -Force).VersionInfo.ProductVersion
+    } catch {
+        return $null
+    }
+}
+
 function Resolve-DheDnlibPath {
     param(
         [string]$RequestedPath = "",
@@ -1183,6 +1276,8 @@ function Assert-DheSafeOutputRoot {
                     [IO.Path]::GetDirectoryName([IO.Path]::GetFullPath($sourceBoundaryPath))
                 } elseif ($pathBase -eq "git-root-v1") {
                     $gitRoot
+                } elseif ($pathBase -eq "project-root-v1") {
+                    Resolve-DheProjectRootFromBoundary -BoundaryPath $sourceBoundaryPath -RepositoryRoot $gitRoot
                 } else { throw "DHE source boundary has an unsupported pathBase: $sourceBoundaryPath" }
                 $boundaryPaths = @()
                 foreach ($exact in @($boundary.exactPaths)) {

@@ -69,6 +69,13 @@ function Add-WarningCheck([string]$Name, [string]$Message) {
     $warnings.Add($Message)
 }
 
+function Get-JsonPropertyValue($Object, [string]$Name) {
+    if ($null -eq $Object) { return $null }
+    $property = $Object.PSObject.Properties[$Name]
+    if ($null -eq $property) { return $null }
+    return $property.Value
+}
+
 function Require-File([string]$Path, [string]$Description) {
     if (-not [IO.File]::Exists($Path)) {
         Add-ErrorCheck "file:$Description" "$Description was not found: $Path"
@@ -202,7 +209,15 @@ $packageLockPath = if (-not [string]::IsNullOrWhiteSpace($PackageLockPath)) {
 } else {
     ""
 }
-$packageRoot = Resolve-DheEmbeddedPackageRoot -ProjectRoot $ProjectPath -PackageLockPath $packageLockPath -AllowMissing
+$packageResolutionError = $null
+try {
+    $packageRoot = Resolve-DheEmbeddedPackageRoot -ProjectRoot $ProjectPath -PackageLockPath $packageLockPath -AllowMissing
+} catch {
+    # A structurally malformed lock must become a normal preflight failure,
+    # not an unhandled exception with no machine-readable report.
+    $packageRoot = $null
+    $packageResolutionError = $_.Exception.Message
+}
 $embeddedPackagePresent = $null -ne $packageRoot -and (Test-Path -LiteralPath $packageRoot -PathType Container)
 $identityTemplatePath = if (-not [string]::IsNullOrWhiteSpace($IdentityTemplatePath)) {
     [IO.Path]::GetFullPath($IdentityTemplatePath)
@@ -237,42 +252,47 @@ $packageLock = if ($packageLockAvailable) {
     }
     $null
 }
+if (-not [string]::IsNullOrWhiteSpace($packageResolutionError)) {
+    Add-ErrorCheck "package:lock" $packageResolutionError
+}
 $runtimeLock = Read-Json $runtimeLockPath "DHE runtime lock"
 if ($null -ne $runtimeLock) {
-    $runtimeSourceMode = if ($null -ne $runtimeLock.PSObject.Properties["sourceMode"]) {
-        [string]$runtimeLock.sourceMode
-    } else { "overlay" }
-    if ([int]$runtimeLock.schemaVersion -ne 1 -or
-        [string]$runtimeLock.format -ne "hybridclr.dhe-runtime-lock.json" -or
+    $runtimeSourceMode = [string](Get-JsonPropertyValue $runtimeLock "sourceMode")
+    if ([string]::IsNullOrWhiteSpace($runtimeSourceMode)) { $runtimeSourceMode = "overlay" }
+    $runtimePatches = @((Get-JsonPropertyValue $runtimeLock "patches") | Where-Object { $null -ne $_ })
+    if ([int](Get-JsonPropertyValue $runtimeLock "schemaVersion") -ne 1 -or
+        [string](Get-JsonPropertyValue $runtimeLock "format") -ne "hybridclr.dhe-runtime-lock.json" -or
         $runtimeSourceMode -notin @("overlay", "integrated") -or
-        @($runtimeLock.patches).Count -eq 0) {
+        $runtimePatches.Count -eq 0) {
         Add-ErrorCheck "runtime-lock:schema" "DHE runtime lock has an invalid schema or empty patch set."
     } else {
-        $modeMismatches = @($runtimeLock.patches | Where-Object {
-            $entryMode = if ($null -ne $_.PSObject.Properties["sourceMode"]) { [string]$_.sourceMode } else { $runtimeSourceMode }
+        $modeMismatches = @($runtimePatches | Where-Object {
+            $entryMode = [string](Get-JsonPropertyValue $_ "sourceMode")
+            if ([string]::IsNullOrWhiteSpace($entryMode)) { $entryMode = $runtimeSourceMode }
             $entryMode -ne $runtimeSourceMode
         })
         if ($modeMismatches.Count -gt 0) {
             Add-ErrorCheck "runtime-lock:schema" "DHE runtime lock mixes overlay and integrated patch entries."
         } else {
-            Add-Check "runtime-lock:schema" $true "schemaVersion=1; sourceMode=$runtimeSourceMode; patches=$(@($runtimeLock.patches).Count)"
+            Add-Check "runtime-lock:schema" $true "schemaVersion=1; sourceMode=$runtimeSourceMode; patches=$($runtimePatches.Count)"
         }
     }
 }
 if ($null -ne $packageLock) {
-    $packageSourceMode = if ($null -ne $packageLock.PSObject.Properties["sourceMode"]) {
-        [string]$packageLock.sourceMode
-    } else { "overlay" }
-    if ([int]$packageLock.schemaVersion -ne 1 -or
-        [string]$packageLock.format -ne "hybridclr.dhe-package-lock.json" -or
-        [string]$packageLock.repository -ne "hybridclr_unity" -or
-        [string]$packageLock.baseCommit -notmatch '^[0-9a-f]{40}$' -or
-        [string]$packageLock.pathBase -ne "project-root-v1" -or
+    $packageSourceMode = [string](Get-JsonPropertyValue $packageLock "sourceMode")
+    if ([string]::IsNullOrWhiteSpace($packageSourceMode)) { $packageSourceMode = "overlay" }
+    $packageBaseCommit = [string](Get-JsonPropertyValue $packageLock "baseCommit")
+    $packageIntegratedCommit = [string](Get-JsonPropertyValue $packageLock "integratedCommit")
+    if ([int](Get-JsonPropertyValue $packageLock "schemaVersion") -ne 1 -or
+        [string](Get-JsonPropertyValue $packageLock "format") -ne "hybridclr.dhe-package-lock.json" -or
+        [string](Get-JsonPropertyValue $packageLock "repository") -ne "hybridclr_unity" -or
+        $packageBaseCommit -notmatch '^[0-9a-f]{40}$' -or
+        [string](Get-JsonPropertyValue $packageLock "pathBase") -ne "project-root-v1" -or
         $packageSourceMode -notin @("overlay", "integrated") -or
-        ($packageSourceMode -eq "integrated" -and [string]$packageLock.integratedCommit -notmatch '^[0-9a-fA-F]{40}$')) {
+        ($packageSourceMode -eq "integrated" -and $packageIntegratedCommit -notmatch '^[0-9a-fA-F]{40}$')) {
         Add-ErrorCheck "package-lock:schema" "DHE package lock has an invalid schema, repository identity, or path base."
     } else {
-        Add-Check "package-lock:schema" $true "schemaVersion=1; sourceMode=$packageSourceMode; pathBase=project-root-v1; baseCommit=$($packageLock.baseCommit)"
+        Add-Check "package-lock:schema" $true "schemaVersion=1; sourceMode=$packageSourceMode; pathBase=project-root-v1; baseCommit=$packageBaseCommit"
     }
     if (-not (Test-DhePackageHashPolicy $packageLock)) {
         Add-ErrorCheck "package-lock:tree-hash-policy" "DHE package lock treeHashIgnoredPaths does not match the toolchain package hash policy."
@@ -299,28 +319,48 @@ if ($null -ne $packageLock) {
 }
 
 if ($null -ne $runtimeLock -and $null -ne $packageLock) {
-    $runtimeSourceMode = if ($null -ne $runtimeLock.PSObject.Properties["sourceMode"]) { [string]$runtimeLock.sourceMode } else { "overlay" }
-    $packageSourceMode = if ($null -ne $packageLock.PSObject.Properties["sourceMode"]) { [string]$packageLock.sourceMode } else { "overlay" }
+    $runtimeSourceMode = [string](Get-JsonPropertyValue $runtimeLock "sourceMode")
+    if ([string]::IsNullOrWhiteSpace($runtimeSourceMode)) { $runtimeSourceMode = "overlay" }
+    $packageSourceMode = [string](Get-JsonPropertyValue $packageLock "sourceMode")
+    if ([string]::IsNullOrWhiteSpace($packageSourceMode)) { $packageSourceMode = "overlay" }
     if ($runtimeSourceMode -ne $packageSourceMode) {
         Add-ErrorCheck "locks:source-mode" "Runtime and package locks must use the same sourceMode."
     } else {
         Add-Check "locks:source-mode" $true "sourceMode=$runtimeSourceMode"
     }
-    $runtimePackageIds = @($runtimeLock.patches |
-        Where-Object { [string]$_.applyRoot -eq "package" } |
-        ForEach-Object { [string]$_.id } | Sort-Object)
-    $lockedPackageIds = @($packageLock.patches | ForEach-Object { [string]$_ } | Sort-Object)
+    $runtimePatches = @((Get-JsonPropertyValue $runtimeLock "patches") | Where-Object { $null -ne $_ })
+    $packagePatches = @((Get-JsonPropertyValue $packageLock "patches") | Where-Object { $null -ne $_ })
+    $runtimePackageIds = @($runtimePatches |
+        Where-Object { [string](Get-JsonPropertyValue $_ "applyRoot") -eq "package" } |
+        ForEach-Object { [string](Get-JsonPropertyValue $_ "id") } | Sort-Object)
+    $lockedPackageIds = @($packagePatches | ForEach-Object { [string]$_ } | Sort-Object)
     if (($runtimePackageIds -join ",") -ne ($lockedPackageIds -join ",")) {
         Add-ErrorCheck "locks:package-patches" "Package lock patch IDs do not match runtime lock package patches."
     } else {
         Add-Check "locks:package-patches" $true "package patch IDs match"
+    }
+    if ($runtimeSourceMode -eq "integrated" -and $packageSourceMode -eq "integrated") {
+        $runtimePackageEntries = @($runtimePatches | Where-Object {
+            [string](Get-JsonPropertyValue $_ "applyRoot") -eq "package"
+        })
+        $commitMismatches = @($runtimePackageEntries | Where-Object {
+            $entryCommit = [string](Get-JsonPropertyValue $_ "integratedCommit")
+            $entryCommit -notmatch '^[0-9a-fA-F]{40}$' -or
+            -not [StringComparer]::OrdinalIgnoreCase.Equals($entryCommit, $packageIntegratedCommit)
+        })
+        if ($runtimePackageEntries.Count -eq 0 -or $commitMismatches.Count -gt 0) {
+            Add-ErrorCheck "locks:package-integrated-commit" "Package lock integratedCommit must match every integrated runtime patch applied at package root."
+        } else {
+            Add-Check "locks:package-integrated-commit" $true "integratedCommit=$packageIntegratedCommit"
+        }
     }
 }
 
 if ($embeddedPackagePresent -and $null -ne $packageLock) {
     $packageTreeHash = Get-DhePackageTreeHash $packageRoot
     if ($null -eq $packageLock -or
-        -not [StringComparer]::OrdinalIgnoreCase.Equals($packageTreeHash, [string]$packageLock.treeSha256)) {
+        -not [StringComparer]::OrdinalIgnoreCase.Equals($packageTreeHash,
+            [string](Get-JsonPropertyValue $packageLock "treeSha256"))) {
         Add-ErrorCheck "package:tree-hash" "Embedded HybridCLR package tree hash does not match dhe-package-lock.json."
     } else {
         Add-Check "package:tree-hash" $true $packageTreeHash
@@ -335,14 +375,16 @@ if ($embeddedPackagePresent) {
 }
 
 if ($null -ne $runtimeLock) {
-    foreach ($entry in @($runtimeLock.patches)) {
-        $patchPath = Join-Path $LabRoot ([string]$entry.path)
-        if (-not (Require-File $patchPath "DHE patch '$([string]$entry.id)'")) { continue }
+    foreach ($entry in @((Get-JsonPropertyValue $runtimeLock "patches"))) {
+        $patchRelativePath = [string](Get-JsonPropertyValue $entry "path")
+        $patchId = [string](Get-JsonPropertyValue $entry "id")
+        $patchPath = Join-Path $LabRoot $patchRelativePath
+        if (-not (Require-File $patchPath "DHE patch '$patchId'")) { continue }
         $patchHash = (Get-FileHash -LiteralPath $patchPath -Algorithm SHA256).Hash
-        if (-not [StringComparer]::OrdinalIgnoreCase.Equals($patchHash, [string]$entry.sha256)) {
-            Add-ErrorCheck "patch:$([string]$entry.id)" "DHE patch hash mismatch: $patchPath"
+        if (-not [StringComparer]::OrdinalIgnoreCase.Equals($patchHash, [string](Get-JsonPropertyValue $entry "sha256"))) {
+            Add-ErrorCheck "patch:$patchId" "DHE patch hash mismatch: $patchPath"
         } else {
-            Add-Check "patch:$([string]$entry.id)" $true $patchHash
+            Add-Check "patch:$patchId" $true $patchHash
         }
     }
 }
@@ -536,9 +578,8 @@ if (-not [string]::IsNullOrWhiteSpace($RuntimeSource)) {
         $manifestSourceMode = if ($null -ne $runtimeManifest.PSObject.Properties["dheRuntimeSourceMode"]) {
             [string]$runtimeManifest.dheRuntimeSourceMode
         } else { "overlay" }
-        $lockedSourceMode = if ($null -ne $runtimeLock.PSObject.Properties["sourceMode"]) {
-            [string]$runtimeLock.sourceMode
-        } else { "overlay" }
+        $lockedSourceMode = [string](Get-JsonPropertyValue $runtimeLock "sourceMode")
+        if ([string]::IsNullOrWhiteSpace($lockedSourceMode)) { $lockedSourceMode = "overlay" }
         if ($manifestSourceMode -ne $lockedSourceMode) {
             Add-ErrorCheck "runtime:source-mode" "Runtime manifest source mode '$manifestSourceMode' does not match the locked mode '$lockedSourceMode'."
             $runtimeReady = $false
@@ -671,8 +712,8 @@ if (-not [string]::IsNullOrWhiteSpace($RuntimeSource)) {
                     Add-Check "runtime:source-$sourceName" $true ("commit={0}; dirty={1}" -f $actualCommit, $actualDirty)
                 }
                 if ($lockedSourceMode -eq "integrated") {
-                    $integratedEntries = @($runtimeLock.patches | Where-Object {
-                        [string]$_.repository -eq $sourceName
+                    $integratedEntries = @((Get-JsonPropertyValue $runtimeLock "patches") | Where-Object {
+                        [string](Get-JsonPropertyValue $_ "repository") -eq $sourceName
                     })
                     foreach ($integratedEntry in $integratedEntries) {
                         $integratedCommit = if ($null -ne $integratedEntry.PSObject.Properties["integratedCommit"]) {
@@ -747,7 +788,7 @@ if (-not [string]::IsNullOrWhiteSpace($RuntimeSource)) {
             } else { "" }
             if (-not [string]::IsNullOrWhiteSpace($runtimeEngineExecutable) -and
                 (Test-Path -LiteralPath $runtimeEngineExecutable -PathType Leaf)) {
-                $editorProductVersion = [string](Get-Item -LiteralPath $runtimeEngineExecutable -Force).VersionInfo.ProductVersion
+                $editorProductVersion = Get-DheEngineProductVersion $runtimeEngineExecutable
                 if ([string]::IsNullOrWhiteSpace($editorProductVersion) -or
                     -not ($editorProductVersion -match ('^' + [regex]::Escape($expectedUnityVersion) + '(?:_|$)'))) {
                     Add-ErrorCheck "runtime:editor-product-version" "Engine executable ProductVersion '$editorProductVersion' does not match workflow unityVersion '$expectedUnityVersion'."

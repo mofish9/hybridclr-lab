@@ -490,7 +490,7 @@ Set-PropertyValue $sourcePreflightDocument "packageLockPath" $(if ($null -eq $pa
 Set-PropertyValue $sourcePreflightDocument "identityTemplatePath" $null
 foreach ($check in @($sourcePreflightDocument.checks)) {
     $details = [string](Get-PropertyValue $check "details")
-    if ($details -match '(?i)(?:^|[^A-Z0-9])(?:[A-Z]:[\\/]|\\\\[^\\/])') {
+    if (Test-DheMachineLocalPath $details) {
         Set-PropertyValue $check "details" "workspace path omitted from archive"
     }
 }

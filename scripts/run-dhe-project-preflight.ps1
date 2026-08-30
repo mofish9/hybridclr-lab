@@ -43,7 +43,8 @@ $sourcePreflightPassed = $null
 $resolvedDnlibPath = $null
 
 try {
-Assert-DheSafeOutputRoot -Path $outputPath -ProtectedPaths @($projectRootPath, $baselinePath, $currentPath)
+Assert-DheSafeOutputRoot -Path $outputPath -ProtectedPaths @(
+    $projectRootPath, $baselinePath, $currentPath, $RuntimeSource)
 Assert-DheOutputNotAncestor -Path $outputPath -Root $LabRoot
 if (Test-Path -LiteralPath $outputPath) {
     if (-not $ForceOutput -and @(Get-ChildItem -LiteralPath $outputPath -Force).Count -gt 0) {

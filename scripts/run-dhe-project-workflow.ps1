@@ -307,6 +307,9 @@ function Invoke-CleanCheckoutStage {
 
 try {
     $workflowLock = Enter-DheWorkflowLock -LabRoot $labRoot -TimeoutSeconds $WorkflowLockTimeoutSeconds
+    if ($StopAfterPreflight -and $Mode -eq "Release") {
+        throw "-StopAfterPreflight is a contract-test mode and cannot be combined with -Mode Release. Use -Mode Exploratory when intentionally skipping Player, archive, and release stages."
+    }
     if ($baselineRequired -and [string]::IsNullOrWhiteSpace($baselineAotPath)) {
         throw "DHE Release requires -BaselineAotRoot from a previous stripped-AOT release."
     }

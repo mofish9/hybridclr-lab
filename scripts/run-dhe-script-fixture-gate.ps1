@@ -113,6 +113,61 @@ $externalEmbeddedPackageLockValidated = $LASTEXITCODE -eq 0 -and
 Require $externalEmbeddedPackageLockValidated `
     "A project-root-relative package lock outside the consumer project did not pass source preflight."
 
+# An embedded package lock must identify the same integrated package commit as
+# the runtime lock. A matching tree hash alone is insufficient because a
+# different commit can produce the same copied tree after local edits.
+$staleIntegratedPackageLock = $checkedPackageLock | ConvertTo-Json -Depth 8 | ConvertFrom-Json
+$staleIntegratedPackageLock.integratedCommit = $staleIntegratedPackageLock.baseCommit
+$staleIntegratedPackageLockPath = Join-Path $externalEmbeddedLockRoot "stale-integrated-commit-package-lock.json"
+[IO.File]::WriteAllText($staleIntegratedPackageLockPath, ($staleIntegratedPackageLock | ConvertTo-Json -Depth 8), $fixtureUtf8NoBom)
+$staleIntegratedPackageLockExit = Invoke-ExpectedFailure @(
+    (Join-Path $LabRoot "scripts/run-dhe-source-preflight.ps1"),
+    "-LabRoot", $LabRoot,
+    "-ProjectPath", $externalEmbeddedProject,
+    "-OutputRoot", (Join-Path $externalEmbeddedRoot "stale-integrated-commit-source-preflight"),
+    "-PackageLockPath", $staleIntegratedPackageLockPath,
+    "-RequireEmbeddedPackage",
+    "-RequireDheEqualsHotUpdate",
+    "-ForceOutput"
+)
+$staleIntegratedPackageLockReportPath = Join-Path $externalEmbeddedRoot "stale-integrated-commit-source-preflight/source-preflight-report.json"
+$staleIntegratedPackageLockReport = if (Test-Path -LiteralPath $staleIntegratedPackageLockReportPath -PathType Leaf) {
+    Get-Content -Raw -LiteralPath $staleIntegratedPackageLockReportPath | ConvertFrom-Json
+} else { $null }
+$staleIntegratedPackageLockRejected = $staleIntegratedPackageLockExit -ne 0 -and
+    $null -ne $staleIntegratedPackageLockReport -and
+    @($staleIntegratedPackageLockReport.errors | Where-Object { $_ -like "*package-integrated-commit*" -or $_ -like "*integratedCommit*" }).Count -gt 0
+Require $staleIntegratedPackageLockRejected `
+    "Source preflight accepted a package lock with an integrated commit different from the runtime lock."
+
+# A valid JSON document with missing lock fields must fail through the normal
+# report contract instead of terminating on StrictMode property access.
+$malformedPackageLock = $checkedPackageLock | ConvertTo-Json -Depth 8 | ConvertFrom-Json
+$malformedPackageLock.PSObject.Properties.Remove("integratedCommit")
+$malformedPackageLockPath = Join-Path $externalEmbeddedLockRoot "malformed-package-lock.json"
+[IO.File]::WriteAllText($malformedPackageLockPath, ($malformedPackageLock | ConvertTo-Json -Depth 8), $fixtureUtf8NoBom)
+$malformedPackageLockOutputRoot = Join-Path $externalEmbeddedRoot "malformed-package-lock-source-preflight"
+$malformedPackageLockExit = Invoke-ExpectedFailure @(
+    (Join-Path $LabRoot "scripts/run-dhe-source-preflight.ps1"),
+    "-LabRoot", $LabRoot,
+    "-ProjectPath", $externalEmbeddedProject,
+    "-OutputRoot", $malformedPackageLockOutputRoot,
+    "-PackageLockPath", $malformedPackageLockPath,
+    "-RequireEmbeddedPackage",
+    "-RequireDheEqualsHotUpdate",
+    "-ForceOutput"
+)
+$malformedPackageLockReportPath = Join-Path $malformedPackageLockOutputRoot "source-preflight-report.json"
+$malformedPackageLockReport = if (Test-Path -LiteralPath $malformedPackageLockReportPath -PathType Leaf) {
+    Get-Content -Raw -LiteralPath $malformedPackageLockReportPath | ConvertFrom-Json
+} else { $null }
+$malformedPackageLockReported = $malformedPackageLockExit -ne 0 -and
+    $null -ne $malformedPackageLockReport -and
+    [bool]$malformedPackageLockReport.passed -eq $false -and
+    @($malformedPackageLockReport.errors | Where-Object { $_ -like "*package-lock:schema*" -or $_ -like "*invalid schema*" }).Count -gt 0
+Require $malformedPackageLockReported `
+    "Malformed package lock did not produce a machine-readable source preflight report."
+
 $legacyPackageLock = $checkedPackageLock | ConvertTo-Json -Depth 8 | ConvertFrom-Json
 $legacyPackageLock.packagePath = "unity2021-dhe-demo/Packages/com.code-philosophy.hybridclr"
 $legacyPackageLockPath = Join-Path $externalEmbeddedLockRoot "legacy-lab-relative-package-lock.json"
@@ -150,7 +205,7 @@ Require $absolutePackageLockRejected `
     "Source preflight accepted an absolute embedded package lock path."
 # Invalid inputs are probes, not evidence documents. Keep their versioned
 # failure reports but do not leave invalid recognized JSON in aggregate scans.
-Remove-Item -LiteralPath $legacyPackageLockPath,$absolutePackageLockPath -Force
+Remove-Item -LiteralPath $legacyPackageLockPath,$absolutePackageLockPath,$staleIntegratedPackageLockPath,$malformedPackageLockPath -Force
 
 $workflowLockTested = -not [bool]$WorkflowLockAlreadyHeld
 $workflowLockRejected = $null
@@ -357,6 +412,33 @@ try {
 }
 Require $unsafeSourceOutputRejected "Output safety accepted a formal tracked source directory."
 
+# Project preflight must protect the runtime input itself before honoring
+# -ForceOutput. This is a destructive-path regression test, so use an isolated
+# temporary tree and verify a sentinel survives the rejected invocation.
+$runtimeOutputProtectionRoot = Join-Path $OutputRoot "runtime-output-protection"
+$runtimeOutputBaselineRoot = Join-Path $runtimeOutputProtectionRoot "baseline"
+$runtimeOutputCurrentRoot = Join-Path $runtimeOutputProtectionRoot "current"
+$runtimeOutputSettingsRoot = Join-Path $runtimeOutputProtectionRoot "project/ProjectSettings"
+$runtimeOutputProjectRoot = Join-Path $runtimeOutputProtectionRoot "project"
+$runtimeOutputSentinel = Join-Path $runtimeOutputProtectionRoot "runtime-sentinel.txt"
+New-Item -ItemType Directory -Force -Path $runtimeOutputBaselineRoot,$runtimeOutputCurrentRoot,$runtimeOutputSettingsRoot | Out-Null
+Copy-Item -LiteralPath (Join-Path $LabRoot "unity2021-dhe-demo/ProjectSettings/HybridCLRSettings.asset") `
+    -Destination (Join-Path $runtimeOutputSettingsRoot "HybridCLRSettings.asset") -Force
+Set-Content -LiteralPath $runtimeOutputSentinel -Value "preserve" -Encoding ASCII
+$runtimeOutputProtectionExit = Invoke-ExpectedFailure @(
+    (Join-Path $LabRoot "scripts/run-dhe-project-preflight.ps1"),
+    "-SettingsFile", (Join-Path $runtimeOutputSettingsRoot "HybridCLRSettings.asset"),
+    "-BaselineRoot", $runtimeOutputBaselineRoot,
+    "-CurrentRoot", $runtimeOutputCurrentRoot,
+    "-ProjectRoot", $runtimeOutputProjectRoot,
+    "-RuntimeSource", $runtimeOutputProtectionRoot,
+    "-OutputRoot", $runtimeOutputProtectionRoot,
+    "-ForceOutput"
+)
+$runtimeOutputProtected = $runtimeOutputProtectionExit -ne 0 -and
+    (Test-Path -LiteralPath $runtimeOutputSentinel -PathType Leaf)
+Require $runtimeOutputProtected "Project preflight allowed -ForceOutput to delete RuntimeSource."
+
 # Filesystem roots must remain roots during normalization. Trimming the root
 # separator turns `C:\` into `C:` on Windows, which SVN interprets as the
 # current working copy and can make an external output directory look unsafe
@@ -373,6 +455,31 @@ try {
 }
 Require $filesystemRootPreserved "Path normalization stripped the filesystem root separator."
 Require $filesystemRootRejected "Output safety accepted the filesystem root."
+
+# Portable archive/package JSON must reject POSIX machine-local paths as well
+# as Windows drive/UNC paths, without mistaking URLs for filesystem paths.
+Require (Test-DheMachineLocalPath "/Users/build/Unity.app/Contents/MacOS/Unity") `
+    "Machine-local path detection did not reject a POSIX absolute path."
+Require (Test-DheMachineLocalPath "/tmp") `
+    "Machine-local path detection did not reject a one-part POSIX path."
+Require (Test-DheMachineLocalPath "/") `
+    "Machine-local path detection did not reject the POSIX filesystem root."
+Require (Test-DheMachineLocalPath "//server/share") `
+    "Machine-local path detection did not reject a POSIX double-slash network path."
+Require (-not (Test-DheMachineLocalPath "https://example.invalid/runtime.json")) `
+    "Machine-local path detection incorrectly rejected a URL."
+Require (-not (Test-DheMachineLocalPath "a / b")) `
+    "Machine-local path detection incorrectly rejected slash-separated prose."
+
+$projectBoundaryProbeRoot = Join-Path $OutputRoot "project-root-boundary-probe"
+$projectBoundaryProbePath = Join-Path $projectBoundaryProbeRoot "Assets/Editor/DHE/dhe-source-boundary.json"
+New-Item -ItemType Directory -Force -Path (Join-Path $projectBoundaryProbeRoot "Assets"),
+    (Join-Path $projectBoundaryProbeRoot "ProjectSettings"),
+    (Split-Path -Parent $projectBoundaryProbePath) | Out-Null
+$resolvedProjectBoundaryRoot = Resolve-DheProjectRootFromBoundary -BoundaryPath $projectBoundaryProbePath `
+    -RepositoryRoot $projectBoundaryProbeRoot
+Require ($resolvedProjectBoundaryRoot -eq ([IO.Path]::GetFullPath($projectBoundaryProbeRoot))) `
+    "project-root-v1 boundary resolution did not identify the Unity project root."
 
 # PowerShell unwraps a one-item native-command result to a scalar. Prove that
 # the tracked-source guard still rejects a directory containing exactly one
@@ -629,8 +736,13 @@ $archiveOverwriteExit = Invoke-ExpectedFailure @(
     "-InputRoot", $OutputRoot,
     "-ArchiveRoot", $archiveOverwriteRoot,
     "-Output", $archiveOverwritePath)
-Require ($archiveOverwriteExit -ne 0 -and -not (Test-Path -LiteralPath $archiveOverwritePath -PathType Leaf)) `
-    "Archive gate allowed output to overlap archive content."
+$archiveOverwriteReport = if (Test-Path -LiteralPath $archiveOverwritePath -PathType Leaf) {
+    Get-Content -Raw -LiteralPath $archiveOverwritePath | ConvertFrom-Json
+} else { $null }
+Require ($archiveOverwriteExit -ne 0 -and $null -ne $archiveOverwriteReport -and
+    $archiveOverwriteReport.passed -is [bool] -and -not [bool]$archiveOverwriteReport.passed -and
+    @($archiveOverwriteReport.errors | Where-Object { $_ -like "*overlaps protected input*" }).Count -eq 1) `
+    "Archive gate did not emit a machine-readable report for an output overlap."
 $global:LASTEXITCODE = 0
 
 $shapeInput = Join-Path $fixtures "dhe-shapes-input.cpp"

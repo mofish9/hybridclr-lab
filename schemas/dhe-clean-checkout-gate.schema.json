@@ -61,7 +61,7 @@
         "trackedSourcesRequired": { "type": "boolean" },
         "sourceBoundaryPath": { "type": ["string", "null"] },
         "sourceBoundarySha256": { "type": ["string", "null"], "pattern": "^[0-9a-fA-F]{64}$" },
-        "sourceBoundaryPathBase": { "enum": ["git-root-v1", "manifest-directory-v1", null] },
+        "sourceBoundaryPathBase": { "enum": ["git-root-v1", "manifest-directory-v1", "project-root-v1", null] },
         "missingTrackedSources": { "type": "array", "items": { "type": "string" } },
         "passed": { "type": "boolean" },
         "errors": { "type": "array", "items": { "type": "string" } },

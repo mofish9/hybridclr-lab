@@ -9,6 +9,8 @@ param(
     [string]$Il2CppPlusSource = "",
     [string]$PackageRoot = "",
     [string]$ReposRoot = "",
+    [string]$EditorExecutable = "",
+    [string]$ExternalHeadersRoot = "",
     [switch]$AllowDirty,
     [switch]$AllowSurrogateExternalHeaders
 )
@@ -175,15 +177,32 @@ if (Test-Path $stagingPath) {
 }
 New-Item -ItemType Directory -Force -Path $stagingPath | Out-Null
 Copy-DirectoryContents (Join-Path $il2cppPath "libil2cpp") $stagedLibil2cpp
-$editorExecutable = [IO.Path]::GetFullPath($workflow.engine.executablePath)
+$editorExecutable = if ([string]::IsNullOrWhiteSpace($EditorExecutable)) {
+    [IO.Path]::GetFullPath([string]$workflow.engine.executablePath)
+} else {
+    [IO.Path]::GetFullPath($EditorExecutable)
+}
 $editorAvailable = Test-Path $editorExecutable
-$editorExternal = if ($editorAvailable) {
-    Join-Path (Split-Path -Parent $editorExecutable) "Data/il2cpp/external"
+$editorDirectory = Split-Path -Parent $editorExecutable
+$editorExternal = if (-not [string]::IsNullOrWhiteSpace($ExternalHeadersRoot)) {
+    [IO.Path]::GetFullPath($ExternalHeadersRoot)
+} elseif ($editorAvailable) {
+    # Unity on Windows keeps il2cpp under Editor/Data. macOS Unity.app keeps
+    # it under Contents/il2cpp, so probe both layouts without encoding a host
+    # OS into the workflow manifest.
+    $externalCandidates = @(
+        (Join-Path $editorDirectory "Data/il2cpp/external"),
+        (Join-Path $editorDirectory "../il2cpp/external"),
+        (Join-Path $editorDirectory "../Data/il2cpp/external")
+    ) | ForEach-Object { [IO.Path]::GetFullPath($_) }
+    $existingExternal = @($externalCandidates | Where-Object { Test-Path -LiteralPath $_ -PathType Container })
+    if ($existingExternal.Count -gt 0) { $existingExternal[0] } else { $externalCandidates[0] }
 } elseif ($null -ne $workflow.engine.PSObject.Properties["nativeTestExternalPath"]) {
     [IO.Path]::GetFullPath([string]$workflow.engine.nativeTestExternalPath)
 } else {
     ""
 }
+$workflow.engine.executablePath = $editorExecutable
 $externalHeadersAreSurrogate = -not $editorAvailable
 if ([string]::IsNullOrWhiteSpace($editorExternal) -or -not (Test-Path $editorExternal)) {
     throw "Engine il2cpp external headers were not found for '$EngineWorkflow': $editorExternal"
