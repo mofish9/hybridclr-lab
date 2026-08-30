@@ -1,7 +1,7 @@
 [CmdletBinding(PositionalBinding = $false)]
 param(
     [Parameter(Position = 0)]
-    [ValidateSet("help", "archive", "doctor", "install", "new-adapter", "preflight", "release", "schema", "validate", "verify-package", "version", "workflow")]
+    [ValidateSet("help", "archive", "baseline-manifest", "doctor", "install", "new-adapter", "preflight", "release", "schema", "validate", "verify-package", "version", "workflow")]
     [string]$Command = "help",
     [Parameter(ValueFromRemainingArguments = $true)]
     [string[]]$CommandArguments = @()
@@ -14,7 +14,7 @@ $manifestPath = Join-Path $toolRoot "dhe-toolchain-manifest.json"
 
 if ($Command -eq "help") {
     Write-Host "HybridCLR DHE toolchain commands:"
-    Write-Host "  doctor, install, new-adapter, preflight, workflow"
+    Write-Host "  doctor, install, new-adapter, baseline-manifest, preflight, workflow"
     Write-Host "  validate, release, archive, schema, verify-package, version"
     exit 0
 }
@@ -32,6 +32,7 @@ if ($Command -eq "version") {
 
 $scriptByCommand = @{
     "archive" = "run-dhe-archive-gate.ps1"
+    "baseline-manifest" = "new-dhe-baseline-manifest.ps1"
     "doctor" = "run-dhe-toolchain-doctor.ps1"
     "install" = "install-dhe-toolchain.ps1"
     "new-adapter" = "new-dhe-project-adapter.ps1"

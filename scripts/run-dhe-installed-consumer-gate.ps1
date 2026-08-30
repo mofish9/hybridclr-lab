@@ -181,6 +181,46 @@ try {
     $runtimeManifestPath = Join-Path ([IO.Path]::GetDirectoryName($RuntimeSource)) "runtime-manifest.json"
     $runtimeManifest = Get-Content -Raw -LiteralPath $runtimeManifestPath | ConvertFrom-Json
     $runtimeTreeSha256 = [string]$runtimeManifest.stagedRuntimeSha256
+    # A clean consumer clone has no previous release artifacts. Bootstrap a
+    # target-equivalent stripped-AOT baseline through the installed workflow
+    # itself, then bind it with the package's public baseline-manifest command.
+    # The subsequent Release run still receives an explicit previous baseline;
+    # this does not weaken the production contract.
+    $bootstrapWorkflowRoot = Join-Path $ConsumerRoot "artifacts/dhe-installed-consumer-bootstrap"
+    $bootstrapArchiveRoot = Join-Path $ConsumerRoot "artifacts/dhe-installed-consumer-bootstrap-archive"
+    Invoke-PwshFile (Join-Path $installedRoot "dhe.ps1") @(
+        "workflow",
+        "-AdapterScript", (Join-Path $ConsumerRoot "scripts/adapters/dhe-demo-project-adapter.ps1"),
+        "-ProjectPath", $projectRoot,
+        "-SettingsFile", (Join-Path $projectRoot "ProjectSettings/HybridCLRSettings.asset"),
+        "-RuntimeSource", $RuntimeSource,
+        "-OutputRoot", $bootstrapWorkflowRoot,
+        "-ArchiveRoot", $bootstrapArchiveRoot,
+        "-DnlibPath", $dnlibPath,
+        "-PackageLockPath", (Join-Path $ConsumerRoot "manifests/dhe-package-lock.json"),
+        "-IdentityTemplatePath", (Join-Path $projectRoot "Assets/Runtime/HybridCLRDheBuildIdentity.cs"),
+        "-GitRoot", $ConsumerRoot,
+        "-SourceBoundaryPath", (Join-Path $ConsumerRoot "manifests/dhe-source-boundary.json"),
+        "-Target", $Target,
+        "-Mode", "Exploratory",
+        "-RequireEmbeddedPackage",
+        "-RequireIdentityTemplate",
+        "-StopAfterPreflight",
+        "-ForceOutput")
+    $baselineRoot = Join-Path $bootstrapWorkflowRoot "adapter/baseline"
+    if (-not (Test-Path -LiteralPath $baselineRoot -PathType Container)) {
+        throw "Installed-consumer bootstrap did not produce a stripped-AOT baseline: $baselineRoot"
+    }
+    $baselineManifestPath = Join-Path $baselineRoot "dhe-baseline-manifest.json"
+    Invoke-PwshFile (Join-Path $installedRoot "dhe.ps1") @(
+        "baseline-manifest",
+        "-BaselineRoot", $baselineRoot,
+        "-RuntimeManifestPath", $runtimeManifestPath,
+        "-SettingsFile", (Join-Path $projectRoot "ProjectSettings/HybridCLRSettings.asset"),
+        "-PackageLockPath", (Join-Path $ConsumerRoot "manifests/dhe-package-lock.json"),
+        "-Target", $Target,
+        "-Output", $baselineManifestPath,
+        "-ForceOutput")
     $consumerWorkflowRoot = Join-Path $ConsumerRoot "artifacts/dhe-installed-consumer-workflow"
     $consumerArchiveRoot = Join-Path $ConsumerRoot "artifacts/dhe-installed-consumer-workflow-archive"
     $consumerArchiveGate = $consumerArchiveRoot + ".gate.json"
@@ -192,6 +232,8 @@ try {
         "-RuntimeSource", $RuntimeSource,
         "-OutputRoot", $consumerWorkflowRoot,
         "-ArchiveRoot", $consumerArchiveRoot,
+        "-BaselineAotRoot", $baselineRoot,
+        "-BaselineManifestPath", $baselineManifestPath,
         "-DnlibPath", $dnlibPath,
         "-PackageLockPath", (Join-Path $ConsumerRoot "manifests/dhe-package-lock.json"),
         "-IdentityTemplatePath", (Join-Path $projectRoot "Assets/Runtime/HybridCLRDheBuildIdentity.cs"),

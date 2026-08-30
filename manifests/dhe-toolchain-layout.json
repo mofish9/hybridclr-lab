@@ -82,6 +82,7 @@
   ],
   "commands": [
     "archive",
+    "baseline-manifest",
     "doctor",
     "install",
     "new-adapter",

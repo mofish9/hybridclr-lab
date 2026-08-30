@@ -263,8 +263,21 @@ $packageId = "<64-hex-package-id>"
 Other entry-point commands are:
 
 ```text
-archive  doctor  install  new-adapter  preflight
+archive  baseline-manifest  doctor  install  new-adapter  preflight
 release  schema  validate  verify-package  version  workflow
+```
+
+Create a target-bound previous-release baseline manifest through the same
+installed entry point:
+
+```powershell
+./Tools/HybridCLRDhe/dhe.ps1 baseline-manifest `
+  -BaselineRoot C:/releases/previous/stripped-aot/Android `
+  -RuntimeManifestPath C:/runtime/DHE-Unity2021/runtime-manifest.json `
+  -SettingsFile C:/project/ProjectSettings/HybridCLRSettings.asset `
+  -PackageLockPath C:/project/Assets/Editor/DHE/dhe-package-lock.json `
+  -Target Android `
+  -Output C:/releases/previous/stripped-aot/Android/dhe-baseline-manifest.json
 ```
 
 Adapters may publish additional versioned DHE report formats without copying
