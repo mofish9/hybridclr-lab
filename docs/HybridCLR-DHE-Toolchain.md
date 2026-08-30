@@ -49,6 +49,26 @@ explicit `-BaselineAotRoot` argument; an environment variable alone is not a
 substitute. Projects should persist these facts in their own baseline manifest
 and reject a target or engine mismatch before Unity generation starts.
 
+The supplied helper creates the manifest from a stripped-AOT directory and the
+runtime/settings locks. Keep the manifest beside the baseline directory and
+carry both as one release input:
+
+```powershell
+./scripts/new-dhe-baseline-manifest.ps1 `
+  -BaselineRoot C:/releases/previous/stripped-aot/Android `
+  -RuntimeManifestPath C:/runtime/DHE-Unity2021/runtime-manifest.json `
+  -SettingsFile C:/project/ProjectSettings/HybridCLRSettings.asset `
+  -PackageLockPath C:/project/Assets/Editor/DHE/dhe-package-lock.json `
+  -Target Android `
+  -Output C:/releases/previous/stripped-aot/Android/dhe-baseline-manifest.json
+```
+
+The manifest records assembly SHA-256 values and is checked again by the
+orchestrator and adapter. It is intentionally workspace-absolute; copy the
+directory and manifest together and pass their paths on the build host. A
+different target (for example iOS versus Android) requires a separate
+stripped-AOT baseline and manifest.
+
 ## Unity Package API
 
 The embedded `HybridCLR.Editor` package exposes the project-independent DHE

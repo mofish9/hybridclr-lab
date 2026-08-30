@@ -15,6 +15,9 @@ param(
     [string]$PackageLockPath = "",
     [string]$IdentityTemplatePath = "",
     [string]$BaselineAotRoot = "",
+    [string]$BaselineManifestPath = "",
+    [string]$AdapterOptionsPath = "",
+    [string]$PlayerSmokeRunner = "",
     [ValidateSet("Auto", "Git", "Svn")]
     [string]$ProjectVcs = "Auto",
     [string]$GitRoot = "",
@@ -49,6 +52,13 @@ $settingsPath = [IO.Path]::GetFullPath($SettingsFile)
 $runtimePath = [IO.Path]::GetFullPath($RuntimeSource)
 $outputPath = [IO.Path]::GetFullPath($OutputRoot)
 $baselineAotPath = if ([string]::IsNullOrWhiteSpace($BaselineAotRoot)) { "" } else { [IO.Path]::GetFullPath($BaselineAotRoot) }
+$baselineManifestPath = if ([string]::IsNullOrWhiteSpace($BaselineManifestPath)) {
+    if (-not [string]::IsNullOrWhiteSpace($baselineAotPath)) {
+        $candidate = Join-Path $baselineAotPath "dhe-baseline-manifest.json"
+        if ([IO.File]::Exists($candidate)) { [IO.Path]::GetFullPath($candidate) } else { "" }
+    } else { "" }
+} else { [IO.Path]::GetFullPath($BaselineManifestPath) }
+$adapterOptionsPath = if ([string]::IsNullOrWhiteSpace($AdapterOptionsPath)) { "" } else { [IO.Path]::GetFullPath($AdapterOptionsPath) }
 $gitRootPath = if ([string]::IsNullOrWhiteSpace($GitRoot)) {
     $projectPath
 } else {
@@ -65,6 +75,8 @@ $gitVerificationRequested = $Mode -eq "Release" -or [bool]$RequireGitClean -or
 $coverageRequired = $Mode -eq "Release" -or [bool]$RequireCompleteCoverage
 $baselineRequired = $Mode -eq "Release"
 $trackedSourcesRequired = $Mode -eq "Release" -or [bool]$RequireTrackedSources
+$toolchainManifestPath = Join-Path $labRoot "dhe-toolchain-manifest.json"
+$installedToolchain = Test-Path -LiteralPath $toolchainManifestPath -PathType Leaf
 $packageLockPathResolved = if ([string]::IsNullOrWhiteSpace($PackageLockPath)) {
     ""
 } else {
@@ -310,12 +322,9 @@ try {
     if ($StopAfterPreflight -and $Mode -eq "Release") {
         throw "-StopAfterPreflight is a contract-test mode and cannot be combined with -Mode Release. Use -Mode Exploratory when intentionally skipping Player, archive, and release stages."
     }
-    if ($baselineRequired -and [string]::IsNullOrWhiteSpace($baselineAotPath)) {
-        throw "DHE Release requires -BaselineAotRoot from a previous stripped-AOT release."
-    }
-    if (-not [string]::IsNullOrWhiteSpace($baselineAotPath) -and -not [IO.Directory]::Exists($baselineAotPath)) {
-        throw "DHE baseline AOT root was not found: $baselineAotPath"
-    }
+    # Establish the report directory before trust or input checks so every
+    # pre-adapter rejection, including a missing Release package pin, leaves a
+    # machine-readable failure report.
     $protectedInputs = @($projectPath, $runtimePath)
     if (-not [string]::IsNullOrWhiteSpace($baselineAotPath)) { $protectedInputs += $baselineAotPath }
     $null = Assert-DheSafeOutputRoot -Path $outputPath -ProtectedPaths $protectedInputs
@@ -330,11 +339,48 @@ try {
     }
     New-Item -ItemType Directory -Force -Path $outputPath | Out-Null
     $outputRootSafe = $true
+
+    # Establish trust in an installed Release toolchain before validating any
+    # project inputs or invoking project-owned code. This keeps a missing
+    # external package pin fail-closed even when other inputs are incomplete.
+    if ($installedToolchain -and $Mode -eq "Release" -and
+        [string]::IsNullOrWhiteSpace($ExpectedToolchainPackageId)) {
+        throw "An installed DHE Release workflow requires -ExpectedToolchainPackageId from a trusted external release record."
+    }
+    if ($baselineRequired -and [string]::IsNullOrWhiteSpace($baselineAotPath)) {
+        throw "DHE Release requires -BaselineAotRoot from a previous stripped-AOT release."
+    }
+    if (-not [string]::IsNullOrWhiteSpace($baselineAotPath) -and -not [IO.Directory]::Exists($baselineAotPath)) {
+        throw "DHE baseline AOT root was not found: $baselineAotPath"
+    }
+    if (-not [string]::IsNullOrWhiteSpace($baselineManifestPath) -and
+        -not [IO.File]::Exists($baselineManifestPath)) {
+        throw "DHE baseline manifest was not found: $baselineManifestPath"
+    }
+    if ($baselineRequired -and [string]::IsNullOrWhiteSpace($baselineManifestPath)) {
+        throw "DHE Release requires dhe-baseline-manifest.json beside the previous stripped-AOT baseline or an explicit -BaselineManifestPath."
+    }
+    if (-not [string]::IsNullOrWhiteSpace($baselineManifestPath) -and
+        [string]::IsNullOrWhiteSpace($baselineAotPath)) {
+        throw "DHE baseline manifest requires -BaselineAotRoot."
+    }
+    if (-not [string]::IsNullOrWhiteSpace($adapterOptionsPath) -and
+        -not [IO.File]::Exists($adapterOptionsPath)) {
+        throw "DHE adapter options were not found: $adapterOptionsPath"
+    }
     $scriptHost = Resolve-DhePowerShellHost
     Require-File $adapterPath "DHE project adapter"
     Require-Directory $projectPath "DHE project"
     Require-File $settingsPath "HybridCLR settings"
     Require-Directory $runtimePath "DHE runtime source"
+    if (-not [string]::IsNullOrWhiteSpace($baselineManifestPath)) {
+        $runtimeManifestForBaseline = Join-Path ([IO.Path]::GetDirectoryName($runtimePath)) "runtime-manifest.json"
+        $settingsForBaseline = Resolve-DheSettingsAssemblySets -SettingsFile $settingsPath -ProjectRoot $projectPath
+        Assert-DheBaselineManifestBinding -Manifest (Read-DheBaselineManifest $baselineManifestPath) `
+            -ManifestPath $baselineManifestPath -BaselineRoot $baselineAotPath -Target $Target `
+            -RuntimeManifestPath $runtimeManifestForBaseline -PackageLockPath $PackageLockPath `
+            -AssemblyNames @($settingsForBaseline.dheAotAssemblies)
+    }
     if ($embeddedPackageRequired -and [string]::IsNullOrWhiteSpace($PackageLockPath)) {
         throw "Embedded package provenance requires an explicit -PackageLockPath. The core workflow does not use a Demo package lock fallback."
     }
@@ -342,13 +388,8 @@ try {
         throw "Identity template verification requires an explicit -IdentityTemplatePath."
     }
 
-    $toolchainManifestPath = Join-Path $labRoot "dhe-toolchain-manifest.json"
-    $installedToolchain = Test-Path -LiteralPath $toolchainManifestPath -PathType Leaf
     $toolchainGatePath = $null
     if (Test-Path -LiteralPath $toolchainManifestPath -PathType Leaf) {
-        if ($Mode -eq "Release" -and [string]::IsNullOrWhiteSpace($ExpectedToolchainPackageId)) {
-            throw "An installed DHE Release workflow requires -ExpectedToolchainPackageId from a trusted external release record."
-        }
         $toolchainGatePath = Join-Path $outputPath "toolchain/toolchain-gate.json"
         $toolchainGateArgs = @{
             PackageRoot = $labRoot
@@ -384,6 +425,9 @@ try {
     $prepareExitCode = Invoke-Adapter "Prepare" @{
         Mode = $Mode
         BaselineAotRoot = $BaselineAotRoot
+        BaselineManifestPath = $baselineManifestPath
+        AdapterOptionsPath = $adapterOptionsPath
+        PlayerSmokeRunner = $PlayerSmokeRunner
     }
     $preparePath = Join-Path $outputPath "adapter/prepare.json"
     if ($prepareExitCode -ne 0 -and -not (Test-Path -LiteralPath $preparePath -PathType Leaf)) {
@@ -395,7 +439,7 @@ try {
     $prepareBinding = Assert-DheAdapterPrepareReport -Report $prepare `
         -ToolchainContractVersion $toolchainContractVersion -Target $Target `
         -ProjectPath $projectPath -SettingsFile $settingsPath -Mode $Mode `
-        -BaselineAotRoot $baselineAotPath
+        -BaselineAotRoot $baselineAotPath -BaselineManifestPath $baselineManifestPath
     if ($prepareExitCode -ne 0) {
         throw "DHE adapter Prepare action failed. See $preparePath"
     }
@@ -474,6 +518,8 @@ try {
             target = $Target
             adapterScript = $adapterPath
             projectPath = $projectPath
+            baselineManifestPath = if ([string]::IsNullOrWhiteSpace($baselineManifestPath)) { $null } else { $baselineManifestPath }
+            adapterOptionsPath = if ([string]::IsNullOrWhiteSpace($adapterOptionsPath)) { $null } else { $adapterOptionsPath }
             toolchainGate = $toolchainGatePath
             expectedToolchainPackageId = if ([string]::IsNullOrWhiteSpace($ExpectedToolchainPackageId)) { $null } else { $ExpectedToolchainPackageId.ToLowerInvariant() }
             sourcePreflight = $stages.sourcePreflight.report
@@ -498,6 +544,9 @@ try {
         ProjectPlanValidation = $projectPlanValidationPath
         BatchReport = $batchReportPath
         SourcePreflight = [string]$stages.sourcePreflight.report
+        BaselineManifestPath = $baselineManifestPath
+        AdapterOptionsPath = $adapterOptionsPath
+        PlayerSmokeRunner = $PlayerSmokeRunner
     }
     if ($coverageRequired) { $playerParameters.RequireCompleteCoverage = $true }
     if (-not [string]::IsNullOrWhiteSpace([string]$stages.cleanCheckout.report)) {
@@ -635,6 +684,8 @@ try {
         target = $Target
         adapterScript = $adapterPath
         projectPath = $projectPath
+        baselineManifestPath = if ([string]::IsNullOrWhiteSpace($baselineManifestPath)) { $null } else { $baselineManifestPath }
+        adapterOptionsPath = if ([string]::IsNullOrWhiteSpace($adapterOptionsPath)) { $null } else { $adapterOptionsPath }
         toolchainGate = $toolchainGatePath
         expectedToolchainPackageId = if ([string]::IsNullOrWhiteSpace($ExpectedToolchainPackageId)) { $null } else { $ExpectedToolchainPackageId.ToLowerInvariant() }
         sourcePreflight = $stages.sourcePreflight.report
@@ -668,6 +719,8 @@ catch {
                 toolchainContractVersion = $toolchainContractVersion
                 adapterScript = $adapterPath
                 projectPath = $projectPath
+                baselineManifestPath = if ([string]::IsNullOrWhiteSpace($baselineManifestPath)) { $null } else { $baselineManifestPath }
+                adapterOptionsPath = if ([string]::IsNullOrWhiteSpace($adapterOptionsPath)) { $null } else { $adapterOptionsPath }
                 expectedToolchainPackageId = if ([string]::IsNullOrWhiteSpace($ExpectedToolchainPackageId)) { $null } else { $ExpectedToolchainPackageId.ToLowerInvariant() }
                 error = $message
                 errors = $errors.ToArray()

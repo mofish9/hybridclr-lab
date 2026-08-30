@@ -72,6 +72,7 @@ $formalScriptNames = @(
     "apply-dhe-runtime-patches.ps1",
     "generate-dhe-mv.ps1",
     "generate-dhe-batch.ps1",
+    "new-dhe-baseline-manifest.ps1",
     "run-dhe-project-preflight.ps1",
     "run-dhe-project-workflow.ps1",
     "adapters/dhe-demo-project-adapter.ps1",

@@ -558,6 +558,142 @@ function Resolve-DheSettingsAssemblySets {
     }
 }
 
+function Get-DheSha256([string]$Path) {
+    $resolved = [IO.Path]::GetFullPath($Path)
+    if (-not [IO.File]::Exists($resolved)) {
+        throw "DHE hash input was not found: $resolved"
+    }
+    return (Get-FileHash -LiteralPath $resolved -Algorithm SHA256).Hash.ToLowerInvariant()
+}
+
+function Read-DheBaselineManifest([string]$Path) {
+    $resolved = [IO.Path]::GetFullPath($Path)
+    if (-not [IO.File]::Exists($resolved)) {
+        throw "DHE baseline manifest was not found: $resolved"
+    }
+    try {
+        return Get-Content -Raw -LiteralPath $resolved | ConvertFrom-Json
+    } catch {
+        throw "DHE baseline manifest is not valid JSON: $resolved ($($_.Exception.Message))"
+    }
+}
+
+function Assert-DheBaselineManifestBinding {
+    param(
+        [Parameter(Mandatory = $true)]$Manifest,
+        [Parameter(Mandatory = $true)][string]$ManifestPath,
+        [Parameter(Mandatory = $true)][string]$BaselineRoot,
+        [Parameter(Mandatory = $true)][string]$Target,
+        [Parameter(Mandatory = $true)][string]$RuntimeManifestPath,
+        [string]$PackageLockPath = "",
+        [string[]]$AssemblyNames = @()
+    )
+
+    if ($null -eq $Manifest -or [int]$Manifest.schemaVersion -ne 1 -or
+        [string]$Manifest.format -ne "hybridclr.dhe-baseline-manifest.json") {
+        throw "DHE baseline manifest has an unsupported schema or format: $ManifestPath"
+    }
+    if ([string]$Manifest.pathSemantics -ne "workspace-absolute-v1" -or
+        [string]$Manifest.baselineKind -ne "stripped-aot") {
+        throw "DHE baseline manifest has unsupported path or baseline semantics: $ManifestPath"
+    }
+    if ([string]$Manifest.target -ne $Target) {
+        throw "DHE baseline target '$([string]$Manifest.target)' does not match requested target '$Target'."
+    }
+    $resolvedRuntimeManifest = [IO.Path]::GetFullPath($RuntimeManifestPath)
+    try { $runtime = Get-Content -Raw -LiteralPath $resolvedRuntimeManifest | ConvertFrom-Json }
+    catch { throw "DHE runtime manifest is not valid JSON: $resolvedRuntimeManifest ($($_.Exception.Message))" }
+    $runtimeHash = Get-DheSha256 $resolvedRuntimeManifest
+    if ($null -eq $Manifest.runtime -or
+        [string]$Manifest.runtime.runtimeManifestSha256 -ne $runtimeHash) {
+        throw "DHE baseline runtime manifest hash does not match the current runtime manifest."
+    }
+    foreach ($propertyName in @("engineWorkflow", "engine")) {
+        if ($null -eq $Manifest.$propertyName -or $null -eq $runtime.$propertyName) {
+            throw "DHE baseline manifest is missing runtime identity '$propertyName'."
+        }
+    }
+    if ([string]$Manifest.engineWorkflow -ne [string]$runtime.engineWorkflow) {
+        throw "DHE baseline engine workflow does not match the current runtime workflow."
+    }
+    foreach ($propertyName in @("family", "version", "unityVersion", "unityVersionNumber", "tuanjieVersionNumber")) {
+        if ([string]$Manifest.engine.$propertyName -ne [string]$runtime.engine.$propertyName) {
+            throw "DHE baseline engine identity '$propertyName' does not match the current runtime."
+        }
+    }
+    $runtimePackageTreeSha256 = ""
+    if ($null -ne $runtime.source -and $null -ne $runtime.source.hybridclr_unity) {
+        $runtimePackageTreeSha256 = [string]$runtime.source.hybridclr_unity.treeSha256
+    }
+    $runtimeIdentity = [ordered]@{
+        profile = [string]$runtime.profile
+        stagedRuntimeSha256 = [string]$runtime.stagedRuntimeSha256
+        packageTreeSha256 = $runtimePackageTreeSha256
+    }
+    foreach ($propertyName in @("profile", "stagedRuntimeSha256", "packageTreeSha256")) {
+        $manifestValue = [string]$Manifest.runtime.$propertyName
+        $runtimeValue = [string]$runtimeIdentity[$propertyName]
+        if ([string]::IsNullOrWhiteSpace($runtimeValue) -or $manifestValue -ne $runtimeValue) {
+            throw "DHE baseline runtime identity '$propertyName' does not match the current runtime."
+        }
+    }
+    if (-not [string]::IsNullOrWhiteSpace($PackageLockPath)) {
+        if ($null -eq $Manifest.package -or
+            [string]::IsNullOrWhiteSpace([string]$Manifest.package.treeSha256)) {
+            throw "DHE baseline manifest is missing package provenance for the supplied package lock."
+        }
+        $lockPath = [IO.Path]::GetFullPath($PackageLockPath)
+        if (-not [IO.File]::Exists($lockPath)) { throw "DHE package lock was not found: $lockPath" }
+        try { $lock = Get-Content -Raw -LiteralPath $lockPath | ConvertFrom-Json }
+        catch { throw "DHE package lock is not valid JSON: $lockPath ($($_.Exception.Message))" }
+        foreach ($propertyName in @("repository", "baseCommit")) {
+            $manifestValue = [string]$Manifest.package.$propertyName
+            $lockValue = [string]$lock.$propertyName
+            if (-not [string]::IsNullOrWhiteSpace($lockValue) -and $manifestValue -ne $lockValue) {
+                throw "DHE baseline package $propertyName does not match the supplied package lock."
+            }
+        }
+        if ([string]$Manifest.package.treeSha256 -ne [string]$lock.treeSha256) {
+            throw "DHE baseline package tree hash does not match the supplied package lock."
+        }
+        if (-not [string]::IsNullOrWhiteSpace([string]$Manifest.package.integratedCommit) -and
+            [string]$Manifest.package.integratedCommit -ne [string]$lock.integratedCommit) {
+            throw "DHE baseline package integrated commit does not match the supplied package lock."
+        }
+    }
+    $expectedRoot = Normalize-DhePath ([IO.Path]::GetFullPath($BaselineRoot))
+    if ($null -ne $Manifest.sourceRoot -and
+        (Normalize-DhePath ([IO.Path]::GetFullPath([string]$Manifest.sourceRoot))) -ne $expectedRoot) {
+        throw "DHE baseline manifest sourceRoot does not match the supplied baseline root."
+    }
+    $records = @($Manifest.assemblies)
+    if ($records.Count -eq 0) { throw "DHE baseline manifest contains no assembly records." }
+    $recordNames = @($records | ForEach-Object { [string]$_.assemblyName })
+    $uniqueRecordNames = @($recordNames | Sort-Object -Unique)
+    $emptyRecordNames = @($recordNames | Where-Object { [string]::IsNullOrWhiteSpace($_) })
+    if ($uniqueRecordNames.Count -ne $recordNames.Count -or $emptyRecordNames.Count -gt 0) {
+        throw "DHE baseline manifest contains empty or duplicate assembly records."
+    }
+    if (@($AssemblyNames).Count -gt 0) {
+        $expectedNames = @($AssemblyNames | Sort-Object -Unique)
+        $actualNames = @($recordNames | Sort-Object -Unique)
+        if ((($expectedNames -join "`n") -ne ($actualNames -join "`n"))) {
+            throw "DHE baseline manifest assembly set does not match HybridCLR settings."
+        }
+    }
+    foreach ($record in $records) {
+        $name = [string]$record.assemblyName
+        $hash = [string]$record.sha256
+        if ($hash -notmatch '^[0-9a-fA-F]{64}$') { throw "DHE baseline assembly hash is invalid: $name" }
+        $assemblyPath = Join-Path ([IO.Path]::GetFullPath($BaselineRoot)) ($name + ".dll")
+        if (-not [IO.File]::Exists($assemblyPath)) { throw "DHE baseline assembly is missing: $assemblyPath" }
+        if ((Get-DheSha256 $assemblyPath) -ne $hash.ToLowerInvariant()) {
+            throw "DHE baseline assembly hash does not match manifest: $name"
+        }
+    }
+    return $true
+}
+
 function Assert-DheAdapterPrepareReport {
     param(
         [Parameter(Mandatory = $true)]
@@ -572,7 +708,8 @@ function Assert-DheAdapterPrepareReport {
         [string]$SettingsFile,
         [ValidateSet("Release", "Exploratory")]
         [string]$Mode = "Exploratory",
-        [string]$BaselineAotRoot = ""
+        [string]$BaselineAotRoot = "",
+        [string]$BaselineManifestPath = ""
     )
 
     if ([int]$Report.schemaVersion -ne 1 -or
@@ -619,6 +756,13 @@ function Assert-DheAdapterPrepareReport {
         $expectedBaselineRoot = Normalize-DhePath ([IO.Path]::GetFullPath($BaselineAotRoot))
         if ($baselineGenerated -or (Normalize-DhePath $references.baselineSourceRoot) -ne $expectedBaselineRoot) {
             throw "DHE Release adapter prepare did not bind baselineSourceRoot to the supplied previous release baseline."
+        }
+    }
+    if (-not [string]::IsNullOrWhiteSpace($BaselineManifestPath)) {
+        $manifestProperty = $Report.PSObject.Properties["baselineManifestPath"]
+        if ($null -eq $manifestProperty -or [string]::IsNullOrWhiteSpace([string]$manifestProperty.Value) -or
+            (Normalize-DhePath ([string]$manifestProperty.Value)) -ne (Normalize-DhePath $BaselineManifestPath)) {
+            throw "DHE adapter prepare report did not bind baselineManifestPath to the supplied manifest."
         }
     }
     $references.baselineGeneratedFromCurrent = $baselineGenerated

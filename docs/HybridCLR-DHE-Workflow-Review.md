@@ -566,3 +566,30 @@ YAML 解析器增加了引号逗号/井号和行尾注释的回归用例。
 
 Player gate 默认有 120 秒超时，可通过 `-PlayerTimeoutSeconds` 调整；Unity 编辑器构建阶段默认有
 600 秒超时，可通过 `-UnityTimeoutSeconds` 调整。任一超时都会主动终止进程并使工作流失败。
+
+## 2026-08-30 流程复核
+
+本轮复核补上了 baseline manifest 的正式生成和绑定链：生成器按
+`dhe-runtime-manifest` 的实际 schema 校验，不再要求不存在的 `format` 字段；绑定时同时
+核对目标、引擎版本、runtime tree、HybridCLR package tree、package lock、程序集集合和每个
+baseline DLL 的 SHA-256。Release workflow 会在任何项目输入检查和 adapter 调用前验证外部
+toolchain package ID，并保证早期拒绝也落盘 failure report。baseline manifest 输出也不能覆盖
+runtime/settings/package lock 输入。
+
+Cat adapter 的 YooAsset 平台选择改为按请求的 Android/iOS/Standalone target 显式映射，删除
+Standalone 隐式复用 Android 平台的 fallback。PowerShell adapter 通过 `ProcessStartInfo`
+和 PowerShell 7 在 Windows/macOS 共用；仓库 native CTest 仍依赖 Windows `cmd.exe`、MSVC
+和 Visual Studio，不能作为 macOS native gate。
+
+当前证据：formal static gate 通过（PowerShell parse、43 个 schema、source boundary、script
+fixture、toolchain publish/install/upgrade/release fixture）；Cat Android
+`Exploratory + StopAfterPreflight` 通过，16/16 hot-update 与 DHE AOT 程序集一致，16 个 MV
+均生成且 project plan compatible，Unity 2021 Android `Prepare/GenerateAll` 和 YooAsset
+收集（15739 assets、922 bundles）通过。MV 全量生成在 Cat 上约为分钟级，最大程序集明显更慢。
+
+尚未完成的证据必须保持为条件状态：真实 changed-method 的 Android ARM64 Player dispatch、
+Android 设备 smoke、iOS Unity/Xcode/device smoke、完整 archive/release gate 均未在当前机器
+执行；当前 Unity 安装没有 iOS module。当前 formal worktree 和 Cat SVN working copy 也都
+是 dirty，尚未形成新的正式提交或发布包。生产接入前必须为目标平台提供
+`PlayerSmokeRunner`，使用对应 target 的 previous stripped-AOT baseline/manifest，并在
+clean checkout 上重新取得 Player、archive 和 Release 身份证据。

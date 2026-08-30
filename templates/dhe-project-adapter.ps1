@@ -20,6 +20,8 @@ param(
     [ValidateSet("Release", "Exploratory")]
     [string]$Mode,
     [string]$BaselineAotRoot = "",
+    [string]$BaselineManifestPath = "",
+    [string]$AdapterOptionsPath = "",
     [string]$ProjectPlan = "",
     [string]$ProjectPlanValidation = "",
     [string]$BatchReport = "",
