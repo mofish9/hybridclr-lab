@@ -1,5 +1,5 @@
 diff --git a/Editor/Commands/DheBuildPipeline.cs b/Editor/Commands/DheBuildPipeline.cs
-index 2947fe9..20e62b7 100644
+index 2947fe9..1f367f9 100644
 --- a/Editor/Commands/DheBuildPipeline.cs
 +++ b/Editor/Commands/DheBuildPipeline.cs
 @@ -189,7 +189,7 @@ namespace HybridCLR.Editor.Commands
@@ -43,7 +43,7 @@ index 2947fe9..20e62b7 100644
 +                BuildReport report = options.BuildPlayerCallback == null
 +                    ? BuildPipeline.BuildPlayer(buildOptions)
 +                    : options.BuildPlayerCallback(buildOptions);
-+                if (report == null || report.summary == null)
++                if (report == null)
 +                {
 +                    throw new BuildFailedException("DHE Player build callback returned no BuildReport.");
 +                }
