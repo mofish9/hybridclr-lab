@@ -207,10 +207,20 @@ try {
         "-RequireIdentityTemplate",
         "-StopAfterPreflight",
         "-ForceOutput")
-    $baselineRoot = Join-Path $bootstrapWorkflowRoot "adapter/baseline"
-    if (-not (Test-Path -LiteralPath $baselineRoot -PathType Container)) {
-        throw "Installed-consumer bootstrap did not produce a stripped-AOT baseline: $baselineRoot"
+    # The built-in demo adapter reports its roots under `stripped/`, while
+    # project adapters commonly use `adapter/`. Accept only those explicit
+    # workflow-owned locations and fail if neither is present.
+    $baselineCandidates = @(
+        (Join-Path $bootstrapWorkflowRoot "adapter/baseline"),
+        (Join-Path $bootstrapWorkflowRoot "stripped/baseline")
+    )
+    $baselineRoot = @($baselineCandidates | Where-Object {
+        Test-Path -LiteralPath $_ -PathType Container
+    } | Select-Object -First 1)
+    if ($baselineRoot.Count -ne 1) {
+        throw "Installed-consumer bootstrap did not produce a stripped-AOT baseline under the workflow root: $bootstrapWorkflowRoot"
     }
+    $baselineRoot = [IO.Path]::GetFullPath([string]$baselineRoot[0])
     $baselineManifestPath = Join-Path $baselineRoot "dhe-baseline-manifest.json"
     Invoke-PwshFile (Join-Path $installedRoot "dhe.ps1") @(
         "baseline-manifest",
