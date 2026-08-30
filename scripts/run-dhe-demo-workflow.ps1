@@ -52,6 +52,12 @@ $settingsSnapshot = if (Test-Path -LiteralPath $settingsPath -PathType Leaf) {
 } else {
     $null
 }
+$unityMetaPath = Join-Path $ProjectPath "Packages/com.code-philosophy.hybridclr/Editor/BuildProcessors/AddLil2cppSourceCodeToXcodeproj2023OrNewer.cs.meta"
+$unityMetaSnapshot = if (Test-Path -LiteralPath $unityMetaPath -PathType Leaf) {
+    [IO.File]::ReadAllBytes($unityMetaPath)
+} else {
+    $null
+}
 $identitySourcePath = Join-Path $ProjectPath "Assets/Runtime/HybridCLRDheBuildIdentity.cs"
 $identitySourceSnapshot = if (Test-Path -LiteralPath $identitySourcePath -PathType Leaf) {
     [IO.File]::ReadAllBytes($identitySourcePath)
@@ -72,6 +78,14 @@ function Restore-IdentitySourceSnapshot {
         [IO.File]::WriteAllBytes($identitySourcePath, $identitySourceSnapshot)
     } elseif (Test-Path -LiteralPath $identitySourcePath) {
         Remove-Item -LiteralPath $identitySourcePath -Force
+    }
+}
+
+function Restore-UnityMetaSnapshot {
+    if ($null -ne $unityMetaSnapshot) {
+        [IO.File]::WriteAllBytes($unityMetaPath, $unityMetaSnapshot)
+    } elseif (Test-Path -LiteralPath $unityMetaPath) {
+        Remove-Item -LiteralPath $unityMetaPath -Force
     }
 }
 
@@ -714,6 +728,40 @@ if (-not $playerPassed) {
     throw "DHE Player gate failed; inspect $resultPath"
 }
 
+# Tuanjie may upgrade this legacy package .meta file while importing the
+# embedded HybridCLR package. Its raw form is intentionally excluded from the
+# package tree hash, so restore the checkout's original bytes before final
+# Release identity checks.
+Restore-UnityMetaSnapshot
+
+if ($Invocation -eq "Standalone" -and $Mode -eq "Release") {
+    $finalCleanCheckoutRoot = Join-Path $OutputRoot "clean-checkout-gate-final"
+    $finalCleanCheckoutParameters = @{
+        LabRoot = $LabRoot
+        ProjectPath = $ProjectPath
+        RuntimeSource = $runtimeSourcePath
+        OutputRoot = $finalCleanCheckoutRoot
+        IdentityTemplatePath = $identitySourcePath
+        PackageLockPath = $packageLockPath
+        SourceBoundaryPath = (Join-Path $LabRoot "manifests/dhe-source-boundary.json")
+        ToolGitRoot = $LabRoot
+        ToolSourceBoundaryPath = (Join-Path $LabRoot "manifests/dhe-source-boundary.json")
+        RequireIdentityTemplate = $true
+        RequireEmbeddedPackage = $true
+        GitRoot = $LabRoot
+        RequireGitClean = $true
+        RequireTrackedSources = $true
+        RequireToolGitClean = $true
+        RequireToolTrackedSources = $true
+        ForceOutput = $true
+    }
+    & (Join-Path $LabRoot "scripts/run-dhe-clean-checkout-gate.ps1") @finalCleanCheckoutParameters
+    if ($LASTEXITCODE -ne 0) {
+        throw "DHE final clean-checkout gate failed. See $finalCleanCheckoutRoot"
+    }
+    $cleanCheckoutReportPath = Join-Path $finalCleanCheckoutRoot "clean-checkout-gate-report.json"
+}
+
 # The final deterministic build updates identity v2 after guard injection.
 # Never publish a report using the pre-injection identity snapshot.
 $finalBuildIdentity = Get-Content -Raw -LiteralPath $identityPath | ConvertFrom-Json
@@ -931,6 +979,7 @@ catch {
     throw
 }
 finally {
+    Restore-UnityMetaSnapshot
     Restore-IdentitySourceSnapshot
     Restore-SettingsSnapshot
     Exit-DheWorkflowLock -Lock $workflowLock
