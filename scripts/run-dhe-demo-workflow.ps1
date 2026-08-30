@@ -58,6 +58,13 @@ $unityMetaSnapshot = if (Test-Path -LiteralPath $unityMetaPath -PathType Leaf) {
 } else {
     $null
 }
+$unityMetaSnapshotSha256 = if ($null -ne $unityMetaSnapshot) {
+    $sha = [Security.Cryptography.SHA256]::Create()
+    try { ([BitConverter]::ToString($sha.ComputeHash($unityMetaSnapshot))).Replace("-", "").ToLowerInvariant() }
+    finally { $sha.Dispose() }
+} else {
+    $null
+}
 $identitySourcePath = Join-Path $ProjectPath "Assets/Runtime/HybridCLRDheBuildIdentity.cs"
 $identitySourceSnapshot = if (Test-Path -LiteralPath $identitySourcePath -PathType Leaf) {
     [IO.File]::ReadAllBytes($identitySourcePath)
@@ -87,6 +94,37 @@ function Restore-UnityMetaSnapshot {
     } elseif (Test-Path -LiteralPath $unityMetaPath) {
         Remove-Item -LiteralPath $unityMetaPath -Force
     }
+
+    # The Editor can finish an AssetDatabase write shortly after its process
+    # exits. Require several consecutive matching observations so the final
+    # clean-checkout gate cannot race that asynchronous rewrite.
+    $stableObservations = 0
+    $deadline = [DateTime]::UtcNow.AddSeconds(15)
+    do {
+        $matches = $false
+        try {
+            if ($null -eq $unityMetaSnapshot) {
+                $matches = -not (Test-Path -LiteralPath $unityMetaPath -PathType Leaf)
+            } elseif (Test-Path -LiteralPath $unityMetaPath -PathType Leaf) {
+                $matches = (Get-FileHash -LiteralPath $unityMetaPath -Algorithm SHA256).Hash.ToLowerInvariant() -eq $unityMetaSnapshotSha256
+            }
+        } catch {
+            $matches = $false
+        }
+        if ($matches) {
+            $stableObservations++
+        } else {
+            $stableObservations = 0
+            if ($null -ne $unityMetaSnapshot) {
+                [IO.File]::WriteAllBytes($unityMetaPath, $unityMetaSnapshot)
+            } elseif (Test-Path -LiteralPath $unityMetaPath) {
+                Remove-Item -LiteralPath $unityMetaPath -Force
+            }
+        }
+        if ($stableObservations -ge 3) { return }
+        Start-Sleep -Milliseconds 200
+    } while ([DateTime]::UtcNow -lt $deadline)
+    throw "Unity package metadata did not stabilize after restoration: $unityMetaPath"
 }
 
 function Invoke-Unity([string[]]$Arguments, [string]$LogPath) {
