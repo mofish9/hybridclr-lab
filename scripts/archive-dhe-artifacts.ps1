@@ -442,6 +442,7 @@ Set-PropertyValue $identity "nativeManifestPath" "dhe-native-manifest.json"
 Set-PropertyValue $identity "runtimeManifest" "runtime-manifest.json"
 Set-PropertyValue $identity "runtimePlan" "runtime-plan/dhe-runtime-plan.json"
 Set-PropertyValue $identity "runtimeSource" $null
+Set-PropertyValue $identity "baselineSourceRoot" $null
 Set-PropertyValue $identity "pathSemantics" "archive-relative-v1"
 $archiveGeneratedAbsolutePaths = @($archiveGeneratedPaths | ForEach-Object {
     Join-Path $archivePath ($_.Replace('/', [IO.Path]::DirectorySeparatorChar))
