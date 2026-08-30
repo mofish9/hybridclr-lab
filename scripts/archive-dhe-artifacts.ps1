@@ -500,10 +500,8 @@ $cleanCheckoutDocument = Get-Content -Raw -LiteralPath $cleanCheckoutPath | Conv
 Set-PropertyValue $cleanCheckoutDocument "pathSemantics" "archive-relative-v1"
 Set-PropertyValue $cleanCheckoutDocument "gitRoot" $null
 Set-PropertyValue $cleanCheckoutDocument "sourceBoundaryPath" $null
-foreach ($nullableIdentityField in @("gitHead", "gitTree", "sourceBoundarySha256", "vcs", "vcsRoot", "vcsRevision", "vcsRepository", "projectGit", "toolGit")) {
-    if ($null -eq $cleanCheckoutDocument.PSObject.Properties[$nullableIdentityField]) {
-        Set-PropertyValue $cleanCheckoutDocument $nullableIdentityField $null
-    }
+foreach ($nullableIdentityField in @("gitHead", "gitTree", "sourceBoundarySha256", "vcs", "vcsRoot", "vcsRevision", "vcsRepository")) {
+    Set-PropertyValue $cleanCheckoutDocument $nullableIdentityField $null
 }
 foreach ($identityName in @("projectGit", "toolGit")) {
     $cleanIdentity = Get-PropertyValue $cleanCheckoutDocument $identityName
