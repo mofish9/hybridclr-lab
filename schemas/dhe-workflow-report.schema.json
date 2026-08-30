@@ -22,6 +22,7 @@
     "aotSnapshotKind": { "const": "managed-assembly-plus-generated-cpp-v1" },
     "nativeGuardSourceSha256": { "type": "string", "pattern": "^[0-9a-fA-F]{64}$" },
     "nativeManifestSha256": { "type": "string", "pattern": "^[0-9a-fA-F]{64}$" },
+    "yooAssetBuild": { "type": ["string", "null"] },
     "pathSemantics": { "enum": ["workspace-absolute-v1", "archive-relative-v1"] },
     "runtimeSource": { "type": ["string", "null"] },
     "artifactValidation": { "type": ["string", "null"] },
@@ -36,12 +37,43 @@
     "cleanCheckoutGate": { "type": "string", "minLength": 1 },
     "transaction": {
       "type": "object",
-      "required": ["retryValidated", "retryAssemblyName", "retryFailure"],
+      "required": ["status", "retryValidated", "retryAssemblyName", "retryFailure"],
       "properties": {
+        "status": { "enum": ["validated", "notApplicable", "failed"] },
         "retryValidated": { "type": "boolean" },
         "retryAssemblyName": { "type": ["string", "null"] },
         "retryFailure": { "type": ["string", "null"] }
-      }
+      },
+      "allOf": [
+        {
+          "if": { "properties": { "status": { "const": "validated" } }, "required": ["status"] },
+          "then": {
+            "properties": {
+              "retryValidated": { "const": true },
+              "retryAssemblyName": { "type": "string", "minLength": 1 },
+              "retryFailure": { "const": "DHE_MV_REGISTRATION_FAILED" }
+            }
+          }
+        },
+        {
+          "if": { "properties": { "status": { "const": "notApplicable" } }, "required": ["status"] },
+          "then": {
+            "properties": {
+              "retryValidated": { "const": false },
+              "retryAssemblyName": { "type": "null" },
+              "retryFailure": { "type": "null" }
+            }
+          }
+        },
+        {
+          "if": { "properties": { "status": { "const": "failed" } }, "required": ["status"] },
+          "then": {
+            "properties": {
+              "retryValidated": { "const": false }
+            }
+          }
+        }
+      ]
     },
     "assemblyScope": {
       "type": "object",

@@ -351,8 +351,8 @@ if (-not [string]::IsNullOrWhiteSpace($RuntimePlan)) {
     $runtimePlanDocument = if ($null -ne $runtimePlanPath) { Read-JsonFile $runtimePlanPath "runtime plan" } else { $null }
     if ($null -ne $runtimePlanDocument) {
         if ((Get-IntProperty $runtimePlanDocument "schemaVersion") -ne 1 -or
-            (Get-StringProperty $runtimePlanDocument "format") -ne "hybridclr.dhe-runtime-plan.json") {
-            Add-Error "Runtime plan schema or format is invalid: $runtimePlanPath"
+            (Get-StringProperty $runtimePlanDocument "format") -ne "hybridclr.dhe-runtime-handoff-plan.json") {
+            Add-Error "Runtime handoff plan schema or format is invalid: $runtimePlanPath"
         }
         $planDirectory = [IO.Path]::GetDirectoryName($runtimePlanPath)
         $planAssemblies = @($runtimePlanDocument.assemblies)
@@ -821,6 +821,131 @@ if (-not [string]::IsNullOrWhiteSpace($WorkflowReport)) {
                 }
             }
         }
+        $yooAssetBuildValue = Get-StringProperty $workflow "yooAssetBuild"
+        if (-not [string]::IsNullOrWhiteSpace($yooAssetBuildValue)) {
+            $workflowDirectory = [IO.Path]::GetDirectoryName($workflowPath)
+            $yooAssetBuildPath = Resolve-File $yooAssetBuildValue "YooAsset build evidence" $workflowDirectory
+            $yooAssetBuild = if ($null -ne $yooAssetBuildPath) {
+                Read-JsonFile $yooAssetBuildPath "YooAsset build evidence"
+            } else { $null }
+            if ($null -ne $yooAssetBuild) {
+                if ((Get-IntProperty $yooAssetBuild "schemaVersion") -ne 1 -or
+                    (Get-StringProperty $yooAssetBuild "format") -ne "hybridclr.dhe-yooasset-build.json" -or
+                    -not (Get-BoolProperty $yooAssetBuild "passed") -or
+                    (Get-IntProperty $yooAssetBuild "assetCount") -lt 0 -or
+                    (Get-IntProperty $yooAssetBuild "bundleCount") -lt 0) {
+                    Add-Error "YooAsset build evidence schema or pass state is invalid."
+                }
+                $requiredYooAssets = @($yooAssetBuild.requiredAssets)
+                if ($requiredYooAssets.Count -lt 5) {
+                    Add-Error "YooAsset build evidence does not cover all required DHE assets."
+                } else {
+                    $yooAssetByKey = @{}
+                    $yooAssetPackageDirectory = Get-StringProperty $yooAssetBuild "packageDirectory"
+                    $yooAssetPackageRoot = $null
+                    if (-not [string]::IsNullOrWhiteSpace($yooAssetPackageDirectory)) {
+                        if (-not [IO.Directory]::Exists($yooAssetPackageDirectory)) {
+                            Add-Error "YooAsset packageDirectory was not found: $yooAssetPackageDirectory"
+                        } else {
+                            $yooAssetPackageRoot = [IO.Path]::GetFullPath($yooAssetPackageDirectory).TrimEnd('\', '/') + [IO.Path]::DirectorySeparatorChar
+                        }
+                    }
+                    foreach ($requiredYooAsset in $requiredYooAssets) {
+                        if (-not (Get-BoolProperty $requiredYooAsset "present") -or
+                            [string]::IsNullOrWhiteSpace((Get-StringProperty $requiredYooAsset "assetPath")) -or
+                            [string]::IsNullOrWhiteSpace((Get-StringProperty $requiredYooAsset "assetKind")) -or
+                            [string]::IsNullOrWhiteSpace((Get-StringProperty $requiredYooAsset "bundleName")) -or
+                            [string]::IsNullOrWhiteSpace((Get-StringProperty $requiredYooAsset "bundleFileName")) -or
+                            [string]::IsNullOrWhiteSpace((Get-StringProperty $requiredYooAsset "bundleFileHash")) -or
+                            (Get-StringProperty $requiredYooAsset "bundleSha256") -notmatch '^[0-9a-fA-F]{64}$' -or
+                            (Get-IntProperty $requiredYooAsset "bundleSize") -lt 0) {
+                            Add-Error "YooAsset build evidence contains an incomplete required asset record."
+                            break
+                        }
+                        $assetKind = Get-StringProperty $requiredYooAsset "assetKind"
+                        $assetAssembly = Get-StringProperty $requiredYooAsset "assemblyName"
+                        if ($assetKind -in @("current", "mv", "snapshot", "aot-metadata")) {
+                            if ([string]::IsNullOrWhiteSpace($assetAssembly)) {
+                                Add-Error "YooAsset DHE payload record has no assemblyName."
+                                continue
+                            }
+                            $assetKey = $assetAssembly + "|" + $assetKind
+                            if ($yooAssetByKey.ContainsKey($assetKey)) {
+                                Add-Error "YooAsset evidence contains duplicate DHE payload '$assetKey'."
+                            } else {
+                                $yooAssetByKey[$assetKey] = $requiredYooAsset
+                            }
+                        } elseif ($assetKind -ne "control") {
+                            Add-Error "YooAsset evidence contains an unknown assetKind '$assetKind'."
+                        }
+                        if ($null -ne $yooAssetPackageRoot) {
+                            $bundleFileName = Get-StringProperty $requiredYooAsset "bundleFileName"
+                            if ([IO.Path]::IsPathRooted($bundleFileName) -or
+                                $bundleFileName.Replace('\', '/') -match '(^|/)\.\.(/|$)') {
+                                Add-Error "YooAsset bundle file name is unsafe: $bundleFileName"
+                            } else {
+                                $bundlePath = [IO.Path]::GetFullPath((Join-Path $yooAssetPackageRoot $bundleFileName))
+                                if (-not $bundlePath.StartsWith($yooAssetPackageRoot, [StringComparison]::OrdinalIgnoreCase)) {
+                                    Add-Error "YooAsset bundle file escapes packageDirectory: $bundleFileName"
+                                } elseif (-not [IO.File]::Exists($bundlePath)) {
+                                    Add-Error "YooAsset bundle file was not found: $bundlePath"
+                                } else {
+                                    $bundleItem = Get-Item -LiteralPath $bundlePath
+                                    $expectedSize = Get-IntProperty $requiredYooAsset "bundleSize"
+                                    if ($bundleItem.Length -ne $expectedSize) {
+                                        Add-Error "YooAsset bundle size mismatch for '$bundleFileName'."
+                                    }
+                                    $actualBundleSha = (Get-FileHash -LiteralPath $bundlePath -Algorithm SHA256).Hash.ToLowerInvariant()
+                                    if (-not [StringComparer]::OrdinalIgnoreCase.Equals(
+                                            $actualBundleSha, (Get-StringProperty $requiredYooAsset "bundleSha256"))) {
+                                        Add-Error "YooAsset bundle SHA-256 mismatch for '$bundleFileName'."
+                                    }
+                                    $actualBundleMd5 = (Get-FileHash -LiteralPath $bundlePath -Algorithm MD5).Hash.ToLowerInvariant()
+                                    if (-not [StringComparer]::OrdinalIgnoreCase.Equals(
+                                            $actualBundleMd5, (Get-StringProperty $requiredYooAsset "bundleFileHash"))) {
+                                        Add-Error "YooAsset bundle hash mismatch for '$bundleFileName'."
+                                    }
+                                }
+                            }
+                        }
+                    }
+                    if ($null -eq $runtimePlanDocument -or $null -eq $runtimePlanDocument.assemblies) {
+                        Add-Error "YooAsset evidence requires a runtime plan to prove per-assembly payload coverage."
+                    } else {
+                        $controlAssetNames = @($requiredYooAssets | Where-Object {
+                            (Get-StringProperty $_ "assetKind") -eq "control"
+                        } | ForEach-Object {
+                            [IO.Path]::GetFileName((Get-StringProperty $_ "assetPath").Replace('/', [IO.Path]::DirectorySeparatorChar))
+                        })
+                        foreach ($controlName in @("DheRuntimePlan.json", "DheSmokeConfig.json", "HotfixFileList.txt", "HotfixAotDependencyMap.txt", "AotFileList.txt")) {
+                            if (-not @($controlAssetNames | Where-Object { $_ -eq $controlName }).Count) {
+                                Add-Error "YooAsset evidence is missing control asset '$controlName'."
+                            }
+                        }
+                        foreach ($planAssembly in @($runtimePlanDocument.assemblies)) {
+                            $planAssemblyName = Get-StringProperty $planAssembly "assemblyName"
+                            foreach ($payloadKind in @("current", "mv", "snapshot")) {
+                                $payloadKey = $planAssemblyName + "|" + $payloadKind
+                                if (-not $yooAssetByKey.ContainsKey($payloadKey)) {
+                                    Add-Error "YooAsset evidence is missing DHE payload '$payloadKey'."
+                                    continue
+                                }
+                                $payloadRecord = $yooAssetByKey[$payloadKey]
+                                $assetFileName = [IO.Path]::GetFileName((Get-StringProperty $payloadRecord "assetPath").Replace('/', [IO.Path]::DirectorySeparatorChar))
+                                $expectedFileName = switch ($payloadKind) {
+                                    "current" { $planAssemblyName + ".dll.bytes"; break }
+                                    "mv" { $planAssemblyName + ".mv.bytes"; break }
+                                    "snapshot" { $planAssemblyName + ".aot-snapshot.bytes"; break }
+                                }
+                                if (-not [StringComparer]::OrdinalIgnoreCase.Equals($assetFileName, $expectedFileName)) {
+                                    Add-Error "YooAsset payload '$payloadKey' has an unexpected asset filename '$assetFileName'."
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        }
         $validationPassed = Get-BoolProperty $workflow "validationPassed"
         $coverageRequired = Get-BoolProperty $workflow "coverageRequired"
         $coverageGatePassed = Get-BoolProperty $workflow "coverageGatePassed"
@@ -843,14 +968,25 @@ if (-not [string]::IsNullOrWhiteSpace($WorkflowReport)) {
         if ($null -eq $transactionProperty -or $null -eq $workflow.transaction) {
             Add-Error "Workflow report is missing transaction evidence."
         } else {
-            if (-not (Get-BoolProperty $workflow.transaction "retryValidated")) {
-                Add-Error "Workflow transaction retry probe did not pass."
-            }
-            if ([string]::IsNullOrWhiteSpace((Get-StringProperty $workflow.transaction "retryAssemblyName"))) {
-                Add-Error "Workflow transaction evidence has no retry assembly name."
-            }
-            if ((Get-StringProperty $workflow.transaction "retryFailure") -ne "DHE_MV_REGISTRATION_FAILED") {
-                Add-Error "Workflow transaction evidence has an unexpected retry failure code."
+            $workflowChangedMethodCount = Get-IntProperty (Get-ObjectProperty $workflow "capability") "changedMethodCount"
+            $transactionStatus = Get-StringProperty $workflow.transaction "status"
+            $transactionRetryValidated = Get-BoolProperty $workflow.transaction "retryValidated"
+            $transactionAssemblyName = Get-StringProperty $workflow.transaction "retryAssemblyName"
+            $transactionFailure = Get-StringProperty $workflow.transaction "retryFailure"
+            if ($null -eq $workflowChangedMethodCount) {
+                Add-Error "Workflow capability.changedMethodCount is missing or invalid."
+            } elseif ($workflowChangedMethodCount -eq 0) {
+                if ($transactionStatus -ne "notApplicable" -or $transactionRetryValidated -ne $false -or
+                    $null -ne (Get-ObjectProperty $workflow.transaction "retryAssemblyName") -or
+                    $null -ne (Get-ObjectProperty $workflow.transaction "retryFailure")) {
+                    Add-Error "No-op workflow must report transaction.status=notApplicable and no retry evidence."
+                }
+            } elseif ($workflowChangedMethodCount -gt 0) {
+                if ($transactionStatus -ne "validated" -or $transactionRetryValidated -ne $true -or
+                    [string]::IsNullOrWhiteSpace($transactionAssemblyName) -or
+                    $transactionFailure -ne "DHE_MV_REGISTRATION_FAILED") {
+                    Add-Error "Workflow transaction retry probe did not pass for changed methods."
+                }
             }
         }
         $complete = Get-BoolProperty $workflow.nativeGuardCoverage "complete"

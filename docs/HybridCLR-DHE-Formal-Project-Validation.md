@@ -142,7 +142,7 @@ Prepare -ProjectPath -SettingsFile -RuntimeSource -OutputRoot -Target -Mode
 Player  -ProjectPath -SettingsFile -RuntimeSource -OutputRoot -Target -Mode
         -ToolchainContractVersion
         -ProjectPlan -ProjectPlanValidation -BatchReport
-        -SourcePreflight -CleanCheckoutGate
+        -SourcePreflight -CleanCheckoutGate [-RequireCompleteCoverage]
 ```
 
 `Prepare` must build the exact stripped-AOT baseline and current hot-update DLL
@@ -169,10 +169,19 @@ by DHE. `Player` receives the validated project plan and must write the standard
 `<OutputRoot>/workflow-report.json`; it owns the Unity build, generated C++ guard
 injection, runtime-plan staging, and Player assertions, but it must use the paths
 and assembly set from that plan rather than rediscovering them.
+When complete coverage is requested, the core also passes
+`-RequireCompleteCoverage` to the adapter so project-specific transforms and
+artifact checks use the same policy as preflight and release gates.
 The workflow runner independently executes the archive gate and, in `Release`
 mode, the release gate. Its summary is
 `<OutputRoot>/project-workflow-report.json` and conforms to
 `schemas/dhe-project-workflow.schema.json`.
+
+If the adapter publishes `yooAssetBuild` evidence, its `requiredAssets` must
+include the five DHE control assets, every runtime-plan `current`/`mv`/`snapshot`
+payload, and every AOT metadata asset listed by the project's AOT list. The
+validator matches these records back to the runtime plan and, for workspace
+evidence, verifies the referenced bundle file, size, SHA-256, and YooAsset hash.
 
 For adapter development, `-StopAfterPreflight` runs the real source and project
 preflight with a `Prepare` implementation but intentionally skips Player,
@@ -448,7 +457,8 @@ the current DLL is loaded only as the differential image.
 The demo report declares `assemblyScope.strategy=multi-assembly-dhe` and records
 the exact four-assembly set (`ManagedCasesAot`, `ManagedCases`, `MetadataStress`,
 and `CrossAssemblyDerived`) in both the project plan and Player result. The
-runtime plan is staged beside the per-assembly current/baseline/MV/snapshot
+runtime asset plan is staged beside the per-assembly current/MV/snapshot assets;
+the archive handoff plan carries the corresponding current/baseline/MV/snapshot
 files, so a missing or extra image fails before gameplay execution.
 The demo's `Assets/Plugins/HybridCLRLab` directory may also contain the
 compile-only `HybridCLR.BoundaryContracts` reference used by the editor/player

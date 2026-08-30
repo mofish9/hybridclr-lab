@@ -261,6 +261,32 @@ $cleanCheckoutPath = Resolve-InputFile $cleanCheckoutReference "clean checkout g
 $playerResultPath = Resolve-InputFile $playerResultReference "Player result"
 $runtimeManifestPath = Resolve-InputFile $runtimeManifestReference "runtime manifest"
 $runtimeManifestDocument = Read-JsonFile $runtimeManifestPath "runtime manifest"
+$archiveYooAssetBuildRelative = $null
+$yooAssetBuildReference = Get-NullableStringProperty $workflow "yooAssetBuild"
+if (-not [string]::IsNullOrWhiteSpace($yooAssetBuildReference)) {
+    $yooAssetBuildPath = Resolve-InputFile $yooAssetBuildReference "YooAsset build evidence" $workflowDirectory
+    $yooAssetBuildDocument = Read-JsonFile $yooAssetBuildPath "YooAsset build evidence"
+    if ($null -eq $yooAssetBuildDocument -or
+        $null -eq $yooAssetBuildDocument.PSObject.Properties["passed"] -or
+        $yooAssetBuildDocument.passed -ne $true) {
+        throw "YooAsset build evidence did not pass: $yooAssetBuildPath"
+    }
+
+    # The source evidence points at a machine-local package directory. Keep
+    # the raw YooAsset report in the archive, but rewrite those references so
+    # the archived evidence remains portable and hash-verifiable.
+    $rawYooReportReference = Get-NullableStringProperty $yooAssetBuildDocument "buildReport"
+    if (-not [string]::IsNullOrWhiteSpace($rawYooReportReference)) {
+        $rawYooReportPath = Resolve-InputFile $rawYooReportReference "YooAsset raw build report" ([IO.Path]::GetDirectoryName($yooAssetBuildPath))
+        Copy-ArchiveFile $rawYooReportPath "yooasset/build-report.json" | Out-Null
+        Set-PropertyValue $yooAssetBuildDocument "buildReport" "yooasset/build-report.json"
+    } else {
+        Set-PropertyValue $yooAssetBuildDocument "buildReport" $null
+    }
+    Set-PropertyValue $yooAssetBuildDocument "packageDirectory" $null
+    Set-PropertyValue $yooAssetBuildDocument "pathSemantics" "archive-relative-v1"
+    $archiveYooAssetBuildRelative = Write-ArchiveJson "yooasset/dhe-yooasset-build.json" $yooAssetBuildDocument
+}
 
 $archiveAssemblyRecords = New-Object System.Collections.Generic.List[object]
 $archiveAssemblyByName = @{}
@@ -564,6 +590,7 @@ Set-PropertyValue $archiveWorkflow "runtimePlan" "runtime-plan/dhe-runtime-plan.
 Set-PropertyValue $archiveWorkflow "runtimePlanProjectPath" "runtime-plan/dhe-runtime-plan.json"
 Set-PropertyValue $archiveWorkflow "archiveManifest" "archive-manifest.json"
 Set-PropertyValue $archiveWorkflow "archiveGate" $null
+Set-PropertyValue $archiveWorkflow "yooAssetBuild" $archiveYooAssetBuildRelative
 Set-PropertyValue $archiveWorkflow "mvJson" @($archiveAssemblyRecords | ForEach-Object { $_.mvJson })
 Set-PropertyValue $archiveWorkflow "mvBytes" @($archiveAssemblyRecords | ForEach-Object { $_.mvBytes })
 Set-PropertyValue $archiveWorkflow "artifactValidation" "artifact-validation.json"
@@ -678,6 +705,7 @@ $archiveManifest = [ordered]@{
     nativeManifest = "dhe-native-manifest.json"
     runtimeManifest = "runtime-manifest.json"
     runtimePlan = "runtime-plan/dhe-runtime-plan.json"
+    yooAssetBuild = $archiveYooAssetBuildRelative
     projectPlan = "project-plan.json"
     projectPlanValidation = "project-plan-validation.json"
     generatedCppRoot = "generated-cpp"

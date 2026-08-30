@@ -23,7 +23,8 @@ param(
     [string]$ProjectPlanValidation = "",
     [string]$BatchReport = "",
     [string]$SourcePreflight = "",
-    [string]$CleanCheckoutGate = ""
+    [string]$CleanCheckoutGate = "",
+    [switch]$RequireCompleteCoverage
 )
 
 Set-StrictMode -Version Latest
@@ -63,6 +64,7 @@ $arguments = @(
     "-BaselineAotRoot", $BaselineAotRoot,
     "-WorkflowLockAlreadyHeld"
 )
+if ($RequireCompleteCoverage) { $arguments += "-RequireCompleteCoverage" }
 if ($Action -eq "Player") {
     foreach ($required in @{
             ProjectPlan = $ProjectPlan

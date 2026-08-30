@@ -267,6 +267,25 @@ try {
         ($null -ne $workflowArchive.PSObject.Properties["runtimeSource"] -and $null -ne $workflowArchive.runtimeSource)) {
         throw "Archived workflow report retains workspace path semantics."
     }
+    $archiveYooAssetReference = Get-PropertyValue $workflowArchive "yooAssetBuild"
+    if ($null -ne $archiveYooAssetReference -and
+        -not [string]::IsNullOrWhiteSpace([string]$archiveYooAssetReference)) {
+        $archiveYooAssetPath = Resolve-ArchivePath ([string]$archiveYooAssetReference) "Archived YooAsset evidence"
+        $archiveYooAsset = Get-Content -Raw -LiteralPath $archiveYooAssetPath | ConvertFrom-Json
+        if ($archiveYooAsset.passed -ne $true -or
+            ($null -ne $archiveYooAsset.PSObject.Properties["packageDirectory"] -and
+             $null -ne $archiveYooAsset.packageDirectory)) {
+            throw "Archived YooAsset evidence is not portable or did not pass."
+        }
+        $archiveYooRawReport = Get-PropertyValue $archiveYooAsset "buildReport"
+        if ($null -ne $archiveYooRawReport -and
+            -not [string]::IsNullOrWhiteSpace([string]$archiveYooRawReport)) {
+            $archiveYooRawReportPath = Resolve-ArchivePath ([string]$archiveYooRawReport) "Archived raw YooAsset report"
+            if (-not [IO.File]::Exists($archiveYooRawReportPath)) {
+                throw "Archived raw YooAsset report is missing: $archiveYooRawReportPath"
+            }
+        }
+    }
     $sourcePreflightArchivePath = Resolve-ArchivePath "source-preflight-report.json" "Source preflight"
     $sourcePreflightArchive = Get-Content -Raw -LiteralPath $sourcePreflightArchivePath | ConvertFrom-Json
     if ([string](Get-PropertyValue $sourcePreflightArchive "pathSemantics") -ne "archive-relative-v1") {

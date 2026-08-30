@@ -1,7 +1,7 @@
 {
   "schemaVersion": 1,
   "format": "hybridclr.dhe-toolchain-layout.json",
-  "toolchainVersion": "0.1.2",
+  "toolchainVersion": "0.1.3",
   "contractVersion": 1,
   "exactPaths": [
     ".gitattributes",
@@ -30,6 +30,7 @@
     "schemas/dhe-release-gate.schema.json",
     "schemas/dhe-runtime-lock.schema.json",
     "schemas/dhe-runtime-manifest.schema.json",
+    "schemas/dhe-runtime-handoff-plan.schema.json",
     "schemas/dhe-runtime-plan.schema.json",
     "schemas/dhe-schema-gate.schema.json",
     "schemas/dhe-source-boundary.schema.json",
@@ -41,6 +42,7 @@
     "schemas/dhe-toolchain-manifest.schema.json",
     "schemas/dhe-workflow-failure.schema.json",
     "schemas/dhe-workflow-report.schema.json",
+    "schemas/dhe-yooasset-build.schema.json",
     "scripts/apply-dhe-generated-cpp.ps1",
     "scripts/apply-dhe-runtime-patches.ps1",
     "scripts/archive-dhe-artifacts.ps1",

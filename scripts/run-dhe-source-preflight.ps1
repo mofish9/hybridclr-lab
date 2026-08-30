@@ -167,6 +167,7 @@ $requiredSchemas = @(
     "dhe-build-identity.schema.json",
     "dhe-native-manifest.schema.json",
     "dhe-runtime-plan.schema.json",
+    "dhe-runtime-handoff-plan.schema.json",
     "dhe-project-plan.schema.json",
     "dhe-project-plan-validation.schema.json",
     "dhe-project-adapter-prepare.schema.json",

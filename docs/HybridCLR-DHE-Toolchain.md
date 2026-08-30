@@ -3,7 +3,7 @@
 ## Distribution contract
 
 The formal distribution is a versioned source toolchain, not a copy of the lab
-workspace. Version `0.1.2` uses toolchain and adapter contract version `1`.
+workspace. Version `0.1.3` uses toolchain and adapter contract version `1`.
 
 The package contains:
 
@@ -48,7 +48,10 @@ primitives through `HybridCLR.Editor.Commands.DheBuildPipeline`:
 - `ValidateAssemblyScope` validates `hotUpdateAssemblies` and
   `dheAotAssemblies` without depending on a project build framework.
 - `StageRuntimePlan` stages current DLLs, MV binaries, baseline snapshots and
-  runtime indexes from `DheRuntimePlanOptions`. Adapters can supply callbacks
+  runtime indexes from `DheRuntimePlanOptions`; the project asset plan uses
+  `hybridclr.dhe-runtime-asset-plan.json`, while its handoff copy uses
+  `hybridclr.dhe-runtime-handoff-plan.json` and carries baseline/hash fields.
+  Adapters can supply callbacks
   for encrypted bytes, dependency ordering and project-specific dependency
   maps.
 - `BuildPlayer` binds the previous stripped-AOT directory to
@@ -64,7 +67,7 @@ Publish only from a clean Git checkout in which every layout input is tracked:
 
 ```powershell
 ./scripts/publish-dhe-toolchain.ps1 `
-  -OutputRoot ./artifacts/dhe-toolchain-0.1.2 `
+  -OutputRoot ./artifacts/dhe-toolchain-0.1.3 `
   -Mode Release -ForceOutput
 ```
 
@@ -92,7 +95,7 @@ trusted tool root:
 ```powershell
 $packageId = "<64-hex-package-id>"
 $trustedTool = "C:/trusted/HybridCLRDhe"
-$candidate = "C:/releases/dhe-toolchain-0.1.2"
+$candidate = "C:/releases/dhe-toolchain-0.1.3"
 
 & "$trustedTool/scripts/test-dhe-toolchain-package.ps1" `
   -PackageRoot $candidate `
@@ -124,7 +127,7 @@ the runtime tree and passing installed-consumer gate:
 
 ```powershell
 ./scripts/publish-dhe-toolchain-release.ps1 `
-  -PackageRoot C:/releases/dhe-toolchain-0.1.2 `
+  -PackageRoot C:/releases/dhe-toolchain-0.1.3 `
   -RuntimeManifest ./staging/runtime/DHE-Tuanjie2022/runtime-manifest.json `
   -InstalledConsumerGate ./artifacts/dhe-installed-consumer-gate/installed-consumer-gate-report.json `
   -ForceOutput
@@ -198,6 +201,7 @@ The orchestrator rejects a different contract before project preflight.
 - `BatchReport`
 - `SourcePreflight`
 - `CleanCheckoutGate`
+- `RequireCompleteCoverage` when complete native/MV coverage is required
 
 It builds and runs the target Player, loads every planned DHE assembly with its
 matching MV data, performs target-specific assertions, and writes the standard

@@ -21,7 +21,8 @@ param(
     [string]$ProjectPlanValidation = "",
     [string]$BatchReport = "",
     [string]$SourcePreflight = "",
-    [string]$CleanCheckoutGate = ""
+    [string]$CleanCheckoutGate = "",
+    [switch]$RequireCompleteCoverage
 )
 
 Set-StrictMode -Version Latest

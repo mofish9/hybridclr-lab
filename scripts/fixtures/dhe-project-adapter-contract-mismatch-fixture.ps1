@@ -9,7 +9,8 @@ param(
     [Parameter(Mandatory = $true)][string]$OutputRoot,
     [Parameter(Mandatory = $true)][int]$ToolchainContractVersion,
     [string]$Target = "StandaloneWindows64",
-    [string]$Mode = "Exploratory"
+    [string]$Mode = "Exploratory",
+    [switch]$RequireCompleteCoverage
 )
 
 Set-StrictMode -Version Latest

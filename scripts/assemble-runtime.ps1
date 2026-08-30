@@ -48,6 +48,17 @@ function Resolve-WorkflowSourcePath([string]$RawPath) {
         (Split-Path -Parent $LabRoot),
         (Split-Path -Parent (Split-Path -Parent $LabRoot))
     )
+    # Workflow manifests are authored from the repository root. In a
+    # worktree, a sibling directory named "repos" may exist under the
+    # worktree parent and must not shadow the repository-root interpretation
+    # of ../repos/<name>.
+    if ($RawPath.Replace('\', '/') -match '^\.\./repos/') {
+        $candidateBases = @(
+            (Split-Path -Parent $LabRoot),
+            $LabRoot,
+            (Split-Path -Parent (Split-Path -Parent $LabRoot))
+        )
+    }
     foreach ($base in $candidateBases) {
         $candidate = [IO.Path]::GetFullPath((Join-Path $base $RawPath))
         if (Test-Path -LiteralPath $candidate -PathType Container) {

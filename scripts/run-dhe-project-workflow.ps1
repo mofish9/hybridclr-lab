@@ -477,6 +477,7 @@ try {
             cleanCheckout = $stages.cleanCheckout.report
             projectPreflight = $preflightReportPath
             workflowReport = $null
+            yooAssetBuild = $null
             archiveGate = $null
             releaseGate = $null
             stages = $stages
@@ -495,6 +496,7 @@ try {
         BatchReport = $batchReportPath
         SourcePreflight = [string]$stages.sourcePreflight.report
     }
+    if ($coverageRequired) { $playerParameters.RequireCompleteCoverage = $true }
     if (-not [string]::IsNullOrWhiteSpace([string]$stages.cleanCheckout.report)) {
         $playerParameters.CleanCheckoutGate = [string]$stages.cleanCheckout.report
     }
@@ -511,6 +513,30 @@ try {
     $stages.player.passed = $playerExitCode -eq 0 -and $workflowPassed -and $workflowValidationPassed
     if (-not $stages.player.passed) {
         throw "DHE adapter Player action did not produce a passing workflow report. See $workflowPath"
+    }
+    $yooAssetBuildReference = Get-PropertyValue $workflow "yooAssetBuild"
+    $yooAssetBuildPath = if ($null -eq $yooAssetBuildReference -or
+        [string]::IsNullOrWhiteSpace([string]$yooAssetBuildReference)) {
+        $null
+    } elseif ([IO.Path]::IsPathRooted([string]$yooAssetBuildReference)) {
+        [IO.Path]::GetFullPath([string]$yooAssetBuildReference)
+    } else {
+        [IO.Path]::GetFullPath((Join-Path ([IO.Path]::GetDirectoryName($workflowPath)) [string]$yooAssetBuildReference))
+    }
+    if ($null -ne $yooAssetBuildPath) {
+        Require-File $yooAssetBuildPath "DHE adapter YooAsset evidence"
+        $yooAssetBuildDocument = Read-JsonFile $yooAssetBuildPath "DHE adapter YooAsset evidence"
+        if (-not (Require-BooleanProperty $yooAssetBuildDocument "passed" "DHE YooAsset evidence passed")) {
+            throw "DHE adapter YooAsset evidence did not pass: $yooAssetBuildPath"
+        }
+    }
+
+    # Player generation can touch tracked Unity/HybridCLR outputs (and an
+    # adapter may install or rewrite project-owned sources). Release evidence
+    # must describe the checkout after that work, not only the pre-build state.
+    if ($Mode -eq "Release") {
+        Invoke-CleanCheckoutStage
+        Invoke-SourcePreflightStage
     }
     if ([string](Get-PropertyValue $workflow "target") -ne $Target -or
         [string](Get-PropertyValue $workflow "pathSemantics") -ne "workspace-absolute-v1") {
@@ -612,6 +638,7 @@ try {
         cleanCheckout = $stages.cleanCheckout.report
         projectPreflight = $preflightReportPath
         workflowReport = $workflowPath
+        yooAssetBuild = $yooAssetBuildPath
         archiveGate = $archiveGatePath
         releaseGate = $releaseGatePath
         stages = $stages

@@ -392,6 +392,22 @@ if ($null -ne $packageLock) {
         if (($runtimePackageIds -join ",") -ne ($lockedPackageIds -join ",")) {
             $packageLockErrors.Add("package patch IDs do not match runtime lock")
         }
+        if ($packageSourceMode -eq "integrated") {
+            $packageTreeHash = [string](Get-StaticProperty $packageLock "treeSha256")
+            $packageCommit = [string](Get-StaticProperty $packageLock "integratedCommit")
+            foreach ($runtimePackagePatch in @($runtimePatches | Where-Object {
+                    [string](Get-StaticProperty $_ "applyRoot") -eq "package"
+                })) {
+                $runtimePackageTree = [string](Get-StaticProperty $runtimePackagePatch "expectedTreeSha256")
+                $runtimePackageCommit = [string](Get-StaticProperty $runtimePackagePatch "integratedCommit")
+                if (-not [StringComparer]::OrdinalIgnoreCase.Equals($runtimePackageTree, $packageTreeHash)) {
+                    $packageLockErrors.Add("package tree hash does not match runtime patch '$([string](Get-StaticProperty $runtimePackagePatch 'id'))'")
+                }
+                if (-not [StringComparer]::OrdinalIgnoreCase.Equals($runtimePackageCommit, $packageCommit)) {
+                    $packageLockErrors.Add("package integrated commit does not match runtime patch '$([string](Get-StaticProperty $runtimePackagePatch 'id'))'")
+                }
+            }
+        }
     }
     $packageLockShapeDetail = if ($packageLockErrors.Count -eq 0) {
         "schemaVersion=1; pathBase=project-root-v1; package path and patch IDs are structurally valid"

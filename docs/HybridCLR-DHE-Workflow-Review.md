@@ -333,7 +333,8 @@ demo adapter 同时要求 Git clean。该检查只有在正式文件形成提交
   选择唯一匹配的仓库根，避免路径正确但提交错误。
 - `scripts/fixtures/`：guard/resolver/ABI 的最小回归夹具。
 - `schemas/dhe-*.schema.json`：DHE 输出契约，供 CI 或其他工具消费；其中
-  `dhe-runtime-plan.schema.json` 约束 Player 逐程序集加载所需的 current/baseline/MV/snapshot 映射；
+  `dhe-runtime-plan.schema.json` 约束项目内 Player 逐程序集加载所需的 current/MV/snapshot 映射，
+  `dhe-runtime-handoff-plan.schema.json` 约束归档交接所需的 current/baseline/MV/snapshot/hash 映射；
   `dhe-runtime-manifest.schema.json` 约束 workspace 与 archive 两种 provenance 路径语义；
   `dhe-clean-checkout-gate.schema.json` 约束源码边界回归报告，
   `dhe-archive-manifest.schema.json`/`dhe-archive-gate.schema.json` 约束可移植归档。

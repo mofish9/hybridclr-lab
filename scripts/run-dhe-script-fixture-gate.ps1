@@ -1087,7 +1087,7 @@ $releaseGatePath = Join-Path $releaseOutputRoot "release-gate.json"
         projectPlan = "missing/project-plan.json"
         projectPlanValidation = "missing/project-plan-validation.json"
         batchReport = "missing/batch-report.json"
-        transaction = [ordered]@{ retryValidated = $true; retryAssemblyName = "Fixture"; retryFailure = "DHE_MV_REGISTRATION_FAILED" }
+        transaction = [ordered]@{ status = "validated"; retryValidated = $true; retryAssemblyName = "Fixture"; retryFailure = "DHE_MV_REGISTRATION_FAILED" }
         player = [ordered]@{ passed = $true; loadError = "OK"; multiAssemblyValidated = $true }
         nativeGuardCoverage = [ordered]@{
             manifestAvailable = $true

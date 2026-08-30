@@ -229,8 +229,14 @@ try {
         throw "Embedded HybridCLR package does not match its package lock: $packageRoot"
     }
     $runtimePackageSource = [string]$runtimeManifest.source.hybridclr_unity.commit
-    if (-not $runtimePackageSource.Equals([string]$packageLock.baseCommit, [StringComparison]::OrdinalIgnoreCase)) {
-        throw "DHE package lock base commit differs from the runtime manifest source commit."
+    $expectedRuntimePackageCommit = if ([string]$packageLock.sourceMode -eq "integrated" -and
+        $null -ne $packageLock.PSObject.Properties["integratedCommit"]) {
+        [string]$packageLock.integratedCommit
+    } else {
+        [string]$packageLock.baseCommit
+    }
+    if (-not $runtimePackageSource.Equals($expectedRuntimePackageCommit, [StringComparison]::OrdinalIgnoreCase)) {
+        throw "DHE package lock integrated/base commit differs from the runtime manifest source commit."
     }
     $runtimeLockForPackage = Get-Content -Raw -LiteralPath (Join-Path $LabRoot "manifests/dhe-runtime-lock.json") | ConvertFrom-Json
     $runtimePackagePatchIds = @($runtimeLockForPackage.patches |
@@ -609,7 +615,7 @@ foreach ($assembly in $orderedPlanAssemblies) {
 }
 $runtimePlan = [ordered]@{
     schemaVersion = 1
-    format = "hybridclr.dhe-runtime-plan.json"
+    format = "hybridclr.dhe-runtime-asset-plan.json"
     assemblies = $runtimePlanRecords.ToArray()
 }
 $runtimePlanNames = @($runtimePlanRecords.ToArray() | ForEach-Object { [string]$_['assemblyName'] })
@@ -651,7 +657,7 @@ foreach ($record in $runtimePlanRecords) {
 }
 $runtimePlanArchive = [ordered]@{
     schemaVersion = 1
-    format = "hybridclr.dhe-runtime-plan.json"
+    format = "hybridclr.dhe-runtime-handoff-plan.json"
     assemblies = $runtimePlanArchiveRecords.ToArray()
 }
 $runtimePlanArchivePath = Join-Path $runtimePlanArchiveDirectory "dhe-runtime-plan.json"
@@ -779,9 +785,10 @@ $report = [ordered]@{
         secondaryAssemblyDirectValidated = Get-DheStrictBooleanProperty $playerResult "secondaryAssemblyDirectValidated" "DHE Player secondaryAssemblyDirectValidated"
     }
     transaction = [ordered]@{
+        status = [string]$playerResult.transactionStatus
         retryValidated = Get-DheStrictBooleanProperty $playerResult "retryValidated" "DHE Player retryValidated"
-        retryAssemblyName = [string]$playerResult.retryAssemblyName
-        retryFailure = [string]$playerResult.retryFailure
+        retryAssemblyName = if ($null -eq $playerResult.retryAssemblyName) { $null } else { [string]$playerResult.retryAssemblyName }
+        retryFailure = if ($null -eq $playerResult.retryFailure) { $null } else { [string]$playerResult.retryFailure }
     }
     nativeGuardCoverage = $nativeCoverage
     runtimeSource = $runtimeSourcePath

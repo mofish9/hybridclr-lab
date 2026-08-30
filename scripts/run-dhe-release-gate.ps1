@@ -167,10 +167,33 @@ if ($null -eq $player -or -not (Test-StrictBoolean $player "passed" "DHE Player 
     $errors.Add("DHE Player report is not a successful load/dispatch result.")
 }
 $transaction = Get-Property $workflow "transaction"
-if ($null -eq $transaction -or -not (Test-StrictBoolean $transaction "retryValidated" "DHE transaction retryValidated") -or
-    [string](Get-Property $transaction "retryFailure") -ne "DHE_MV_REGISTRATION_FAILED" -or
-    [string]::IsNullOrWhiteSpace([string](Get-Property $transaction "retryAssemblyName"))) {
-    $errors.Add("DHE workflow is missing a successful same-process transaction retry probe.")
+$capability = Get-Property $workflow "capability"
+$changedMethodValue = Get-Property $capability "changedMethodCount"
+$changedMethodCount = $null
+if ($null -ne $changedMethodValue) {
+    try { $changedMethodCount = [int]$changedMethodValue } catch { $changedMethodCount = $null }
+}
+if ($null -eq $changedMethodCount -or $changedMethodCount -lt 0) {
+    $errors.Add("DHE workflow capability.changedMethodCount is missing or invalid.")
+}
+if ($null -eq $transaction) {
+    $errors.Add("DHE workflow is missing transaction evidence.")
+} elseif ($changedMethodCount -eq 0) {
+    $status = [string](Get-Property $transaction "status")
+    $retryValidated = Test-StrictBoolean $transaction "retryValidated" "DHE transaction retryValidated"
+    if ($status -ne "notApplicable" -or $retryValidated -ne $false -or
+        $null -ne (Get-Property $transaction "retryAssemblyName") -or
+        $null -ne (Get-Property $transaction "retryFailure")) {
+        $errors.Add("DHE no-op workflow must report transaction.status=notApplicable and no retry evidence.")
+    }
+} elseif ($changedMethodCount -gt 0) {
+    $status = [string](Get-Property $transaction "status")
+    $retryValidated = Test-StrictBoolean $transaction "retryValidated" "DHE transaction retryValidated"
+    if ($status -ne "validated" -or $retryValidated -ne $true -or
+        [string](Get-Property $transaction "retryFailure") -ne "DHE_MV_REGISTRATION_FAILED" -or
+        [string]::IsNullOrWhiteSpace([string](Get-Property $transaction "retryAssemblyName"))) {
+        $errors.Add("DHE workflow is missing a successful same-process transaction retry probe.")
+    }
 }
 if ($null -ne $player -and $player.PSObject.Properties["multiAssemblyValidated"] -ne $null -and
     -not (Test-StrictBoolean $player "multiAssemblyValidated" "DHE Player multiAssemblyValidated")) {
@@ -500,6 +523,10 @@ if (-not (Test-Path -LiteralPath $runtimePlanPath -PathType Leaf)) {
     try { $runtimePlanDocument = Read-Json $runtimePlanPath "Runtime plan" } catch { $errors.Add($_.Exception.Message) }
 }
 if ($null -ne $runtimePlanDocument) {
+    if ([int](Get-Property $runtimePlanDocument "schemaVersion") -ne 1 -or
+        [string](Get-Property $runtimePlanDocument "format") -ne "hybridclr.dhe-runtime-handoff-plan.json") {
+        $errors.Add("Runtime handoff plan schema or format is invalid: $runtimePlanPath")
+    }
     $runtimePlanByAssembly = @{}
     foreach ($runtimeAssembly in @((Get-Property $runtimePlanDocument "assemblies"))) {
         $runtimeName = [string](Get-Property $runtimeAssembly "assemblyName")

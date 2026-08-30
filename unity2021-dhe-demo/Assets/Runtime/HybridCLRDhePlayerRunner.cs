@@ -57,12 +57,13 @@ namespace HybridCLR.Lab
             DheRuntimePlanData runtimePlan = JsonUtility.FromJson<DheRuntimePlanData>(
                 System.Text.Encoding.UTF8.GetString(ReadStreamingAssetBytes(RuntimePlanFile)));
             if (runtimePlan == null || runtimePlan.schemaVersion != 1 ||
-                !string.Equals(runtimePlan.format, "hybridclr.dhe-runtime-plan.json", StringComparison.Ordinal) ||
+                !string.Equals(runtimePlan.format, "hybridclr.dhe-runtime-asset-plan.json", StringComparison.Ordinal) ||
                 runtimePlan.assemblies == null || runtimePlan.assemblies.Length == 0)
             {
                 throw new InvalidDataException("DHE runtime plan is empty or invalid.");
             }
             Dictionary<string, LoadedDheAssembly> loadedAssemblies = new Dictionary<string, LoadedDheAssembly>(StringComparer.OrdinalIgnoreCase);
+            int changedMethodCount = 0;
             bool retryValidated = false;
             string retryAssemblyName = string.Empty;
             LoadImageErrorCode retryFailureCode = LoadImageErrorCode.OK;
@@ -104,12 +105,14 @@ namespace HybridCLR.Lab
                 {
                     throw new InvalidDataException("DHE runtime plan hash binding failed for " + assemblyPlan.assemblyName);
                 }
+                int assemblyChangedMethodCount = checked((int)BitConverter.ToUInt32(assemblyMv, 16));
+                changedMethodCount = checked(changedMethodCount + assemblyChangedMethodCount);
 
                 // Exercise the runtime transaction boundary before the first
                 // valid load: an invalid method token must retire the
                 // homologous image, allowing the same assembly to be retried
                 // without an already-loaded false positive.
-                if (!retryValidated && string.Equals(assemblyPlan.assemblyName, MainAssemblyName, StringComparison.Ordinal))
+                if (!retryValidated && assemblyChangedMethodCount > 0)
                 {
                     byte[] invalidMv = CreateInvalidMetaVersion(assemblyMv);
                     retryFailureCode = RuntimeApi.LoadDifferentialHybridAssemblyWithMetaVersion(
@@ -138,7 +141,8 @@ namespace HybridCLR.Lab
                     mvCurrentHash = assemblyExpectedCurrentHash,
                     mvBaselineHash = assemblyExpectedBaselineHash,
                 });
-                if (string.Equals(assemblyPlan.assemblyName, MainAssemblyName, StringComparison.Ordinal))
+                if (!string.IsNullOrWhiteSpace(retryAssemblyName) &&
+                    string.Equals(assemblyPlan.assemblyName, retryAssemblyName, StringComparison.Ordinal))
                 {
                     retryValidated = true;
                 }
@@ -244,25 +248,31 @@ namespace HybridCLR.Lab
                 string.Equals(buildIdentity.aotSnapshotSha256, ToHex(snapshot), StringComparison.OrdinalIgnoreCase) &&
                 string.Equals(buildIdentity.nativeGuardSourceSha256, HybridCLRDheBuildIdentity.NativeGuardSourceSha256, StringComparison.OrdinalIgnoreCase) &&
                 string.Equals(buildIdentity.nativeManifestSha256, HybridCLRDheBuildIdentity.NativeManifestSha256, StringComparison.OrdinalIgnoreCase);
-
-            return new DheRun
-            {
-                passed = loadError == LoadImageErrorCode.OK && addResult == 101 && stableResult == 4 &&
+            bool changedBehaviorValidated = changedMethodCount == 0 ||
+                (addResult == 101 && stableResult == 4 &&
                     addViaStableResult == 104 && addPairResult == 107 && wideResult == 1005L &&
                     touchValue == 705 && instanceAddResult == 201 && instanceStableResult == 6 &&
                     instanceAddViaStableResult == 206 && addChanged && !stableChanged &&
                     addViaStableChanged && addPairChanged && wideChanged && touchChanged &&
                     !instanceStableChanged && instanceAddChanged && instanceAddViaStableChanged &&
-                    mainInterpreterEntryCount >= 7 && mainAotEntryCount >= 3 &&
-                    currentHashValidated && baselineHashValidated && snapshotHashValidated && buildIdentityValidated && capability.passed &&
-                    directCapability.passed &&
-                    managedSecondaryChanged && !managedSecondaryUnchanged && metadataSecondaryChanged && crossSecondaryChanged &&
+                    mainInterpreterEntryCount >= 7 && mainAotEntryCount >= 3 && capability.passed &&
+                    directCapability.passed && managedSecondaryChanged && !managedSecondaryUnchanged &&
+                    metadataSecondaryChanged && crossSecondaryChanged &&
                     managedSecondaryDirectResult == 103 && managedSecondaryUnchangedDirectResult == 6 &&
                     metadataSecondaryDirectResult == 103 && crossSecondaryDirectResult == 103 &&
                     metadataSecondaryReflectionResult == 103 && crossSecondaryReflectionResult == 103 &&
                     loadedAssemblies.Count >= 4 && metadataStressResult > 0 &&
-                    string.Equals(crossAssemblyResult, "derived:26:34", StringComparison.Ordinal) &&
-                    retryValidated,
+                    string.Equals(crossAssemblyResult, "derived:26:34", StringComparison.Ordinal));
+            bool transactionEvidenceValid = changedMethodCount == 0 || retryValidated;
+            string transactionStatus = changedMethodCount == 0
+                ? "notApplicable"
+                : (retryValidated ? "validated" : "failed");
+
+            return new DheRun
+            {
+                passed = loadError == LoadImageErrorCode.OK && changedBehaviorValidated &&
+                    currentHashValidated && baselineHashValidated && snapshotHashValidated &&
+                    buildIdentityValidated && transactionEvidenceValid,
                 loadError = loadError.ToString(),
                 assemblyName = typeof(DheDemoCalculator).Assembly.GetName().Name,
                 currentAssemblySha256 = ToHex(currentHash),
@@ -347,9 +357,11 @@ namespace HybridCLR.Lab
                 capabilityGenericVirtualResult = capability.genericVirtualResult,
                 plannedDheAssemblies = GetAssemblyNames(runtimePlan),
                 loadedDheAssemblies = GetAssemblyNames(loadedAssemblies),
+                changedMethodCount = changedMethodCount,
+                transactionStatus = transactionStatus,
                 retryValidated = retryValidated,
-                retryAssemblyName = retryAssemblyName,
-                retryFailure = retryFailureCode.ToString(),
+                retryAssemblyName = changedMethodCount == 0 ? null : retryAssemblyName,
+                retryFailure = retryValidated ? retryFailureCode.ToString() : null,
                 assemblyValidations = loadedAssemblies.Values.OrderBy(item => item.plan.assemblyName, StringComparer.Ordinal)
                     .Select(item => new DheAssemblyValidation
                     {
@@ -904,6 +916,8 @@ namespace HybridCLR.Lab
             public string assemblyName;
             public string[] plannedDheAssemblies;
             public string[] loadedDheAssemblies;
+            public int changedMethodCount;
+            public string transactionStatus;
             public bool retryValidated;
             public string retryAssemblyName;
             public string retryFailure;

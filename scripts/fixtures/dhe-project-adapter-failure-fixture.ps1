@@ -15,7 +15,8 @@ param(
     [ValidateRange(1, 1)]
     [int]$ToolchainContractVersion,
     [string]$Target = "StandaloneWindows64",
-    [string]$Mode = "Exploratory"
+    [string]$Mode = "Exploratory",
+    [switch]$RequireCompleteCoverage
 )
 
 Set-StrictMode -Version Latest
