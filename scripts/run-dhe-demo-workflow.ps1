@@ -771,6 +771,7 @@ if (-not $playerPassed) {
 # package tree hash, so restore the checkout's original bytes before final
 # Release identity checks.
 Restore-UnityMetaSnapshot
+Restore-SettingsSnapshot
 
 if ($Invocation -eq "Standalone" -and $Mode -eq "Release") {
     $finalCleanCheckoutRoot = Join-Path $OutputRoot "clean-checkout-gate-final"
