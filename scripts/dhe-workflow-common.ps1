@@ -1120,16 +1120,47 @@ function Get-DheEmptyFileSetHash {
     }
 }
 
-function Get-DheFileSetHashOrEmpty {
+function Get-DheNativeManifestSourcePaths {
     param(
         [Parameter(Mandatory = $true)]
+        [AllowNull()]
+        [object]$Manifest,
+        [Parameter(Mandatory = $true)]
+        [string]$GeneratedCppRoot
+    )
+
+    $root = Normalize-DhePath $GeneratedCppRoot
+    $prefix = $root + [IO.Path]::DirectorySeparatorChar
+    $paths = New-Object System.Collections.Generic.List[string]
+    $methodsProperty = if ($null -eq $Manifest) { $null } else {
+        $Manifest.PSObject.Properties["methods"]
+    }
+    $methods = if ($null -eq $methodsProperty) { @() } else { @($methodsProperty.Value) }
+    foreach ($method in $methods) {
+        if ($null -eq $method) { continue }
+        $sourceProperty = $method.PSObject.Properties["sourceFile"]
+        if ($null -eq $sourceProperty -or [string]::IsNullOrWhiteSpace([string]$sourceProperty.Value)) {
+            throw "DHE native manifest method has no sourceFile."
+        }
+        $source = Normalize-DhePath ([string]$sourceProperty.Value)
+        if (-not $source.StartsWith($prefix, [StringComparison]::OrdinalIgnoreCase)) {
+            throw "Native manifest source is outside generated C++ root: $source"
+        }
+        if (-not $paths.Contains($source)) { $paths.Add($source) }
+    }
+    return @($paths.ToArray() | Sort-Object)
+}
+
+function Get-DheFileSetHashOrEmpty {
+    param(
+        [AllowNull()]
         [AllowEmptyCollection()]
-        [string[]]$Paths,
+        [string[]]$Paths = @(),
         [Parameter(Mandatory = $true)]
         [string]$Root
     )
 
-    if (@($Paths).Count -eq 0) {
+    if ($null -eq $Paths -or @($Paths).Count -eq 0) {
         # An empty native guard set is a valid no-op build. Keep a stable
         # digest in build identity instead of making callers invent a path.
         return Get-DheEmptyFileSetHash

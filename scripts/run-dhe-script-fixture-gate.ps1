@@ -1121,6 +1121,11 @@ Require ($noopResult.changedMethodCount -eq 0 -and
 Require ((Get-DheFileSetHashOrEmpty @() $fixtures) -eq
     "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855") `
     "No-op guard fixture did not produce the canonical empty source-set hash."
+Require ((Get-DheFileSetHashOrEmpty $null $fixtures) -eq
+    "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855") `
+    "Null no-op guard input did not normalize to the canonical empty source-set hash."
+Require (@(Get-DheNativeManifestSourcePaths ([pscustomobject]@{ methods = @() }) $fixtures).Count -eq 0) `
+    "Empty native manifest did not produce an empty generated-C++ source set."
 
 # The validator and native parser must agree on the closed MV flag set.
 $unknownFlagsBinary = Join-Path $OutputRoot "Noop.Assembly.mv.bytes"
