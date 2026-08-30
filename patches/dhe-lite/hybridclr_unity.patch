@@ -1,212 +1,64 @@
-diff --git a/Runtime/LoadImageErrorCode.cs b/Runtime/LoadImageErrorCode.cs
-index d327810..0d675f6 100644
---- a/Runtime/LoadImageErrorCode.cs
-+++ b/Runtime/LoadImageErrorCode.cs
-@@ -14,6 +14,12 @@ namespace HybridCLR
-         UNKNOWN_IMAGE_FORMAT,
-         UNSUPPORT_FORMAT_VERSION,
-         UNMATCH_FORMAT_VARIANT,
--    };
-+		DHE_MV_BAD_FORMAT,
-+		DHE_MV_ASSEMBLY_NOT_FOUND,
-+		DHE_MV_REGISTRATION_FAILED,
-+		DHE_MV_CURRENT_HASH_MISMATCH,
-+		DHE_MV_BASELINE_HASH_MISMATCH,
-+		DHE_MV_BAD_SNAPSHOT_HASH,
-+		DHE_MV_DLL_ASSEMBLY_MISMATCH,
-+	};
- }
--
-diff --git a/Runtime/RuntimeApi.cs b/Runtime/RuntimeApi.cs
-index 1ee67bb..64de1aa 100644
---- a/Runtime/RuntimeApi.cs
-+++ b/Runtime/RuntimeApi.cs
-@@ -30,6 +30,70 @@ namespace HybridCLR
-         public static extern LoadImageErrorCode LoadMetadataForAOTAssembly(byte[] dllBytes, HomologousImageMode mode);
- #endif
- 
-+        /// <summary>
-+        /// Legacy DHE-lite overload. It is retained for ABI compatibility but
-+        /// always rejects loading because it cannot verify the AOT snapshot.
-+        /// </summary>
-+#if UNITY_EDITOR
-+        [Obsolete("Use the overload with aotSnapshotHash for DHE loading.")]
-+        public static LoadImageErrorCode LoadDifferentialHybridAssemblyWithMetaVersion(byte[] dllBytes, byte[] mvBytes)
-+        {
-+            return LoadImageErrorCode.DHE_MV_BAD_SNAPSHOT_HASH;
-+        }
-+
-+        public static LoadImageErrorCode LoadDifferentialHybridAssemblyWithMetaVersion(byte[] dllBytes, byte[] mvBytes, byte[] aotSnapshotHash)
-+        {
-+            return LoadImageErrorCode.NOT_IMPLEMENT;
-+        }
-+#else
-+        [Obsolete("Use the overload with aotSnapshotHash for DHE loading.")]
-+        [MethodImpl(MethodImplOptions.InternalCall)]
-+        public static extern LoadImageErrorCode LoadDifferentialHybridAssemblyWithMetaVersion(byte[] dllBytes, byte[] mvBytes);
-+
-+        /// <summary>
-+        /// Strict DHE-lite loader variant. The snapshot hash must be the
-+        /// baseline hash embedded in mv.bytes and must come from the actual
-+        /// platform player build.
-+        /// </summary>
-+        [MethodImpl(MethodImplOptions.InternalCall)]
-+        public static extern LoadImageErrorCode LoadDifferentialHybridAssemblyWithMetaVersion(byte[] dllBytes, byte[] mvBytes, byte[] aotSnapshotHash);
-+
-+#endif
-+
-+        /// <summary>
-+        /// Returns whether the loaded DHE image marks this method as changed.
-+        /// This is a diagnostics API for validating the generated AOT guard.
-+        /// </summary>
-+#if UNITY_EDITOR
-+        public static bool IsDifferentialMethodChanged(MethodInfo method)
-+        {
-+            return false;
-+        }
-+#else
-+        [MethodImpl(MethodImplOptions.InternalCall)]
-+        public static extern bool IsDifferentialMethodChanged(MethodInfo method);
-+#endif
-+
-+        /// <summary>Returns diagnostic counts for the DHE dispatch path.</summary>
-+#if UNITY_EDITOR
-+        public static int GetDifferentialInterpreterEntryCount() { return 0; }
-+        public static int GetDifferentialAotBridgeCallCount() { return 0; }
-+        public static int GetDifferentialAotEntryCount() { return 0; }
-+        public static void ResetDifferentialDispatchCounters() { }
-+#else
-+        [MethodImpl(MethodImplOptions.InternalCall)]
-+        public static extern int GetDifferentialInterpreterEntryCount();
-+
-+        [MethodImpl(MethodImplOptions.InternalCall)]
-+        public static extern int GetDifferentialAotBridgeCallCount();
-+
-+        [MethodImpl(MethodImplOptions.InternalCall)]
-+        public static extern int GetDifferentialAotEntryCount();
-+
-+        [MethodImpl(MethodImplOptions.InternalCall)]
-+        public static extern void ResetDifferentialDispatchCounters();
-+#endif
-+
-         /// <summary>
-         /// prejit method to avoid the jit cost of first time running
-         /// </summary>
-diff --git a/Editor/Settings/HybridCLRSettings.cs b/Editor/Settings/HybridCLRSettings.cs
-index f577a95..214971f 100644
---- a/Editor/Settings/HybridCLRSettings.cs
-+++ b/Editor/Settings/HybridCLRSettings.cs
-@@ -25,6 +25,9 @@ namespace HybridCLR.Editor.Settings
-         [Tooltip("hot update assembly names(without .dll suffix)")]
-         public string[] hotUpdateAssemblies;
- 
-+        [Tooltip("DHE hot update assemblies that must also be retained in the AOT player")]
-+        public string[] dheAotAssemblies;
-+
-         [Tooltip("preserved hot update assembly names(without .dll suffix)")]
-         public string[] preserveHotUpdateAssemblies;
-
-diff --git a/Editor/Settings/HybridCLRSettingProvider.cs b/Editor/Settings/HybridCLRSettingProvider.cs
-index 51ecb3b..221351d 100644
---- a/Editor/Settings/HybridCLRSettingProvider.cs
-+++ b/Editor/Settings/HybridCLRSettingProvider.cs
-@@ -16,6 +16,7 @@ namespace HybridCLR.Editor.Settings
-         private SerializedProperty _il2cppPlusRepoURL;
-         private SerializedProperty _hotUpdateAssemblyDefinitions;
-         private SerializedProperty _hotUpdateAssemblies;
-+        private SerializedProperty _dheAotAssemblies;
-         private SerializedProperty _preserveHotUpdateAssemblies;
-         private SerializedProperty _hotUpdateDllCompileOutputRootDir;
-         private SerializedProperty _externalHotUpdateAssemblyDirs;
-@@ -44,6 +45,7 @@ namespace HybridCLR.Editor.Settings
-             _il2cppPlusRepoURL = _serializedObject.FindProperty("il2cppPlusRepoURL");
-             _hotUpdateAssemblyDefinitions = _serializedObject.FindProperty("hotUpdateAssemblyDefinitions");
-             _hotUpdateAssemblies = _serializedObject.FindProperty("hotUpdateAssemblies");
-+            _dheAotAssemblies = _serializedObject.FindProperty("dheAotAssemblies");
-             _preserveHotUpdateAssemblies = _serializedObject.FindProperty("preserveHotUpdateAssemblies");
-             _hotUpdateDllCompileOutputRootDir = _serializedObject.FindProperty("hotUpdateDllCompileOutputRootDir");
-             _externalHotUpdateAssemblyDirs = _serializedObject.FindProperty("externalHotUpdateAssembliyDirs");
-@@ -69,6 +71,7 @@ namespace HybridCLR.Editor.Settings
-             EditorGUILayout.PropertyField(_useGlobalIl2cpp);
-             EditorGUILayout.PropertyField(_hotUpdateAssemblyDefinitions);
-             EditorGUILayout.PropertyField(_hotUpdateAssemblies);
-+            EditorGUILayout.PropertyField(_dheAotAssemblies);
-             EditorGUILayout.PropertyField(_preserveHotUpdateAssemblies);
-             EditorGUILayout.PropertyField(_hotUpdateDllCompileOutputRootDir);
-             EditorGUILayout.PropertyField(_externalHotUpdateAssemblyDirs);
-
-diff --git a/Editor/SettingsUtil.cs b/Editor/SettingsUtil.cs
-index 0aaa269..1387869 100644
---- a/Editor/SettingsUtil.cs
-+++ b/Editor/SettingsUtil.cs
-@@ -82,6 +82,22 @@ namespace HybridCLR.Editor
-             }
-         }
- 
-+        public static List<string> DheAotAssemblyNames
-+        {
-+            get
-+            {
-+                // An empty DHE list means "all configured hot-update
-+                // assemblies". Keep this fallback aligned with the offline
-+                // project preflight so the Unity build cannot silently filter
-+                // every hot-update assembly while the plan expects DHE AOT
-+                // images for them.
-+                var configured = HybridCLRSettings.Instance.dheAotAssemblies;
-+                return configured != null && configured.Length > 0
-+                    ? configured.ToList()
-+                    : HotUpdateAssemblyNamesExcludePreserved;
-+            }
-+        }
-+
-         public static List<string> HotUpdateAssemblyFilesExcludePreserved => HotUpdateAssemblyNamesExcludePreserved.Select(dll => dll + ".dll").ToList();
- 
- 
-diff --git a/Editor/BuildProcessors/FilterHotFixAssemblies.cs b/Editor/BuildProcessors/FilterHotFixAssemblies.cs
-index 1cb56b6..e07743c 100644
---- a/Editor/BuildProcessors/FilterHotFixAssemblies.cs
-+++ b/Editor/BuildProcessors/FilterHotFixAssemblies.cs
-@@ -26,6 +26,24 @@ namespace HybridCLR.Editor.BuildProcessors
-                 return assemblies;
-             }
-             List<string> allHotUpdateDllNames = SettingsUtil.HotUpdateAssemblyNamesExcludePreserved;
-+            List<string> dheAotDllNames = SettingsUtil.DheAotAssemblyNames;
-+            var allHotUpdateDllSet = new HashSet<string>(allHotUpdateDllNames, StringComparer.Ordinal);
-+            var dheAotDllSet = new HashSet<string>(StringComparer.Ordinal);
-+            foreach (var dheAotDll in dheAotDllNames)
-+            {
-+                if (string.IsNullOrWhiteSpace(dheAotDll))
-+                {
-+                    throw new BuildFailedException("DHE AOT assembly name can't be empty");
-+                }
-+                if (!dheAotDllSet.Add(dheAotDll))
-+                {
-+                    throw new BuildFailedException($"DHE AOT assembly:{dheAotDll} is duplicated");
-+                }
-+                if (!allHotUpdateDllSet.Contains(dheAotDll))
-+                {
-+                    throw new BuildFailedException($"DHE AOT assembly:{dheAotDll} must also be listed in hotUpdateAssemblies");
-+                }
-+            }
-
-             // 检查是否重复填写
-             var hotUpdateDllSet = new HashSet<string>();
-@@ -52,11 +70,16 @@ namespace HybridCLR.Editor.BuildProcessors
-                 }
-             }
-
--            // 将热更dll从打包列表中移除
-+            // Ordinary hot-update DLLs stay external. DHE assemblies are a
-+            // deliberate exception: their baseline image must be compiled
-+            // into the player while the current image is loaded at runtime.
-+            var assembliesToFilter = new HashSet<string>(
-+                allHotUpdateDllNames.Where(name => !dheAotDllSet.Contains(name)),
-+                StringComparer.Ordinal);
-             return assemblies.Where(ass =>
+diff --git a/Editor/Commands/DheBuildPipeline.cs b/Editor/Commands/DheBuildPipeline.cs
+index 2947fe9..20e62b7 100644
+--- a/Editor/Commands/DheBuildPipeline.cs
++++ b/Editor/Commands/DheBuildPipeline.cs
+@@ -189,7 +189,7 @@ namespace HybridCLR.Editor.Commands
+             DheRuntimePlanDocument runtimePlan = new DheRuntimePlanDocument
              {
-                 string assName = Path.GetFileNameWithoutExtension(ass);
--                bool reserved = allHotUpdateDllNames.All(dll => !assName.Equals(dll, StringComparison.Ordinal));
-+                bool reserved = !assembliesToFilter.Contains(assName);
-                 if (!reserved)
+                 schemaVersion = 1,
+-                format = "hybridclr.dhe-runtime-plan.json",
++                format = "hybridclr.dhe-runtime-asset-plan.json",
+                 assemblies = runtimeRecords.ToArray(),
+             };
+             File.WriteAllText(Path.Combine(currentAssetRoot, "DheRuntimePlan.json"),
+@@ -197,7 +197,7 @@ namespace HybridCLR.Editor.Commands
+             DheRuntimePlanHandoffDocument handoffPlan = new DheRuntimePlanHandoffDocument
+             {
+                 schemaVersion = 1,
+-                format = "hybridclr.dhe-runtime-plan.json",
++                format = "hybridclr.dhe-runtime-handoff-plan.json",
+                 assemblies = handoffRecords.ToArray(),
+             };
+             string handoffPlanPath = Path.Combine(handoffRoot, "dhe-runtime-plan.json");
+@@ -239,14 +239,27 @@ namespace HybridCLR.Editor.Commands
+             Environment.SetEnvironmentVariable(BaselineEnvironmentVariable, baselineRoot);
+             try
+             {
+-                BuildReport report = BuildPipeline.BuildPlayer(new BuildPlayerOptions
++                BuildPlayerOptions buildOptions = new BuildPlayerOptions
                  {
-                     Debug.Log($"[FilterHotFixAssemblies] filter assembly:{assName}");
+                     scenes = options.Scenes,
+                     locationPathName = outputPath,
+                     target = options.Target,
+                     targetGroup = group,
+                     options = options.BuildOptions,
+-                });
++                };
++                // The package owns the baseline binding and result contract,
++                // while a project may wrap the actual Unity build with its
++                // resource scopes, signing settings, or platform options.
++                // Keeping this callback at the package boundary avoids making
++                // the generic DHE workflow depend on a project's build
++                // framework (YooAsset, Addressables, or a custom builder).
++                BuildReport report = options.BuildPlayerCallback == null
++                    ? BuildPipeline.BuildPlayer(buildOptions)
++                    : options.BuildPlayerCallback(buildOptions);
++                if (report == null || report.summary == null)
++                {
++                    throw new BuildFailedException("DHE Player build callback returned no BuildReport.");
++                }
+                 if (report.summary.result != BuildResult.Succeeded)
+                 {
+                     throw new BuildFailedException("DHE Player build failed: " + report.summary.result);
+@@ -482,5 +495,11 @@ namespace HybridCLR.Editor.Commands
+         public BuildTarget Target;
+         public BuildOptions BuildOptions;
+         public string[] Scenes;
++        /// <summary>
++        /// Optional project-owned build wrapper. The callback receives the
++        /// fully populated Unity options after the package has bound the
++        /// previous stripped-AOT baseline in the process environment.
++        /// </summary>
++        public Func<BuildPlayerOptions, BuildReport> BuildPlayerCallback;
+     }
+ }

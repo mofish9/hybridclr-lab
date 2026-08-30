@@ -47,7 +47,7 @@
       "il2cppPlus": {
         "tag": "v2022-8.11.0-opt3",
         "commit": "bf15337e189ae7da5876aa51c9b896a36c52a155",
-        "path": "../worktrees/dhe-opt4-il2cpp-unity2022"
+        "path": "../repos/il2cpp_plus"
       },
       "fullGenericSharing": "required",
       "productionWorkflow": {
@@ -77,7 +77,7 @@
       "il2cppPlus": {
         "tag": "v2021-8.1.0-opt3",
         "commit": "511df62f4aa7cba2bdb505deead48a8d080d582c",
-        "path": "../worktrees/dhe-opt4-il2cpp-unity2021"
+        "path": "../repos/il2cpp_plus"
       },
       "fullGenericSharing": "disabled",
       "productionWorkflow": {
