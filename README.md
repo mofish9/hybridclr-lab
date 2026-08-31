@@ -84,13 +84,14 @@ arguments are configuration inputs.
 `Release` is intentionally usable only from a clean checkout after the formal
 sources have been committed. During tool development, substitute
 `-Mode Exploratory`; it records `releaseReady=false`. `-RunPlayer` invokes the
-project adapter's C# methods for runtime-plan staging, YooAsset, scripts-only,
-and final Player builds. The current end-to-end adapter evidence is
+project adapter's C# methods for runtime-plan staging, resource evidence,
+scripts-only, and final Player builds. The historical Demo evidence was
 `4/4 compatible`, `changed=27`, `supported=27`, `unsupported=0`, and
-`nativeEntryCount=34`. It covers direct/reflection generic calls, a null generic
+`nativeEntryCount=34`; it covers direct/reflection generic calls, a null generic
 reference, generic virtual dispatch, value-type state-machine paths, secondary
-assemblies, and the invalid-MV same-process retry. The Player also checks the snapshot
-hash compiled into `HybridCLRDheBuildIdentity`, so a mutable
+assemblies, and the invalid-MV same-process retry. A new release must reproduce
+this evidence after migration. The Player also checks the snapshot hash compiled
+into `HybridCLRDheBuildIdentity`, so a mutable
 `StreamingAssets` snapshot cannot stand in for the actual AOT build. The workflow
 also archives a self-contained `runtime-plan/` directory and validates its
 payload hashes independently of the ignored Unity `Assets/StreamingAssets` cache.
@@ -301,10 +302,11 @@ column must share the same Candidate build manifest. Steady results are the
 primary optimization metric. Cold results are recorded separately because
 their process-start variance is too large for small optimization claims.
 
-The build script compiles the engine-independent managed cases, installs the
-merged `libil2cpp` through the package Installer, runs `HybridCLR/Generate/All`,
-builds a Release Player, stages the stripped AOT metadata assemblies required
-for generic sharing, and executes the Player runner with a per-case timeout.
+The C# host workflow compiles the engine-independent managed cases, installs
+the merged `libil2cpp` through the package Installer, runs
+`HybridCLR/Generate/All`, builds a Release Player, stages the stripped AOT
+metadata assemblies required for generic sharing, and executes the Player
+runner with a per-case timeout.
 Generated runtime copies, IL2CPP caches, Player builds, and StreamingAssets
 DLLs stay outside Git.
 

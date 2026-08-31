@@ -26,11 +26,12 @@ managed baseline/current
   -> Tuanjie 2022 Player gate
 ```
 
-当前 Demo 已经跑通“全部已配置 hotfix 程序集进入 DHE”的完整能力闭环：四程序集
-workflow 聚合结果为 27/27 supported managed tokens、0 unsupported，并解析出 34 个
-真实 native entries。这里的 34 是 concrete/gshared 等原生入口数量，不是 34 个 changed
-managed methods。该结论证明当前 Windows Demo 覆盖的 ABI 和工作流可以完整发布；它
-不能外推为任意 Unity 版本、Android/小游戏平台或尚未纳入 fixture 的 ABI 自动可用。
+此前一次 Demo workflow 运行曾产生“全部已配置 hotfix 程序集进入 DHE”的证据：四程序集
+聚合结果为 27/27 supported managed tokens、0 unsupported，并解析出 34 个真实 native
+entries。这里的 34 是 concrete/gshared 等原生入口数量，不是 34 个 changed managed
+methods。该证据只代表当时锁定的 Windows/Tuanjie 构建身份；本轮 C# host 迁移后必须在
+目标环境重新取得 Player smoke 和 native manifest，才能恢复 Release 结论，不能把历史
+报告当作当前发布证明。
 
 脚本迁移后，C# host 已重新验证四程序集离线 preflight、MV/batch、包发布/校验和
 安装/doctor；历史 Player/native 数字仍是旧脚本身份的参考，不能当作本轮 C# host
