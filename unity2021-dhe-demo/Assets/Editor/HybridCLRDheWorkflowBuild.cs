@@ -2,18 +2,20 @@ using System;
 using System.Collections.Generic;
 using System.IO;
 using System.Linq;
+using System.Threading.Tasks;
 using HybridCLR.Editor;
 using HybridCLR.Editor.Commands;
 using UnityEditor;
 using UnityEditor.Build;
+using UnityEditor.Build.Reporting;
 using UnityEngine;
 
 namespace HybridCLR.Lab.Editor
 {
     /// <summary>
-    /// Minimal C# project adapter consumed by HybridCLR.DheTool. The demo
-    /// deliberately keeps resource/device assertions out of the package and
-    /// exposes the same phase-bound methods as a production project.
+    /// C# project adapter consumed by HybridCLR.DheTool. Project-specific
+    /// paths and the smoke assertion stay here; MV generation, runtime-plan
+    /// binding, and baseline/current phase isolation stay in the package.
     /// </summary>
     public static class HybridCLRDheWorkflowBuild
     {
@@ -68,12 +70,217 @@ namespace HybridCLR.Lab.Editor
 
         public static void StageRuntimePlan()
         {
-            throw new BuildFailedException("The demo adapter requires a validated project plan; use the C# host preflight before staging.");
+            BuildTarget target = ParseTarget(Argument("-dheTarget"));
+            string outputRoot = Path.GetFullPath(Argument("-dheOutputRoot"));
+            string planPath = Path.GetFullPath(Argument("-dheProjectPlan"));
+            string projectRoot = ProjectRoot();
+            EnsureTarget(target);
+            string runtimeAssetRoot = Path.Combine(projectRoot, "Assets", "StreamingAssets", "HybridCLRLab", "DheDemo");
+            string strippedAotRoot = Path.GetFullPath(SettingsUtil.GetAssembliesPostIl2CppStripDir(target));
+            DheRuntimePlanResult result = DheBuildPipeline.StageRuntimePlan(new DheRuntimePlanOptions
+            {
+                Target = target,
+                ProjectRoot = projectRoot,
+                ProjectPlanPath = planPath,
+                RuntimeAssetRoot = runtimeAssetRoot,
+                OutputRoot = outputRoot,
+                StrippedAotRoot = strippedAotRoot,
+                AotMetadataAssemblyNames = SettingsUtil.AOTAssemblyNames.ToArray(),
+                HotfixAssemblyNames = SettingsUtil.HotUpdateAssemblyNamesExcludePreserved.ToArray(),
+                HotfixLoadOrderResolver = names => names.OrderBy(name => name, StringComparer.OrdinalIgnoreCase).ToArray(),
+            });
+            AssetDatabase.Refresh(ImportAssetOptions.ForceUpdate | ImportAssetOptions.ForceSynchronousImport);
+            WriteJson(Path.Combine(outputRoot, "adapter", "stage-runtime-plan.json"), new StageReport
+            {
+                schemaVersion = 1,
+                format = "hybridclr.dhe-adapter-stage.json",
+                generatedAtUtc = DateTimeOffset.UtcNow.ToString("O"),
+                passed = true,
+                target = target.ToString(),
+                runtimePlanPath = result.RuntimePlanPath,
+                handoffPlanPath = result.HandoffPlanPath,
+                assemblyCount = result.AssemblyNames.Length,
+                assemblyNames = result.AssemblyNames,
+            });
         }
 
-        public static void BuildScriptsOnly() => throw new BuildFailedException("Demo Player build requires a project-owned smoke configuration.");
+        /// <summary>
+        /// The demo has no YooAsset catalog. Keep the workflow phase explicit
+        /// and emit the same structured evidence a resource-owning project
+        /// would produce, so the host never needs a shell-specific fallback.
+        /// </summary>
+        public static void BuildDheYooAsset()
+        {
+            string outputRoot = Path.GetFullPath(Argument("-dheOutputRoot"));
+            string target = Argument("-dheTarget");
+            string path = Path.Combine(outputRoot, "adapter", "resource-evidence.json");
+            WriteJson(path, new ResourceEvidenceReport
+            {
+                schemaVersion = 1,
+                format = "hybridclr.dhe-resource-evidence.json",
+                generatedAtUtc = DateTimeOffset.UtcNow.ToString("O"),
+                passed = true,
+                policy = "skip",
+                strategy = "demo-no-resource-catalog",
+                target = target,
+            });
+        }
 
-        public static void BuildFinalPlayer() => throw new BuildFailedException("Demo Player build requires a project-owned smoke configuration.");
+        public static void BuildScriptsOnly() => BuildPlayer(true);
+
+        public static void BuildFinalPlayer()
+        {
+            BuildPlayer(false);
+        }
+
+        private static void BuildPlayer(bool scriptsOnly)
+        {
+            BuildTarget target = ParseTarget(Argument("-dheTarget"));
+            string outputRoot = Path.GetFullPath(Argument("-dheOutputRoot"));
+            string baselineRoot = Path.GetFullPath(Argument("-dheBaselineRoot"));
+            EnsureTarget(target);
+            EnsureBuildScene();
+            ConfigurePlayerSettings(target);
+            string playerRoot = Path.Combine(outputRoot, "player");
+            string playerPath = target == BuildTarget.Android
+                ? Path.Combine(playerRoot, "HybridCLRLab.apk")
+                : target == BuildTarget.iOS
+                    ? Path.Combine(playerRoot, "HybridCLRLab-iOS")
+                    : Path.Combine(playerRoot, "HybridCLRLab.exe");
+            if (!scriptsOnly)
+            {
+                StageBuildIdentity(baselineRoot);
+                AssetDatabase.Refresh(ImportAssetOptions.ForceUpdate | ImportAssetOptions.ForceSynchronousImport);
+            }
+            BuildReport report = DheBuildPipeline.BuildPlayer(new DhePlayerBuildOptions
+            {
+                OutputPath = playerPath,
+                BaselineAotRoot = baselineRoot,
+                Target = target,
+                BuildOptions = scriptsOnly ? BuildOptions.BuildScriptsOnly : BuildOptions.None,
+                Scenes = new[] { "Assets/Scenes/HybridCLRLab.unity" },
+                BuildPlayerCallback = options => BuildPipeline.BuildPlayer(options),
+            });
+            WriteJson(Path.Combine(outputRoot, "adapter", scriptsOnly ? "build-scripts-only.json" : "build-final-player.json"), new PlayerBuildReport
+            {
+                schemaVersion = 1,
+                format = "hybridclr.dhe-adapter-player-build.json",
+                generatedAtUtc = DateTimeOffset.UtcNow.ToString("O"),
+                passed = report != null && report.summary.result == BuildResult.Succeeded,
+                scriptsOnly = scriptsOnly,
+                target = target.ToString(),
+                playerPath = playerPath,
+            });
+            if (!scriptsOnly && target == BuildTarget.StandaloneWindows64)
+            {
+                RunStandaloneSmoke(playerPath, outputRoot);
+            }
+        }
+
+        private static void EnsureBuildScene()
+        {
+            const string scenePath = "Assets/Scenes/HybridCLRLab.unity";
+            if (!File.Exists(Path.Combine(ProjectRoot(), scenePath.Replace('/', Path.DirectorySeparatorChar))))
+                throw new FileNotFoundException("DHE demo scene was not found", scenePath);
+            EditorBuildSettings.scenes = new[] { new EditorBuildSettingsScene(scenePath, true) };
+        }
+
+        private static void ConfigurePlayerSettings(BuildTarget target)
+        {
+            BuildTargetGroup group = BuildPipeline.GetBuildTargetGroup(target);
+            PlayerSettings.SetScriptingBackend(group, ScriptingImplementation.IL2CPP);
+            if (target == BuildTarget.Android)
+            {
+                PlayerSettings.Android.targetArchitectures = AndroidArchitecture.ARM64;
+                EditorUserBuildSettings.buildAppBundle = false;
+            }
+        }
+
+        private static void EnsureTarget(BuildTarget target)
+        {
+            if (target == BuildTarget.NoTarget)
+                throw new InvalidOperationException("DHE requires an explicit Unity build target.");
+            BuildTargetGroup group = BuildPipeline.GetBuildTargetGroup(target);
+            if (group == BuildTargetGroup.Unknown)
+                throw new InvalidOperationException("Unity has no build target group for " + target + ".");
+            if (EditorUserBuildSettings.activeBuildTarget != target &&
+                !EditorUserBuildSettings.SwitchActiveBuildTarget(group, target))
+                throw new BuildFailedException("Unable to switch Unity active build target to " + target + ".");
+        }
+
+        private static void StageBuildIdentity(string baselineRoot)
+        {
+            const string mainAssembly = "HybridCLR.ManagedCasesAot.dll";
+            string baselinePath = Path.Combine(baselineRoot, mainAssembly);
+            if (!File.Exists(baselinePath)) throw new FileNotFoundException("DHE baseline assembly was not found", baselinePath);
+            string hash = Sha256File(baselinePath);
+            const string zeroHash = "0000000000000000000000000000000000000000000000000000000000000000";
+            string source = "namespace HybridCLR.Lab\n{\n" +
+                "    internal static class HybridCLRDheBuildIdentity\n    {\n" +
+                "        public const int IdentityVersion = 2;\n" +
+                "        public const string BaselineAssemblySha256 = \"" + hash + "\";\n" +
+                "        public const string AotSnapshotSha256 = \"" + hash + "\";\n" +
+                "        public const string AotSnapshotKind = \"managed-assembly-plus-generated-cpp-v1\";\n" +
+                "        public const string NativeGuardSourceSha256 = \"" + zeroHash + "\";\n" +
+                "        public const string NativeManifestSha256 = \"" + zeroHash + "\";\n" +
+                "    }\n}\n";
+            string sourcePath = Path.Combine(ProjectRoot(), "Assets", "Runtime", "HybridCLRDheBuildIdentity.cs");
+            File.WriteAllText(sourcePath, source, new System.Text.UTF8Encoding(false));
+            string streamingRoot = Path.Combine(ProjectRoot(), "Assets", "StreamingAssets", "HybridCLRLab");
+            Directory.CreateDirectory(streamingRoot);
+            File.WriteAllText(Path.Combine(streamingRoot, "build-identity.json"),
+                "{\"identityVersion\":2,\"baselineAssemblySha256\":\"" + hash + "\",\"aotSnapshotSha256\":\"" + hash + "\",\"aotSnapshotKind\":\"managed-assembly-plus-generated-cpp-v1\",\"nativeGuardSourceSha256\":\"" + zeroHash + "\",\"nativeManifestSha256\":\"" + zeroHash + "\"}",
+                new System.Text.UTF8Encoding(false));
+            AssetDatabase.ImportAsset("Assets/Runtime/HybridCLRDheBuildIdentity.cs", ImportAssetOptions.ForceUpdate | ImportAssetOptions.ForceSynchronousImport);
+        }
+
+        private static void RunStandaloneSmoke(string playerPath, string outputRoot)
+        {
+            if (!File.Exists(playerPath)) throw new FileNotFoundException("DHE Player executable was not produced", playerPath);
+            string resultPath = Path.Combine(outputRoot, "dhe-player-result.json");
+            var start = new System.Diagnostics.ProcessStartInfo(playerPath)
+            {
+                WorkingDirectory = Path.GetDirectoryName(playerPath),
+                UseShellExecute = false,
+                RedirectStandardOutput = true,
+                RedirectStandardError = true,
+            };
+            start.ArgumentList.Add("-batchmode");
+            start.ArgumentList.Add("-nographics");
+            start.ArgumentList.Add("-labMode");
+            start.ArgumentList.Add("dhe");
+            start.ArgumentList.Add("-labTarget");
+            start.ArgumentList.Add("StandaloneWindows64");
+            start.ArgumentList.Add("-labAotMetadataMode");
+            start.ArgumentList.Add("supplemental");
+            start.ArgumentList.Add("-labResult");
+            start.ArgumentList.Add(resultPath);
+            start.ArgumentList.Add("-logFile");
+            start.ArgumentList.Add(Path.Combine(outputRoot, "dhe-player.log"));
+            using System.Diagnostics.Process process = System.Diagnostics.Process.Start(start);
+            if (process == null) throw new InvalidOperationException("Unable to start DHE Player.");
+            Task<string> stdout = process.StandardOutput.ReadToEndAsync();
+            Task<string> stderr = process.StandardError.ReadToEndAsync();
+            bool exited = process.WaitForExit(180000);
+            if (!exited)
+            {
+                try
+                {
+                    process.Kill();
+                    process.WaitForExit();
+                }
+                catch { }
+            }
+            Task.WaitAll(stdout, stderr);
+            File.WriteAllText(Path.Combine(outputRoot, "dhe-player-process.log"), stdout.Result + Environment.NewLine + stderr.Result, new System.Text.UTF8Encoding(false));
+            if (!exited)
+                throw new TimeoutException("DHE Player smoke timed out.");
+            if (process.ExitCode != 0) throw new BuildFailedException("DHE Player smoke exited with code " + process.ExitCode);
+            if (!File.Exists(resultPath)) throw new FileNotFoundException("DHE Player smoke result was not produced", resultPath);
+            string result = File.ReadAllText(resultPath);
+            if (!result.Contains("\"passed\": true", StringComparison.OrdinalIgnoreCase) && !result.Contains("\"passed\":true", StringComparison.OrdinalIgnoreCase))
+                throw new BuildFailedException("DHE Player smoke reported failure: " + resultPath);
+        }
 
         private static void CopyAssemblies(string sourceRoot, string destinationRoot, IEnumerable<string> names)
         {
@@ -84,6 +291,15 @@ namespace HybridCLR.Lab.Editor
                 if (!File.Exists(source)) throw new FileNotFoundException("DHE stripped assembly was not found", source);
                 File.Copy(source, Path.Combine(destinationRoot, name + ".dll"), true);
             }
+        }
+
+        private static string ProjectRoot() => Directory.GetParent(Application.dataPath).FullName;
+
+        private static string Sha256File(string path)
+        {
+            using System.Security.Cryptography.SHA256 sha = System.Security.Cryptography.SHA256.Create();
+            using FileStream stream = File.OpenRead(path);
+            return BitConverter.ToString(sha.ComputeHash(stream)).Replace("-", string.Empty).ToLowerInvariant();
         }
 
         private static string Argument(string name) => OptionalArgument(name) ?? throw new InvalidOperationException("Missing Unity argument: " + name);
@@ -128,6 +344,44 @@ namespace HybridCLR.Lab.Editor
             public bool baselineGeneratedFromCurrent;
             public string[] aotAssemblies;
             public string[] hotUpdateAssemblies;
+        }
+
+        [Serializable]
+        private sealed class StageReport
+        {
+            public int schemaVersion;
+            public string format;
+            public string generatedAtUtc;
+            public bool passed;
+            public string target;
+            public string runtimePlanPath;
+            public string handoffPlanPath;
+            public int assemblyCount;
+            public string[] assemblyNames;
+        }
+
+        [Serializable]
+        private sealed class PlayerBuildReport
+        {
+            public int schemaVersion;
+            public string format;
+            public string generatedAtUtc;
+            public bool passed;
+            public bool scriptsOnly;
+            public string target;
+            public string playerPath;
+        }
+
+        [Serializable]
+        private sealed class ResourceEvidenceReport
+        {
+            public int schemaVersion;
+            public string format;
+            public string generatedAtUtc;
+            public bool passed;
+            public string policy;
+            public string strategy;
+            public string target;
         }
     }
 }

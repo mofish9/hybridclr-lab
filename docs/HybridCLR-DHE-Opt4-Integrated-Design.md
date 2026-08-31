@@ -33,13 +33,17 @@ call graph needs to cross the boundary.
   content tree hash, then refuses to apply any patch. The lock still retains
   patch paths and hashes as migration/audit references.
 
-`apply-dhe-runtime-patches.ps1` and `assemble-runtime.ps1` fail closed on an
-unknown mode, a mixed entry mode, a commit mismatch, a tree mismatch, or an
-attempt to use an integrated lock with a stale staged tree. The package lock
-uses the same mode and binds the embedded package tree to the integrated
-`hybridclr_unity` commit.
+The distributed DHE package does not execute either of those historical shell
+commands. Runtime source assembly and native CTest remain lab-only gates; the
+cross-platform package entry point is the C# host described below. The package
+lock still binds the embedded package tree to the integrated `hybridclr_unity`
+commit.
 
-## Assembly commands
+## Historical runtime assembly
+
+The following commands are retained only for reproducing the native/runtime
+proof in this lab. They are not required by a consuming project and are not
+copied into the published DHE package.
 
 The normal formal assembly is:
 
@@ -67,9 +71,33 @@ opt3 engine line:
 the matching Unity 2022 Editor must pass `-AllowSurrogateExternalHeaders`; the
 result is exploratory native evidence only.
 
-## Required gates
+## C# project workflow
 
-Run the gates in this order after assembling the runtime:
+After a target-bound previous-release stripped-AOT root is available, a project
+provides a C# adapter with `Prepare`, `StageRuntimePlan`,
+`BuildDheYooAsset`, `BuildScriptsOnly`, and `BuildFinalPlayer`. Run the
+cross-platform host directly:
+
+```text
+dotnet run --project tool/HybridCLR.DheTool.csproj --configuration Release --no-restore -- workflow \
+  -ProjectPath C:/project \
+  -SettingsFile C:/project/ProjectSettings/HybridCLRSettings.asset \
+  -OutputRoot C:/build/dhe \
+  -BaselineAotRoot C:/release/stripped-aot \
+  -Target Android \
+  -AdapterMethod MyGame.Editor.DheWorkflowBuild.Prepare \
+  -Unity /path/to/Unity -RunPlayer
+```
+
+The host starts Unity with .NET `ProcessStartInfo`, writes separate Unity and
+process logs, and performs MV/batch/preflight before any Player stage. Resource
+packaging, signing, device smoke, and generated-native evidence remain explicit
+C# adapter responsibilities.
+
+## Required lab gates
+
+When reproducing the native/runtime proof in this lab, run the historical
+native/source gates in this order after assembling the runtime:
 
 1. `run-dhe-source-preflight.ps1` checks the integrated source commits/tree
    hashes, package tree, settings scope, and runtime manifest.
@@ -77,8 +105,8 @@ Run the gates in this order after assembling the runtime:
    matching engine headers.
 3. `run-dhe-capability-gate.ps1` and
    `run-dhe-compatibility-negative-gate.ps1` validate MV semantics.
-4. `run-dhe-project-workflow.ps1` is the only gate that can produce real
-   Player evidence and a release-ready report.
+4. Run the C# project workflow above; it is the only supported project entry
+   point that can produce Player evidence.
 
 The current verification is conditional: Tuanjie 2022 and Unity 2021 native
 compilation/CTest pass, and Unity 2022 native compilation passes with surrogate
