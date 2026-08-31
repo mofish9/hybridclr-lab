@@ -95,6 +95,13 @@ primitives through `HybridCLR.Editor.Commands.DheBuildPipeline`:
 - `BuildPlayer` binds the previous stripped-AOT directory to
   `HYBRIDCLR_DHE_AOT_BASELINE_ROOT` and builds the configured target using
   `DhePlayerBuildOptions`.
+- `DheRuntimePlanOptions.HotfixAssemblyNames` is the complete hot-update load
+  set. It may contain assemblies outside the DHE plan; the package stages only
+  DHE payloads and preserves project-owned legacy hotfix bytes.
+- `ClearDheRuntimePlanAssets` removes only the generated DHE DLL/MV/snapshot
+  sidecars and plan/control JSON from a project hot-update directory. Project
+  base-package entry points should call it before running the legacy
+  `PrebuildDll` path so an ordinary package cannot inherit a previous DHE plan.
 
 The shared PowerShell workflow helpers also expose
 `Get-DheNativeManifestSourcePaths` and `Get-DheFileSetHashOrEmpty`. Both treat

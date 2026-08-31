@@ -462,7 +462,7 @@ try {
 
     $prepareExitCode = Invoke-Adapter "Prepare" @{
         Mode = $Mode
-        BaselineAotRoot = $BaselineAotRoot
+        BaselineAotRoot = $baselineAotPath
         BaselineManifestPath = $baselineManifestPath
         AdapterOptionsPath = $adapterOptionsPath
         PlayerSmokeRunner = $PlayerSmokeRunner

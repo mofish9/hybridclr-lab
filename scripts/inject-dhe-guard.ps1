@@ -236,7 +236,6 @@ function New-Guard([object]$method) {
 
     $lines = @(
     "    // $marker",
-        "    hybridclr::dhe::RecordAotEntry();",
         "    const RuntimeMethod* dheMethod = method;",
         "    if (dheMethod == nullptr)",
         "    {",
@@ -247,7 +246,9 @@ function New-Guard([object]$method) {
     )
     $lines += "        $helperCall"
     $lines += @(
-        "    }"
+        "    }",
+        "    // Count only the path that reaches the original generated AOT body.",
+        "    hybridclr::dhe::RecordAotEntry();"
     )
     return ($lines -join "`r`n") + "`r`n"
 }

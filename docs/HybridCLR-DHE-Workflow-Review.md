@@ -76,8 +76,7 @@ HybridCLR package 占据绝大多数；DHE 脚本、fixture、schema 和审查�
 - deterministic Player runner 现在对 settings/identity 源文件做字节级 finally 恢复；即使
    standalone no-op 或失败构建也不会把机器路径和构建 identity 留在项目源码中。
 - source preflight 和 batch 现在共享 settings 解析器，支持 inline YAML list、asmdef GUID
-  和 `dheAotAssemblies` 缺失/空数组回退到完整 `hotUpdateAssemblies`；这与正式项目常见的
-  HybridCLR 设置保持一致。
+  和显式 `dheAotAssemblies`；缺失/空数组保持 legacy HybridCLR 行为，不会隐式开启 DHE。
 - native CTest 的 DHE profile 显式要求 `DheRuntime.cpp/.h`，C++ transformer 的临时
   manifest/report 只写入事务目录并在 finally 清理；归档 gate 同时拒绝 locale 格式的
   `generatedAtUtc`。
@@ -226,9 +225,10 @@ non-surrogate external headers，以及完整 hot-update/DHE 集合。没有匹�
 - project workflow 只有在调用者显式传入 `-ForceOutput` 时才会把覆盖权限传给 sibling
   archive；旧归档默认保持 fail-closed，避免一次新的 Player 验证静默替换仍在交接中的
   证据。
-- Unity package 的 `DheAotAssemblyNames` 现在与离线 settings 解析器保持一致：缺失或空的
-  `dheAotAssemblies` 回退到完整 hot-update/assembly-definition 集合，非空数组仍是显式
-  子集；对应 patch/tree lock 已更新并通过 clean base patch check。
+- Unity package 的 `DheAotAssemblyNames` 现在是显式 opt-in：缺失或空的
+  `dheAotAssemblies` 保持 legacy hot-update 过滤行为；DHE workflow 必须显式提供目标集合。
+  `DheRuntimePlanOptions.HotfixAssemblyNames` 允许 package 在 DHE 子集与 legacy hotfix 共存时
+  写出完整加载列表，并只清理有 MV/snapshot 证据的 DHE sidecar；对应 patch/tree lock 已更新。
 - project workflow、release gate、project-plan validator 和 artifact validator 对关键
   `passed`/`coverage` 字段执行 JSON boolean 类型检查，避免 PowerShell 将字符串
   `"false"` 按非空值误转为 `$true`。
