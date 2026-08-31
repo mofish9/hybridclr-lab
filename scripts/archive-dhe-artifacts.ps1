@@ -571,6 +571,7 @@ $sourcePreflightDocument = Get-Content -Raw -LiteralPath $sourcePreflightPath | 
 Set-PropertyValue $sourcePreflightDocument "pathSemantics" "archive-relative-v1"
 Set-PropertyValue $sourcePreflightDocument "labRoot" $null
 Set-PropertyValue $sourcePreflightDocument "projectPath" $null
+Set-PropertyValue $sourcePreflightDocument "settingsFile" ("project-settings/" + $settingsName)
 Set-PropertyValue $sourcePreflightDocument "runtimeSource" $null
 Set-PropertyValue $sourcePreflightDocument "packageLockPath" $(if ($null -eq $packageLockPath) { $null } else { "provenance/dhe-package-lock.json" })
 Set-PropertyValue $sourcePreflightDocument "identityTemplatePath" $null
