@@ -19,8 +19,8 @@ removed from this branch as well. The repository's lab-only operations are
 available as C# host commands, so a macOS/iOS build machine does not need
 PowerShell.
 
-The lab commands are intentionally explicit and map one-to-one to the former
-helpers: `assemble-runtime`, `native-tests`, `build-managed-cases`,
+The current DHE lab commands are intentionally explicit and replace the
+helpers that participate in this workflow: `assemble-runtime`, `native-tests`, `build-managed-cases`,
 `generate-test-manifest`, `generate-metadata-stress-source`, `reference`,
 `compare-results`, `check-environment`, `prepare-engine-test-project`,
 `bootstrap-repos`, `clear-unity-project-locks`, and `wait-editor`. For example:

@@ -431,6 +431,8 @@ claim for the workflow described above.
 
 The formal DHE toolchain is C#-only. Use `tool/HybridCLR.DheTool.csproj` with
 `dotnet`; the repository and distributed package contain no PowerShell scripts.
-All lab helpers have corresponding host commands. See
+All DHE lab helpers used by the current workflow have corresponding host
+commands. Older opt1-3 benchmark/matrix runners are retired with their scripts.
+See
 `docs/HybridCLR-DHE-Toolchain.md` for the current workflow and the explicit
 platform prerequisites for Android and iOS.
