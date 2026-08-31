@@ -496,7 +496,7 @@ internal static class Program
         };
     }
 
-    private static bool IsWorkflowPathKey(string key) => key is "projectpath" or "settingsfile" or "outputroot" or "baselineaotroot" or "dnlibpath" or "unity";
+    private static bool IsWorkflowPathKey(string key) => key is "projectpath" or "settingsfile" or "outputroot" or "baselineaotroot" or "dnlibpath" or "unity" or "dhecurrentinputroot";
 
     private static string ResolveConfigPath(string value, string configDirectory)
     {
@@ -627,7 +627,7 @@ internal sealed class AssemblyDiff
     {
         using var b = ModuleDefMD.Load(baselinePath); using var c = ModuleDefMD.Load(currentPath); var result = new AssemblyDiff { AssemblyName = b.Assembly?.Name.String ?? "", BaselinePath = Path.GetFullPath(baselinePath), CurrentPath = Path.GetFullPath(currentPath), BaselineSha256 = Sha256(baselinePath), CurrentSha256 = Sha256(currentPath), BaselineMvid = b.Mvid?.ToString() ?? "", CurrentMvid = c.Mvid?.ToString() ?? "", BaselineAssemblyRefs = References(b), CurrentAssemblyRefs = References(c) }; if (!string.Equals(result.AssemblyName, c.Assembly?.Name.String, StringComparison.Ordinal)) throw new InvalidOperationException("Assembly names differ.");
         if (!result.BaselineAssemblyRefs.SequenceEqual(result.CurrentAssemblyRefs, StringComparer.Ordinal)) result.Reasons.Add("assembly references changed");
-        var bm = MethodsOf(b); var cm = MethodsOf(c); foreach (var id in bm.Keys.Union(cm.Keys).OrderBy(x => x, StringComparer.Ordinal)) { bm.TryGetValue(id, out var oldMethod); cm.TryGetValue(id, out var newMethod); var kind = oldMethod is null ? "added" : newMethod is null ? "removed" : oldMethod.BodyHash != newMethod.BodyHash ? "changed" : oldMethod.Token != newMethod.Token ? "tokenChanged" : oldMethod.Shape != newMethod.Shape ? "shapeChanged" : "unchanged"; result.Methods.Add(new MethodChange(id, kind, newMethod?.Name ?? oldMethod!.Name, oldMethod?.Token, newMethod?.Token, oldMethod?.BodyHash, newMethod?.BodyHash, oldMethod?.Shape == newMethod?.Shape)); if (kind is "added" or "removed" or "tokenChanged" or "shapeChanged" || kind == "changed" && (oldMethod!.Token != newMethod!.Token || oldMethod.Shape != newMethod.Shape)) result.Reasons.Add(kind + ": " + id); }
+        var bm = MethodsOf(b); var cm = MethodsOf(c); foreach (var id in bm.Keys.Union(cm.Keys).OrderBy(x => x, StringComparer.Ordinal)) { bm.TryGetValue(id, out var oldMethod); cm.TryGetValue(id, out var newMethod); var kind = oldMethod is null ? "added" : newMethod is null ? "removed" : oldMethod.BodyHash != newMethod.BodyHash ? "changed" : oldMethod.Token != newMethod.Token ? "tokenChanged" : oldMethod.Shape != newMethod.Shape ? "shapeChanged" : "unchanged"; var metadata = newMethod ?? oldMethod!; result.Methods.Add(new MethodChange(id, kind, metadata.Name, oldMethod?.Token, newMethod?.Token, oldMethod?.BodyHash, newMethod?.BodyHash, oldMethod?.Shape == newMethod?.Shape, metadata.DeclaringType, metadata.ReturnType, metadata.ParameterTypes, metadata.IsStatic, metadata.HasThis, metadata.IsAbstract, metadata.IsPInvoke, metadata.DeclaringTypeIsValueType, metadata.GenericParameterCount, metadata.DeclaringTypeGenericParameterCount)); if (kind is "added" or "removed" or "tokenChanged" or "shapeChanged" || kind == "changed" && (oldMethod!.Token != newMethod!.Token || oldMethod.Shape != newMethod.Shape)) result.Reasons.Add(kind + ": " + id); }
         var bt = TypesOf(b); var ct = TypesOf(c); foreach (var id in bt.Keys.Union(ct.Keys).OrderBy(x => x, StringComparer.Ordinal)) { bt.TryGetValue(id, out var oldType); ct.TryGetValue(id, out var newType); var kind = oldType is null ? "added" : newType is null ? "removed" : oldType != newType ? "layoutChanged" : "unchanged"; if (kind != "unchanged") { result.TypeChanges.Add(new TypeChange(id, kind, oldType, newType)); result.Reasons.Add("type layout changed: " + id); } }
         return result;
     }
@@ -639,7 +639,24 @@ internal sealed class AssemblyDiff
     private static string MethodId(MethodDef method) => (method.DeclaringType?.FullName ?? "") + "::" + method.Name + "|" + method.MethodSig;
     private static string[] References(ModuleDef module) => module.GetAssemblyRefs().Select(x => x.FullName).OrderBy(x => x, StringComparer.Ordinal).ToArray();
     private static string Sha256(string path) { using var sha = SHA256.Create(); return Convert.ToHexString(sha.ComputeHash(File.ReadAllBytes(path))).ToLowerInvariant(); }
-    private sealed record MethodInfo(string Name, uint Token, string BodyHash, string Shape) { public static MethodInfo Create(MethodDef method) => new(method.Name.String, method.MDToken.Raw, BodyHash(method), method.MethodSig.ToString() + ":" + method.Attributes + ":" + method.ImplAttributes); }
+    private sealed record MethodInfo(string Name, uint Token, string BodyHash, string Shape, string DeclaringType, string ReturnType, string[] ParameterTypes, bool IsStatic, bool HasThis, bool IsAbstract, bool IsPInvoke, bool DeclaringTypeIsValueType, uint GenericParameterCount, uint DeclaringTypeGenericParameterCount)
+    {
+        public static MethodInfo Create(MethodDef method) => new(
+            method.Name.String,
+            method.MDToken.Raw,
+            BodyHash(method),
+            method.MethodSig.ToString() + ":" + method.Attributes + ":" + method.ImplAttributes,
+            method.DeclaringType?.FullName ?? "",
+            method.MethodSig.RetType.FullName,
+            method.MethodSig.Params.Select(parameter => parameter.FullName).ToArray(),
+            method.IsStatic,
+            method.MethodSig.HasThis,
+            method.IsAbstract,
+            method.IsPinvokeImpl,
+            method.DeclaringType?.IsValueType ?? false,
+            (uint)method.MethodSig.GenParamCount,
+            (uint)(method.DeclaringType?.GenericParameters.Count ?? 0));
+    }
     private static string BodyHash(MethodDef method) { if (!method.HasBody) return ""; var text = new StringBuilder().Append(method.Body!.MaxStack).Append('|').Append(method.Body.InitLocals); foreach (var instruction in method.Body.Instructions) text.Append('|').Append(instruction.OpCode.Code).Append(':').Append(Operand(instruction.Operand)); foreach (var handler in method.Body.ExceptionHandlers) text.Append("|eh:").Append(handler.HandlerType).Append(':').Append(handler.CatchType?.FullName); return Convert.ToHexString(SHA256.HashData(Encoding.UTF8.GetBytes(text.ToString()))).ToLowerInvariant(); }
     private static string Operand(object? operand)
     {
@@ -650,7 +667,7 @@ internal sealed class AssemblyDiff
     }
 }
 
-internal sealed record MethodChange(string Id, string Kind, string Name, uint? BaselineToken, uint? CurrentToken, string? BaselineBodySha256, string? CurrentBodySha256, bool ShapeStable)
+internal sealed record MethodChange(string Id, string Kind, string Name, uint? BaselineToken, uint? CurrentToken, string? BaselineBodySha256, string? CurrentBodySha256, bool ShapeStable, string DeclaringType, string ReturnType, string[] ParameterTypes, bool IsStatic, bool HasThis, bool IsAbstract, bool IsPInvoke, bool DeclaringTypeIsValueType, uint GenericParameterCount, uint DeclaringTypeGenericParameterCount)
 {
     public bool TokenStable => BaselineToken == CurrentToken;
 }

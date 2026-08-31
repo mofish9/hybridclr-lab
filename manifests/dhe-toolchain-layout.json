@@ -1,7 +1,7 @@
 {
   "schemaVersion": 1,
   "format": "hybridclr.dhe-toolchain-layout.json",
-  "toolchainVersion": "0.1.9",
+  "toolchainVersion": "0.1.10",
   "contractVersion": 1,
   "exactPaths": [
     ".gitattributes",
@@ -11,8 +11,11 @@
     "tool/dnlib.dll",
     "docs/HybridCLR-DHE-Toolchain.md",
     "docs/THIRD-PARTY-NOTICES.md",
+    "manifests/dhe-package-lock.json",
     "manifests/dhe-runtime-lock.json",
     "manifests/dhe-toolchain-layout.json",
+    "manifests/repo-lock.json",
+    "manifests/runtime-workflows.json",
     "schemas/dhe-archive-gate.schema.json",
     "schemas/dhe-archive-manifest.schema.json",
     "schemas/dhe-aot-metadata-manifest.schema.json",
@@ -57,9 +60,7 @@
   ],
   "generatedPaths": [
     "dhe-source-boundary.json",
-    "dhe-toolchain-manifest.json",
-    "manifests/repo-lock.json",
-    "manifests/runtime-workflows.json"
+    "dhe-toolchain-manifest.json"
   ],
   "commands": [
     "assemble-runtime",

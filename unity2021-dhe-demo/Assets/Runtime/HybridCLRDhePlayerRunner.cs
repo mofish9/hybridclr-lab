@@ -16,7 +16,7 @@ namespace HybridCLR.Lab
 {
     internal static class HybridCLRDhePlayerRunner
     {
-        private const string RuntimePlanFile = "HybridCLRLab/DheDemo/dhe-runtime-plan.json";
+        private const string RuntimePlanFile = "HybridCLRLab/DheDemo/DheRuntimePlan.json";
         private const string MainAssemblyName = "HybridCLR.ManagedCasesAot";
         private const string BuildIdentityFile = "HybridCLRLab/build-identity.json";
         private const string DefaultResultFile = "hybridclr-lab-dhe-result.json";
@@ -98,12 +98,21 @@ namespace HybridCLR.Lab
                 }
                 byte[] assemblyCurrentHash = Sha256(assemblyCurrent);
                 byte[] assemblyBaselineHash = Sha256(assemblyBaseline);
-                if (!string.Equals(assemblyPlan.currentSha256, ToHex(assemblyCurrentHash), StringComparison.OrdinalIgnoreCase) ||
-                    !string.Equals(assemblyPlan.baselineSha256, ToHex(assemblyBaselineHash), StringComparison.OrdinalIgnoreCase) ||
+                string actualCurrentHash = ToHex(assemblyCurrentHash);
+                string actualBaselineHash = ToHex(assemblyBaselineHash);
+                string mvCurrentHash = ToHex(assemblyExpectedCurrentHash);
+                string mvBaselineHash = ToHex(assemblyExpectedBaselineHash);
+                string snapshotHash = ToHex(assemblySnapshot);
+                if (!string.Equals(assemblyPlan.currentSha256, actualCurrentHash, StringComparison.OrdinalIgnoreCase) ||
+                    !string.Equals(assemblyPlan.baselineSha256, actualBaselineHash, StringComparison.OrdinalIgnoreCase) ||
                     !ByteArraysEqual(assemblyCurrentHash, assemblyExpectedCurrentHash) || !ByteArraysEqual(assemblyBaselineHash, assemblyExpectedBaselineHash) ||
                     !ByteArraysEqual(assemblySnapshot, assemblyExpectedBaselineHash))
                 {
-                    throw new InvalidDataException("DHE runtime plan hash binding failed for " + assemblyPlan.assemblyName);
+                    throw new InvalidDataException("DHE runtime plan hash binding failed for " +
+                        assemblyPlan.assemblyName + "; current=" + actualCurrentHash +
+                        "/plan=" + assemblyPlan.currentSha256 + "/mv=" + mvCurrentHash +
+                        "; baseline=" + actualBaselineHash + "/plan=" + assemblyPlan.baselineSha256 +
+                        "/mv=" + mvBaselineHash + "; snapshot=" + snapshotHash);
                 }
                 int assemblyChangedMethodCount = checked((int)BitConverter.ToUInt32(assemblyMv, 16));
                 changedMethodCount = checked(changedMethodCount + assemblyChangedMethodCount);

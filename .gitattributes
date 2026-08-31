@@ -9,5 +9,5 @@
 /manifests/dhe-*.json text eol=lf
 /schemas/dhe-*.json text eol=lf
 unity2021-dhe-demo/Packages/com.code-philosophy.hybridclr/** -text
-patches/dhe-lite/*.patch -text
+patches/dhe-lite/*.patch binary
 *.sln text eol=crlf

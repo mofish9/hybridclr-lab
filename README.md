@@ -394,6 +394,9 @@ claim for the workflow described above.
 
 The formal DHE toolchain is C#-only. Use `tool/HybridCLR.DheTool.csproj` with
 `dotnet`; the repository and distributed package contain no PowerShell scripts.
+The final DHE Player path also stays in C#: the package injects guards into the
+last IL2CPP-generated source snapshot and invokes the editor-owned Bee backend
+directly before runtime smoke validation.
 All DHE lab helpers used by the current workflow have corresponding host
 commands. Older opt1-3 benchmark/matrix runners are retired with their scripts.
 See

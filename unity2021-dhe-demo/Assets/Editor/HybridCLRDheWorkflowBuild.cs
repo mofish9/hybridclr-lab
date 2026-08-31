@@ -27,6 +27,11 @@ namespace HybridCLR.Lab.Editor
             string currentRoot = Path.GetFullPath(Argument("-dheCurrentRoot"));
             string mode = OptionalArgument("-dheMode") ?? "Exploratory";
             DheBuildPipeline.ValidateAssemblyScope(true, out string[] hotfix, out string[] dhe);
+            string currentInputRoot = OptionalArgument("-dheCurrentInputRoot");
+            if (!string.IsNullOrWhiteSpace(currentInputRoot))
+            {
+                StageCurrentAssemblyInputs(Path.GetFullPath(currentInputRoot), dhe);
+            }
             DheBuildPipeline.GenerateCurrentArtifacts(target);
             string strippedRoot = Path.GetFullPath(SettingsUtil.GetAssembliesPostIl2CppStripDir(target));
             CopyAssemblies(strippedRoot, currentRoot, dhe);
@@ -159,9 +164,20 @@ namespace HybridCLR.Lab.Editor
                 BaselineAotRoot = baselineRoot,
                 Target = target,
                 BuildOptions = scriptsOnly ? BuildOptions.BuildScriptsOnly : BuildOptions.None,
+                // scripts-only owns the clean generation pass. After that
+                // pass the package patches the generated C++ guards; the
+                // final build must reuse those exact Bee inputs.
+                CleanBuild = scriptsOnly,
                 Scenes = new[] { "Assets/Scenes/HybridCLRLab.unity" },
                 BuildPlayerCallback = options => BuildPipeline.BuildPlayer(options),
+                GeneratedCppFinalizeCallback = scriptsOnly
+                    ? (Action<BuildReport>)null
+                    : report => FinalizeGeneratedPlayer(target, outputRoot),
             });
+            if (scriptsOnly)
+            {
+                InjectGeneratedGuards(target, outputRoot);
+            }
             WriteJson(Path.Combine(outputRoot, "adapter", scriptsOnly ? "build-scripts-only.json" : "build-final-player.json"), new PlayerBuildReport
             {
                 schemaVersion = 1,
@@ -178,12 +194,122 @@ namespace HybridCLR.Lab.Editor
             }
         }
 
+        private static void FinalizeGeneratedPlayer(BuildTarget target, string outputRoot)
+        {
+            // BuildPlayer may regenerate IL2CPP output after the scripts-only
+            // pass (for example when build identity changes). Patch the final
+            // snapshot and rebuild it while baseline inputs remain bound.
+            NativeGuardReport nativeReport = InjectGeneratedGuards(target, outputRoot);
+            DheBeeRebuildResult rebuild = DheBuildPipeline.RebuildPlayerFromGeneratedCpp(
+                new DheBeeRebuildOptions
+                {
+                    ProjectRoot = ProjectRoot(),
+                    GeneratedCppRoot = nativeReport.generatedCppRoot,
+                    LogPath = Path.Combine(outputRoot, "native", "bee-rebuild.log"),
+                    MaxAttempts = 3,
+                    TimeoutSeconds = 600,
+                });
+            WriteJson(Path.Combine(outputRoot, "adapter", "native-finalize.json"),
+                new NativeFinalizeReport
+                {
+                    schemaVersion = 1,
+                    format = "hybridclr.dhe-adapter-native-finalize.json",
+                    generatedAtUtc = DateTimeOffset.UtcNow.ToString("O"),
+                    passed = rebuild.ExitCode == 0 && nativeReport.passed,
+                    target = target.ToString(),
+                    generatedCppRoot = nativeReport.generatedCppRoot,
+                    manifestPath = nativeReport.manifestPath,
+                    beeBackendPath = rebuild.BeeBackendPath,
+                    dagPath = rebuild.DagPath,
+                    logPath = rebuild.LogPath,
+                    attempts = rebuild.Attempts,
+                    exitCode = rebuild.ExitCode,
+                });
+        }
+
         private static void EnsureBuildScene()
         {
             const string scenePath = "Assets/Scenes/HybridCLRLab.unity";
             if (!File.Exists(Path.Combine(ProjectRoot(), scenePath.Replace('/', Path.DirectorySeparatorChar))))
                 throw new FileNotFoundException("DHE demo scene was not found", scenePath);
             EditorBuildSettings.scenes = new[] { new EditorBuildSettingsScene(scenePath, true) };
+        }
+
+        private static void StageCurrentAssemblyInputs(string inputRoot, IEnumerable<string> assemblyNames)
+        {
+            if (!Directory.Exists(inputRoot))
+                throw new DirectoryNotFoundException("DHE current assembly input root was not found: " + inputRoot);
+            string projectRoot = ProjectRoot();
+            string destinationRoot = Path.Combine(projectRoot, "Assets", "Plugins", "HybridCLRLab");
+            Directory.CreateDirectory(destinationRoot);
+            foreach (string assemblyName in assemblyNames)
+            {
+                string sourcePath = Path.Combine(inputRoot, assemblyName + ".dll");
+                if (!File.Exists(sourcePath))
+                    throw new FileNotFoundException("DHE current assembly input was not found", sourcePath);
+                string destinationPath = Path.Combine(destinationRoot, assemblyName + ".dll");
+                File.Copy(sourcePath, destinationPath, true);
+                AssetDatabase.ImportAsset(
+                    "Assets/Plugins/HybridCLRLab/" + assemblyName + ".dll",
+                    ImportAssetOptions.ForceUpdate | ImportAssetOptions.ForceSynchronousImport);
+            }
+        }
+
+        private static NativeGuardReport InjectGeneratedGuards(BuildTarget target, string outputRoot)
+        {
+            string planPath = Path.GetFullPath(Argument("-dheProjectPlan"));
+            if (!File.Exists(planPath))
+                throw new FileNotFoundException("DHE project plan was not found for native guard injection", planPath);
+            DheBuildPipeline.DheProjectPlan plan = JsonUtility.FromJson<DheBuildPipeline.DheProjectPlan>(
+                File.ReadAllText(planPath));
+            if (plan == null || plan.assemblies == null || plan.assemblies.Length == 0)
+                throw new BuildFailedException("DHE project plan has no assemblies for native guard injection.");
+            string[] mvPaths = plan.assemblies.Select(assembly => Path.GetFullPath(assembly.mvJson))
+                .Where(File.Exists).ToArray();
+            if (mvPaths.Length != plan.assemblies.Length)
+                throw new BuildFailedException("DHE project plan MV JSON references are incomplete.");
+            string generatedCppRoot = FindGeneratedCppRoot(plan.assemblies[0].assemblyName);
+            DheNativeGuardResult result = DheBuildPipeline.InjectGeneratedGuards(new DheNativeGuardOptions
+            {
+                MvJsonPaths = mvPaths,
+                GeneratedCppRoot = generatedCppRoot,
+                OutputManifestPath = Path.Combine(outputRoot, "native", "dhe-native-manifest.json"),
+                RequireCompleteCoverage = true,
+            });
+            var report = new NativeGuardReport
+            {
+                schemaVersion = 1,
+                format = "hybridclr.dhe-adapter-native-guards.json",
+                generatedAtUtc = DateTimeOffset.UtcNow.ToString("O"),
+                passed = result.UnsupportedMethodCount == 0 &&
+                    (result.RequestedMethodCount == 0 || result.NativeEntryCount > 0),
+                generatedCppRoot = generatedCppRoot,
+                manifestPath = result.ManifestPath,
+                requestedMethodCount = result.RequestedMethodCount,
+                transformedMethodCount = result.TransformedMethodCount,
+                nativeEntryCount = result.NativeEntryCount,
+                unsupportedMethodCount = result.UnsupportedMethodCount,
+                target = target.ToString(),
+            };
+            WriteJson(Path.Combine(outputRoot, "adapter", "native-guards.json"), report);
+            return report;
+        }
+
+        private static string FindGeneratedCppRoot(string assemblyName)
+        {
+            string beeRoot = Path.Combine(ProjectRoot(), "Library", "Bee", "artifacts");
+            string marker = assemblyName + ".cpp";
+            string[] roots = Directory.Exists(beeRoot)
+                ? Directory.GetFiles(beeRoot, marker, SearchOption.AllDirectories)
+                    .Select(Path.GetDirectoryName)
+                    .Where(path => !string.IsNullOrWhiteSpace(path))
+                    .Distinct(StringComparer.OrdinalIgnoreCase)
+                    .OrderByDescending(path => Directory.GetLastWriteTimeUtc(path))
+                    .ToArray()
+                : Array.Empty<string>();
+            if (roots.Length == 0)
+                throw new DirectoryNotFoundException("DHE generated C++ root was not produced: " + marker);
+            return roots[0];
         }
 
         private static void ConfigurePlayerSettings(BuildTarget target)
@@ -359,6 +485,39 @@ namespace HybridCLR.Lab.Editor
             public string handoffPlanPath;
             public int assemblyCount;
             public string[] assemblyNames;
+        }
+
+        [Serializable]
+        private sealed class NativeGuardReport
+        {
+            public int schemaVersion;
+            public string format;
+            public string generatedAtUtc;
+            public bool passed;
+            public string target;
+            public string generatedCppRoot;
+            public string manifestPath;
+            public int requestedMethodCount;
+            public int transformedMethodCount;
+            public int nativeEntryCount;
+            public int unsupportedMethodCount;
+        }
+
+        [Serializable]
+        private sealed class NativeFinalizeReport
+        {
+            public int schemaVersion;
+            public string format;
+            public string generatedAtUtc;
+            public bool passed;
+            public string target;
+            public string generatedCppRoot;
+            public string manifestPath;
+            public string beeBackendPath;
+            public string dagPath;
+            public string logPath;
+            public int attempts;
+            public int exitCode;
         }
 
         [Serializable]

@@ -129,13 +129,30 @@ internal static class LabCommands
         var lab = LabRoot(cli);
         var target = cli.Optional("target") ?? "StandaloneWindows64";
         var configuration = cli.Optional("configuration") ?? "Release";
+        var variant = cli.Optional("variant") ?? "default";
+        if (!variant.Equals("default", StringComparison.OrdinalIgnoreCase) &&
+            !variant.Equals("current", StringComparison.OrdinalIgnoreCase))
+            throw new InvalidOperationException("build-managed-cases -Variant must be default or current.");
         GenerateTestManifest(new Cli("generate-test-manifest", new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase) { ["labroot"] = lab }));
         GenerateMetadataStressSource(new Cli("generate-metadata-stress-source", new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase) { ["labroot"] = lab }));
-        var output = ResolvePath(lab, $"artifacts/managed-cases/{target}");
-        var aotOutput = ResolvePath(lab, $"artifacts/managed-cases-aot/{target}");
+        var output = ResolvePath(lab, cli.Optional("outputroot") ??
+            (variant.Equals("current", StringComparison.OrdinalIgnoreCase)
+                ? $"artifacts/managed-cases-current/{target}"
+                : $"artifacts/managed-cases/{target}"));
+        var aotOutput = ResolvePath(lab, variant.Equals("current", StringComparison.OrdinalIgnoreCase)
+            ? $"artifacts/managed-cases-current-aot/{target}"
+            : $"artifacts/managed-cases-aot/{target}");
         SafeDelete(output, lab); SafeDelete(aotOutput, lab);
         Directory.CreateDirectory(output); Directory.CreateDirectory(aotOutput);
-        var define = target.Equals("StandaloneWindows64", StringComparison.OrdinalIgnoreCase) ? "HYBRIDCLR_TARGET_WINDOWS" : target.Equals("Android", StringComparison.OrdinalIgnoreCase) ? "HYBRIDCLR_TARGET_ANDROID" : "";
+        var targetDefine = target.Equals("StandaloneWindows64", StringComparison.OrdinalIgnoreCase) ? "HYBRIDCLR_TARGET_WINDOWS" : target.Equals("Android", StringComparison.OrdinalIgnoreCase) ? "HYBRIDCLR_TARGET_ANDROID" : "";
+        // Keep the fixture variants comparable to the historical DHE gate:
+        // the baseline dependency build uses the project defaults and the
+        // current dependency build adds only DHE_CURRENT. Target-specific
+        // symbols would change compiler-generated metadata/token ordering and
+        // turn a body-only diff into a false layout/token incompatibility.
+        var dependencyDefine = variant.Equals("current", StringComparison.OrdinalIgnoreCase)
+            ? "DHE_CURRENT"
+            : targetDefine;
         var projects = new[]
         {
             "managed-cases/HybridCLR.ManagedCases/HybridCLR.ManagedCases.csproj",
@@ -145,18 +162,23 @@ internal static class LabCommands
         foreach (var relative in projects)
         {
             var args = new List<string> { "build", Path.Combine(lab, relative), "--configuration", configuration, "--output", output, "--nologo", "-v:minimal" };
-            if (!string.IsNullOrWhiteSpace(define)) args.Add("-p:DefineConstants=" + define);
+            if (!string.IsNullOrWhiteSpace(dependencyDefine))
+                args.Add("-p:DefineConstants=" + dependencyDefine.Replace(";", "%3B", StringComparison.Ordinal));
             RunProcess("dotnet", args, lab);
         }
         var aotProject = Path.Combine(lab, "managed-cases/HybridCLR.ManagedCasesAot/HybridCLR.ManagedCasesAot.csproj");
-        RunProcess("dotnet", new[] { "build", aotProject, "--configuration", configuration, "--output", aotOutput, "--nologo", "-v:minimal" }, lab);
+        var aotArgs = new List<string> { "build", aotProject, "--configuration", configuration, "--output", aotOutput, "--nologo", "-v:minimal" };
+        if (variant.Equals("current", StringComparison.OrdinalIgnoreCase))
+            aotArgs.Add("-p:DefineConstants=HYBRIDCLR_AOT_BENCHMARK%3BDHE_CURRENT");
+        RunProcess("dotnet", aotArgs, lab);
         var plugin = ResolvePath(lab, cli.Optional("unityprojectroot") is { } p ? Path.Combine(p, "Assets/Plugins/HybridCLRLab") : "unity-test-project/Assets/Plugins/HybridCLRLab");
         Directory.CreateDirectory(plugin);
         foreach (var name in new[] { "HybridCLR.BoundaryContracts.dll", "HybridCLR.ManagedCases.dll", "HybridCLR.MetadataStress.dll", "HybridCLR.CrossAssemblyDerived.dll" })
             CopyRequired(Path.Combine(output, name), Path.Combine(plugin, name));
         var aotDll = Path.Combine(aotOutput, "HybridCLR.ManagedCasesAot.dll");
         CopyRequired(aotDll, Path.Combine(plugin, "HybridCLR.ManagedCasesAot.dll"));
-        Console.WriteLine("Managed cases: " + output);
+        CopyRequired(aotDll, Path.Combine(output, "HybridCLR.ManagedCasesAot.dll"));
+        Console.WriteLine("Managed cases (" + variant + "): " + output);
         return 0;
     }
 

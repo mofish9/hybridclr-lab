@@ -1,0 +1,16 @@
+{
+  "name": "Builtin.Runtime",
+  "rootNamespace": "HybridCLR.Lab",
+  "references": [
+    "HybridCLR.Runtime"
+  ],
+  "includePlatforms": [],
+  "excludePlatforms": [],
+  "allowUnsafeCode": true,
+  "overrideReferences": false,
+  "precompiledReferences": [],
+  "autoReferenced": true,
+  "defineConstraints": [],
+  "versionDefines": [],
+  "noEngineReferences": false
+}

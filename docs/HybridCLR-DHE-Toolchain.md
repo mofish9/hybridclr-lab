@@ -94,6 +94,12 @@ The project provides a C# class containing these Unity execute-methods:
   hotfix load list, AOT metadata roots, and project resource callbacks.
 - `BuildScriptsOnly` and `BuildFinalPlayer`: call
   `DheBuildPipeline.BuildPlayer` with the project build callback.
+- `BuildFinalPlayer`: supply `GeneratedCppFinalizeCallback`; inside that
+  callback resolve the final generated-C++ root, call
+  `DheBuildPipeline.InjectGeneratedGuards`, then call
+  `DheBuildPipeline.RebuildPlayerFromGeneratedCpp`. The callback runs before
+  the package restores temporary baseline assembly inputs, preventing Bee from
+  invalidating UnityLinker/IL2CPP and overwriting the guards.
 
 The host starts Unity directly with `ProcessStartInfo`; no shell is involved.
 The final-player phase binds `HYBRIDCLR_DHE_AOT_BASELINE_ROOT`, while
@@ -110,10 +116,12 @@ the adapter's `StageRuntimePlan`, `BuildDheYooAsset`, `BuildScriptsOnly`, and
 A project contract test can pass `-StopAfterPreflight` after Prepare and strict
 MV validation; this exits before runtime-plan/resource/Player stages while
 still leaving all preflight reports on disk.
-A project may extend the adapter with generated-C++ guards, platform signing,
-and device smoke callbacks. Those stages must produce the existing JSON
-evidence before a build is called Release-ready; a compiled Player without
-changed/unchanged dispatch evidence is intentionally rejected.
+A project adapter owns MV-to-generated-C++ root discovery, platform signing,
+and device smoke callbacks. Native guard injection and Bee graph evaluation
+are package C# APIs and are mandatory for a DHE Player. Those stages must
+produce the existing JSON evidence before a build is called Release-ready; a
+compiled Player without changed/unchanged dispatch evidence is intentionally
+rejected.
 
 For a project adapter named `MyGame.Editor.DheWorkflowBuild`, invoke the same
 host on Windows or macOS with an explicit method name:
@@ -133,8 +141,10 @@ dotnet run --project tool/HybridCLR.DheTool.csproj -- workflow \
 
 The host is platform-neutral. Unity Editor is the platform-specific build
 dependency: Android requires the Android module/SDK, and iOS requires macOS,
-the iOS module, Xcode, signing, and a project-owned runner. The same C# host
-and adapter code is used on both platforms; only the explicit Unity executable,
+the iOS module, Xcode, signing, and a project-owned runner. The package locates
+the editor-owned `bee_backend` executable directly on Windows or macOS and
+invokes it through .NET; no shell executable is involved. The same C# host and
+adapter code is used on both platforms; only the explicit Unity executable,
 target, output path, and runner configuration differ. Windows cannot provide
 evidence for an iOS Xcode/device build.
 
