@@ -517,9 +517,12 @@ release gate even when native coverage is complete.
 The runtime patch set is pinned in `manifests/dhe-runtime-lock.json`, and the
 embedded Unity package is pinned by `manifests/dhe-package-lock.json` (including
 its full tree hash and applied patch IDs). A clean checkout can be assembled with
-`scripts/assemble-runtime.ps1`; no dirty sibling worktree is required. The demo also verifies the embedded Player snapshot hash
-through `HybridCLRDheBuildIdentity`, so a replaceable `StreamingAssets` snapshot
-cannot satisfy the gate by itself.
+`scripts/assemble-runtime.ps1`; no dirty sibling worktree is required. The demo
+binds the stable AOT snapshot hash through `HybridCLRDheBuildIdentity`. The
+post-Bee native guard and manifest hashes are staged into the final Player
+`StreamingAssets` identity and are independently matched to the orchestrator
+report by the Player-result and artifact validators; a JSON replacement cannot
+produce a passing Release workflow without the matching native evidence.
 Use the isolated `DHE-Tuanjie2022` runtime profile for this lane; the ordinary
 `Baseline-Clean` profile intentionally contains no DHE patch and is only a
 control build. identity v2 also records patched generated-C++ and native-manifest
