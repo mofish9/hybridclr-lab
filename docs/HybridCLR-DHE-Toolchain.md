@@ -17,6 +17,26 @@ The package does not contain a shell script or a PowerShell script. Other lab
 experiments may still have platform-specific scripts, but they are not part of
 the DHE toolchain distribution.
 
+## Project Configuration
+
+The host is project-independent and does not select a Demo adapter implicitly.
+Create a configuration with `new-config`, then set the project's adapter method
+and target-specific paths:
+
+```text
+dotnet run --project tool/HybridCLR.DheTool.csproj -- new-config \
+  -Output C:/project/Assets/Editor/DHE/dhe-workflow-config.json
+dotnet run --project tool/HybridCLR.DheTool.csproj -- workflow \
+  -Config C:/project/Assets/Editor/DHE/dhe-workflow-config.json
+```
+
+Paths in the config are resolved relative to the config file; explicit command
+line values override config values. `unityArguments` is a scalar map for
+project-owned Unity adapter options (for example `dhePreview`,
+`dheStandalone`, or a target-specific fallback metadata root). The host still
+owns the reserved DHE paths and stage ordering. The config contract is
+`schemas/dhe-workflow-config.schema.json`.
+
 ## Build and run
 
 Build once on the build host:

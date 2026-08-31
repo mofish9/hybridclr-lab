@@ -34,6 +34,7 @@ internal static class Program
                 "publish" => Publish(cli),
                 "install" => Install(cli),
                 "new-adapter" => NewAdapter(cli),
+                "new-config" => NewConfig(cli),
                 _ => throw new DheException($"Unknown DHE command '{cli.Command}'.")
             };
         }
@@ -197,16 +198,19 @@ internal static class Program
 
     private static int Workflow(Cli cli)
     {
+        ApplyWorkflowConfig(cli);
         var project = RequireDirectory(cli.Require("projectpath"), "DHE project");
         var output = SafeOutputRoot(cli.Require("outputroot"), new[] { project }); Directory.CreateDirectory(output);
         var target = cli.Require("target"); var settings = RequireFile(cli.Require("settingsfile"), "HybridCLR settings");
         var baseline = cli.Optional("baselineaotroot"); if (string.IsNullOrWhiteSpace(baseline)) throw new DheException("Release workflow requires baselineroot.");
         baseline = RequireDirectory(baseline, "Baseline AOT root");
         var current = Path.Combine(output, "current"); var baselineCopy = Path.Combine(output, "baseline");
-        var unity = ResolveUnity(cli, project); var adapterClass = cli.Optional("adaptermethod") ?? "HybridCLR.Lab.Editor.HybridCLRDheWorkflowBuild.Prepare";
+        var unity = ResolveUnity(cli, project); var adapterClass = cli.Require("adaptermethod");
         var mode = cli.Optional("mode") ?? "Release";
         var unityTimeout = int.TryParse(cli.Optional("unitytimeoutseconds"), out var timeoutValue) ? Math.Clamp(timeoutValue, 10, 3600) : 600;
-        RunUnity(unity, project, new[] { "-batchmode", "-nographics", "-quit", "-projectPath", project, "-executeMethod", adapterClass, "-dheTarget", target, "-dheOutputRoot", output, "-dheBaselineRoot", baselineCopy, "-dheCurrentRoot", current, "-dheMode", mode, "-logFile", Path.Combine(output, "unity-prepare.log") }, new Dictionary<string, string> { ["DHE_BASELINE_ROOT"] = baseline }, Path.Combine(output, "unity-prepare-process.log"), unityTimeout);
+        var prepareArgs = new List<string> { "-batchmode", "-nographics", "-quit", "-projectPath", project, "-executeMethod", adapterClass, "-dheTarget", target, "-dheOutputRoot", output, "-dheBaselineRoot", baselineCopy, "-dheCurrentRoot", current, "-dheMode", mode, "-logFile", Path.Combine(output, "unity-prepare.log") };
+        AppendUnityArguments(prepareArgs, cli);
+        RunUnity(unity, project, prepareArgs, new Dictionary<string, string> { ["DHE_BASELINE_ROOT"] = baseline }, Path.Combine(output, "unity-prepare-process.log"), unityTimeout);
         var preflight = new Cli("preflight", new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase) { ["settingsfile"] = settings, ["baselineroot"] = baselineCopy, ["currentroot"] = current, ["outputroot"] = Path.Combine(output, "project-preflight"), ["projectroot"] = project, ["requiredheequalshotupdate"] = "true", ["requirecompletecoverage"] = "true", ["dnlibpath"] = cli.Optional("dnlibpath") ?? "" });
         if (Preflight(preflight) != 0) throw new DheException("DHE project preflight failed.");
         if (cli.Has("stopafterpreflight"))
@@ -218,6 +222,7 @@ internal static class Program
         {
             var adapterType = adapterClass.EndsWith(".Prepare", StringComparison.Ordinal) ? adapterClass[..^".Prepare".Length] : adapterClass;
             var common = new List<string> { "-batchmode", "-nographics", "-quit", "-projectPath", project, "-dheTarget", target, "-dheOutputRoot", output, "-dheBaselineRoot", baselineCopy, "-dheCurrentRoot", current, "-dheMode", mode, "-dheProjectPlan", Path.Combine(output, "project-preflight", "dhe-project-plan.json") };
+            AppendUnityArguments(common, cli);
             RunUnity(unity, project, common.Append("-executeMethod").Append(adapterType + ".StageRuntimePlan").Append("-logFile").Append(Path.Combine(output, "unity-stage.log")), new Dictionary<string, string> { ["DHE_BASELINE_ROOT"] = baseline }, Path.Combine(output, "unity-stage-process.log"), unityTimeout);
             RunUnity(unity, project, common.Append("-executeMethod").Append(adapterType + ".BuildDheYooAsset").Append("-logFile").Append(Path.Combine(output, "unity-yooasset.log")), new Dictionary<string, string> { ["DHE_BASELINE_ROOT"] = baseline }, Path.Combine(output, "unity-yooasset-process.log"), unityTimeout);
             ValidateResourceEvidence(Path.Combine(output, "adapter", "resource-evidence.json"), target);
@@ -388,7 +393,7 @@ internal static class Program
             if (Directory.Exists(source)) CopyDirectory(source, Path.Combine(output, relativePrefix));
         }
         File.WriteAllText(Path.Combine(output, ".gitattributes"), "/** text eol=lf\n/tool/dnlib.dll binary\n/patches/dhe-lite/*.patch binary\n", new UTF8Encoding(false));
-        var boundary = new { schemaVersion = 1, format = "hybridclr.dhe-source-boundary.json", pathBase = "manifest-directory-v1", exactPaths = new[] { ".gitattributes", "dhe-source-boundary.json", "dhe-toolchain-manifest.json" }, prefixes = new[] { "docs/", "manifests/", "patches/dhe-lite/", "schemas/", "tool/" }, generatedPrefixes = new[] { "artifacts/", "staging/", "reports/" } };
+        var boundary = new { schemaVersion = 1, format = "hybridclr.dhe-source-boundary.json", pathBase = "manifest-directory-v1", exactPaths = new[] { ".gitattributes", "dhe-source-boundary.json", "dhe-toolchain-manifest.json" }, prefixes = new[] { "docs/", "manifests/", "patches/dhe-lite/", "schemas/", "templates/", "tool/" }, generatedPrefixes = new[] { "artifacts/", "staging/", "reports/" } };
         WriteJson(Path.Combine(output, "dhe-source-boundary.json"), boundary);
         var files = Directory.GetFiles(output, "*", SearchOption.AllDirectories).Where(x => !x.Equals(Path.Combine(output, "dhe-toolchain-manifest.json"), StringComparison.OrdinalIgnoreCase)).OrderBy(x => x, StringComparer.OrdinalIgnoreCase).Select(path => new { path = Path.GetRelativePath(output, path).Replace(Path.DirectorySeparatorChar, '/'), size = new FileInfo(path).Length, sha256 = Sha256File(path) }).ToArray();
         var sourceHead = GitValue(root, "rev-parse", "HEAD"); var sourceTree = GitValue(root, "rev-parse", "HEAD^{tree}"); var tracked = !string.IsNullOrWhiteSpace(sourceHead); var clean = tracked && string.IsNullOrWhiteSpace(GitValue(root, "status", "--porcelain"));
@@ -428,6 +433,99 @@ internal static class Program
         File.WriteAllText(full, "// Add this file to the Unity project and call DheBuildPipeline from your C# build adapter.\n// The adapter must implement Prepare and Player entry points.\n", new UTF8Encoding(false)); Console.WriteLine("DHE C# adapter template: " + full); return 0;
     }
 
+    private static int NewConfig(Cli cli)
+    {
+        var output = SafeReportPath(cli.Require("output"), Array.Empty<string>());
+        var config = new
+        {
+            schemaVersion = 1,
+            format = "hybridclr.dhe-workflow-config.json",
+            projectPath = ".",
+            settingsFile = "ProjectSettings/HybridCLRSettings.asset",
+            outputRoot = "artifacts/dhe-workflow",
+            baselineAotRoot = "releases/previous/stripped-aot",
+            target = "Android",
+            adapterMethod = "YourGame.Editor.DheWorkflowBuild.Prepare",
+            mode = "Exploratory",
+            runPlayer = false,
+            stopAfterPreflight = true,
+            unityTimeoutSeconds = 600,
+            unityArguments = new Dictionary<string, string>()
+        };
+        WriteJson(output, config);
+        Console.WriteLine("DHE workflow config: " + output);
+        return 0;
+    }
+
+    private static void ApplyWorkflowConfig(Cli cli)
+    {
+        var configPath = cli.Optional("config");
+        if (string.IsNullOrWhiteSpace(configPath)) return;
+        var fullConfigPath = RequireFile(configPath, "DHE workflow config");
+        using var document = JsonDocument.Parse(File.ReadAllText(fullConfigPath));
+        if (document.RootElement.ValueKind != JsonValueKind.Object)
+            throw new DheException("DHE workflow config must be a JSON object: " + fullConfigPath);
+        var configDirectory = Path.GetDirectoryName(fullConfigPath)!;
+        foreach (var property in document.RootElement.EnumerateObject())
+        {
+            var key = property.Name.ToLowerInvariant();
+            if (key is "schemaversion" or "format" or "unityarguments") continue;
+            if (cli.Values.ContainsKey(key)) continue;
+            cli.Values[key] = ConfigValue(property.Value, key, configDirectory);
+        }
+        if (!cli.Values.ContainsKey("unityarguments") && document.RootElement.TryGetProperty("unityArguments", out var unityArguments))
+            cli.Values["unityarguments"] = unityArguments.GetRawText();
+    }
+
+    private static string ConfigValue(JsonElement value, string key, string configDirectory)
+    {
+        return value.ValueKind switch
+        {
+            JsonValueKind.String => IsWorkflowPathKey(key)
+                ? ResolveConfigPath(value.GetString() ?? string.Empty, configDirectory)
+                : value.GetString() ?? string.Empty,
+            JsonValueKind.True => "true",
+            JsonValueKind.False => "false",
+            JsonValueKind.Number => value.GetRawText(),
+            _ => throw new DheException($"Workflow config property '{key}' must be a scalar value.")
+        };
+    }
+
+    private static bool IsWorkflowPathKey(string key) => key is "projectpath" or "settingsfile" or "outputroot" or "baselineaotroot" or "dnlibpath" or "unity";
+
+    private static string ResolveConfigPath(string value, string configDirectory)
+    {
+        if (string.IsNullOrWhiteSpace(value) || Path.IsPathRooted(value)) return value;
+        return Path.GetFullPath(Path.Combine(configDirectory, value));
+    }
+
+    private static void AppendUnityArguments(List<string> arguments, Cli cli)
+    {
+        var raw = cli.Optional("unityarguments");
+        if (string.IsNullOrWhiteSpace(raw)) return;
+        using var document = JsonDocument.Parse(raw);
+        if (document.RootElement.ValueKind != JsonValueKind.Object)
+            throw new DheException("Workflow unityArguments must be a JSON object.");
+        foreach (var property in document.RootElement.EnumerateObject())
+        {
+            if (!System.Text.RegularExpressions.Regex.IsMatch(property.Name, "^[A-Za-z][A-Za-z0-9]*$"))
+                throw new DheException("Workflow unityArguments contains an invalid argument name: " + property.Name);
+            if (property.Name.Equals("projectPath", StringComparison.OrdinalIgnoreCase) ||
+                property.Name.Equals("executeMethod", StringComparison.OrdinalIgnoreCase) ||
+                property.Name.Equals("dheTarget", StringComparison.OrdinalIgnoreCase) ||
+                property.Name.Equals("dheOutputRoot", StringComparison.OrdinalIgnoreCase) ||
+                property.Name.Equals("dheBaselineRoot", StringComparison.OrdinalIgnoreCase) ||
+                property.Name.Equals("dheCurrentRoot", StringComparison.OrdinalIgnoreCase) ||
+                property.Name.Equals("dheMode", StringComparison.OrdinalIgnoreCase) ||
+                property.Name.Equals("dheProjectPlan", StringComparison.OrdinalIgnoreCase))
+                throw new DheException("Workflow unityArguments cannot override a host-owned argument: " + property.Name);
+            if (property.Value.ValueKind != JsonValueKind.String && property.Value.ValueKind != JsonValueKind.Number && property.Value.ValueKind != JsonValueKind.True && property.Value.ValueKind != JsonValueKind.False)
+                throw new DheException("Workflow unityArguments values must be scalar: " + property.Name);
+            arguments.Add("-" + property.Name);
+            arguments.Add(property.Value.ValueKind == JsonValueKind.String ? property.Value.GetString() ?? string.Empty : property.Value.GetRawText());
+        }
+    }
+
     private static void ValidateResourceEvidence(string path, string target)
     {
         var evidence = ReadJson<JsonElement>(RequireFile(path, "Resource evidence"));
@@ -445,7 +543,7 @@ internal static class Program
             throw new DheException("DHE resource evidence pathSemantics is invalid: " + path);
     }
 
-    private static void PrintHelp() => Console.WriteLine("HybridCLR DHE C# tool\nCommands: version, mv, batch, baseline-manifest, aot-metadata-manifest, preflight, workflow, validate, archive, doctor, verify-package, publish, install, new-adapter\nExample: dotnet run --project tool/HybridCLR.DheTool.csproj -- workflow -ProjectPath <project> -SettingsFile <settings> -OutputRoot <output> -BaselineAotRoot <baseline> -Target Android -RunPlayer");
+    private static void PrintHelp() => Console.WriteLine("HybridCLR DHE C# tool\nCommands: version, mv, batch, baseline-manifest, aot-metadata-manifest, preflight, workflow, validate, archive, doctor, verify-package, publish, install, new-adapter, new-config\nExample: dotnet run --project tool/HybridCLR.DheTool.csproj -- workflow -Config <project/dhe-workflow-config.json>");
 
     private static string ResolveUnity(Cli cli, string project) => RequireFile(cli.Optional("unity") ?? Environment.GetEnvironmentVariable("DHE_UNITY_EXE") ?? throw new DheException("Set -Unity or DHE_UNITY_EXE."), "Unity editor");
     private static void RunUnity(string executable, string workingDirectory, IEnumerable<string> arguments, IDictionary<string, string> environment, string logPath, int timeoutSeconds)

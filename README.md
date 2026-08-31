@@ -70,9 +70,16 @@ dotnet run --project tool/HybridCLR.DheTool.csproj --configuration Release --no-
   -SettingsFile ./unity2021-dhe-demo/ProjectSettings/HybridCLRSettings.asset \
   -OutputRoot ./artifacts/dhe-project-workflow \
   -BaselineAotRoot ./releases/previous/stripped-aot \
-  -Target StandaloneWindows64 -Unity /path/to/Unity \
+  -Target StandaloneWindows64 \
+  -AdapterMethod HybridCLR.Lab.Editor.HybridCLRDheWorkflowBuild.Prepare \
+  -Unity /path/to/Unity \
   -Mode Release -RunPlayer
 ```
+
+For a project-owned setup, keep these values in a versioned
+`dhe-workflow-config.json` and run `workflow -Config <path>`. The host never
+assumes the Demo adapter; the adapter method and project-specific Unity
+arguments are configuration inputs.
 
 `Release` is intentionally usable only from a clean checkout after the formal
 sources have been committed. During tool development, substitute

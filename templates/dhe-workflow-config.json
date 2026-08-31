@@ -1,0 +1,15 @@
+{
+  "schemaVersion": 1,
+  "format": "hybridclr.dhe-workflow-config.json",
+  "projectPath": ".",
+  "settingsFile": "ProjectSettings/HybridCLRSettings.asset",
+  "outputRoot": "artifacts/dhe-workflow",
+  "baselineAotRoot": "releases/previous/stripped-aot",
+  "target": "Android",
+  "adapterMethod": "YourGame.Editor.DheWorkflowBuild.Prepare",
+  "mode": "Exploratory",
+  "runPlayer": false,
+  "stopAfterPreflight": true,
+  "unityTimeoutSeconds": 600,
+  "unityArguments": {}
+}
