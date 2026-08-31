@@ -33,43 +33,31 @@ call graph needs to cross the boundary.
   content tree hash, then refuses to apply any patch. The lock still retains
   patch paths and hashes as migration/audit references.
 
-The distributed DHE package does not execute either of those historical shell
-commands. Runtime source assembly and native CTest remain lab-only gates; the
-cross-platform package entry point is the C# host described below. The package
-lock still binds the embedded package tree to the integrated `hybridclr_unity`
-commit.
+The distributed DHE package does not apply source patches implicitly. Runtime
+source assembly and native CTest remain explicit gates driven by the C# host;
+the cross-platform package entry point is the C# host described below. The
+package lock still binds the embedded package tree to the integrated
+`hybridclr_unity` commit.
 
-## Historical runtime assembly
+## C# runtime assembly
 
-The following commands are retained only for reproducing the native/runtime
-proof in this lab. They are not required by a consuming project and are not
-copied into the published DHE package.
+Runtime and native proof are driven by the same C# host as the project
+workflow. Runtime assembly is target-bound and uses an integrated runtime
+checkout; no shell patcher is involved:
 
-The normal formal assembly is:
-
-```powershell
-./scripts/assemble-runtime.ps1 `
-  -Profile DHE-Tuanjie2022 `
-  -EngineWorkflow Tuanjie2022Fgs `
-  -ReposRoot ../repos `
-  -PackageRoot ./unity2021-dhe-demo/Packages/com.code-philosophy.hybridclr
+```text
+dotnet run --project tool/HybridCLR.DheTool.csproj -- assemble-runtime \
+  -LabRoot . -Profile DHE-Tuanjie2022 -EngineWorkflow Tuanjie2022Fgs \
+  -Il2CppPlusSource ../worktrees/il2cpp-plus-metadata-tuanjie-v8.13.0
+dotnet run --project tool/HybridCLR.DheTool.csproj -- native-tests \
+  -LabRoot . -Profile DHE-Tuanjie2022
 ```
 
-The same integrated HybridCLR source can be checked against the Unity 2021
-opt3 engine line:
-
-```powershell
-./scripts/assemble-runtime.ps1 `
-  -Profile DHE-Unity2021 `
-  -EngineWorkflow Unity2021Standard `
-  -ReposRoot ../repos `
-  -Il2CppPlusSource ../worktrees/dhe-opt4-il2cpp-unity2021 `
-  -PackageRoot ./unity2021-dhe-demo/Packages/com.code-philosophy.hybridclr
-```
-
-`DHE-Unity2022` is also supported for source/native assembly. A machine without
-the matching Unity 2022 Editor must pass `-AllowSurrogateExternalHeaders`; the
-result is exploratory native evidence only.
+`DHE-Unity2021` and `DHE-Unity2022` use the same commands with their matching
+engine workflow and `-Il2CppPlusSource`. A machine without the matching Editor
+must pass `-AllowSurrogateExternalHeaders`; that native report is exploratory
+evidence only. Overlay patch application is intentionally not implicit: use a
+repository checkout at the locked integrated commit.
 
 ## C# project workflow
 

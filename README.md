@@ -230,10 +230,10 @@ propagation.
 
 Run the reference suite from this repository root:
 
-```powershell
-./scripts/run-reference.ps1
-./scripts/run-native-tests.ps1
-./scripts/summarize-coverage.ps1 -Player reports/baseline-clean-player-result.json
+```text
+dotnet run --project tool/HybridCLR.DheTool.csproj -- generate-test-manifest -LabRoot .
+dotnet run --project tool/HybridCLR.DheTool.csproj -- reference -LabRoot .
+dotnet run --project tool/HybridCLR.DheTool.csproj -- compare-results -LabRoot . -Actual reports/player-result.json
 ```
 
 The Clean Baseline passes 185/185 reference cases and, when supplemental AOT
@@ -273,14 +273,19 @@ that caused a 300-second benchmark timeout; the fix and the
 gate. Instrumented timing is diagnostic only and is never used as a performance
 result.
 
-## Reproduce the baseline
+## Historical baseline records
+
+The following performance and compatibility numbers were produced by an older
+lab harness. Its PowerShell entry points are retired; use the C# host commands
+above for current DHE validation. The records remain here only to preserve the
+identity of earlier opt1-3 experiments.
 
 From this repository root, use the following order:
 
-```powershell
-./scripts/check-build-environment.ps1 -Target StandaloneWindows64
-./scripts/assemble-runtime.ps1 -Profile Baseline-Clean -AllowDirty
-./scripts/build-clean-baseline.ps1 -Profile Baseline-Clean -AllowDirty
+```text
+dotnet run --project tool/HybridCLR.DheTool.csproj -- check-environment -LabRoot . -Target StandaloneWindows64
+dotnet run --project tool/HybridCLR.DheTool.csproj -- assemble-runtime -LabRoot . -Profile Baseline-Clean
+dotnet run --project tool/HybridCLR.DheTool.csproj -- build-managed-cases -LabRoot . -Target StandaloneWindows64
 ```
 
 Once the clean runtime has been assembled, the complete gate can be run with:
@@ -328,7 +333,11 @@ for generic sharing, and executes the Player runner with a per-case timeout.
 Generated runtime copies, IL2CPP caches, Player builds, and StreamingAssets
 DLLs stay outside Git.
 
-## Generic sharing and metadata gate
+## Historical generic sharing records
+
+This section documents older opt2/opt3 compatibility runs. The current DHE
+lane uses `assemble-runtime`, `native-tests`, and `workflow` from the C# host;
+the old matrix runner is no longer present.
 
 The production merge design is in
 `docs/HybridCLR-Full-Generic-Sharing-Merge-Design.md`. One HybridCLR runtime
@@ -337,11 +346,11 @@ full generic sharing and no supplemental AOT metadata, plus Unity 2021 with
 standard generic sharing and supplemental metadata. Run the cross-version
 native gate and all three real Player gates with:
 
-```powershell
-./scripts/run-runtime-compatibility-matrix.ps1 -HybridClrSource ../repos/hybridclr -AllowDirty
-./scripts/run-engine-workflow-gate.ps1 -EngineWorkflow Unity2021Standard -HybridClrSource ../repos/hybridclr -AllowDirty
-./scripts/run-engine-workflow-gate.ps1 -EngineWorkflow Unity2022Fgs -HybridClrSource ../repos/hybridclr -AllowDirty
-./scripts/run-engine-workflow-gate.ps1 -EngineWorkflow Tuanjie2022Fgs -HybridClrSource ../repos/hybridclr -AllowDirty
+```text
+dotnet run --project tool/HybridCLR.DheTool.csproj -- assemble-runtime -LabRoot . -Profile DHE-Unity2021 -EngineWorkflow Unity2021Standard
+dotnet run --project tool/HybridCLR.DheTool.csproj -- native-tests -LabRoot . -Profile DHE-Unity2021
+dotnet run --project tool/HybridCLR.DheTool.csproj -- assemble-runtime -LabRoot . -Profile DHE-Unity2022 -EngineWorkflow Unity2022Fgs
+dotnet run --project tool/HybridCLR.DheTool.csproj -- native-tests -LabRoot . -Profile DHE-Unity2022
 ```
 
 When an Editor is unavailable, surrogate external headers are rejected by
@@ -393,7 +402,11 @@ measurements and the separate lazy-vtable experiment are historical material;
 the current optimization design is retained in
 `docs/HybridCLR-Optimization-Design.md`.
 
-## Android ARM64 gate
+## Historical Android ARM64 records
+
+The Android measurements below belong to the retired experiment harness. The
+formal DHE Android/iOS entry point is the cross-platform C# `workflow` command;
+device signing and smoke remain project adapter responsibilities.
 
 Android ARM64 is a separate final-validation lane rather than a replacement
 for the Windows iteration loop. The lab builds Release IL2CPP APKs containing
@@ -416,8 +429,8 @@ The Android protocol is outside this DHE-focused checkout and is not a release
 claim for the workflow described above.
 # DHE workflow implementation note
 
-The formal DHE toolchain is now C#-only. Use `tool/HybridCLR.DheTool.csproj`
-with `dotnet`; the distributed package contains no `dhe.ps1` or DHE core
-PowerShell scripts. The older PowerShell commands later in this lab README
-describe historical experiment lanes and are not the production DHE entry
-point. See `docs/HybridCLR-DHE-Toolchain.md` for the current workflow.
+The formal DHE toolchain is C#-only. Use `tool/HybridCLR.DheTool.csproj` with
+`dotnet`; the repository and distributed package contain no PowerShell scripts.
+All lab helpers have corresponding host commands. See
+`docs/HybridCLR-DHE-Toolchain.md` for the current workflow and the explicit
+platform prerequisites for Android and iOS.

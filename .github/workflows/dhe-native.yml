@@ -14,17 +14,17 @@ jobs:
         uses: actions/checkout@v4
 
       - name: Build C# DHE host
-        shell: pwsh
+        shell: bash
         run: dotnet build HybridCLR.Lab.sln --configuration Release --ignore-failed-sources
 
       - name: Publish C# DHE toolchain
-        shell: pwsh
+        shell: bash
         run: >-
           dotnet run --project tool/HybridCLR.DheTool.csproj --configuration Release --no-restore --
           publish -LabRoot . -OutputRoot artifacts/dhe-toolchain -Mode Exploratory -ForceOutput
 
       - name: Verify C# DHE toolchain
-        shell: pwsh
+        shell: bash
         run: >-
           dotnet run --project tool/HybridCLR.DheTool.csproj --configuration Release --no-restore --
           verify-package -PackageRoot artifacts/dhe-toolchain

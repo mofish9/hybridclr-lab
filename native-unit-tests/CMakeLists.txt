@@ -11,7 +11,7 @@ set(IL2CPP_BASELIB_PLATFORM_INCLUDE "C:/Program Files/Tuanjie/Hub/Editor/2022.3.
 set(IL2CPP_EXTERNAL "${CMAKE_CURRENT_LIST_DIR}/../staging/runtime/Baseline-Clean/external" CACHE PATH "Engine il2cpp external headers")
 
 if (NOT EXISTS "${HYBRIDCLR_TEST_SOURCE_ROOT}/metadata/Opcodes.cpp")
-    message(FATAL_ERROR "HybridCLR runtime sources were not assembled at ${HYBRIDCLR_TEST_SOURCE_ROOT}. Run scripts/assemble-runtime.ps1 first.")
+    message(FATAL_ERROR "HybridCLR runtime sources were not assembled at ${HYBRIDCLR_TEST_SOURCE_ROOT}. Run the C# host assemble-runtime command first.")
 endif()
 
 file(READ "${HYBRIDCLR_RUNTIME_ROOT}/il2cpp-class-internals.h" HYBRIDCLR_CLASS_INTERNALS)

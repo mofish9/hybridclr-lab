@@ -8,8 +8,8 @@
 ## Worktree 基线
 
 正式 workflow 不依赖下面的 dirty research worktree；它使用
-`manifests/repo-lock.json` 的干净提交，再应用 `manifests/dhe-runtime-lock.json`
-中的 patch。下面的 worktree 只保留作历史审计和 patch 生成来源。
+`manifests/repo-lock.json` 和 `manifests/dhe-runtime-lock.json` 锁定的集成提交。
+下面的 worktree 只保留作历史审计和 patch 生成来源。
 
 | 仓库 | 路径 | 分支 |
 |---|---|---|
@@ -25,7 +25,7 @@
 
 ```text
 baseline DLL + current DLL
-    -> generate-dhe-mv.ps1
+    -> C# host mv/batch command
     -> method identity / IL hash / type layout diff
     -> strict *.mv.json + *.mv.bytes
     -> Unity AOT Player guard injection
@@ -35,23 +35,21 @@ baseline DLL + current DLL
 
 运行：
 
-```powershell
-./scripts/generate-dhe-mv.ps1 `
-    -BaselineAssembly C:/path/to/baseline/HybridCLR.ManagedCases.dll `
-    -CurrentAssembly C:/path/to/current/HybridCLR.ManagedCases.dll `
-    -DnlibPath C:/path/to/project/Packages/com.code-philosophy.hybridclr/Plugins/dnlib.dll `
+```text
+dotnet run --project tool/HybridCLR.DheTool.csproj -- mv \
+    -BaselineAssembly C:/path/to/baseline/HybridCLR.ManagedCases.dll \
+    -CurrentAssembly C:/path/to/current/HybridCLR.ManagedCases.dll \
     -Output staging/dhe/HybridCLR.ManagedCases.mv.json
 ```
 
 在第一阶段应使用严格门禁：
 
-```powershell
-./scripts/generate-dhe-mv.ps1 `
-    -BaselineAssembly C:/path/to/baseline/HybridCLR.ManagedCases.dll `
-    -CurrentAssembly C:/path/to/current/HybridCLR.ManagedCases.dll `
-    -DnlibPath C:/path/to/project/Packages/com.code-philosophy.hybridclr/Plugins/dnlib.dll `
-    -Output staging/dhe/HybridCLR.ManagedCases.mv.json `
-    -BinaryOutput staging/dhe/HybridCLR.ManagedCases.mv.bytes `
+```text
+dotnet run --project tool/HybridCLR.DheTool.csproj -- mv \
+    -BaselineAssembly C:/path/to/baseline/HybridCLR.ManagedCases.dll \
+    -CurrentAssembly C:/path/to/current/HybridCLR.ManagedCases.dll \
+    -Output staging/dhe/HybridCLR.ManagedCases.mv.json \
+    -BinaryOutput staging/dhe/HybridCLR.ManagedCases.mv.bytes \
     -StrictCompatibility
 ```
 
@@ -60,9 +58,9 @@ abstract/PInvoke）、完整 method attributes 和所有类型布局保持不变
 状态退出；`-BinaryOutput` 只有在严格门禁通过时才会生成，可以直接交给实验 runtime API。
 这份报告可以作为 CI 的发布门禁。
 
-低层 `generate-dhe-mv.ps1` 要求显式传入 `-DnlibPath`，不会从 Demo 或 sibling
-checkout 猜测依赖。批处理入口可以通过 `-ProjectRoot` 从项目自己的 embedded
-package 解析 dnlib；registry/external package 仍需显式传入路径。
+低层 `mv` 命令要求显式传入 `-DnlibPath`（或使用 host 自带的 pinned
+`tool/dnlib.dll`），不会从 Demo 或 sibling checkout 猜测依赖。`batch`/`preflight`
+可以通过项目 settings 解析 DHE 程序集；registry/external package 仍需显式传入路径。
 
 ## mv 格式
 

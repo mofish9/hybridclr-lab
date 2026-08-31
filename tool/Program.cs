@@ -35,6 +35,11 @@ internal static class Program
                 "install" => Install(cli),
                 "new-adapter" => NewAdapter(cli),
                 "new-config" => NewConfig(cli),
+                "assemble-runtime" or "native-tests" or "build-managed-cases" or
+                "generate-test-manifest" or "generate-metadata-stress-source" or
+                "reference" or "compare-results" or "check-environment" or
+                "clear-unity-project-locks" or "wait-editor" or
+                "prepare-engine-test-project" or "bootstrap-repos" => LabCommands.Run(cli),
                 _ => throw new DheException($"Unknown DHE command '{cli.Command}'.")
             };
         }
@@ -543,7 +548,7 @@ internal static class Program
             throw new DheException("DHE resource evidence pathSemantics is invalid: " + path);
     }
 
-    private static void PrintHelp() => Console.WriteLine("HybridCLR DHE C# tool\nCommands: version, mv, batch, baseline-manifest, aot-metadata-manifest, preflight, workflow, validate, archive, doctor, verify-package, publish, install, new-adapter, new-config\nExample: dotnet run --project tool/HybridCLR.DheTool.csproj -- workflow -Config <project/dhe-workflow-config.json>");
+    private static void PrintHelp() => Console.WriteLine("HybridCLR DHE C# tool\nCommands: version, mv, batch, baseline-manifest, aot-metadata-manifest, preflight, workflow, validate, archive, doctor, verify-package, publish, install, new-adapter, new-config, assemble-runtime, native-tests, build-managed-cases, generate-test-manifest, generate-metadata-stress-source, reference, compare-results, check-environment, clear-unity-project-locks, wait-editor, prepare-engine-test-project, bootstrap-repos\nExample: dotnet run --project tool/HybridCLR.DheTool.csproj -- workflow -Config <project/dhe-workflow-config.json>");
 
     private static string ResolveUnity(Cli cli, string project) => RequireFile(cli.Optional("unity") ?? Environment.GetEnvironmentVariable("DHE_UNITY_EXE") ?? throw new DheException("Set -Unity or DHE_UNITY_EXE."), "Unity editor");
     private static void RunUnity(string executable, string workingDirectory, IEnumerable<string> arguments, IDictionary<string, string> environment, string logPath, int timeoutSeconds)

@@ -1,13 +1,13 @@
 # DHE 工作流审查记录
 
-> Migration note: the supported production entry point is the cross-platform
-> C# host in `tool/HybridCLR.DheTool.csproj`. The former `scripts/*.ps1`
-> commands in this historical review are no longer distributed or supported.
+> Migration note: the supported production and lab entry point is the
+> cross-platform C# host in `tool/HybridCLR.DheTool.csproj`. The former
+> `scripts/*.ps1` layer has been removed; no DHE operation requires a shell.
 
 The formal source boundary now contains only the C# host, Unity C# adapter,
-package/runtime patches, schemas, and managed/native fixtures. The remaining
-`scripts/*.ps1` files in this lab are historical engine or test helpers; they
-are outside the DHE boundary and are never copied by `publish`.
+package/runtime patches, schemas, and managed/native fixtures. Lab-only runtime
+assembly, native tests, fixture generation, and project preparation are exposed
+as explicit C# host commands and are never copied into the DHE package.
 
 审查对象是 `dhe-experiment-lab` 以及它依赖的三个 runtime/package/il2cpp
 worktree。目标是确认哪些内容属于可复现工作流，哪些只是一次性验证材料，
@@ -40,8 +40,7 @@ Android 或 macOS+iOS 环境重新取得 native manifest、Player smoke、归档
 当前工作区的未跟踪项并不等于临时产物：Tuanjie 2022 demo 源码和嵌入式
 HybridCLR package 占据绝大多数；DHE C# host、adapter、fixture、schema 和审查文档是
 正式工作流输入。Unity 生成缓存、Player、StreamingAssets 和历史 probe 已通过
-`.gitignore` 隔离；`unity2021-probe` 与旧的 body-patch/player-watcher
-脚本仍保留在本机供追溯，但不应进入正式提交。
+`.gitignore` 隔离；旧的 body-patch/player-watcher 逻辑不再作为仓库脚本或正式入口保留。
 
 ## 本轮正式化复查
 

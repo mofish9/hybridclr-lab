@@ -1,12 +1,13 @@
 {
   "schemaVersion": 1,
   "format": "hybridclr.dhe-toolchain-layout.json",
-  "toolchainVersion": "0.1.8",
+  "toolchainVersion": "0.1.9",
   "contractVersion": 1,
   "exactPaths": [
     ".gitattributes",
     "tool/HybridCLR.DheTool.csproj",
     "tool/Program.cs",
+    "tool/LabCommands.cs",
     "tool/dnlib.dll",
     "docs/HybridCLR-DHE-Toolchain.md",
     "docs/THIRD-PARTY-NOTICES.md",
@@ -61,19 +62,32 @@
     "manifests/runtime-workflows.json"
   ],
   "commands": [
+    "assemble-runtime",
     "archive",
     "aot-metadata-manifest",
     "baseline-manifest",
     "batch",
+    "bootstrap-repos",
+    "build-managed-cases",
+    "check-environment",
+    "clear-unity-project-locks",
+    "compare-results",
     "doctor",
+    "generate-metadata-stress-source",
+    "generate-test-manifest",
     "install",
     "mv",
+    "native-tests",
     "new-adapter",
+    "new-config",
     "preflight",
     "publish",
+    "prepare-engine-test-project",
+    "reference",
     "validate",
     "verify-package",
     "version",
+    "wait-editor",
     "workflow"
   ]
 }

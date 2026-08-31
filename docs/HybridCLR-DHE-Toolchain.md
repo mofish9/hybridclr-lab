@@ -14,8 +14,27 @@ process orchestration. `tool/dnlib.dll` is the pinned dependency used by both
 the host and the Unity package. JSON schemas remain the compatibility contract.
 
 The package does not contain a shell script or a PowerShell script. Other lab
-experiments may still have platform-specific scripts, but they are not part of
-the DHE toolchain distribution.
+experiments used to have platform-specific helpers; those helpers have been
+removed from this branch as well. The repository's lab-only operations are
+available as C# host commands, so a macOS/iOS build machine does not need
+PowerShell.
+
+The lab commands are intentionally explicit and map one-to-one to the former
+helpers: `assemble-runtime`, `native-tests`, `build-managed-cases`,
+`generate-test-manifest`, `generate-metadata-stress-source`, `reference`,
+`compare-results`, `check-environment`, `prepare-engine-test-project`,
+`bootstrap-repos`, `clear-unity-project-locks`, and `wait-editor`. For example:
+
+```text
+dotnet run --project tool/HybridCLR.DheTool.csproj -- assemble-runtime \
+  -LabRoot . -Profile DHE-Tuanjie2022 -EngineWorkflow Tuanjie2022Fgs \
+  -Il2CppPlusSource C:/repos/il2cpp_plus
+dotnet run --project tool/HybridCLR.DheTool.csproj -- native-tests \
+  -LabRoot . -Profile DHE-Tuanjie2022
+```
+
+These commands use direct .NET process execution and fail closed when an
+external prerequisite (Unity, CMake, compiler, git, or dotnet) is missing.
 
 ## Project Configuration
 

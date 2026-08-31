@@ -1,5 +1,8 @@
 # HybridCLR 完全泛型共享正式合并设计
 
+> 历史 opt2/opt3 记录。文中的 PowerShell helper 已移除；当前 DHE 验证
+> 使用 `HybridCLR-DHE-Toolchain.md` 记录的 C# host 命令。
+
 更新时间：2026-08-25
 
 ## 1. 决策
