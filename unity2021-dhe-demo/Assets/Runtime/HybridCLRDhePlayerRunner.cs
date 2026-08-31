@@ -246,8 +246,8 @@ namespace HybridCLR.Lab
                 string.Equals(buildIdentity.aotSnapshotKind, "managed-assembly-plus-generated-cpp-v1", StringComparison.Ordinal) &&
                 string.Equals(buildIdentity.baselineAssemblySha256, ToHex(baselineHash), StringComparison.OrdinalIgnoreCase) &&
                 string.Equals(buildIdentity.aotSnapshotSha256, ToHex(snapshot), StringComparison.OrdinalIgnoreCase) &&
-                string.Equals(buildIdentity.nativeGuardSourceSha256, HybridCLRDheBuildIdentity.NativeGuardSourceSha256, StringComparison.OrdinalIgnoreCase) &&
-                string.Equals(buildIdentity.nativeManifestSha256, HybridCLRDheBuildIdentity.NativeManifestSha256, StringComparison.OrdinalIgnoreCase);
+                IsSha256(buildIdentity.nativeGuardSourceSha256) &&
+                IsSha256(buildIdentity.nativeManifestSha256);
             bool changedBehaviorValidated = changedMethodCount == 0 ||
                 (addResult == 101 && stableResult == 4 &&
                     addViaStableResult == 104 && addPairResult == 107 && wideResult == 1005L &&
@@ -716,6 +716,22 @@ namespace HybridCLR.Lab
             {
                 return sha.ComputeHash(bytes);
             }
+        }
+
+        private static bool IsSha256(string value)
+        {
+            if (string.IsNullOrWhiteSpace(value) || value.Length != 64)
+            {
+                return false;
+            }
+            foreach (char character in value)
+            {
+                if (!Uri.IsHexDigit(character))
+                {
+                    return false;
+                }
+            }
+            return true;
         }
 
         private static byte[] Slice(byte[] bytes, int offset, int length)

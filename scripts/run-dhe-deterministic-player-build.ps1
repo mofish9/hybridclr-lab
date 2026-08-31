@@ -321,6 +321,24 @@ for ($beeAttempt = 1; $beeAttempt -le 3; $beeAttempt++) {
 if ($beeExitCode -ne 0) {
     throw "Bee failed to rebuild the final Player from patched C++ (exit code $beeExitCode)."
 }
+
+# The final guard transform updates the native identity after Unity has
+# already packaged StreamingAssets. Copy the final identity into the Player
+# data directory so the runtime observes the exact manifest/guard hashes that
+# the orchestrator will publish. The C# identity source is intentionally not
+# recompiled here: its stable AOT fields are settled before the final build,
+# while native hashes belong to this post-Bee artifact handoff.
+$embeddedIdentityPath = Join-Path $playerDataPath "StreamingAssets/HybridCLRLab/build-identity.json"
+if (-not (Test-Path -LiteralPath $playerDataPath -PathType Container)) {
+    throw "Final Player data directory was not found: $playerDataPath"
+}
+New-Item -ItemType Directory -Force -Path (Split-Path -Parent $embeddedIdentityPath) | Out-Null
+Copy-Item -LiteralPath $BuildIdentity -Destination $embeddedIdentityPath -Force
+if (-not [StringComparer]::OrdinalIgnoreCase.Equals(
+        (Get-FileHash -LiteralPath $BuildIdentity -Algorithm SHA256).Hash,
+        (Get-FileHash -LiteralPath $embeddedIdentityPath -Algorithm SHA256).Hash)) {
+    throw "Final Player build identity was not embedded byte-for-byte: $embeddedIdentityPath"
+}
 $projectNativeManifestPath = Join-Path $cppRoot "dhe-native-manifest.json"
 if (-not [IO.Path]::GetFullPath($nativeManifestPath).Equals([IO.Path]::GetFullPath($projectNativeManifestPath), [StringComparison]::OrdinalIgnoreCase)) {
     Copy-Item -LiteralPath $nativeManifestPath -Destination $projectNativeManifestPath -Force
