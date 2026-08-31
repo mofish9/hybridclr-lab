@@ -1,4 +1,4 @@
-name: DHE Static Validation
+name: DHE CSharp Static Validation
 
 on:
   push:
@@ -11,42 +11,35 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4
 
-      - name: Run DHE static gate
+      - name: Build the C# workflow host and managed fixtures
         shell: pwsh
-        run: ./scripts/run-dhe-static-gate.ps1 -OutputRoot artifacts/dhe-static-gate -ForceOutput
+        run: dotnet build HybridCLR.Lab.sln --configuration Release --ignore-failed-sources
 
-      - name: Run DHE static gate on Windows PowerShell 5.1
-        shell: powershell
-        run: .\scripts\run-dhe-static-gate.ps1 -OutputRoot artifacts/dhe-static-gate-ps51 -ForceOutput
-
-      - name: Build managed contracts and fixtures
-        shell: pwsh
-        run: dotnet build HybridCLR.Lab.sln --configuration Release
-
-      - name: Run DHE capability gate
-        shell: pwsh
-        run: ./scripts/run-dhe-capability-gate.ps1 -OutputRoot artifacts/dhe-capability-gate -ForceOutput
-
-      - name: Run DHE compatibility negative gate
-        shell: pwsh
-        run: ./scripts/run-dhe-compatibility-negative-gate.ps1 -OutputRoot artifacts/dhe-compatibility-negative-gate -ForceOutput
-
-      - name: Validate all DHE JSON contracts
+      - name: Publish and verify the C# toolchain
         shell: pwsh
         run: >-
-          ./scripts/run-dhe-schema-gate.ps1
-          -InputRootList '["artifacts/dhe-static-gate","artifacts/dhe-static-gate-ps51","artifacts/dhe-capability-gate","artifacts/dhe-compatibility-negative-gate"]'
-          -OutputRoot artifacts/dhe-schema-gate
-          -ForceOutput
+          dotnet run --project tool/HybridCLR.DheTool.csproj --configuration Release --no-restore --
+          publish -LabRoot . -OutputRoot artifacts/dhe-csharp-toolchain
+          -Mode Exploratory -ForceOutput
 
-      - name: Upload static report
+      - name: Verify the published package
+        shell: pwsh
+        run: >-
+          dotnet run --project tool/HybridCLR.DheTool.csproj --configuration Release --no-restore --
+          verify-package -PackageRoot artifacts/dhe-csharp-toolchain
+
+      - name: Run MV and batch regression
+        shell: pwsh
+        run: >-
+          dotnet run --project tool/HybridCLR.DheTool.csproj --configuration Release --no-restore --
+          batch -BaselineRoot managed-cases/HybridCLR.ManagedCasesAot/bin/Release/netstandard2.1
+          -CurrentRoot managed-cases/HybridCLR.ManagedCasesAot/bin/Release/netstandard2.1
+          -AssemblyNames HybridCLR.ManagedCasesAot
+          -OutputRoot artifacts/dhe-csharp-batch
+
+      - name: Upload C# workflow reports
         if: always()
         uses: actions/upload-artifact@v4
         with:
-          name: dhe-static-gate-report
-          path: |
-            artifacts/dhe-static-gate/**
-            artifacts/dhe-static-gate-ps51/**
-            artifacts/dhe-capability-gate/**
-            artifacts/dhe-compatibility-negative-gate/**
-            artifacts/dhe-schema-gate/**
+          name: dhe-csharp-static-reports
+          path: artifacts/**

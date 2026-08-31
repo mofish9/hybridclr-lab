@@ -35,67 +35,50 @@ non-surrogate engine headers.
 The embedded package is locked by `manifests/dhe-package-lock.json`; the workflow
 checks its full tree hash and, in opt4 integrated mode, verifies the package
 commit without applying the historical patch files.
-`assemble-runtime.ps1 -Profile DHE-Tuanjie2022` requires an explicit
-`-PackageRoot`; a native-only runtime manifest cannot be mistaken for a
-publishable DHE runtime.
+Runtime assembly is an external, target-specific prerequisite. The C# DHE host
+requires its staged runtime/baseline manifests as explicit inputs and never
+silently substitutes a native-only runtime.
 
-The fast, Unity-independent CI gate is:
+The fast, Unity-independent C# host checks are:
 
-```powershell
-./scripts/run-dhe-static-gate.ps1 `
-  -OutputRoot ./artifacts/dhe-static-gate `
-  -ForceOutput
+```text
+dotnet build HybridCLR.Lab.sln --configuration Release --no-restore
+dotnet run --project tool/HybridCLR.DheTool.csproj --configuration Release --no-restore -- \
+  publish -LabRoot . -OutputRoot artifacts/dhe-toolchain -Mode Exploratory -ForceOutput
+dotnet run --project tool/HybridCLR.DheTool.csproj --configuration Release --no-restore -- \
+  verify-package -PackageRoot artifacts/dhe-toolchain
+dotnet run --project tool/HybridCLR.DheTool.csproj --configuration Release --no-restore -- \
+  doctor -Root artifacts/dhe-toolchain -Output artifacts/dhe-toolchain-doctor.json
 ```
 
-It parses every workflow script and schema, validates the checked-in manifests
-against their draft 2020-12 contracts, checks that all managed fixture
-projects remain in `HybridCLR.Lab.sln`, verifies runtime/package lock shape and
-hashes, enforces `manifests/dhe-source-boundary.json`, and runs the guard/ABI
-fixture suite. The same gate runs under both PowerShell 7 and Windows PowerShell
-5.1 in
-`.github/workflows/dhe-static.yml`; it does not claim Player or native ABI
-coverage. The real native compile/CTest lane is available as the manually
-triggered `.github/workflows/dhe-native.yml` on a runner with the matching
-Tuanjie installation. `-AllowSurrogateExternalHeaders` is reserved for
-exploratory native checks and is rejected by Release preflight.
+The published package is authenticated by its manifest and `verify-package`
+rejects any `.ps1` file. `doctor` reports the installed .NET host, package
+identity, and optional Unity project readiness. These checks do not claim
+Player or native ABI coverage. Native compile/CTest and Unity/Xcode remain
+separate environment gates.
 
-`scripts/run-dhe-schema-gate.ps1` also scans generated DHE JSON recursively,
-rejects duplicate JSON properties, and validates each recognized `format`
-against its schema. Windows PowerShell 5.1 delegates this contract check to
-`pwsh`; CI scans the complete static, capability, and compatibility-negative
-outputs instead of treating schema files as documentation only.
+JSON schemas under `schemas/` remain the compatibility contract and can be
+validated by any CI JSON-schema implementation; no shell host is required.
 
 The formal DHE-lite lane is reproducible from clean runtime inputs. Assemble the
 locked runtime (the `-ReposRoot` path may point at a new checkout), then run the
 Demo through the reusable project orchestrator:
 
-```powershell
-./scripts/assemble-runtime.ps1 -Profile DHE-Tuanjie2022 -EngineWorkflow Tuanjie2022Fgs -ReposRoot ../repos -PackageRoot ./unity2021-dhe-demo/Packages/com.code-philosophy.hybridclr
-./scripts/run-dhe-native-gate.ps1 `
-  -Profile DHE-Tuanjie2022 `
-  -OutputRoot ./artifacts/dhe-native-gate `
-  -ForceOutput
-./scripts/run-dhe-project-workflow.ps1 `
-  -AdapterScript ./scripts/adapters/dhe-demo-project-adapter.ps1 `
-  -ProjectPath ./unity2021-dhe-demo `
-  -SettingsFile ./unity2021-dhe-demo/ProjectSettings/HybridCLRSettings.asset `
-  -RuntimeSource ./staging/runtime/DHE-Tuanjie2022/libil2cpp `
-  -OutputRoot ./artifacts/dhe-project-workflow `
-  -ArchiveRoot ./artifacts/dhe-project-workflow-archive `
-  -BaselineAotRoot ./releases/previous/stripped-aot `
-  -DnlibPath ./unity2021-dhe-demo/Packages/com.code-philosophy.hybridclr/Plugins/dnlib.dll `
-  -PackageLockPath ./manifests/dhe-package-lock.json `
-  -IdentityTemplatePath ./unity2021-dhe-demo/Assets/Runtime/HybridCLRDheBuildIdentity.cs `
-  -GitRoot . `
-  -SourceBoundaryPath ./manifests/dhe-source-boundary.json `
-  -Mode Release -RequireEmbeddedPackage -RequireIdentityTemplate -ForceOutput
+```text
+dotnet run --project tool/HybridCLR.DheTool.csproj --configuration Release --no-restore -- \
+  workflow -ProjectPath ./unity2021-dhe-demo \
+  -SettingsFile ./unity2021-dhe-demo/ProjectSettings/HybridCLRSettings.asset \
+  -OutputRoot ./artifacts/dhe-project-workflow \
+  -BaselineAotRoot ./releases/previous/stripped-aot \
+  -Target StandaloneWindows64 -Unity /path/to/Unity \
+  -Mode Release -RunPlayer
 ```
 
 `Release` is intentionally usable only from a clean checkout after the formal
 sources have been committed. During tool development, substitute
-`-Mode Exploratory`; it still runs Prepare, shared preflight, real Player,
-artifact validation, and portable archive, but records `releaseReady=false` and
-does not emit a passing release gate. The current end-to-end adapter evidence is
+`-Mode Exploratory`; it records `releaseReady=false`. `-RunPlayer` invokes the
+project adapter's C# methods for runtime-plan staging, YooAsset, scripts-only,
+and final Player builds. The current end-to-end adapter evidence is
 `4/4 compatible`, `changed=27`, `supported=27`, `unsupported=0`, and
 `nativeEntryCount=34`. It covers direct/reflection generic calls, a null generic
 reference, generic virtual dispatch, value-type state-machine paths, secondary
@@ -104,23 +87,19 @@ hash compiled into `HybridCLRDheBuildIdentity`, so a mutable
 `StreamingAssets` snapshot cannot stand in for the actual AOT build. The workflow
 also archives a self-contained `runtime-plan/` directory and validates its
 payload hashes independently of the ignored Unity `Assets/StreamingAssets` cache.
-The static lane runs `scripts/run-dhe-script-fixture-gate.ps1` to verify guard
-idempotence, generic entry grouping, transactional rollback, release-mode
-rejection, and output safety. The project orchestrator runs
-`scripts/run-dhe-clean-checkout-gate.ps1`, which proves that a
-non-empty stale output, missing runtime, and stale runtime manifest fail before
-Unity generation. Release mode additionally requires a Git-clean source root and
-that the formal boundary sources are tracked. The project and boundary file must
-belong to that same repository; an unrelated clean Git root is rejected.
+The host verifies output safety and fails closed on missing or incompatible
+assemblies before Unity generation. Release mode additionally requires a
+Git-clean source root and tracked formal boundary sources. The project and
+boundary file must belong to that same repository; an unrelated clean Git root
+is rejected.
 Runtime preflight also binds `ProjectSettings/ProjectVersion.txt` to the exact
 engine version recorded by the runtime manifest; a matching executable family
 alone is insufficient.
 The manifest also records the staged external-header tree hash, which the
 source and native gates recompute before accepting the runtime.
 
-The demo workflow invokes `scripts/run-dhe-archive-gate.ps1` at the end and
-produces a sibling `-archive` directory by default. The same command can be
-run manually for an existing workflow output. It copies generated C++ and all
+The host `archive` command produces a sibling archive directory. The same
+command can be run manually for an existing workflow output. It copies generated C++ and all
 managed DHE payloads, the project settings file, and all reports, rewrites
 project-plan/batch/identity/manifest references to archive-relative paths, and
 revalidates the copy from a different working directory. A copied
@@ -141,16 +120,16 @@ DHE AOT set from its own settings and generate strict MV artifacts in one
 command. To cover every hot-update assembly, keep `dheAotAssemblies` equal to
 the complete `hotUpdateAssemblies` list:
 
-```powershell
-./scripts/run-dhe-project-preflight.ps1 `
-  -SettingsFile C:/path/to/project/ProjectSettings/HybridCLRSettings.asset `
-  -BaselineRoot C:/path/to/project/stripped-aot `
-  -CurrentRoot C:/path/to/project/current-hot-update `
-  -OutputRoot ./artifacts/project-dhe-preflight `
-  -RequireCompleteCoverage -RequireDheEqualsHotUpdate -ForceOutput
+```text
+dotnet run --project tool/HybridCLR.DheTool.csproj --configuration Release --no-restore -- \
+  preflight -SettingsFile C:/path/to/project/ProjectSettings/HybridCLRSettings.asset \
+  -BaselineRoot C:/path/to/project/stripped-aot \
+  -CurrentRoot C:/path/to/project/current-hot-update \
+  -OutputRoot ./artifacts/project-dhe-preflight \
+  -RequireCompleteCoverage -RequireDheEqualsHotUpdate
 ```
 
-The preflight invokes the shared artifact validator for every assembly. Native
+The preflight validates every assembly with the same C# host. Native
 ABI coverage remains a separate Unity/IL2CPP stage; this offline report cannot
 prove Player dispatch. Without `-RequireCompleteCoverage`,
 `generationPassed`/`validationPassed` describe tool and artifact health, while
@@ -161,7 +140,7 @@ the demo, pass its package's `dnlib.dll` with `-DnlibPath`, or keep the package
 embedded at `Packages/com.code-philosophy.hybridclr`. Project workflows fail
 closed instead of silently borrowing the demo's dnlib assembly.
 The generated project plan records the hot-update and DHE assembly sets. The
-final `scripts/run-dhe-release-gate.ps1` additionally requires
+Final C# release validation additionally requires
 `requireDheEqualsHotUpdate=true`, a complete Player report, and exact matches
 between the plan's assemblies and the assemblies loaded/AOT-compiled as DHE.
 The plan's `settingsFile`, `baselineRoot`, `currentRoot`, and `batchReport` are
@@ -174,7 +153,7 @@ method token, verifies DHE_MV_REGISTRATION_FAILED, and then retries the valid MV
 in the same process; the result is recorded under transaction in the workflow
 report.
 
-For a production project, use `scripts/run-dhe-project-workflow.ps1` with a
+For a production project, use the C# host `workflow` command with a
 project adapter. The adapter's `Prepare` action supplies the exact stripped-AOT
 baseline/current roots and writes `adapter/prepare.json`; its `Player` action
 consumes the validated project plan and writes the standard `workflow-report.json`.
@@ -182,11 +161,9 @@ The runner owns source preflight, strict MV/artifact validation, archive, and
 Release gating. `-StopAfterPreflight` is available for adapter contract tests;
 it does not claim Player or release coverage. The complete adapter contract is
 in `docs/HybridCLR-DHE-Formal-Project-Validation.md`.
-Both the demo and reusable project orchestrators hold a worktree-scoped
-cross-process mutex for the complete run. Concurrent invocations fail
-immediately by default; `-WorkflowLockTimeoutSeconds` can opt into a bounded
-wait. Once an output root has been created safely, preflight and workflow
-failures leave versioned top-level JSON reports rather than console-only state.
+The host starts Unity directly with `ProcessStartInfo`, so Android and iOS use
+the same C# entry point. Set `-UnityTimeoutSeconds` to bound an Editor phase;
+logs are written below the output root and never back into the project source.
 
 Release additionally requires separate clean project and tool source identities.
 The project `-GitRoot` defaults to `-ProjectPath`; use `-ProjectVcs Svn` for an
@@ -211,8 +188,8 @@ current entry points.
 > or Android helper scripts may refer to files from the earlier lab checkout.
 > Use `docs/HybridCLR-DHE-Toolchain.md` for distribution and installation,
 > `docs/HybridCLR-DHE-Formal-Project-Validation.md` for the project contract,
-> and `scripts/run-dhe-project-preflight.ps1`/`scripts/run-dhe-project-workflow.ps1`
-> for the source-checkout entry points.
+> and the C# `preflight`/`workflow` commands for the source-checkout entry
+> points.
 
 ## Historical lab results
 
@@ -430,3 +407,10 @@ The paired runner alternates Baseline/Candidate order to balance thermal and
 time drift. An x86 emulator is not accepted as ARMv8 performance evidence.
 The Android protocol is outside this DHE-focused checkout and is not a release
 claim for the workflow described above.
+# DHE workflow implementation note
+
+The formal DHE toolchain is now C#-only. Use `tool/HybridCLR.DheTool.csproj`
+with `dotnet`; the distributed package contains no `dhe.ps1` or DHE core
+PowerShell scripts. The older PowerShell commands later in this lab README
+describe historical experiment lanes and are not the production DHE entry
+point. See `docs/HybridCLR-DHE-Toolchain.md` for the current workflow.

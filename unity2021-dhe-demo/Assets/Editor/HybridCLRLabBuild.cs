@@ -85,7 +85,7 @@ namespace HybridCLR.Lab.Editor
         public static void BuildPlayerOnly()
         {
             // The deterministic workflow stages the runtime plan from an
-            // external PowerShell process. Refresh before building so Unity
+            // external build host. Refresh before building so Unity
             // does not reuse an older imported StreamingAssets snapshot.
             AssetDatabase.Refresh(ImportAssetOptions.ForceSynchronousImport);
             ConfigureSettings();
@@ -536,7 +536,7 @@ namespace HybridCLR.Lab.Editor
             string trimmed = value == null ? string.Empty : value.Trim();
             if (trimmed.StartsWith("[") && trimmed.EndsWith("]"))
             {
-                // PowerShell passes array-valued arguments as JSON so a valid
+                // The build host passes array-valued arguments as JSON so a valid
                 // Windows path containing ';' remains a single item. Unity's
                 // JsonUtility cannot deserialize a root array, so wrap it in
                 // a tiny object before parsing.

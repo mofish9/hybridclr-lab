@@ -1,5 +1,14 @@
 # DHE 工作流审查记录
 
+> Migration note: the supported production entry point is the cross-platform
+> C# host in `tool/HybridCLR.DheTool.csproj`. The former `scripts/*.ps1`
+> commands in this historical review are no longer distributed or supported.
+
+The formal source boundary now contains only the C# host, Unity C# adapter,
+package/runtime patches, schemas, and managed/native fixtures. The remaining
+`scripts/*.ps1` files in this lab are historical engine or test helpers; they
+are outside the DHE boundary and are never copied by `publish`.
+
 审查对象是 `dhe-experiment-lab` 以及它依赖的三个 runtime/package/il2cpp
 worktree。目标是确认哪些内容属于可复现工作流，哪些只是一次性验证材料，
 并保证从干净 checkout 仍能判断工作流是否通过。
@@ -23,8 +32,13 @@ workflow 聚合结果为 27/27 supported managed tokens、0 unsupported，并解
 managed methods。该结论证明当前 Windows Demo 覆盖的 ABI 和工作流可以完整发布；它
 不能外推为任意 Unity 版本、Android/小游戏平台或尚未纳入 fixture 的 ABI 自动可用。
 
+脚本迁移后，C# host 已重新验证四程序集离线 preflight、MV/batch、包发布/校验和
+安装/doctor；历史 Player/native 数字仍是旧脚本身份的参考，不能当作本轮 C# host
+的 Release 证据。要恢复 Release 结论，必须用 `workflow -RunPlayer` 在目标 Unity、
+Android 或 macOS+iOS 环境重新取得 native manifest、Player smoke、归档和签名证据。
+
 当前工作区的未跟踪项并不等于临时产物：Tuanjie 2022 demo 源码和嵌入式
-HybridCLR package 占据绝大多数；DHE 脚本、fixture、schema 和审查文档是
+HybridCLR package 占据绝大多数；DHE C# host、adapter、fixture、schema 和审查文档是
 正式工作流输入。Unity 生成缓存、Player、StreamingAssets 和历史 probe 已通过
 `.gitignore` 隔离；`unity2021-probe` 与旧的 body-patch/player-watcher
 脚本仍保留在本机供追溯，但不应进入正式提交。
@@ -226,7 +240,8 @@ non-surrogate external headers，以及完整 hot-update/DHE 集合。没有匹�
   archive；旧归档默认保持 fail-closed，避免一次新的 Player 验证静默替换仍在交接中的
   证据。
 - Unity package 的 `DheAotAssemblyNames` 现在是显式 opt-in：缺失或空的
-  `dheAotAssemblies` 保持 legacy hot-update 过滤行为；DHE workflow 必须显式提供目标集合。
+  `dheAotAssemblies` 保持 legacy hot-update 过滤行为，且 DHE preflight 会拒绝这种配置；
+  DHE workflow 必须显式提供目标集合。
   `DheRuntimePlanOptions.HotfixAssemblyNames` 允许 package 在 DHE 子集与 legacy hotfix 共存时
   写出完整加载列表，并只清理有 MV/snapshot 证据的 DHE sidecar；对应 patch/tree lock 已更新。
 - project workflow、release gate、project-plan validator 和 artifact validator 对关键

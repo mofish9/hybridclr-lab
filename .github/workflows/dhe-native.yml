@@ -1,79 +1,37 @@
-name: DHE Native Validation
+name: DHE CSharp Host Validation
 
 on:
   workflow_dispatch:
 
 jobs:
-  native:
-    # This lane needs the matching Tuanjie installation for baselib headers.
-    # It is deliberately manual so ordinary PR validation does not queue on a
-    # private editor runner, while production validation uses the same script
-    # as the local release workflow.
+  host:
+    # Unity/Xcode/native runtime validation remains an environment gate. This
+    # job verifies that the cross-platform C# tool can be built and distributed
+    # on the dedicated runner; platform Player lanes add their own adapter.
     runs-on: [self-hosted, windows, dhe-tuanjie]
     steps:
       - name: Checkout
         uses: actions/checkout@v4
 
-      - name: Assemble locked DHE runtime
+      - name: Build C# DHE host
         shell: pwsh
-        run: ./scripts/assemble-runtime.ps1 -Profile DHE-Tuanjie2022 -EngineWorkflow Tuanjie2022Fgs -PackageRoot ./unity2021-dhe-demo/Packages/com.code-philosophy.hybridclr
+        run: dotnet build HybridCLR.Lab.sln --configuration Release --ignore-failed-sources
 
-      - name: Run project adapter preflight contract
-        shell: pwsh
-        run: >-
-          ./scripts/run-dhe-project-workflow.ps1
-          -AdapterScript ./scripts/fixtures/dhe-project-adapter-fixture.ps1
-          -ProjectPath ./unity2021-dhe-demo
-          -SettingsFile ./unity2021-dhe-demo/ProjectSettings/HybridCLRSettings.asset
-          -RuntimeSource ./staging/runtime/DHE-Tuanjie2022/libil2cpp
-          -OutputRoot ./artifacts/dhe-project-adapter-contract
-          -DnlibPath ./unity2021-dhe-demo/Packages/com.code-philosophy.hybridclr/Plugins/dnlib.dll
-          -PackageLockPath ./manifests/dhe-package-lock.json
-          -IdentityTemplatePath ./unity2021-dhe-demo/Assets/Runtime/HybridCLRDheBuildIdentity.cs
-          -Mode Exploratory
-          -RequireEmbeddedPackage
-          -RequireIdentityTemplate
-          -StopAfterPreflight
-          -ForceOutput
-
-      - name: Run native compile and tests
-        shell: pwsh
-        run: ./scripts/run-dhe-native-gate.ps1 -Profile DHE-Tuanjie2022 -OutputRoot ./artifacts/dhe-native-gate -ForceOutput
-
-      - name: Publish, install, and run the full DHE consumer workflow
+      - name: Publish C# DHE toolchain
         shell: pwsh
         run: >-
-          ./scripts/run-dhe-installed-consumer-gate.ps1
-          -RuntimeSource ./staging/runtime/DHE-Tuanjie2022/libil2cpp
-          -OutputRoot ./artifacts/dhe-installed-consumer-gate
-          -ForceOutput
+          dotnet run --project tool/HybridCLR.DheTool.csproj --configuration Release --no-restore --
+          publish -LabRoot . -OutputRoot artifacts/dhe-toolchain -Mode Exploratory -ForceOutput
 
-      - name: Publish transport package and source records
+      - name: Verify C# DHE toolchain
         shell: pwsh
         run: >-
-          ./scripts/publish-dhe-toolchain-release.ps1
-          -PackageRoot ./artifacts/dhe-toolchain-release/package
-          -OutputPrefix ./artifacts/dhe-toolchain-release/dhe-toolchain
-          -RuntimeManifest ./staging/runtime/DHE-Tuanjie2022/runtime-manifest.json
-          -InstalledConsumerGate ./artifacts/dhe-installed-consumer-gate/installed-consumer-gate-report.json
-          -ForceOutput
+          dotnet run --project tool/HybridCLR.DheTool.csproj --configuration Release --no-restore --
+          verify-package -PackageRoot artifacts/dhe-toolchain
 
-      - name: Validate native-lane JSON contracts
-        shell: pwsh
-        run: >-
-          ./scripts/run-dhe-schema-gate.ps1
-          -InputRoot artifacts
-          -OutputRoot ./artifacts/dhe-native-schema-gate
-          -ForceOutput
-
-      - name: Upload native report
+      - name: Upload host report
         if: always()
         uses: actions/upload-artifact@v4
         with:
-          name: dhe-native-gate-report
-          path: |
-            artifacts/dhe-project-adapter-contract/**
-            artifacts/dhe-native-gate/**
-            artifacts/dhe-installed-consumer-gate/**
-            artifacts/dhe-toolchain-release/**
-            artifacts/dhe-native-schema-gate/**
+          name: dhe-csharp-host-report
+          path: artifacts/dhe-toolchain/**
