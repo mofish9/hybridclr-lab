@@ -297,9 +297,13 @@ demo adapter 同时要求 Git clean。该检查只有在正式文件形成提交
 - demo Player 的结果路径采用显式 Windows argv quoting；Unity/Player 超时后
   会等待被终止进程退出，避免 finally 恢复工程设置时发生竞态。
 
-## 保留内容
+## 迁移前职责记录
 
-以下内容是工作流的正式输入或实现，应保留并纳入后续提交：
+以下内容是早期 PowerShell 实现的审计记录，不再是当前工作流的可执行入口。
+它们保留在本文件中是为了说明迁移前覆盖过的边界。新项目不得引用这些路径，
+也不需要在 macOS/iOS 环境安装 PowerShell。当前正式输入只包括 C# host、Unity
+C# adapter、HybridCLR package API、schemas、manifest/patch provenance 和项目自身
+的 runtime/native/device runner。
 
 - `scripts/generate-dhe-mv.ps1`：严格 method-body-only MV 生成和二进制输出。
 - `scripts/generate-dhe-batch.ps1`：从项目 HybridCLR settings 解析 DHE AOT 程序集列表；若项目要覆盖全部
@@ -385,45 +389,29 @@ transformer 在显式开启诊断的验证构建中间接调用；它只写入�
 不会进入发布 runtime。升级 Unity 后如果生成代码格式变化，只需用这些诊断材料定位问题，
 不应把其输出混入发布报告。
 
-## 正式验证命令
+## 当前正式验证命令
 
-先验证 runtime/native 层，再通过公共 project workflow 执行 Demo adapter：
+先准备目标平台自己的 runtime/baseline，再通过跨平台 C# host 执行项目 adapter：
 
-```powershell
-./scripts/assemble-runtime.ps1 -Profile DHE-Tuanjie2022 -EngineWorkflow Tuanjie2022Fgs -ReposRoot ./../dhe-locked-repos -PackageRoot ./unity2021-dhe-demo/Packages/com.code-philosophy.hybridclr
-./scripts/run-dhe-native-gate.ps1 -Profile DHE-Tuanjie2022 -OutputRoot ./artifacts/dhe-native-gate -ForceOutput
-
-./scripts/run-dhe-project-workflow.ps1 `
-  -AdapterScript ./scripts/adapters/dhe-demo-project-adapter.ps1 `
-  -ProjectPath ./unity2021-dhe-demo `
-  -SettingsFile ./unity2021-dhe-demo/ProjectSettings/HybridCLRSettings.asset `
-  -RuntimeSource ./staging/runtime/DHE-Tuanjie2022/libil2cpp `
-  -OutputRoot ./artifacts/dhe-project-workflow `
-  -ArchiveRoot ./artifacts/dhe-project-workflow-archive `
-  -BaselineAotRoot ./releases/previous/stripped-aot `
-  -DnlibPath ./unity2021-dhe-demo/Packages/com.code-philosophy.hybridclr/Plugins/dnlib.dll `
-  -PackageLockPath ./manifests/dhe-package-lock.json `
-  -IdentityTemplatePath ./unity2021-dhe-demo/Assets/Runtime/HybridCLRDheBuildIdentity.cs `
-  -GitRoot . -SourceBoundaryPath ./manifests/dhe-source-boundary.json `
-  -Mode Release -RequireEmbeddedPackage -RequireIdentityTemplate -ForceOutput
+```text
+dotnet build HybridCLR.Lab.sln --configuration Release --no-restore
+dotnet run --project tool/HybridCLR.DheTool.csproj --configuration Release --no-restore -- \
+  workflow \
+  -ProjectPath ./unity2021-dhe-demo \
+  -SettingsFile ./unity2021-dhe-demo/ProjectSettings/HybridCLRSettings.asset \
+  -OutputRoot ./artifacts/dhe-project-workflow \
+  -BaselineAotRoot ./releases/previous/stripped-aot \
+  -Target StandaloneWindows64 -Unity /path/to/Unity \
+  -Mode Release -RunPlayer
 ```
 
-工作流完成后可单独复核归档物料（不依赖 Unity 进程状态）：
+工作流完成后可使用同一 C# host 生成自包含归档：
 
-```powershell
-$preflight = Get-Content -Raw ./artifacts/dhe-project-workflow/project-preflight/dhe-project-plan.json | ConvertFrom-Json
-$planned = @($preflight.assemblies | Sort-Object assemblyName)
-./scripts/validate-dhe-artifacts.ps1 `
-  -MvJson @($planned | ForEach-Object { $_.mvJson }) `
-  -MvBytes @($planned | ForEach-Object { $_.mvBytes }) `
-  -BaselineAssembly @($planned | ForEach-Object { $_.baseline }) `
-  -CurrentAssembly @($planned | ForEach-Object { $_.current }) `
-  -NativeManifest ./artifacts/dhe-project-workflow/dhe-native-manifest.json `
-  -BuildIdentity ./artifacts/dhe-project-workflow/build-identity.json `
-  -WorkflowReport ./artifacts/dhe-project-workflow/workflow-report.json `
-  -RuntimePlan ./artifacts/dhe-project-workflow/runtime-plan/dhe-runtime-plan.json `
-  -BatchReport ./artifacts/dhe-project-workflow/project-preflight/batch/dhe-batch-summary.json `
-  -Output ./artifacts/dhe-project-workflow/artifact-validation.json
+```text
+dotnet run --project tool/HybridCLR.DheTool.csproj --configuration Release --no-restore -- \
+  archive -InputRoot ./artifacts/dhe-project-workflow \
+  -ArchiveRoot ./artifacts/dhe-project-workflow-archive \
+  -Output ./artifacts/dhe-project-workflow-archive/archive-gate.json
 ```
 
 这里的 `baseline`/`current`/`mvJson`/`mvBytes` 都来自同一份 project plan，

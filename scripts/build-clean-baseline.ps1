@@ -29,7 +29,7 @@ $LabRoot = if ([string]::IsNullOrWhiteSpace($LabRoot)) {
 }
 $projectRoot = if ([string]::IsNullOrWhiteSpace($ProjectRoot)) { Join-Path $LabRoot "unity-test-project" } else { [IO.Path]::GetFullPath($ProjectRoot) }
 if ($Profile -eq "DHE-Tuanjie2022") {
-    throw "Profile 'DHE-Tuanjie2022' is owned by scripts/run-dhe-demo-workflow.ps1 and requires an embedded package root; build-clean-baseline.ps1 is the non-DHE control lane."
+    throw "Profile 'DHE-Tuanjie2022' is owned by the C# DHE host (tool/HybridCLR.DheTool.csproj); build-clean-baseline.ps1 is the non-DHE control lane."
 }
 $lock = Get-Content -Raw (Join-Path $LabRoot "manifests/repo-lock.json") | ConvertFrom-Json
 $null = . (Join-Path $PSScriptRoot "resolve-repos-root.ps1")

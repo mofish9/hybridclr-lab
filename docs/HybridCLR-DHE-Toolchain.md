@@ -68,6 +68,9 @@ the adapter's `StageRuntimePlan`, `BuildDheYooAsset`, `BuildScriptsOnly`, and
 `BuildFinalPlayer` methods. Each Unity invocation is started directly by
 `ProcessStartInfo`, reads stdout/stderr concurrently, has a bounded
 `-UnityTimeoutSeconds` (default 600), and writes logs below the output root.
+A project contract test can pass `-StopAfterPreflight` after Prepare and strict
+MV validation; this exits before runtime-plan/resource/Player stages while
+still leaving all preflight reports on disk.
 A project may extend the adapter with generated-C++ guards, platform signing,
 and device smoke callbacks. Those stages must produce the existing JSON
 evidence before a build is called Release-ready; a compiled Player without

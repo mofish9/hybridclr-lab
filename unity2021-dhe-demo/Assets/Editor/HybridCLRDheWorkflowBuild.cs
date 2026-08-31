@@ -123,6 +123,7 @@ namespace HybridCLR.Lab.Editor
                 policy = "skip",
                 strategy = "demo-no-resource-catalog",
                 target = target,
+                pathSemantics = "workspace-absolute-v1",
             });
         }
 
@@ -382,6 +383,7 @@ namespace HybridCLR.Lab.Editor
             public string policy;
             public string strategy;
             public string target;
+            public string pathSemantics;
         }
     }
 }

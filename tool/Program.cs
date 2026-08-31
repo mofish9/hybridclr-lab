@@ -209,12 +209,18 @@ internal static class Program
         RunUnity(unity, project, new[] { "-batchmode", "-nographics", "-quit", "-projectPath", project, "-executeMethod", adapterClass, "-dheTarget", target, "-dheOutputRoot", output, "-dheBaselineRoot", baselineCopy, "-dheCurrentRoot", current, "-dheMode", mode, "-logFile", Path.Combine(output, "unity-prepare.log") }, new Dictionary<string, string> { ["DHE_BASELINE_ROOT"] = baseline }, Path.Combine(output, "unity-prepare-process.log"), unityTimeout);
         var preflight = new Cli("preflight", new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase) { ["settingsfile"] = settings, ["baselineroot"] = baselineCopy, ["currentroot"] = current, ["outputroot"] = Path.Combine(output, "project-preflight"), ["projectroot"] = project, ["requiredheequalshotupdate"] = "true", ["requirecompletecoverage"] = "true", ["dnlibpath"] = cli.Optional("dnlibpath") ?? "" });
         if (Preflight(preflight) != 0) throw new DheException("DHE project preflight failed.");
+        if (cli.Has("stopafterpreflight"))
+        {
+            Console.WriteLine("DHE workflow preflight passed; stopping before Player stages.");
+            return 0;
+        }
         if (cli.Has("runplayer"))
         {
             var adapterType = adapterClass.EndsWith(".Prepare", StringComparison.Ordinal) ? adapterClass[..^".Prepare".Length] : adapterClass;
             var common = new List<string> { "-batchmode", "-nographics", "-quit", "-projectPath", project, "-dheTarget", target, "-dheOutputRoot", output, "-dheBaselineRoot", baselineCopy, "-dheCurrentRoot", current, "-dheMode", mode, "-dheProjectPlan", Path.Combine(output, "project-preflight", "dhe-project-plan.json") };
             RunUnity(unity, project, common.Append("-executeMethod").Append(adapterType + ".StageRuntimePlan").Append("-logFile").Append(Path.Combine(output, "unity-stage.log")), new Dictionary<string, string> { ["DHE_BASELINE_ROOT"] = baseline }, Path.Combine(output, "unity-stage-process.log"), unityTimeout);
             RunUnity(unity, project, common.Append("-executeMethod").Append(adapterType + ".BuildDheYooAsset").Append("-logFile").Append(Path.Combine(output, "unity-yooasset.log")), new Dictionary<string, string> { ["DHE_BASELINE_ROOT"] = baseline }, Path.Combine(output, "unity-yooasset-process.log"), unityTimeout);
+            ValidateResourceEvidence(Path.Combine(output, "adapter", "resource-evidence.json"), target);
             RunUnity(unity, project, common.Append("-executeMethod").Append(adapterType + ".BuildScriptsOnly").Append("-logFile").Append(Path.Combine(output, "unity-scripts.log")), new Dictionary<string, string> { ["DHE_BASELINE_ROOT"] = baseline }, Path.Combine(output, "unity-scripts-process.log"), unityTimeout);
             RunUnity(unity, project, common.Append("-executeMethod").Append(adapterType + ".BuildFinalPlayer").Append("-logFile").Append(Path.Combine(output, "unity-player.log")), new Dictionary<string, string> { ["DHE_BASELINE_ROOT"] = baseline }, Path.Combine(output, "unity-player-process.log"), unityTimeout);
             WriteJson(Path.Combine(output, "workflow-report.json"), new { schemaVersion = 1, format = "hybridclr.dhe-project-workflow.json", generatedAtUtc = DateTimeOffset.UtcNow, passed = true, mode, target, projectPath = project, playerExecuted = true, preflight = Path.Combine(output, "project-preflight", "project-preflight-report.json") });
@@ -420,6 +426,23 @@ internal static class Program
     {
         var output = cli.Require("output"); var full = SafeReportPath(output, Array.Empty<string>()); Directory.CreateDirectory(Path.GetDirectoryName(full)!);
         File.WriteAllText(full, "// Add this file to the Unity project and call DheBuildPipeline from your C# build adapter.\n// The adapter must implement Prepare and Player entry points.\n", new UTF8Encoding(false)); Console.WriteLine("DHE C# adapter template: " + full); return 0;
+    }
+
+    private static void ValidateResourceEvidence(string path, string target)
+    {
+        var evidence = ReadJson<JsonElement>(RequireFile(path, "Resource evidence"));
+        if (GetInt(evidence, "schemaVersion") != 1 ||
+            GetString(evidence, "format") != "hybridclr.dhe-resource-evidence.json")
+            throw new DheException("Invalid DHE resource evidence format: " + path);
+        if (!evidence.TryGetProperty("passed", out var passed) || !passed.GetBoolean())
+            throw new DheException("DHE resource evidence reports failure: " + path);
+        if (!string.Equals(GetString(evidence, "target"), target, StringComparison.OrdinalIgnoreCase))
+            throw new DheException("DHE resource evidence target does not match workflow target: " + path);
+        if (string.IsNullOrWhiteSpace(GetString(evidence, "strategy")))
+            throw new DheException("DHE resource evidence strategy is missing: " + path);
+        var semantics = GetString(evidence, "pathSemantics");
+        if (semantics != "workspace-absolute-v1" && semantics != "archive-relative-v1")
+            throw new DheException("DHE resource evidence pathSemantics is invalid: " + path);
     }
 
     private static void PrintHelp() => Console.WriteLine("HybridCLR DHE C# tool\nCommands: version, mv, batch, baseline-manifest, aot-metadata-manifest, preflight, workflow, validate, archive, doctor, verify-package, publish, install, new-adapter\nExample: dotnet run --project tool/HybridCLR.DheTool.csproj -- workflow -ProjectPath <project> -SettingsFile <settings> -OutputRoot <output> -BaselineAotRoot <baseline> -Target Android -RunPlayer");
