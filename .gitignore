@@ -65,8 +65,3 @@ unity2021-dhe-demo/*.log
 # This project is a one-off Unity 2021 generation probe. Keep it locally for
 # historical diagnosis, but never include it in the formal source boundary.
 unity2021-probe/
-
-# Retained local diagnostics from the first generation-patching experiments.
-# The formal workflow uses the manifest-driven transformer instead.
-scripts/patch-dhe-method-body.ps1
-unity2021-dhe-demo/run-dhe-player-build.ps1
