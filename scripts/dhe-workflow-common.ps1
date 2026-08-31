@@ -553,7 +553,7 @@ function Assert-DhePlayerResultContract {
     if ($RequireDispatchEvidence -and
         (-not [StringComparer]::OrdinalIgnoreCase.Equals([string]$manifestHashProperty.Value, $NativeManifestHash) -or
          -not [StringComparer]::OrdinalIgnoreCase.Equals([string]$guardHashProperty.Value, $NativeGuardHash))) {
-        throw "External DHE Player result native manifest/guard hashes do not match orchestrator evidence."
+        throw "DHE Release/complete-coverage Player result native manifest/guard hashes do not match orchestrator evidence."
     }
 
     $transactionProperty = $Report.PSObject.Properties["transactionStatus"]
@@ -581,12 +581,12 @@ function Assert-DhePlayerResultContract {
             throw "DHE Player result expectedChangedMethodCount does not match MV evidence."
         }
     } elseif ($RequireDispatchEvidence) {
-        throw "External DHE Player runner must report expectedChangedMethodCount."
+        throw "DHE Release/complete-coverage Player result must report expectedChangedMethodCount."
     }
     $dispatchProperty = $Report.PSObject.Properties["dispatchProbeValidated"]
     if ($null -ne $dispatchProperty) {
         if ($dispatchProperty.Value -isnot [bool] -or
-            ($ExpectedChangedMethodCount -gt 0 -and -not [bool]$dispatchProperty.Value)) {
+            ($RequireDispatchEvidence -and -not [bool]$dispatchProperty.Value)) {
             throw "DHE Player result dispatchProbeValidated is invalid."
         }
         foreach ($probeName in @("changedProbeChanged", "unchangedProbeChanged")) {
@@ -600,7 +600,7 @@ function Assert-DhePlayerResultContract {
             throw "DHE Player result changed/unchanged dispatch evidence is inconsistent."
         }
     } elseif ($RequireDispatchEvidence) {
-        throw "External DHE Player runner must report dispatchProbeValidated evidence."
+        throw "DHE Release/complete-coverage Player result must report dispatchProbeValidated evidence."
     }
     if ($RequireDispatchEvidence -and -not [string]::IsNullOrWhiteSpace($Target)) {
         $targetProperty = $Report.PSObject.Properties["target"]

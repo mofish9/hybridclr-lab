@@ -3,6 +3,9 @@ param(
     [string]$LabRoot = "",
     [Parameter(Mandatory = $true)]
     [string]$ProjectPath,
+    # Direct callers retain the Unity default; reusable callers can bind the
+    # exact settings file used by the project workflow.
+    [string]$SettingsFile = "",
     [string]$RuntimeSource = "",
     [string]$OutputRoot = "",
     [string]$PackageLockPath = "",
@@ -203,7 +206,11 @@ foreach ($schemaName in $requiredSchemas) {
     Require-File (Join-Path $LabRoot "schemas/$schemaName") "formal DHE schema '$schemaName'" | Out-Null
 }
 
-$settingsPath = Join-Path $ProjectPath "ProjectSettings/HybridCLRSettings.asset"
+$settingsPath = if ([string]::IsNullOrWhiteSpace($SettingsFile)) {
+    Join-Path $ProjectPath "ProjectSettings/HybridCLRSettings.asset"
+} else {
+    [IO.Path]::GetFullPath($SettingsFile)
+}
 $packageLockPath = if (-not [string]::IsNullOrWhiteSpace($PackageLockPath)) {
     [IO.Path]::GetFullPath($PackageLockPath)
 } else {
@@ -852,6 +859,7 @@ $report = [ordered]@{
     } else { $null }
     labRoot = $LabRoot
     projectPath = $ProjectPath
+    settingsFile = $settingsPath
     runtimeSource = $runtimePath
     hotUpdateAssemblies = [string[]]$hotUpdate
     dheAotAssemblies = [string[]]$dheAot

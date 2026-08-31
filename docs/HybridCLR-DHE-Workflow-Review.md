@@ -131,7 +131,7 @@ DHE native CTest；门禁运行本身没有产生额外的非 ignored 源码改�
   unsupported=0、native entries=34；secondary direct/changed、direct/reflection/null generic、
   generic virtual、snapshot/hash 和同进程事务重试均通过。
 - `run-dhe-archive-gate.ps1`：归档复制和独立复核通过；native gate、source preflight
-  与 Player 报告均绑定到当前 runtime tree `A01A5B57210340CDF005F43F72BA60A3048F8DAFCBF78CC396155593A920D13A`，DheRuntime.cpp
+  与 Player 报告均绑定到当前 runtime tree `35F110133B02C5BF5A23C71E0F5F000AA076654281447C1DB9C19B6C3B8F2E3F`，DheRuntime.cpp
   hash 为 `6AA3633CB836CA79C20C2BBFADEE8A55CA16E6EB9924801EB45ED754B06C4553`。
 - `run-dhe-release-gate.ps1`：完整覆盖的 Exploratory 报告仍会被拒绝；Release 必须同时
   证明 `mode=Release`、project/tool 双 Git 身份均 clean 且 boundary tracked、clean runtime
@@ -142,11 +142,11 @@ non-surrogate external headers，以及完整 hot-update/DHE 集合。没有匹�
 安装时只能运行显式 exploratory native lane；该约束也通过手动
 `.github/workflows/dhe-native.yml` 固化到 self-hosted runner 入口。
 
-需要明确的是：本审查工作树中的正式 DHE 文件目前仍有未跟踪项（嵌入式 package、
-demo source、脚本、schema 和文档）。这只表示它们尚未形成提交，不表示它们是临时
-文件；真正交接前必须按上表的正式 allowlist 提交，并从一个 Git clean checkout
-重新运行 source preflight 和 demo workflow。不能用 `git add .` 把 Unity cache、
-Player 或历史实验目录一并纳入提交。
+需要明确的是：当前 formal worktree 已 clean，正式 DHE 文件已经形成可审查提交，
+并已生成本地 Release package/transport record。该记录绑定当前 source HEAD，尚未
+替代远端 branch 的正式发布；推送远端并从远端 clean checkout 重跑门禁后，才能作为
+团队共享的发布身份。不能用 `git add .` 把 Unity cache、Player 或历史实验目录
+一并纳入提交。
 
 下面几项仍属于正式化缺口，而不是应该通过删除文件解决的“临时内容”：
 
@@ -581,7 +581,7 @@ Standalone 隐式复用 Android 平台的 fallback。PowerShell adapter 通过 `
 和 PowerShell 7 在 Windows/macOS 共用；仓库 native CTest 仍依赖 Windows `cmd.exe`、MSVC
 和 Visual Studio，不能作为 macOS native gate。
 
-当前证据：formal static gate 通过（PowerShell parse、43 个 schema、source boundary、script
+当前证据：formal static gate 通过（PowerShell parse、45 个 schema、source boundary、script
 fixture、toolchain publish/install/upgrade/release fixture）；Cat Android
 `Exploratory + StopAfterPreflight` 通过，16/16 hot-update 与 DHE AOT 程序集一致，16 个 MV
 均生成且 project plan compatible，Unity 2021 Android `Prepare/GenerateAll` 和 YooAsset
@@ -589,7 +589,7 @@ fixture、toolchain publish/install/upgrade/release fixture）；Cat Android
 
 尚未完成的证据必须保持为条件状态：真实 changed-method 的 Android ARM64 Player dispatch、
 Android 设备 smoke、iOS Unity/Xcode/device smoke、完整 archive/release gate 均未在当前机器
-执行；当前 Unity 安装没有 iOS module。当前 formal worktree 和 Cat SVN working copy 也都
-是 dirty，尚未形成新的正式提交或发布包。生产接入前必须为目标平台提供
+执行；当前 Unity 安装没有 iOS module。formal worktree 当前 clean，Cat SVN working copy
+的生产状态仍未作为本轮 Release 身份验证。生产接入前必须为目标平台提供
 `PlayerSmokeRunner`，使用对应 target 的 previous stripped-AOT baseline/manifest，并在
 clean checkout 上重新取得 Player、archive 和 Release 身份证据。

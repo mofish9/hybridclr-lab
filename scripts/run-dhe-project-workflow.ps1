@@ -220,6 +220,7 @@ function Invoke-SourcePreflightStage {
     $sourceArgs = @{
         LabRoot = $labRoot
         ProjectPath = $projectPath
+        SettingsFile = $settingsPath
         RuntimeSource = $runtimePath
         OutputRoot = $sourceRoot
         RequireRuntime = $true
@@ -244,6 +245,11 @@ function Invoke-SourcePreflightStage {
     Require-File $sourceReportPath "DHE source preflight report"
     $sourceReport = Read-JsonFile $sourceReportPath "DHE source preflight report"
     $stages.sourcePreflight.report = $sourceReportPath
+    $sourceSettingsFile = [string](Get-PropertyValue $sourceReport "settingsFile")
+    if ([string]::IsNullOrWhiteSpace($sourceSettingsFile) -or
+        (Normalize-Path $sourceSettingsFile) -ne (Normalize-Path $settingsPath)) {
+        throw "DHE source preflight settingsFile does not match the workflow SettingsFile: expected $settingsPath, got $sourceSettingsFile"
+    }
     $stages.sourcePreflight.passed = $sourceExitCode -eq 0 -and
         (Require-BooleanProperty $sourceReport "passed" "DHE source preflight passed")
     if (-not $stages.sourcePreflight.passed) {
@@ -277,6 +283,7 @@ function Invoke-CleanCheckoutStage {
     $cleanCheckoutArgs = @{
         LabRoot = $labRoot
         ProjectPath = $projectPath
+        SettingsFile = $settingsPath
         RuntimeSource = $runtimePath
         OutputRoot = $cleanCheckoutRoot
         ToolSourceBoundaryPath = [IO.Path]::GetFullPath([string]$toolBoundaryPath[0])
@@ -350,8 +357,11 @@ try {
         -PackageLockPath $packageLockPathResolved -AllowMissing
     $embeddedPackagePresent = $null -ne $embeddedPackageRoot -and
         (Test-Path -LiteralPath $embeddedPackageRoot -PathType Container)
-    $embeddedPackageRequired = [bool]$RequireEmbeddedPackage -or
-        ($Mode -eq "Release" -and $embeddedPackagePresent)
+    # A publishable DHE Player must compile against the exact patched
+    # HybridCLR Unity package. Release therefore requires an explicit project
+    # package lock and an embedded package, while exploratory workflows may
+    # still use an adapter-managed external package.
+    $embeddedPackageRequired = [bool]$RequireEmbeddedPackage -or $Mode -eq "Release"
     if (-not $externalPlayerRunnerRequested -and
         -not [string]::IsNullOrWhiteSpace($adapterOptionsPath)) {
         try {
@@ -410,7 +420,7 @@ try {
             -AssemblyNames @($settingsForBaseline.dheAotAssemblies)
     }
     if ($embeddedPackageRequired -and [string]::IsNullOrWhiteSpace($PackageLockPath)) {
-        throw "Embedded package provenance requires an explicit -PackageLockPath. The core workflow does not use a Demo package lock fallback."
+        throw "DHE Release requires an explicit -PackageLockPath for the patched HybridCLR Unity package."
     }
     if ($RequireIdentityTemplate -and [string]::IsNullOrWhiteSpace($IdentityTemplatePath)) {
         throw "Identity template verification requires an explicit -IdentityTemplatePath."
@@ -550,6 +560,7 @@ try {
             target = $Target
             adapterScript = $adapterPath
             projectPath = $projectPath
+            settingsFile = $settingsPath
             baselineManifestPath = if ([string]::IsNullOrWhiteSpace($baselineManifestPath)) { $null } else { $baselineManifestPath }
             adapterOptionsPath = if ([string]::IsNullOrWhiteSpace($adapterOptionsPath)) { $null } else { $adapterOptionsPath }
             toolchainGate = $toolchainGatePath
@@ -603,7 +614,7 @@ try {
         -ExpectedChangedMethodCount $expectedChangedMethodCount `
         -NativeManifestHash ([string](Get-PropertyValue $workflow "nativeManifestSha256")) `
         -NativeGuardHash ([string](Get-PropertyValue $workflow "nativeGuardSourceSha256")) `
-        -Target $Target -RequireDispatchEvidence:$externalPlayerRunnerRequested
+        -Target $Target -RequireDispatchEvidence:($Mode -eq "Release" -or $coverageRequired)
     $yooAssetBuildReference = Get-PropertyValue $workflow "yooAssetBuild"
     $yooAssetBuildPath = if ($null -eq $yooAssetBuildReference -or
         [string]::IsNullOrWhiteSpace([string]$yooAssetBuildReference)) {
@@ -756,6 +767,7 @@ try {
         target = $Target
         adapterScript = $adapterPath
         projectPath = $projectPath
+        settingsFile = $settingsPath
         baselineManifestPath = if ([string]::IsNullOrWhiteSpace($baselineManifestPath)) { $null } else { $baselineManifestPath }
         adapterOptionsPath = if ([string]::IsNullOrWhiteSpace($adapterOptionsPath)) { $null } else { $adapterOptionsPath }
         toolchainGate = $toolchainGatePath
@@ -791,6 +803,7 @@ catch {
                 toolchainContractVersion = $toolchainContractVersion
                 adapterScript = $adapterPath
                 projectPath = $projectPath
+                settingsFile = $settingsPath
                 baselineManifestPath = if ([string]::IsNullOrWhiteSpace($baselineManifestPath)) { $null } else { $baselineManifestPath }
                 adapterOptionsPath = if ([string]::IsNullOrWhiteSpace($adapterOptionsPath)) { $null } else { $adapterOptionsPath }
                 expectedToolchainPackageId = if ([string]::IsNullOrWhiteSpace($ExpectedToolchainPackageId)) { $null } else { $ExpectedToolchainPackageId.ToLowerInvariant() }

@@ -4,7 +4,7 @@
   "title": "HybridCLR DHE Project Workflow Report",
   "type": "object",
   "additionalProperties": true,
-  "required": ["schemaVersion", "format", "generatedAtUtc", "passed", "mode", "toolchainContractVersion", "target", "adapterScript", "projectPath", "toolchainGate", "expectedToolchainPackageId", "sourcePreflight", "cleanCheckout", "projectPreflight", "workflowReport", "archiveGate", "releaseGate", "stages"],
+  "required": ["schemaVersion", "format", "generatedAtUtc", "passed", "mode", "toolchainContractVersion", "target", "adapterScript", "projectPath", "settingsFile", "toolchainGate", "expectedToolchainPackageId", "sourcePreflight", "cleanCheckout", "projectPreflight", "workflowReport", "archiveGate", "releaseGate", "stages"],
   "properties": {
     "schemaVersion": { "const": 1 },
     "format": { "const": "hybridclr.dhe-project-workflow.json" },
@@ -15,6 +15,7 @@
     "target": { "type": "string", "pattern": "^[A-Za-z0-9._-]+$" },
     "adapterScript": { "type": "string", "minLength": 1 },
     "projectPath": { "type": "string", "minLength": 1 },
+    "settingsFile": { "type": "string", "minLength": 1 },
     "toolchainGate": { "type": ["string", "null"] },
     "expectedToolchainPackageId": { "type": ["string", "null"], "pattern": "^[0-9a-fA-F]{64}$" },
     "sourcePreflight": { "type": ["string", "null"] },

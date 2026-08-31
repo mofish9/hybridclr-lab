@@ -302,6 +302,7 @@ try {
         $sourcePreflightParameters = @{
             LabRoot = $LabRoot
             ProjectPath = $ProjectPath
+            SettingsFile = $settingsPath
             RuntimeSource = $runtimeSourcePath
             OutputRoot = $sourcePreflightRoot
             PackageLockPath = $packageLockPath
@@ -322,6 +323,7 @@ try {
         $cleanCheckoutParameters = @{
             LabRoot = $LabRoot
             ProjectPath = $ProjectPath
+            SettingsFile = $settingsPath
             RuntimeSource = $runtimeSourcePath
             OutputRoot = $cleanCheckoutRoot
             IdentityTemplatePath = $identitySourcePath
@@ -778,6 +780,7 @@ if ($Invocation -eq "Standalone" -and $Mode -eq "Release") {
     $finalCleanCheckoutParameters = @{
         LabRoot = $LabRoot
         ProjectPath = $ProjectPath
+        SettingsFile = $settingsPath
         RuntimeSource = $runtimeSourcePath
         OutputRoot = $finalCleanCheckoutRoot
         IdentityTemplatePath = $identitySourcePath

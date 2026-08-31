@@ -11,7 +11,7 @@ implementation:
 
 - `hybridclr@9e4fc7219724a3c63ff845e0b2acaa7d10c2430b` is the formal
   `optimize/v8.13.0` commit and annotated tag `v8.13.0-opt4`.
-- `hybridclr_unity@9a9b703463a453e7cfa75957f17cbcb28acb21dc` is the formal
+- `hybridclr_unity@2f07ff4f862cd097742186f566dd602d88a8ebe0` is the formal
   `optimize/v8.13.0` package commit. The package does not receive an opt tag.
 - `il2cpp_plus` has no DHE source change in this round and continues to use the
   three opt3 engine tags.

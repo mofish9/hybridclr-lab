@@ -24,6 +24,7 @@ path, asset loading, Player build, and target-specific assertions.
 ```powershell
 ./scripts/run-dhe-source-preflight.ps1 `
   -ProjectPath C:/path/to/project `
+  -SettingsFile C:/path/to/project/ProjectSettings/HybridCLRSettings.asset `
   -RuntimeSource C:/path/to/staging/runtime/DHE-Tuanjie2022/libil2cpp `
   -PackageLockPath C:/path/to/dhe-package-lock.json `
   -OutputRoot ./artifacts/source-preflight `
@@ -51,9 +52,11 @@ runtime manifest 还记录 staged external headers 的 tree hash；预检和 nat
 `engine.unityVersion` 完全一致；Tuanjie 项目还必须匹配 `m_TuanjieEditorVersion` 与
 `engine.version`。只检查引擎家族名称不足以证明生成 C++ ABI 兼容。
 
-`PackageLockPath` 和 `RequireEmbeddedPackage` 只在项目把 HybridCLR 作为 embedded
-package 管理时启用。使用 registry/package manager 的项目可以省略它们，通用预检
-仍会执行程序集范围、runtime 和输出目录安全检查。
+`PackageLockPath` 和 `RequireEmbeddedPackage` 是 Release 的必需配置。若项目原本
+使用 registry/package manager，应先将审查过的集成 package commit vendor 到
+`Packages`，并在项目 lock 中记录实际 package 路径和 tree hash；探索模式才允许
+adapter 自己管理外部 package。`com.code-philosophy.hybridclr@8.13.0` 这样的
+目录名可以保留，但 lock 的 `packagePath` 必须包含完整后缀。
 Embedded package locks use `pathBase=project-root-v1`; `packagePath` must be a
 safe relative path such as `Packages/com.code-philosophy.hybridclr`. The lock
 file itself may live outside the project because its directory is never used as
@@ -183,12 +186,13 @@ and assembly set from that plan rather than rediscovering them.
 The nested `player` result must use `hybridclr.dhe-player-result.json`, report
 `loadError=OK`, exact planned/loaded DHE assembly sets, identity version 2,
 the generated-C++ snapshot kind, the MV-derived `changedMethodCount`, matching
-native manifest/guard hashes, and one successful hash/load validation for every
-loaded assembly. An external `PlayerSmokeRunner` must additionally echo the
-expected changed-method count, matching native manifest/guard hashes, and
-boolean changed/unchanged dispatch probe evidence. A built-in adapter may
-report the embedded Player identity hash separately from the post-Bee source
-audit hash; both values must still be valid SHA-256 values.
+native manifest/guard hashes, one successful hash/load validation for every
+loaded assembly, and boolean `dispatchProbeValidated`, `changedProbeChanged`,
+and `unchangedProbeChanged` fields from the real Player. An external
+`PlayerSmokeRunner` is the normal Android/iOS implementation of that probe; a
+built-in adapter may provide the same fields after running its own target Player.
+A built-in adapter may report the embedded Player identity hash separately from
+the post-Bee source audit hash; both values must still be valid SHA-256 values.
 When complete coverage is requested, the core also passes
 `-RequireCompleteCoverage` to the adapter so project-specific transforms and
 artifact checks use the same policy as preflight and release gates.
@@ -237,8 +241,9 @@ toolchain, use its `dhe.ps1 workflow` entry point and supply the externally
 pinned `-ExpectedToolchainPackageId` described in
 `docs/HybridCLR-DHE-Toolchain.md`.
 
-`Release` is the default and therefore requires complete native coverage and
-matching (non-surrogate) engine external headers;
+`Release` is the default and therefore requires a locked embedded DHE package,
+complete native coverage, matching (non-surrogate) engine external headers, and
+real Player dispatch evidence;
 `-Mode Exploratory` is the explicit non-release development lane; it may have
 complete native coverage but never produces a passing release identity.
 
@@ -591,9 +596,10 @@ the production fallback.
 
 ## Example project preflight
 
-For one reference project, using an available Android compile output as a
-preflight baseline and `Library/ScriptAssemblies` as current output, all 16
-configured hotfix DLLs were present. Seven passed the current strict
-method-body-only gate and nine required token/signature or type-layout
-handling. This is only an artifact compatibility result, not a project-specific
-design rule or a player performance conclusion.
+An earlier reference-project exploratory run, using an available Android
+compile output as a preflight baseline and `Library/ScriptAssemblies` as
+current output, found all 16 configured hotfix DLLs. Its result was seven
+method-body-only compatible assemblies and nine requiring token/signature or
+type-layout handling. This is historical artifact evidence only; it is not the
+current Cat Release result, a project-specific design rule, or a Player
+performance conclusion.

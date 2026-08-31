@@ -4,7 +4,7 @@
   "title": "HybridCLR DHE Source Preflight Report",
   "type": "object",
   "additionalProperties": true,
-  "required": ["schemaVersion", "format", "passed", "runtimeRequired", "runtimeReady", "cleanRuntimeSourcesRequired", "hotUpdateAssemblies", "dheAotAssemblies", "dheAotConfigured", "externalHotUpdateAssemblyDirs", "externalHeadersRequired", "externalHeadersSurrogate", "errors", "warnings", "checks"],
+  "required": ["schemaVersion", "format", "passed", "runtimeRequired", "runtimeReady", "cleanRuntimeSourcesRequired", "hotUpdateAssemblies", "dheAotAssemblies", "dheAotConfigured", "externalHotUpdateAssemblyDirs", "externalHeadersRequired", "externalHeadersSurrogate", "settingsFile", "errors", "warnings", "checks"],
   "properties": {
     "schemaVersion": { "const": 1 },
     "format": { "const": "hybridclr.dhe-source-preflight.json" },

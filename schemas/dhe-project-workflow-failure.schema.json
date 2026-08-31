@@ -4,7 +4,7 @@
   "title": "HybridCLR DHE Project Workflow Failure Report",
   "type": "object",
   "additionalProperties": true,
-  "required": ["schemaVersion", "format", "generatedAtUtc", "passed", "toolchainContractVersion", "adapterScript", "projectPath", "expectedToolchainPackageId", "error", "stages"],
+  "required": ["schemaVersion", "format", "generatedAtUtc", "passed", "toolchainContractVersion", "adapterScript", "projectPath", "settingsFile", "expectedToolchainPackageId", "error", "stages"],
   "properties": {
     "schemaVersion": { "const": 1 },
     "format": { "const": "hybridclr.dhe-project-workflow-failure.json" },
@@ -13,6 +13,7 @@
     "toolchainContractVersion": { "const": 1 },
     "adapterScript": { "type": "string", "minLength": 1 },
     "projectPath": { "type": "string", "minLength": 1 },
+    "settingsFile": { "type": "string", "minLength": 1 },
     "expectedToolchainPackageId": { "type": ["string", "null"], "pattern": "^[0-9a-fA-F]{64}$" },
     "error": { "type": "string", "minLength": 1 },
     "errors": { "type": "array", "items": { "type": "string" } },

@@ -267,6 +267,8 @@ namespace HybridCLR.Lab
             string transactionStatus = changedMethodCount == 0
                 ? "notApplicable"
                 : (retryValidated ? "validated" : "failed");
+            bool dispatchProbeValidated = loadError == LoadImageErrorCode.OK &&
+                (changedMethodCount == 0 || changedBehaviorValidated);
 
             return new DheRun
             {
@@ -358,6 +360,11 @@ namespace HybridCLR.Lab
                 plannedDheAssemblies = GetAssemblyNames(runtimePlan),
                 loadedDheAssemblies = GetAssemblyNames(loadedAssemblies),
                 changedMethodCount = changedMethodCount,
+                expectedChangedMethodCount = changedMethodCount,
+                dispatchProbeValidated = dispatchProbeValidated,
+                changedProbeChanged = addChanged,
+                unchangedProbeChanged = stableChanged,
+                dispatchProbeError = dispatchProbeValidated ? null : "DHE changed/unchanged dispatch assertions failed.",
                 transactionStatus = transactionStatus,
                 retryValidated = retryValidated,
                 retryAssemblyName = changedMethodCount == 0 ? null : retryAssemblyName,
@@ -917,6 +924,11 @@ namespace HybridCLR.Lab
             public string[] plannedDheAssemblies;
             public string[] loadedDheAssemblies;
             public int changedMethodCount;
+            public int expectedChangedMethodCount;
+            public bool dispatchProbeValidated;
+            public bool changedProbeChanged;
+            public bool unchangedProbeChanged;
+            public string dispatchProbeError;
             public string transactionStatus;
             public bool retryValidated;
             public string retryAssemblyName;

@@ -113,6 +113,27 @@ $externalEmbeddedPackageLockValidated = $LASTEXITCODE -eq 0 -and
 Require $externalEmbeddedPackageLockValidated `
     "A project-root-relative package lock outside the consumer project did not pass source preflight."
 
+# The reusable source gate must validate the exact settings file supplied by a
+# project adapter, rather than silently falling back to ProjectSettings when a
+# project keeps its generated settings in another project-owned location.
+$customSettingsPath = Join-Path $externalEmbeddedProject "Config/HybridCLRSettings.asset"
+New-Item -ItemType Directory -Force -Path (Split-Path -Parent $customSettingsPath) | Out-Null
+Copy-Item -LiteralPath (Join-Path $externalEmbeddedSettings "HybridCLRSettings.asset") -Destination $customSettingsPath -Force
+$customSettingsReportRoot = Join-Path $externalEmbeddedRoot "custom-settings-source-preflight"
+& (Resolve-DhePowerShellHost) -NoProfile -ExecutionPolicy Bypass -File `
+    (Join-Path $LabRoot "scripts/run-dhe-source-preflight.ps1") `
+    -LabRoot $LabRoot -ProjectPath $externalEmbeddedProject -SettingsFile $customSettingsPath `
+    -OutputRoot $customSettingsReportRoot -PackageLockPath $externalPackageLockPath `
+    -RequireEmbeddedPackage -RequireDheEqualsHotUpdate -ForceOutput | Out-Null
+$customSettingsReportPath = Join-Path $customSettingsReportRoot "source-preflight-report.json"
+$customSettingsReport = if (Test-Path -LiteralPath $customSettingsReportPath -PathType Leaf) {
+    Get-Content -Raw -LiteralPath $customSettingsReportPath | ConvertFrom-Json
+} else { $null }
+$customSettingsValidated = $LASTEXITCODE -eq 0 -and $null -ne $customSettingsReport -and
+    [bool]$customSettingsReport.passed -and
+    [IO.Path]::GetFullPath([string]$customSettingsReport.settingsFile) -eq [IO.Path]::GetFullPath($customSettingsPath)
+Require $customSettingsValidated "Source preflight did not honor an explicit SettingsFile path."
+
 # An embedded package lock must identify the same integrated package commit as
 # the runtime lock. A matching tree hash alone is insufficient because a
 # different commit can produce the same copied tree after local edits.

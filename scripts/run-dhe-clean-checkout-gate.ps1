@@ -3,6 +3,7 @@ param(
     [string]$LabRoot = "",
     [Parameter(Mandatory = $true)]
     [string]$ProjectPath,
+    [string]$SettingsFile = "",
     [string]$RuntimeSource = "",
     [string]$OutputRoot = "",
     [string]$PackageLockPath = "",
@@ -34,6 +35,11 @@ $LabRoot = if ([string]::IsNullOrWhiteSpace($LabRoot)) {
     [IO.Path]::GetFullPath($LabRoot)
 }
 $ProjectPath = [IO.Path]::GetFullPath($ProjectPath)
+$SettingsFile = if ([string]::IsNullOrWhiteSpace($SettingsFile)) {
+    Join-Path $ProjectPath "ProjectSettings/HybridCLRSettings.asset"
+} else {
+    [IO.Path]::GetFullPath($SettingsFile)
+}
 $OutputRoot = if ([string]::IsNullOrWhiteSpace($OutputRoot)) {
     Join-Path $LabRoot "artifacts/dhe-clean-checkout-gate"
 } else {
@@ -510,6 +516,7 @@ $packageArguments = if ($RequireEmbeddedPackage) {
 $cleanArgs = @(
     "-LabRoot", $LabRoot,
     "-ProjectPath", $ProjectPath,
+    "-SettingsFile", $SettingsFile,
     "-OutputRoot", $cleanRoot
 ) + $packageArguments + $identityArguments
 $cleanExit = Invoke-SourcePreflight $cleanArgs
@@ -725,6 +732,7 @@ $report = [ordered]@{
         Join-Path $LabRoot "manifests/dhe-source-boundary.json"
     } else { [IO.Path]::GetFullPath($SourceBoundaryPath) }
     sourceBoundarySha256 = if ($null -eq $projectGit) { $null } else { $projectGit.sourceBoundarySha256 }
+    settingsFile = $SettingsFile
     missingTrackedSources = @($missingTrackedSources)
     projectGit = $projectGit
     toolGit = $toolGit

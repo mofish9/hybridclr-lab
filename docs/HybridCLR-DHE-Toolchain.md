@@ -24,9 +24,10 @@ to the project adapter.
 - Windows or macOS with PowerShell 7 (`pwsh`) on `PATH`;
 - Git on `PATH` for publishing the toolchain and tool-source provenance;
 - Git or SVN on `PATH` for the project source checkout (`-ProjectVcs Svn` selects SVN explicitly);
-- a Unity project with HybridCLR settings;
-- `dnlib.dll` from the project's embedded HybridCLR package, or an explicit
-  `-DnlibPath` for registry/external packages;
+- a Unity project with HybridCLR settings and, for Release, the reviewed
+  `hybridclr_unity` package vendored under `Packages/`;
+- `dnlib.dll` from that package (or an explicit `-DnlibPath` only for
+  exploratory external-package workflows);
 - an already assembled DHE runtime whose manifest binds engine, repository,
   patch, and external-header identities.
 
@@ -39,7 +40,10 @@ external-header paths for each host platform; the project adapter owns Unity exe
 discovery, generated-C++ locations, and target-specific Player output. An iOS
 adapter must run on macOS with the Unity iOS module and may export an Xcode
 project; signing, Xcode compilation, device launch, and the runtime smoke test
-remain adapter-owned assertions.
+remain adapter-owned assertions. Release and complete-coverage workflows must
+publish `dispatchProbeValidated`, `changedProbeChanged`, and
+`unchangedProbeChanged` from the real Player result; an adapter may implement
+that probe in PowerShell, C#, or another platform-native runner.
 
 The previous-release stripped-AOT baseline is a target-bound input, not merely
 a directory containing files. A Release adapter must bind it to the same
@@ -48,6 +52,11 @@ release used to produce the current build. The core workflow requires the
 explicit `-BaselineAotRoot` argument; an environment variable alone is not a
 substitute. Projects should persist these facts in their own baseline manifest
 and reject a target or engine mismatch before Unity generation starts.
+
+The package lock is project configuration, not a lab default. It must record
+the exact integrated package commit, tree hash, and project-relative directory;
+versioned directories such as `Packages/com.code-philosophy.hybridclr@8.13.0`
+are supported when the suffix is present in `packagePath`.
 
 The supplied helper creates the manifest from a stripped-AOT directory and the
 runtime/settings locks. Keep the manifest beside the baseline directory and
@@ -263,10 +272,11 @@ $packageId = "<64-hex-package-id>"
   -ProjectPath C:/project `
   -SettingsFile C:/project/ProjectSettings/HybridCLRSettings.asset `
   -RuntimeSource C:/runtime/DHE/libil2cpp `
+  -PackageLockPath C:/project/Build/dhe-package-lock.json `
   -OutputRoot C:/build-artifacts/dhe-workflow `
   -BaselineAotRoot C:/releases/previous/stripped-aot `
   -ExpectedToolchainPackageId $packageId `
-  -Mode Release -ForceOutput
+  -Mode Release -RequireEmbeddedPackage -ForceOutput
 ```
 
 Other entry-point commands are:

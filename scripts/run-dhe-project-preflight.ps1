@@ -74,6 +74,7 @@ if ($runSourcePreflight) {
         (Join-Path $LabRoot "scripts/run-dhe-source-preflight.ps1"),
         "-LabRoot", $LabRoot,
         "-ProjectPath", $projectRootPath,
+        "-SettingsFile", $settingsPath,
         "-OutputRoot", (Split-Path -Parent $sourcePreflightPath),
         "-ForceOutput"
     )
@@ -96,9 +97,15 @@ if ($runSourcePreflight) {
     if (-not (Test-Path -LiteralPath $sourcePreflightPath -PathType Leaf)) {
         throw "DHE source preflight did not produce a report: $sourcePreflightPath"
     }
-    $sourcePreflightReport = Get-Content -Raw -LiteralPath $sourcePreflightPath | ConvertFrom-Json
-    $sourcePreflightPassed = $sourcePreflightExitCode -eq 0 -and
-        (Get-DheStrictBooleanProperty $sourcePreflightReport "passed" "DHE source preflight passed")
+$sourcePreflightReport = Get-Content -Raw -LiteralPath $sourcePreflightPath | ConvertFrom-Json
+$sourcePreflightPassed = $sourcePreflightExitCode -eq 0 -and
+    (Get-DheStrictBooleanProperty $sourcePreflightReport "passed" "DHE source preflight passed")
+$sourceSettingsFileProperty = $sourcePreflightReport.PSObject.Properties["settingsFile"]
+if ($null -eq $sourceSettingsFileProperty -or
+    [string]::IsNullOrWhiteSpace([string]$sourceSettingsFileProperty.Value) -or
+    ([IO.Path]::GetFullPath([string]$sourceSettingsFileProperty.Value) -ne $settingsPath)) {
+    $sourcePreflightPassed = $false
+}
     if (-not $sourcePreflightPassed) {
         throw "DHE source preflight failed. See $sourcePreflightPath"
     }
