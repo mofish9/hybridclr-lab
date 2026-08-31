@@ -599,6 +599,10 @@ Write-ArchiveJson "source-preflight-report.json" $sourcePreflightDocument | Out-
 
 $cleanCheckoutDocument = Get-Content -Raw -LiteralPath $cleanCheckoutPath | ConvertFrom-Json
 Set-PropertyValue $cleanCheckoutDocument "pathSemantics" "archive-relative-v1"
+# The clean-checkout report now records the exact HybridCLR settings file used
+# by preflight. Preserve that evidence as the copied archive settings payload
+# instead of leaking the workspace-absolute path into a portable report.
+Set-PropertyValue $cleanCheckoutDocument "settingsFile" ("project-settings/" + $settingsName)
 Set-PropertyValue $cleanCheckoutDocument "gitRoot" $null
 Set-PropertyValue $cleanCheckoutDocument "sourceBoundaryPath" $null
 foreach ($nullableIdentityField in @("gitHead", "gitTree", "sourceBoundarySha256", "vcs", "vcsRoot", "vcsRevision", "vcsRepository")) {
