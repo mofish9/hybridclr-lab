@@ -229,6 +229,8 @@ foreach ($documentPath in @($candidateFiles | Sort-Object)) {
             $schemaPath = $formatSchemas[$format]
         } elseif ($format -match '^hybridclr\.dhe-[A-Za-z0-9._-]+-workflow\.json$') {
             $schemaPath = $schemaByName["dhe-workflow-report.schema.json"]
+        } elseif ($format -match '^hybridclr\.dhe-[A-Za-z0-9._-]+-workflow-failure\.json$') {
+            $schemaPath = $schemaByName["dhe-workflow-failure.schema.json"]
         } elseif ($format.StartsWith("hybridclr.dhe", [StringComparison]::Ordinal)) {
             $errors.Add("No DHE schema is registered for format '$format': $documentPath")
             $documentRecords.Add([ordered]@{ path = $documentPath; schema = $null; passed = $false; detail = "unknown DHE format: $format" })

@@ -7,7 +7,7 @@
   "required": ["schemaVersion", "format", "passed", "error", "outputRoot"],
   "properties": {
     "schemaVersion": { "const": 1 },
-    "format": { "const": "hybridclr.dhe-demo-workflow-failure.json" },
+    "format": { "pattern": "^hybridclr\\.dhe-[A-Za-z0-9._-]+-workflow-failure\\.json$" },
     "generatedAtUtc": { "type": "string", "format": "date-time" },
     "passed": { "const": false },
     "error": { "type": "string", "minLength": 1 },
