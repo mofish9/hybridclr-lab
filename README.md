@@ -288,37 +288,12 @@ dotnet run --project tool/HybridCLR.DheTool.csproj -- assemble-runtime -LabRoot 
 dotnet run --project tool/HybridCLR.DheTool.csproj -- build-managed-cases -LabRoot . -Target StandaloneWindows64
 ```
 
-Once the clean runtime has been assembled, the complete gate can be run with:
-
-```powershell
-./scripts/run-correctness-gate.ps1 -Profile Baseline-Clean -SkipAssembly
-```
-
-Reproduce or inspect the formal baseline with:
-
-```powershell
-./scripts/run-benchmark-player.ps1 -Profile Baseline-Clean -Mode steady -BenchmarkRuntime hybridclr
-./scripts/run-benchmark-player.ps1 -Profile Baseline-Clean -Mode steady -BenchmarkRuntime aot
-./scripts/compare-benchmark-runtimes.ps1
-```
-
-Reproduce the current Candidate and three-way comparison:
-
-```powershell
-./scripts/run-correctness-gate.ps1 -Profile Candidate -SkipAssembly
-./scripts/run-benchmark-player.ps1 -Profile Candidate -Mode steady -BenchmarkRuntime hybridclr -Processes 10 -Output reports/candidate4-player-hybridclr-steady-repeat-benchmark.json
-./scripts/run-benchmark-player.ps1 -Profile Candidate -Mode steady -BenchmarkRuntime aot -Processes 10 -Output reports/candidate4-player-aot-steady-benchmark.json
-./scripts/run-benchmark-player.ps1 -Profile Candidate -Mode cold -BenchmarkRuntime hybridclr -Processes 10 -Output reports/candidate4-player-hybridclr-cold-benchmark.json
-./scripts/run-benchmark-player.ps1 -Profile Candidate -Mode cold -BenchmarkRuntime aot -Processes 10 -Output reports/candidate4-player-aot-cold-benchmark.json
-./scripts/compare-performance-profiles.ps1 -BaselineSteady reports/baseline-clean-player-hybridclr-steady-benchmark.json -CandidateSteady reports/candidate4-player-hybridclr-steady-repeat-benchmark.json -CandidateAotSteady reports/candidate4-player-aot-steady-benchmark.json -BaselineCold reports/baseline-clean-player-hybridclr-cold-benchmark.json -CandidateCold reports/candidate4-player-hybridclr-cold-benchmark.json -CandidateAotCold reports/candidate4-player-aot-cold-benchmark.json -Output reports/candidate4-triple-performance-comparison-repeat.json
-```
-
-When a new instruction needs execution evidence, run correctness with the
-instrumented profile and require the generic opcode names explicitly:
-
-```powershell
-./scripts/run-correctness-gate.ps1 -Profile Baseline-Instrumented -AllowDirty -RequiredOpcode SetArrayElementVarVar_i4_NoNullNoBounds,NewValueTypeCtor_4_scalar
-```
+The old correctness and benchmark runners were experiment-only PowerShell
+programs and are no longer distributed. Their reports remain historical
+records; current validation uses the C# `workflow`, `reference`,
+`compare-results`, and `native-tests` commands described above. This keeps the
+document from advertising commands that cannot be executed from a clean
+checkout.
 
 The comparison keeps Clean, Candidate, and AOT build manifests separate. It
 only aligns workload contracts and benchmark policy; the Candidate and its AOT
@@ -358,29 +333,19 @@ default. `-AllowSurrogateExternalHeaders` permits an explicit native-only run,
 but its report sets `mergeReady=false` and cannot replace that engine's Player
 gate.
 
-Metadata-only changes are validated against all three engine ABI surfaces without
-requiring the separate FGS bridge symbols:
-
-```powershell
-./scripts/run-runtime-compatibility-matrix.ps1 -CompatibilityScope Metadata -HybridClrSource ../worktrees/hybridclr-metadata-v8.13.0 -AllowDirty
-```
-
-Use the dedicated `Metadata-Unity2021` and `Metadata-Unity2022` profiles for
-metadata work. This keeps their staging separate from the full-generic-sharing
-compatibility lanes.
-
-The two matrix scopes retain independent reports in
-`reports/runtime-compatibility-matrix-workflow.json` and
-`reports/runtime-compatibility-matrix-metadata.json`.
+Metadata-only changes use the dedicated `Metadata-Unity2021` and
+`Metadata-Unity2022` profiles with the same C# `assemble-runtime` and
+`native-tests` commands. This keeps their staging separate from the
+full-generic-sharing compatibility lanes.
 
 The metadata touch curve separates selective reflection from the exhaustive
 worst case. Each point runs paired independent Player processes; selective
 points directly resolve a deterministic spread of generated types and do not
 call `Assembly.GetTypes()` first:
 
-```powershell
-./scripts/run-metadata-touch-curve.ps1 -Pairs 10 -Output reports/metadata-touch-curve.json
-```
+The curve generator from the retired experiment harness is not part of the
+formal toolchain. Use `generate-metadata-stress-source` and the project-owned
+workflow when a metadata stress run is required.
 
 The default curve covers 1, 10, 100, 500, and 1024 outer stress types plus the
 existing exhaustive all-types/all-members/all-attributes contract. Exhaustive
@@ -414,14 +379,10 @@ only `arm64-v8a`, cross-compiles the native unit suite as an AArch64 ELF, runs
 the full Player differential gate on a real device, and collects the
 same 21 performance workloads with device and thermal-state evidence.
 
-```powershell
-./scripts/build-android-arm64.ps1 -Profile Baseline-Clean -SkipAssembly
-./scripts/build-android-arm64.ps1 -Profile Candidate -SkipAssembly -AllowDirty
-./scripts/run-native-tests-android-arm64.ps1 -Profile Candidate
-./scripts/run-android-arm64-correctness.ps1 -Profile Candidate
-./scripts/run-android-arm64-paired-benchmark.ps1 -Pairs 10
-./scripts/run-android-arm64-benchmark.ps1 -Profile Candidate -Mode steady -BenchmarkRuntime aot
-```
+The old Android ARM64 runners were also experiment-only scripts. Android and
+iOS builds now enter through the cross-platform C# `workflow`; signing,
+deployment, device smoke, and platform-specific performance collection belong
+to the project's C# adapter.
 
 The paired runner alternates Baseline/Candidate order to balance thermal and
 time drift. An x86 emulator is not accepted as ARMv8 performance evidence.
