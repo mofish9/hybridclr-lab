@@ -16,9 +16,11 @@ validation contract for a new project; it does not require PowerShell.
   exploratory evidence only.
 - A staged runtime manifest bound to the same engine, runtime patch, package
   tree, target, and external headers.
-- A C# adapter exposing `Prepare`, `StageRuntimePlan`, `BuildScriptsOnly`, and
-  `BuildFinalPlayer` Unity execute-methods. Resource packaging, signing, and
-  device smoke remain project callbacks.
+- A C# adapter exposing `Prepare`, `StageRuntimePlan`, `BuildDheYooAsset`,
+  `BuildScriptsOnly`, and `BuildFinalPlayer` Unity execute-methods. A project
+  without YooAsset still implements `BuildDheYooAsset` and writes structured
+  `policy=skip` resource evidence. Signing and device smoke remain project
+  callbacks.
 
 ## Offline validation
 
