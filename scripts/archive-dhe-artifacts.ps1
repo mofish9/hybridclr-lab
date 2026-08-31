@@ -445,26 +445,28 @@ foreach ($record in @($runtimePlanDocument.assemblies)) {
 }
 $archiveAotMetadataRecords = New-Object System.Collections.Generic.List[object]
 $runtimePlanAotMetadata = Get-PropertyValue $runtimePlanDocument "aotMetadata"
-foreach ($record in @($runtimePlanAotMetadata)) {
-    $assemblyName = [string](Get-PropertyValue $record "assemblyName")
-    Assert-SafeAssemblyName $assemblyName
-    $reference = [string](Get-PropertyValue $record "path")
-    if ([string]::IsNullOrWhiteSpace($reference)) {
-        throw "Runtime plan AOT metadata has no path for '$assemblyName'."
+if ($null -ne $runtimePlanAotMetadata) {
+    foreach ($record in @($runtimePlanAotMetadata)) {
+        $assemblyName = [string](Get-PropertyValue $record "assemblyName")
+        Assert-SafeAssemblyName $assemblyName
+        $reference = [string](Get-PropertyValue $record "path")
+        if ([string]::IsNullOrWhiteSpace($reference)) {
+            throw "Runtime plan AOT metadata has no path for '$assemblyName'."
+        }
+        $source = Resolve-InputFile $reference "Runtime plan AOT metadata '$assemblyName'" ([IO.Path]::GetDirectoryName($runtimePlanPath))
+        $destination = Copy-ArchiveFile $source ("runtime-plan/aot/" + $assemblyName + ".bytes")
+        $archiveAotMetadataRecords.Add([ordered]@{
+            assemblyName = $assemblyName
+            sourceKind = [string](Get-PropertyValue $record "sourceKind")
+            sha256 = [string](Get-PropertyValue $record "sha256")
+            manifestSha256 = if ($null -eq $archiveAotMetadataManifestHash) {
+                [string](Get-PropertyValue $record "manifestSha256")
+            } else { $archiveAotMetadataManifestHash }
+            # Runtime-plan paths are resolved relative to runtime-plan/ by the
+            # independent validator, so omit that archive directory prefix.
+            path = "aot/" + $assemblyName + ".bytes"
+        })
     }
-    $source = Resolve-InputFile $reference "Runtime plan AOT metadata '$assemblyName'" ([IO.Path]::GetDirectoryName($runtimePlanPath))
-    $destination = Copy-ArchiveFile $source ("runtime-plan/aot/" + $assemblyName + ".bytes")
-    $archiveAotMetadataRecords.Add([ordered]@{
-        assemblyName = $assemblyName
-        sourceKind = [string](Get-PropertyValue $record "sourceKind")
-        sha256 = [string](Get-PropertyValue $record "sha256")
-        manifestSha256 = if ($null -eq $archiveAotMetadataManifestHash) {
-            [string](Get-PropertyValue $record "manifestSha256")
-        } else { $archiveAotMetadataManifestHash }
-        # Runtime-plan paths are resolved relative to runtime-plan/ by the
-        # independent validator, so omit that archive directory prefix.
-        path = "aot/" + $assemblyName + ".bytes"
-    })
 }
 $archiveRuntimePlan = [ordered]@{
     schemaVersion = [int](Get-PropertyValue $runtimePlanDocument "schemaVersion")
