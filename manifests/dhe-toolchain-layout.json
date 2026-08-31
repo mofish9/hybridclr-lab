@@ -1,7 +1,7 @@
 {
   "schemaVersion": 1,
   "format": "hybridclr.dhe-toolchain-layout.json",
-  "toolchainVersion": "0.1.10",
+  "toolchainVersion": "0.1.11",
   "contractVersion": 1,
   "exactPaths": [
     ".gitattributes",
@@ -53,6 +53,7 @@
     "schemas/dhe-workflow-report.schema.json",
     "schemas/dhe-workflow-config.schema.json",
     "schemas/dhe-yooasset-build.schema.json",
+    "templates/DheWorkflowBuild.cs",
     "templates/dhe-workflow-config.json"
   ],
   "prefixes": [
@@ -74,6 +75,7 @@
     "clear-unity-project-locks",
     "compare-results",
     "doctor",
+    "file-hash",
     "generate-metadata-stress-source",
     "generate-test-manifest",
     "install",
@@ -85,6 +87,7 @@
     "publish",
     "prepare-engine-test-project",
     "reference",
+    "tree-hash",
     "validate",
     "verify-package",
     "version",

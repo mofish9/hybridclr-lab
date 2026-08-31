@@ -11,7 +11,7 @@ implementation:
 
 - `hybridclr@9e4fc7219724a3c63ff845e0b2acaa7d10c2430b` is the formal
   `optimize/v8.13.0` commit and annotated tag `v8.13.0-opt4`.
-- `hybridclr_unity@2a08955fe670964a78709512fdb7a7649de473fe` is the formal
+- `hybridclr_unity@fbb83b4edd7b8a643518910496f5d97f934ea41e` is the formal
   `optimize/v8.13.0` package commit. The package does not receive an opt tag.
 - `il2cpp_plus` has no DHE source change in this round and continues to use the
   three opt3 engine tags.
@@ -61,10 +61,12 @@ repository checkout at the locked integrated commit.
 
 ## C# project workflow
 
-After a target-bound previous-release stripped-AOT root is available, a project
-provides a C# adapter with `Prepare`, `StageRuntimePlan`,
-`BuildDheYooAsset`, `BuildScriptsOnly`, and `BuildFinalPlayer`. Run the
-cross-platform host directly:
+After a target-bound previous-release stripped-AOT root is available, generate
+the compilable adapter template with `new-adapter`, then customize its resource,
+signing, and smoke callbacks. The adapter exposes `Prepare`, `StageRuntimePlan`,
+`BuildDheYooAsset`, `BuildScriptsOnly`, and `BuildFinalPlayer`. Package APIs own
+the stripped-AOT preparation, runtime-plan staging, generated-C++ discovery,
+guard injection, and Bee rebuild. Run the cross-platform host directly:
 
 ```text
 dotnet run --project tool/HybridCLR.DheTool.csproj --configuration Release --no-restore -- workflow \

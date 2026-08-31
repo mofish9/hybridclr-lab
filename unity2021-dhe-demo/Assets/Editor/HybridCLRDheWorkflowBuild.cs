@@ -26,29 +26,24 @@ namespace HybridCLR.Lab.Editor
             string baselineRoot = Path.GetFullPath(Argument("-dheBaselineRoot"));
             string currentRoot = Path.GetFullPath(Argument("-dheCurrentRoot"));
             string mode = OptionalArgument("-dheMode") ?? "Exploratory";
-            DheBuildPipeline.ValidateAssemblyScope(true, out string[] hotfix, out string[] dhe);
             string currentInputRoot = OptionalArgument("-dheCurrentInputRoot");
-            if (!string.IsNullOrWhiteSpace(currentInputRoot))
-            {
-                StageCurrentAssemblyInputs(Path.GetFullPath(currentInputRoot), dhe);
-            }
-            DheBuildPipeline.GenerateCurrentArtifacts(target);
-            string strippedRoot = Path.GetFullPath(SettingsUtil.GetAssembliesPostIl2CppStripDir(target));
-            CopyAssemblies(strippedRoot, currentRoot, dhe);
             string configuredBaseline = Environment.GetEnvironmentVariable("DHE_BASELINE_ROOT");
-            if (!string.IsNullOrWhiteSpace(configuredBaseline) && Directory.Exists(configuredBaseline))
-            {
-                CopyAssemblies(Path.GetFullPath(configuredBaseline), baselineRoot, dhe);
-            }
-            if (string.Equals(mode, "Release", StringComparison.OrdinalIgnoreCase) &&
-                !Directory.Exists(baselineRoot))
-            {
-                throw new BuildFailedException("Release Prepare requires a previous baseline root.");
-            }
-            if (!Directory.Exists(baselineRoot))
-            {
-                CopyAssemblies(strippedRoot, baselineRoot, dhe);
-            }
+            DheProjectPrepareResult prepared = DheBuildPipeline.PrepareProjectArtifacts(
+                new DheProjectPrepareOptions
+                {
+                    Target = target,
+                    Mode = mode,
+                    BaselineSourceRoot = !string.IsNullOrWhiteSpace(configuredBaseline) &&
+                        Directory.Exists(configuredBaseline) ? Path.GetFullPath(configuredBaseline) : null,
+                    BaselineOutputRoot = baselineRoot,
+                    CurrentOutputRoot = currentRoot,
+                    RequireDheEqualsHotUpdate = true,
+                    BeforeCurrentGeneration = names =>
+                    {
+                        if (!string.IsNullOrWhiteSpace(currentInputRoot))
+                            StageCurrentAssemblyInputs(Path.GetFullPath(currentInputRoot), names);
+                    },
+                });
             var report = new PrepareReport
             {
                 schemaVersion = 1,
@@ -63,12 +58,12 @@ namespace HybridCLR.Lab.Editor
                 settingsFile = Path.GetFullPath("ProjectSettings/HybridCLRSettings.asset"),
                 baselineRoot = baselineRoot,
                 currentRoot = currentRoot,
-                baselineSourceRoot = baselineRoot,
-                currentSourceRoot = strippedRoot,
-                runtimeAssemblySourceRoot = strippedRoot,
-                baselineGeneratedFromCurrent = !string.Equals(baselineRoot, strippedRoot, StringComparison.OrdinalIgnoreCase),
-                aotAssemblies = dhe,
-                hotUpdateAssemblies = hotfix,
+                baselineSourceRoot = prepared.BaselineSourceRoot,
+                currentSourceRoot = prepared.CurrentSourceRoot,
+                runtimeAssemblySourceRoot = prepared.CurrentSourceRoot,
+                baselineGeneratedFromCurrent = prepared.BaselineGeneratedFromCurrent,
+                aotAssemblies = prepared.DheAotAssemblyNames,
+                hotUpdateAssemblies = prepared.HotUpdateAssemblyNames,
             };
             WriteJson(Path.Combine(outputRoot, "adapter", "prepare.json"), report);
         }
@@ -170,13 +165,15 @@ namespace HybridCLR.Lab.Editor
                 CleanBuild = scriptsOnly,
                 Scenes = new[] { "Assets/Scenes/HybridCLRLab.unity" },
                 BuildPlayerCallback = options => BuildPipeline.BuildPlayer(options),
-                GeneratedCppFinalizeCallback = scriptsOnly
-                    ? (Action<BuildReport>)null
-                    : report => FinalizeGeneratedPlayer(target, outputRoot),
+                NativeFinalizeOptions = scriptsOnly ? null : CreateNativeFinalizeOptions(outputRoot, true),
+                NativeFinalizeResultCallback = scriptsOnly ? null :
+                    result => WriteNativeReports(target, outputRoot, result, true),
             });
             if (scriptsOnly)
             {
-                InjectGeneratedGuards(target, outputRoot);
+                DheNativeFinalizeResult nativeResult = DheBuildPipeline.FinalizeProjectNativeCode(
+                    CreateNativeFinalizeOptions(outputRoot, false));
+                WriteNativeReports(target, outputRoot, nativeResult, false);
             }
             WriteJson(Path.Combine(outputRoot, "adapter", scriptsOnly ? "build-scripts-only.json" : "build-final-player.json"), new PlayerBuildReport
             {
@@ -194,37 +191,20 @@ namespace HybridCLR.Lab.Editor
             }
         }
 
-        private static void FinalizeGeneratedPlayer(BuildTarget target, string outputRoot)
+        private static DheNativeFinalizeOptions CreateNativeFinalizeOptions(
+            string outputRoot, bool rebuildPlayer)
         {
-            // BuildPlayer may regenerate IL2CPP output after the scripts-only
-            // pass (for example when build identity changes). Patch the final
-            // snapshot and rebuild it while baseline inputs remain bound.
-            NativeGuardReport nativeReport = InjectGeneratedGuards(target, outputRoot);
-            DheBeeRebuildResult rebuild = DheBuildPipeline.RebuildPlayerFromGeneratedCpp(
-                new DheBeeRebuildOptions
-                {
-                    ProjectRoot = ProjectRoot(),
-                    GeneratedCppRoot = nativeReport.generatedCppRoot,
-                    LogPath = Path.Combine(outputRoot, "native", "bee-rebuild.log"),
-                    MaxAttempts = 3,
-                    TimeoutSeconds = 600,
-                });
-            WriteJson(Path.Combine(outputRoot, "adapter", "native-finalize.json"),
-                new NativeFinalizeReport
-                {
-                    schemaVersion = 1,
-                    format = "hybridclr.dhe-adapter-native-finalize.json",
-                    generatedAtUtc = DateTimeOffset.UtcNow.ToString("O"),
-                    passed = rebuild.ExitCode == 0 && nativeReport.passed,
-                    target = target.ToString(),
-                    generatedCppRoot = nativeReport.generatedCppRoot,
-                    manifestPath = nativeReport.manifestPath,
-                    beeBackendPath = rebuild.BeeBackendPath,
-                    dagPath = rebuild.DagPath,
-                    logPath = rebuild.LogPath,
-                    attempts = rebuild.Attempts,
-                    exitCode = rebuild.ExitCode,
-                });
+            return new DheNativeFinalizeOptions
+            {
+                ProjectRoot = ProjectRoot(),
+                ProjectPlanPath = Path.GetFullPath(Argument("-dheProjectPlan")),
+                OutputManifestPath = Path.Combine(outputRoot, "native", "dhe-native-manifest.json"),
+                BeeLogPath = Path.Combine(outputRoot, "native", "bee-rebuild.log"),
+                RequireCompleteCoverage = true,
+                RebuildPlayer = rebuildPlayer,
+                BeeMaxAttempts = 3,
+                BeeTimeoutSeconds = 600,
+            };
         }
 
         private static void EnsureBuildScene()
@@ -255,27 +235,10 @@ namespace HybridCLR.Lab.Editor
             }
         }
 
-        private static NativeGuardReport InjectGeneratedGuards(BuildTarget target, string outputRoot)
+        private static void WriteNativeReports(BuildTarget target, string outputRoot,
+            DheNativeFinalizeResult nativeResult, bool final)
         {
-            string planPath = Path.GetFullPath(Argument("-dheProjectPlan"));
-            if (!File.Exists(planPath))
-                throw new FileNotFoundException("DHE project plan was not found for native guard injection", planPath);
-            DheBuildPipeline.DheProjectPlan plan = JsonUtility.FromJson<DheBuildPipeline.DheProjectPlan>(
-                File.ReadAllText(planPath));
-            if (plan == null || plan.assemblies == null || plan.assemblies.Length == 0)
-                throw new BuildFailedException("DHE project plan has no assemblies for native guard injection.");
-            string[] mvPaths = plan.assemblies.Select(assembly => Path.GetFullPath(assembly.mvJson))
-                .Where(File.Exists).ToArray();
-            if (mvPaths.Length != plan.assemblies.Length)
-                throw new BuildFailedException("DHE project plan MV JSON references are incomplete.");
-            string generatedCppRoot = FindGeneratedCppRoot(plan.assemblies[0].assemblyName);
-            DheNativeGuardResult result = DheBuildPipeline.InjectGeneratedGuards(new DheNativeGuardOptions
-            {
-                MvJsonPaths = mvPaths,
-                GeneratedCppRoot = generatedCppRoot,
-                OutputManifestPath = Path.Combine(outputRoot, "native", "dhe-native-manifest.json"),
-                RequireCompleteCoverage = true,
-            });
+            DheNativeGuardResult result = nativeResult.GuardResult;
             var report = new NativeGuardReport
             {
                 schemaVersion = 1,
@@ -283,7 +246,7 @@ namespace HybridCLR.Lab.Editor
                 generatedAtUtc = DateTimeOffset.UtcNow.ToString("O"),
                 passed = result.UnsupportedMethodCount == 0 &&
                     (result.RequestedMethodCount == 0 || result.NativeEntryCount > 0),
-                generatedCppRoot = generatedCppRoot,
+                generatedCppRoot = nativeResult.GeneratedCppRoot,
                 manifestPath = result.ManifestPath,
                 requestedMethodCount = result.RequestedMethodCount,
                 transformedMethodCount = result.TransformedMethodCount,
@@ -292,24 +255,24 @@ namespace HybridCLR.Lab.Editor
                 target = target.ToString(),
             };
             WriteJson(Path.Combine(outputRoot, "adapter", "native-guards.json"), report);
-            return report;
-        }
-
-        private static string FindGeneratedCppRoot(string assemblyName)
-        {
-            string beeRoot = Path.Combine(ProjectRoot(), "Library", "Bee", "artifacts");
-            string marker = assemblyName + ".cpp";
-            string[] roots = Directory.Exists(beeRoot)
-                ? Directory.GetFiles(beeRoot, marker, SearchOption.AllDirectories)
-                    .Select(Path.GetDirectoryName)
-                    .Where(path => !string.IsNullOrWhiteSpace(path))
-                    .Distinct(StringComparer.OrdinalIgnoreCase)
-                    .OrderByDescending(path => Directory.GetLastWriteTimeUtc(path))
-                    .ToArray()
-                : Array.Empty<string>();
-            if (roots.Length == 0)
-                throw new DirectoryNotFoundException("DHE generated C++ root was not produced: " + marker);
-            return roots[0];
+            if (!final) return;
+            DheBeeRebuildResult rebuild = nativeResult.BeeRebuildResult;
+            WriteJson(Path.Combine(outputRoot, "adapter", "native-finalize.json"),
+                new NativeFinalizeReport
+                {
+                    schemaVersion = 1,
+                    format = "hybridclr.dhe-adapter-native-finalize.json",
+                    generatedAtUtc = DateTimeOffset.UtcNow.ToString("O"),
+                    passed = rebuild != null && rebuild.ExitCode == 0 && report.passed,
+                    target = target.ToString(),
+                    generatedCppRoot = nativeResult.GeneratedCppRoot,
+                    manifestPath = result.ManifestPath,
+                    beeBackendPath = rebuild == null ? null : rebuild.BeeBackendPath,
+                    dagPath = rebuild == null ? null : rebuild.DagPath,
+                    logPath = rebuild == null ? null : rebuild.LogPath,
+                    attempts = rebuild == null ? 0 : rebuild.Attempts,
+                    exitCode = rebuild == null ? -1 : rebuild.ExitCode,
+                });
         }
 
         private static void ConfigurePlayerSettings(BuildTarget target)

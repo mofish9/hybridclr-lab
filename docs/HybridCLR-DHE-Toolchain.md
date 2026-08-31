@@ -39,18 +39,25 @@ external prerequisite (Unity, CMake, compiler, git, or dotnet) is missing.
 ## Project Configuration
 
 The host is project-independent and does not select a Demo adapter implicitly.
-Create a configuration with `new-config`, then set the project's adapter method
-and target-specific paths:
+Generate the Unity C# adapter and configuration, then customize only the
+project-owned resource, signing, and smoke policies:
 
 ```text
+dotnet run --project tool/HybridCLR.DheTool.csproj -- new-adapter \
+  -Root . -Namespace MyGame.Editor \
+  -Output C:/project/Assets/Editor/DHE/DheWorkflowBuild.cs
 dotnet run --project tool/HybridCLR.DheTool.csproj -- new-config \
   -Output C:/project/Assets/Editor/DHE/dhe-workflow-config.json
 dotnet run --project tool/HybridCLR.DheTool.csproj -- workflow \
   -Config C:/project/Assets/Editor/DHE/dhe-workflow-config.json
 ```
 
-Paths in the config are resolved relative to the config file; explicit command
-line values override config values. `unityArguments` is a scalar map for
+The generated adapter is a compilable StreamingAssets implementation, not a
+stub. It calls every package-owned DHE phase and writes the required structured
+evidence. A YooAsset/Addressables project replaces its asset root/resolver and
+resource evidence; a production project also supplies signing and runtime smoke
+logic. Paths in the config are resolved relative to the config file; explicit
+command line values override config values. `unityArguments` is a scalar map for
 project-owned Unity adapter options (for example `dhePreview`,
 `dheStandalone`, or a target-specific fallback metadata root). The host still
 owns the reserved DHE paths and stage ordering. The config contract is
@@ -88,18 +95,22 @@ are never allowed to overwrite an assembly or settings file.
 
 The project provides a C# class containing these Unity execute-methods:
 
-- `Prepare`: call `DheBuildPipeline.GenerateCurrentArtifacts(target)` and
-  write `adapter/prepare.json`.
-- `StageRuntimePlan`: call the package API with an explicit `Target`, complete
-  hotfix load list, AOT metadata roots, and project resource callbacks.
+- `Prepare`: call `DheBuildPipeline.PrepareProjectArtifacts` to regenerate the
+  current stripped-AOT image and stage complete baseline/current assembly sets,
+  then write `adapter/prepare.json`.
+- `StageRuntimePlan`: call `DheBuildPipeline.StageRuntimePlan` with an explicit
+  `Target`, complete hotfix load list, AOT metadata roots, and project resource
+  callbacks. `RuntimeAssetPathResolver` maps staged files to a YooAsset,
+  Addressables, or other catalog locator; its default is StreamingAssets.
 - `BuildScriptsOnly` and `BuildFinalPlayer`: call
   `DheBuildPipeline.BuildPlayer` with the project build callback.
-- `BuildFinalPlayer`: supply `GeneratedCppFinalizeCallback`; inside that
-  callback resolve the final generated-C++ root, call
-  `DheBuildPipeline.InjectGeneratedGuards`, then call
-  `DheBuildPipeline.RebuildPlayerFromGeneratedCpp`. The callback runs before
-  the package restores temporary baseline assembly inputs, preventing Bee from
-  invalidating UnityLinker/IL2CPP and overwriting the guards.
+- `BuildScriptsOnly`: call `DheBuildPipeline.FinalizeProjectNativeCode` with
+  `RebuildPlayer=false` after the clean generated-C++ pass and record its guard
+  evidence.
+- `BuildFinalPlayer`: set `DhePlayerBuildOptions.NativeFinalizeOptions`. The
+  package resolves the final generated-C++ root, injects all MV guards, rebuilds
+  the editor-owned Bee graph, and invokes `NativeFinalizeResultCallback` before
+  temporary baseline assembly inputs are restored.
 
 The host starts Unity directly with `ProcessStartInfo`; no shell is involved.
 The final-player phase binds `HYBRIDCLR_DHE_AOT_BASELINE_ROOT`, while
@@ -116,9 +127,10 @@ the adapter's `StageRuntimePlan`, `BuildDheYooAsset`, `BuildScriptsOnly`, and
 A project contract test can pass `-StopAfterPreflight` after Prepare and strict
 MV validation; this exits before runtime-plan/resource/Player stages while
 still leaving all preflight reports on disk.
-A project adapter owns MV-to-generated-C++ root discovery, platform signing,
-and device smoke callbacks. Native guard injection and Bee graph evaluation
-are package C# APIs and are mandatory for a DHE Player. Those stages must
+A project adapter owns resource catalog integration, platform signing, and
+device smoke callbacks. Generated-C++ discovery, native guard injection, and
+Bee graph evaluation are package C# APIs and are mandatory for a DHE Player.
+Those stages must
 produce the existing JSON evidence before a build is called Release-ready; a
 compiled Player without changed/unchanged dispatch evidence is intentionally
 rejected.

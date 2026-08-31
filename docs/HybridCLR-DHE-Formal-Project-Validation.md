@@ -48,17 +48,22 @@ or Player runtime behavior.
 
 The host calls the adapter's `Prepare` with `DHE_BASELINE_ROOT` set to the
 previous release. The adapter must call
-`DheBuildPipeline.GenerateCurrentArtifacts(target)`, which clears inherited
-baseline state and regenerates the current stripped image. The final Player
-must call `DheBuildPipeline.BuildPlayer` with the same target and baseline
-root; the package binds `HYBRIDCLR_DHE_AOT_BASELINE_ROOT` only for that phase.
+`DheBuildPipeline.PrepareProjectArtifacts`, which clears inherited baseline
+state, regenerates the current stripped image, and copies the complete DHE
+baseline/current assembly sets. The final Player must call
+`DheBuildPipeline.BuildPlayer` with the same target and baseline root and set
+`NativeFinalizeOptions`; the package binds `HYBRIDCLR_DHE_AOT_BASELINE_ROOT`
+only for that phase and finalizes the generated C++ before restoring temporary
+baseline inputs.
 Every Unity invocation must pass an explicit target. Do not rely on the active
 Editor target when staging runtime plans or fallback AOT metadata.
 
 ## Runtime and resource evidence
 
 The runtime plan must contain each DHE assembly's current DLL, MV binary,
-baseline snapshot, and AOT metadata records. A resource policy of `required`
+baseline snapshot, and AOT metadata records. Projects that do not load from
+StreamingAssets must provide `RuntimeAssetPathResolver` so every serialized
+locator names the actual catalog asset. A resource policy of `required`
 must produce structured YooAsset evidence. A policy of `skip` must produce a
 structured alternate resource-evidence document with target and strategy;
 absence of that document is a Release failure.

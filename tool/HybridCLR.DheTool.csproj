@@ -18,5 +18,6 @@
       <Private>true</Private>
     </Reference>
     <None Include="dnlib.dll" CopyToOutputDirectory="PreserveNewest" />
+    <None Include="../templates/DheWorkflowBuild.cs" Link="templates/DheWorkflowBuild.cs" CopyToOutputDirectory="PreserveNewest" />
   </ItemGroup>
 </Project>

@@ -33,8 +33,26 @@ internal static class LabCommands
             "wait-editor" => WaitEditor(cli),
             "prepare-engine-test-project" => PrepareEngineTestProject(cli),
             "bootstrap-repos" => BootstrapRepos(cli),
+            "tree-hash" => TreeHashCommand(cli),
+            "file-hash" => FileHashCommand(cli),
             _ => throw new InvalidOperationException("Unsupported C# lab command: " + cli.Command)
         };
+    }
+
+    private static int TreeHashCommand(Cli cli)
+    {
+        var root = RequireDirectory(cli.Require("path"));
+        var hash = TreeHash(root, cli.Has("excludegit"), cli.GetList("ignore"));
+        Console.WriteLine(hash);
+        return 0;
+    }
+
+    private static int FileHashCommand(Cli cli)
+    {
+        var path = Path.GetFullPath(cli.Require("path"));
+        if (!File.Exists(path)) throw new FileNotFoundException(path);
+        Console.WriteLine(Sha256File(path).ToUpperInvariant());
+        return 0;
     }
 
     private static int GenerateTestManifest(Cli cli)
@@ -443,12 +461,22 @@ internal static class LabCommands
     private static void WriteJson(string path, object value) { Directory.CreateDirectory(Path.GetDirectoryName(Path.GetFullPath(path))!); File.WriteAllText(path, JsonSerializer.Serialize(value, Json), new UTF8Encoding(false)); }
     private static void WriteText(string path, string value) { Directory.CreateDirectory(Path.GetDirectoryName(Path.GetFullPath(path))!); File.WriteAllText(path, value, new UTF8Encoding(false)); }
     private static string Sha256File(string path) { using var sha = SHA256.Create(); using var stream = File.OpenRead(path); return Convert.ToHexString(sha.ComputeHash(stream)).ToLowerInvariant(); }
-    private static string TreeHash(string root, bool excludeGit = false)
+    private static string TreeHash(string root, bool excludeGit = false,
+        IEnumerable<string>? ignoredPaths = null)
     {
         root = RequireDirectory(root);
+        var ignored = new HashSet<string>((ignoredPaths ?? Array.Empty<string>())
+            .Select(path => path.Replace('\\', '/').TrimStart('/')), StringComparer.OrdinalIgnoreCase);
         using var sha = SHA256.Create();
         var buffer = new byte[1024 * 1024];
-        foreach (var file in Directory.GetFiles(root, "*", SearchOption.AllDirectories).Where(x => !excludeGit || !Path.GetRelativePath(root, x).Split(Path.DirectorySeparatorChar)[0].Equals(".git", StringComparison.OrdinalIgnoreCase)).OrderBy(x => Path.GetRelativePath(root, x).Replace(Path.DirectorySeparatorChar, '/'), StringComparer.Ordinal))
+        foreach (var file in Directory.GetFiles(root, "*", SearchOption.AllDirectories)
+                     .Where(path =>
+                     {
+                         var relative = Path.GetRelativePath(root, path).Replace(Path.DirectorySeparatorChar, '/');
+                         return !ignored.Contains(relative) && (!excludeGit ||
+                             !relative.Split('/')[0].Equals(".git", StringComparison.OrdinalIgnoreCase));
+                     })
+                     .OrderBy(x => Path.GetRelativePath(root, x).Replace(Path.DirectorySeparatorChar, '/'), StringComparer.Ordinal))
         {
             var rel = Path.GetRelativePath(root, file).Replace(Path.DirectorySeparatorChar, '/');
             var name = Encoding.UTF8.GetBytes(rel + "\n");

@@ -39,7 +39,8 @@ internal static class Program
                 "generate-test-manifest" or "generate-metadata-stress-source" or
                 "reference" or "compare-results" or "check-environment" or
                 "clear-unity-project-locks" or "wait-editor" or
-                "prepare-engine-test-project" or "bootstrap-repos" => LabCommands.Run(cli),
+                "prepare-engine-test-project" or "bootstrap-repos" or
+                "tree-hash" or "file-hash" => LabCommands.Run(cli),
                 _ => throw new DheException($"Unknown DHE command '{cli.Command}'.")
             };
         }
@@ -434,8 +435,33 @@ internal static class Program
 
     private static int NewAdapter(Cli cli)
     {
-        var output = cli.Require("output"); var full = SafeReportPath(output, Array.Empty<string>()); Directory.CreateDirectory(Path.GetDirectoryName(full)!);
-        File.WriteAllText(full, "// Add this file to the Unity project and call DheBuildPipeline from your C# build adapter.\n// The adapter must implement Prepare and Player entry points.\n", new UTF8Encoding(false)); Console.WriteLine("DHE C# adapter template: " + full); return 0;
+        var output = cli.Require("output");
+        var full = SafeReportPath(output, Array.Empty<string>());
+        var namespaceName = cli.Optional("namespace") ?? "YourGame.Editor";
+        if (!IsCSharpNamespace(namespaceName))
+            throw new DheException("Namespace must be a dotted C# identifier: " + namespaceName);
+
+        var explicitTemplate = cli.Optional("template");
+        var candidates = new[]
+        {
+            explicitTemplate,
+            Path.Combine(cli.Root, "templates", "DheWorkflowBuild.cs"),
+            Path.Combine(Directory.GetCurrentDirectory(), "templates", "DheWorkflowBuild.cs"),
+            Path.GetFullPath(Path.Combine(AppContext.BaseDirectory, "..", "..", "..", "..",
+                "templates", "DheWorkflowBuild.cs")),
+            Path.Combine(AppContext.BaseDirectory, "templates", "DheWorkflowBuild.cs"),
+        };
+        var template = candidates.Where(path => !string.IsNullOrWhiteSpace(path))
+            .Select(path => Path.GetFullPath(path!)).FirstOrDefault(File.Exists);
+        if (template == null)
+            throw new DheException("DHE C# adapter template was not found. Pass -Root or -Template explicitly.");
+
+        Directory.CreateDirectory(Path.GetDirectoryName(full)!);
+        var source = File.ReadAllText(template).Replace("__DHE_NAMESPACE__", namespaceName,
+            StringComparison.Ordinal);
+        File.WriteAllText(full, source, new UTF8Encoding(false));
+        Console.WriteLine("DHE C# adapter template: " + full);
+        return 0;
     }
 
     private static int NewConfig(Cli cli)
@@ -548,7 +574,7 @@ internal static class Program
             throw new DheException("DHE resource evidence pathSemantics is invalid: " + path);
     }
 
-    private static void PrintHelp() => Console.WriteLine("HybridCLR DHE C# tool\nCommands: version, mv, batch, baseline-manifest, aot-metadata-manifest, preflight, workflow, validate, archive, doctor, verify-package, publish, install, new-adapter, new-config, assemble-runtime, native-tests, build-managed-cases, generate-test-manifest, generate-metadata-stress-source, reference, compare-results, check-environment, clear-unity-project-locks, wait-editor, prepare-engine-test-project, bootstrap-repos\nExample: dotnet run --project tool/HybridCLR.DheTool.csproj -- workflow -Config <project/dhe-workflow-config.json>");
+    private static void PrintHelp() => Console.WriteLine("HybridCLR DHE C# tool\nCommands: version, mv, batch, baseline-manifest, aot-metadata-manifest, preflight, workflow, validate, archive, doctor, verify-package, publish, install, new-adapter, new-config, assemble-runtime, native-tests, build-managed-cases, generate-test-manifest, generate-metadata-stress-source, reference, compare-results, check-environment, clear-unity-project-locks, wait-editor, prepare-engine-test-project, bootstrap-repos, tree-hash, file-hash\nExample: dotnet run --project tool/HybridCLR.DheTool.csproj -- workflow -Config <project/dhe-workflow-config.json>");
 
     private static string ResolveUnity(Cli cli, string project) => RequireFile(cli.Optional("unity") ?? Environment.GetEnvironmentVariable("DHE_UNITY_EXE") ?? throw new DheException("Set -Unity or DHE_UNITY_EXE."), "Unity editor");
     private static void RunUnity(string executable, string workingDirectory, IEnumerable<string> arguments, IDictionary<string, string> environment, string logPath, int timeoutSeconds)
@@ -585,6 +611,7 @@ internal static class Program
     private static void EnsureOutputOutsideRoot(string output, string root) { var outPath = Path.GetFullPath(output).TrimEnd(Path.DirectorySeparatorChar, Path.AltDirectorySeparatorChar); var rootPath = Path.GetFullPath(root).TrimEnd(Path.DirectorySeparatorChar, Path.AltDirectorySeparatorChar); if (outPath.StartsWith(rootPath + Path.DirectorySeparatorChar, StringComparison.OrdinalIgnoreCase) || rootPath.StartsWith(outPath + Path.DirectorySeparatorChar, StringComparison.OrdinalIgnoreCase) || rootPath.Equals(outPath, StringComparison.OrdinalIgnoreCase)) throw new DheException("Output must be external to the source root: " + output); }
     private static string Sha256File(string path) { using var sha = SHA256.Create(); using var input = File.OpenRead(path); return Convert.ToHexString(sha.ComputeHash(input)).ToLowerInvariant(); }
     private static string NormalizeName(string value) { var trimmed = value.Trim(); var name = trimmed.EndsWith(".dll", StringComparison.OrdinalIgnoreCase) ? trimmed[..^4] : trimmed; if (name.Length == 0 || name.Contains('/') || name.Contains('\\') || Path.IsPathRooted(name) || name.Contains("..", StringComparison.Ordinal)) throw new DheException("Assembly name must be a simple file name: " + value); return name; }
+    private static bool IsCSharpNamespace(string value) => value.Split('.', StringSplitOptions.None).All(part => part.Length > 0 && (char.IsLetter(part[0]) || part[0] == '_') && part.Skip(1).All(ch => char.IsLetterOrDigit(ch) || ch == '_'));
     private static bool SetEquals(IEnumerable<string> a, IEnumerable<string> b) => new HashSet<string>(a, StringComparer.OrdinalIgnoreCase).SetEquals(b);
     private static string GetString(Dictionary<string, JsonElement> d, string key) => d.TryGetValue(key, out var e) && e.ValueKind == JsonValueKind.String ? e.GetString() ?? "" : "";
     private static int GetInt(Dictionary<string, JsonElement> d, string key) => d.TryGetValue(key, out var e) && e.TryGetInt32(out var v) ? v : 0;
