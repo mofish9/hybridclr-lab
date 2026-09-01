@@ -40,8 +40,8 @@ Editor 版本、未登记 package 文件或 runtime tree 漂移都会失败。
    baseline 集合。
 2. host 对全部 `dheAotAssemblies` 生成 MV JSON/binary，要求其集合严格等于
    `hotUpdateAssemblies`。
-3. `StageRuntimePlan` 写入 current、baseline、MV、snapshot 和逐文件 SHA-256，同时绑定
-   AOT metadata manifest。
+3. `StageRuntimePlan` 向运行时资源写入 current、MV、snapshot 和逐文件 SHA-256，同时绑定
+   AOT metadata manifest；完整 baseline 只保留在 workflow handoff 中供独立审计，不进入资源包。
 4. scripts-only Player 生成干净 C++；package 解析所有 changed token、注入 native guard，
    并生成完整 build identity。
 5. final Player 编译该 identity；第二次 native finalize 必须证明 guard 和 immutable native

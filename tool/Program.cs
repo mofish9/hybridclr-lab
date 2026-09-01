@@ -435,6 +435,7 @@ internal static partial class Program
         var player = ReadJson<JsonElement>(playerPath);
         var native = ReadJson<JsonElement>(nativePath);
         var identity = ReadJson<JsonElement>(identityPath);
+        var resource = ReadJson<JsonElement>(resourcePath);
         var records = plan.GetProperty("assemblies").EnumerateArray().ToArray();
         var changed = records.Sum(record => GetInt(record, "changedMethodCount"));
         var methodCount = records.Sum(record =>
@@ -468,7 +469,9 @@ internal static partial class Program
             capability = new { methodCount, changedMethodCount = changed, typeChangeCount = typeChanges, compatibility = "compatible" },
             nativeGuardCoverage = new { manifestAvailable = true, changedMethodCount = GetInt(native, "changedMethodCount"), supportedChangedMethodCount = GetInt(native, "supportedChangedMethodCount"), unsupportedChangedMethodCount = GetInt(native, "unsupportedChangedMethodCount"), nativeEntryCount = GetInt(native, "nativeEntryCount"), guardedMethodCount = GetInt(native, "supportedChangedMethodCount"), complete = GetInt(native, "unsupportedChangedMethodCount") == 0 && GetInt(native, "changedMethodCount") == changed },
             player, playerResult = playerPath, nativeManifest = nativePath, buildIdentity = identityPath,
-            resourceEvidence = resourcePath, resourceBuildPolicy = "skip", artifactValidation = (string?)null,
+            resourceEvidence = resourcePath,
+            resourceBuildPolicy = GetString(resource, "policy") ?? "required",
+            artifactValidation = (string?)null,
             archiveManifest = (string?)null, archiveGate = (string?)null, runtimeSource = evidence.RuntimeManifest
         };
     }
@@ -1405,17 +1408,28 @@ internal static partial class Program
             throw new DheException("DHE resource evidence target does not match workflow target: " + path);
         if (string.IsNullOrWhiteSpace(GetString(evidence, "strategy")))
             throw new DheException("DHE resource evidence strategy is missing: " + path);
+        var policy = GetString(evidence, "policy");
+        if (policy != "required" && policy != "skip")
+            throw new DheException("DHE resource evidence policy is invalid: " + path);
         var semantics = GetString(evidence, "pathSemantics");
         if (semantics != "workspace-absolute-v1" && semantics != "archive-relative-v1")
             throw new DheException("DHE resource evidence pathSemantics is invalid: " + path);
-        if (GetString(evidence, "strategy") == "cat-yooasset-structured-report")
+        string? resourceBuild = GetString(evidence, "resourceBuild");
+        if (string.IsNullOrWhiteSpace(resourceBuild))
+            resourceBuild = GetString(evidence, "yooAssetBuild");
+        if (policy == "required" && string.IsNullOrWhiteSpace(resourceBuild))
+            throw new DheException("Required DHE resource build evidence is missing: " + path);
+        if (!string.IsNullOrWhiteSpace(resourceBuild))
         {
-            var reportPath = ResolveEvidencePath(GetString(evidence, "yooAssetBuild"), Path.GetDirectoryName(path)!,
-                "YooAsset structured report");
+            var reportPath = ResolveEvidencePath(resourceBuild, Path.GetDirectoryName(path)!,
+                "structured resource build report");
             var report = ReadJson<JsonElement>(reportPath);
-            if (GetInt(report, "schemaVersion") != 1 || GetString(report, "format") != "hybridclr.dhe-yooasset-build.json" ||
-                !GetBool(report, "passed") || !string.Equals(GetString(report, "target"), target, StringComparison.OrdinalIgnoreCase))
-                throw new DheException("YooAsset structured report contract is invalid: " + reportPath);
+            if (GetInt(report, "schemaVersion") != 1 || !GetBool(report, "passed") ||
+                !string.Equals(GetString(report, "target"), target, StringComparison.OrdinalIgnoreCase))
+                throw new DheException("Structured resource build report contract is invalid: " + reportPath);
+            if (GetString(evidence, "strategy") != "cat-yooasset-structured-report") return;
+            if (GetString(report, "format") != "hybridclr.dhe-yooasset-build.json")
+                throw new DheException("YooAsset structured report format is invalid: " + reportPath);
             var packageValue = GetString(report, "packageDirectory") ?? "";
             var packageDirectory = Path.GetFullPath(Path.IsPathRooted(packageValue) ? packageValue :
                 Path.Combine(Path.GetDirectoryName(reportPath)!, packageValue));

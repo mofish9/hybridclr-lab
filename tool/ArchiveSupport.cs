@@ -38,8 +38,14 @@ internal static partial class Program
 
     private static void CopyArchiveResourceEvidence(string archive, string input, IList<ArchivePathMapping> mappings)
     {
-        var reportPath = Path.Combine(input, "dhe-yooasset-build.json");
-        if (!File.Exists(reportPath)) return;
+        var evidencePath = Path.Combine(input, "adapter", "resource-evidence.json");
+        if (!File.Exists(evidencePath)) return;
+        var evidence = ReadJson<JsonElement>(evidencePath);
+        var reportReference = GetString(evidence, "resourceBuild");
+        if (string.IsNullOrWhiteSpace(reportReference)) reportReference = GetString(evidence, "yooAssetBuild");
+        if (string.IsNullOrWhiteSpace(reportReference)) return;
+        var reportPath = ResolveEvidencePath(reportReference, Path.GetDirectoryName(evidencePath)!,
+            "Structured resource build report");
         var report = ReadJson<JsonElement>(reportPath);
         if (GetString(report, "format") != "hybridclr.dhe-yooasset-build.json" || !GetBool(report, "passed"))
             throw new DheException("YooAsset archive evidence is not a passing structured report.");
