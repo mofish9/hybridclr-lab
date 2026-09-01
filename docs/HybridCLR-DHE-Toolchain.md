@@ -147,6 +147,13 @@ produce the existing JSON evidence before a build is called Release-ready; a
 compiled Player without changed/unchanged dispatch evidence is intentionally
 rejected.
 
+Native manifest resolver version 3 uses `guard-block-set-v1`. Every method owns
+one begin/end delimited guard block. The package rejects missing, duplicate, or
+non-canonical blocks, while the independent release gate hashes the same blocks
+in path/function/token order. Unrelated generated C++ bytes are provenance but
+are deliberately outside this identity, so compiling the embedded build
+identity cannot create a self-referential hash.
+
 For a project adapter named `MyGame.Editor.DheWorkflowBuild`, invoke the same
 host on Windows or macOS with an explicit method name:
 

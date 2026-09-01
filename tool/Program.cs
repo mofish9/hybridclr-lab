@@ -17,6 +17,8 @@ internal static partial class Program
         "mv-field-order", "mv-switch-target", "mv-assembly-metadata", "mv-flags-tamper",
         "mv-token-tamper", "verify-require-release", "verify-expected-id", "verify-package-id-recompute",
         "verify-extra-source", "verify-release-bit-tamper", "evidence-role-format", "archive-safe-replace",
+        "native-guard-unrelated-source-stable", "native-guard-block-tamper",
+        "native-guard-duplicate-marker", "native-guard-missing-end-marker",
         "schema-valid-document", "schema-maximum-rejected", "schema-additional-type-rejected",
         "schema-unsupported-keyword-rejected", "schema-gate-contract"
     };

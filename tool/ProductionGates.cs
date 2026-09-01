@@ -1,3 +1,4 @@
+using System.Globalization;
 using System.Security.Cryptography;
 using System.Text;
 using System.Text.Json;
@@ -8,6 +9,10 @@ namespace HybridCLR.DheTool;
 
 internal static partial class Program
 {
+    private const string NativeGuardHashContract = "guard-block-set-v1";
+    private const string NativeGuardBeginPrefix = "HYBRIDCLR_DHE_GUARD_BEGIN_V5:";
+    private const string NativeGuardEndPrefix = "HYBRIDCLR_DHE_GUARD_END_V5:";
+
     private sealed record ProductionEvidence(bool Passed, bool ToolchainPassed, bool SourcePreflightPassed,
         bool CleanCheckoutPassed, string? ToolchainGate, string SourcePreflight, string CleanCheckout,
         string? ExpectedPackageId, string? RuntimeManifest);
@@ -787,6 +792,7 @@ internal static partial class Program
         try { PrepareArchiveDestination(unsafeArchive, true); } catch { unsafeArchiveRejected = File.Exists(sentinel); }
         AddRegressionCheck(checks, errors, "archive-safe-replace", unsafeArchiveRejected,
             "non-archive directory replacement must be rejected without deleting contents");
+        RunGuardBlockHashRegressions(regressionRoot, checks, errors);
         var schemasRoot = Path.Combine(cli.Root, "schemas");
         var workflowSchema = ReadJson<JsonElement>(Path.Combine(schemasRoot, "dhe-workflow-config.schema.json"));
         var validConfig = ReadJson<JsonElement>(Path.Combine(cli.Root, "templates", "dhe-workflow-config.json"));
@@ -853,6 +859,64 @@ internal static partial class Program
     {
         checks.Add(new { name, passed, details });
         if (!passed) errors.Add(name + ": " + details);
+    }
+
+    private static void RunGuardBlockHashRegressions(string regressionRoot, List<object> checks,
+        List<string> errors)
+    {
+        const string functionName = "DheRegression_Probe_m0123456789ABCDEF";
+        const uint methodToken = 100663297;
+        var guardRoot = Path.Combine(regressionRoot, "guard-block-hash");
+        Directory.CreateDirectory(guardRoot);
+        var sourcePath = Path.Combine(guardRoot, "Regression.cpp");
+        var begin = NativeGuardBeginPrefix + functionName + ":" +
+            methodToken.ToString(CultureInfo.InvariantCulture);
+        var end = NativeGuardEndPrefix + functionName + ":" +
+            methodToken.ToString(CultureInfo.InvariantCulture);
+        var block = "    // " + begin + "\r\n" +
+                    "    hybridclr::dhe::RecordAotEntry();\r\n" +
+                    "    const RuntimeMethod* dheMethod = method;\r\n" +
+                    "    // " + end;
+        using var nativeDocument = JsonDocument.Parse(JsonSerializer.Serialize(new
+        {
+            schemaVersion = 1,
+            resolverVersion = 3,
+            abiContract = "il2cpp-generated-cpp-signature-v2",
+            guardHashContract = NativeGuardHashContract,
+            generatedCppRoot = guardRoot,
+            methods = new[] { new { functionName, methodToken, sourceFile = sourcePath } }
+        }, Json));
+        File.WriteAllText(sourcePath, "// unrelated before\r\n" + block +
+            "\r\n// unrelated after\r\n", new UTF8Encoding(false));
+        var originalHash = GuardBlockSetHash(nativeDocument.RootElement, guardRoot, guardRoot);
+        File.WriteAllText(sourcePath, "// changed unrelated content\n" +
+            block.Replace("\r\n", "\n", StringComparison.Ordinal) +
+            "\n// another unrelated change\n", new UTF8Encoding(false));
+        var surroundingHash = GuardBlockSetHash(nativeDocument.RootElement, guardRoot, guardRoot);
+        AddRegressionCheck(checks, errors, "native-guard-unrelated-source-stable",
+            originalHash == surroundingHash,
+            "unrelated generated C++ changes must not change the guard-block identity");
+
+        File.WriteAllText(sourcePath, block.Replace("RecordAotEntry", "RecordAotEntryTampered",
+            StringComparison.Ordinal), new UTF8Encoding(false));
+        var tamperedHash = GuardBlockSetHash(nativeDocument.RootElement, guardRoot, guardRoot);
+        AddRegressionCheck(checks, errors, "native-guard-block-tamper",
+            originalHash != tamperedHash, "a guard block mutation must change its identity");
+
+        File.WriteAllText(sourcePath, block + "\r\n" + block, new UTF8Encoding(false));
+        var duplicateRejected = false;
+        try { _ = GuardBlockSetHash(nativeDocument.RootElement, guardRoot, guardRoot); }
+        catch { duplicateRejected = true; }
+        AddRegressionCheck(checks, errors, "native-guard-duplicate-marker", duplicateRejected,
+            "duplicate guard markers must be rejected");
+
+        File.WriteAllText(sourcePath, block.Substring(0,
+            block.IndexOf("    // " + end, StringComparison.Ordinal)), new UTF8Encoding(false));
+        var missingEndRejected = false;
+        try { _ = GuardBlockSetHash(nativeDocument.RootElement, guardRoot, guardRoot); }
+        catch { missingEndRejected = true; }
+        AddRegressionCheck(checks, errors, "native-guard-missing-end-marker", missingEndRejected,
+            "a guard without its end marker must be rejected");
     }
 
     private static void WriteMutatedAssembly(string source, string destination, Action<ModuleDefMD> mutate)
@@ -968,8 +1032,9 @@ internal static partial class Program
     private static void ValidateNativeManifest(JsonElement native, IReadOnlyDictionary<string, AssemblyDiff> diffs,
         List<string> errors)
     {
-        if (GetInt(native, "schemaVersion") != 1 || GetInt(native, "resolverVersion") != 2 ||
-            GetString(native, "abiContract") != "il2cpp-generated-cpp-signature-v2")
+        if (GetInt(native, "schemaVersion") != 1 || GetInt(native, "resolverVersion") != 3 ||
+            GetString(native, "abiContract") != "il2cpp-generated-cpp-signature-v2" ||
+            GetString(native, "guardHashContract") != NativeGuardHashContract)
             errors.Add("Native manifest contract is invalid.");
         var expected = diffs.ToDictionary(pair => pair.Key,
             pair => pair.Value.ChangedTokens.ToHashSet(), StringComparer.OrdinalIgnoreCase);
@@ -1068,8 +1133,13 @@ internal static partial class Program
             var relative = Path.GetRelativePath(generatedRoot, path);
             if (!SafeRelative(relative) || !File.Exists(path)) errors.Add("Build identity generated C++ file is missing or unsafe: " + path);
         }
-        if (!FileSetHash(identityPaths, generatedRoot).Equals(GetString(identity, "nativeGuardSourceSha256"), StringComparison.OrdinalIgnoreCase))
-            errors.Add("Build identity generated C++ source hash is invalid.");
+        try
+        {
+            if (!GuardBlockSetHash(native, nativeDocumentRoot, generatedRoot).Equals(
+                    GetString(identity, "nativeGuardSourceSha256"), StringComparison.OrdinalIgnoreCase))
+                errors.Add("Build identity native guard block hash is invalid.");
+        }
+        catch (Exception ex) { errors.Add("Build identity native guard blocks: " + ex.Message); }
         var recordedManifest = ResolveEvidencePath(GetString(identity, "nativeManifestPath"),
             Path.GetDirectoryName(identityPath)!, "Build identity native manifest");
         if (!Sha256File(recordedManifest).Equals(GetString(identity, "nativeManifestSha256"), StringComparison.OrdinalIgnoreCase))
@@ -1101,23 +1171,80 @@ internal static partial class Program
         return Convert.ToHexString(sha.Hash!).ToLowerInvariant();
     }
 
-    private static string FileSetHash(IEnumerable<string> paths, string root)
+    private static string GuardBlockSetHash(JsonElement native, string nativeDocumentRoot, string root)
     {
-        using var sha = SHA256.Create();
-        foreach (var path in paths.Select(Path.GetFullPath).Distinct(StringComparer.OrdinalIgnoreCase)
-                     .OrderBy(path => path, StringComparer.Ordinal))
+        var records = new List<GuardBlockHashRecord>();
+        var identities = new HashSet<string>(StringComparer.Ordinal);
+        foreach (var method in native.GetProperty("methods").EnumerateArray())
         {
-            var relative = Path.GetRelativePath(root, path).Replace(Path.DirectorySeparatorChar, '/');
-            if (!SafeRelative(relative)) throw new DheException("Generated C++ hash path escapes its root: " + path);
-            var name = Encoding.UTF8.GetBytes(relative + "\n");
-            sha.TransformBlock(name, 0, name.Length, name, 0);
-            var bytes = File.ReadAllBytes(RequireFile(path, "Generated C++ hash input"));
-            sha.TransformBlock(bytes, 0, bytes.Length, bytes, 0);
-            sha.TransformBlock(new byte[] { (byte)'\n' }, 0, 1, null, 0);
+            var functionName = GetString(method, "functionName") ?? "";
+            if (string.IsNullOrWhiteSpace(functionName) || functionName.IndexOfAny(new[] { '\r', '\n' }) >= 0)
+                throw new DheException("Native guard function name is invalid.");
+            if (!method.TryGetProperty("methodToken", out var tokenValue) || !tokenValue.TryGetUInt32(out var methodToken) || methodToken == 0)
+                throw new DheException("Native guard method token is invalid: " + functionName);
+            var sourceValue = GetString(method, "sourceFile") ?? "";
+            var sourcePath = RequireFile(Path.IsPathRooted(sourceValue) ? sourceValue :
+                Path.Combine(nativeDocumentRoot, sourceValue), "Native guard source");
+            var relative = Path.GetRelativePath(root, sourcePath).Replace(Path.DirectorySeparatorChar, '/');
+            if (!SafeRelative(relative))
+                throw new DheException("Native guard source escapes its generated C++ root: " + sourcePath);
+            var identity = relative + "\n" + functionName + "\n" +
+                methodToken.ToString(CultureInfo.InvariantCulture);
+            if (!identities.Add(identity))
+                throw new DheException("Native manifest contains a duplicate guard identity: " + functionName +
+                    "/" + methodToken.ToString(CultureInfo.InvariantCulture));
+            var source = File.ReadAllText(sourcePath, Encoding.UTF8);
+            records.Add(new GuardBlockHashRecord(relative, functionName, methodToken,
+                ExtractGuardBlock(source, functionName, methodToken)));
+        }
+        using var sha = SHA256.Create();
+        var domain = Encoding.UTF8.GetBytes(NativeGuardHashContract + "\n");
+        sha.TransformBlock(domain, 0, domain.Length, domain, 0);
+        foreach (var record in records.OrderBy(item => item.RelativePath, StringComparer.Ordinal)
+                     .ThenBy(item => item.FunctionName, StringComparer.Ordinal)
+                     .ThenBy(item => item.MethodToken))
+        {
+            var header = Encoding.UTF8.GetBytes(record.RelativePath + "\n" + record.FunctionName + "\n" +
+                record.MethodToken.ToString(CultureInfo.InvariantCulture) + "\n");
+            sha.TransformBlock(header, 0, header.Length, header, 0);
+            var block = Encoding.UTF8.GetBytes(record.Block + "\n");
+            sha.TransformBlock(block, 0, block.Length, block, 0);
         }
         sha.TransformFinalBlock(Array.Empty<byte>(), 0, 0);
         return Convert.ToHexString(sha.Hash!).ToLowerInvariant();
     }
+
+    private static string ExtractGuardBlock(string source, string functionName, uint methodToken)
+    {
+        var token = methodToken.ToString(CultureInfo.InvariantCulture);
+        var beginMarker = NativeGuardBeginPrefix + functionName + ":" + token;
+        var endMarker = NativeGuardEndPrefix + functionName + ":" + token;
+        var begin = RequireSingleGuardMarker(source, beginMarker);
+        var end = RequireSingleGuardMarker(source, endMarker);
+        if (end <= begin) throw new DheException("Native guard end marker precedes its begin marker: " + functionName);
+        var lineStart = source.LastIndexOf('\n', begin);
+        lineStart = lineStart < 0 ? 0 : lineStart + 1;
+        var blockEnd = end + endMarker.Length;
+        var lineEnd = source.IndexOf('\n', blockEnd);
+        if (lineEnd < 0) lineEnd = source.Length;
+        var suffix = source.Substring(blockEnd, lineEnd - blockEnd).TrimEnd('\r');
+        if (suffix.Any(character => character != ' ' && character != '\t'))
+            throw new DheException("Native guard end marker has unexpected trailing content: " + functionName);
+        return source.Substring(lineStart, blockEnd - lineStart)
+            .Replace("\r\n", "\n", StringComparison.Ordinal)
+            .Replace("\r", "\n", StringComparison.Ordinal).TrimEnd('\n');
+    }
+
+    private static int RequireSingleGuardMarker(string source, string marker)
+    {
+        var first = source.IndexOf(marker, StringComparison.Ordinal);
+        if (first < 0 || source.IndexOf(marker, first + marker.Length, StringComparison.Ordinal) >= 0)
+            throw new DheException("Native guard marker is missing or duplicated: " + marker);
+        return first;
+    }
+
+    private sealed record GuardBlockHashRecord(string RelativePath, string FunctionName, uint MethodToken,
+        string Block);
 
     private static void ValidateRuntimePlanFiles(JsonElement plan, string root, List<string> errors)
     {
