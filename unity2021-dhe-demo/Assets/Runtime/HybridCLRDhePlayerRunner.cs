@@ -70,7 +70,7 @@ namespace HybridCLR.Lab
             foreach (DheAssemblyPlanData assemblyPlan in runtimePlan.assemblies)
             {
                 if (assemblyPlan == null || string.IsNullOrWhiteSpace(assemblyPlan.assemblyName) ||
-                    string.IsNullOrWhiteSpace(assemblyPlan.current) || string.IsNullOrWhiteSpace(assemblyPlan.baseline) ||
+                    string.IsNullOrWhiteSpace(assemblyPlan.current) ||
                     string.IsNullOrWhiteSpace(assemblyPlan.mv) || string.IsNullOrWhiteSpace(assemblyPlan.snapshot))
                 {
                     throw new InvalidDataException("DHE runtime plan contains an incomplete assembly record.");
@@ -80,16 +80,15 @@ namespace HybridCLR.Lab
                     throw new InvalidDataException("DHE runtime plan contains duplicate assembly: " + assemblyPlan.assemblyName);
                 }
                 byte[] assemblyCurrent = ReadStreamingAssetBytes(assemblyPlan.current);
-                byte[] assemblyBaseline = ReadStreamingAssetBytes(assemblyPlan.baseline);
                 byte[] assemblyMv = ReadStreamingAssetBytes(assemblyPlan.mv);
                 byte[] assemblySnapshot = ReadStreamingAssetBytes(assemblyPlan.snapshot);
-                byte[] assemblyExpectedCurrentHash = Slice(assemblyMv, 56, 32);
-                byte[] assemblyExpectedBaselineHash = Slice(assemblyMv, 24, 32);
                 if (assemblyMv.Length < 88 || !string.Equals(System.Text.Encoding.ASCII.GetString(assemblyMv, 0, 8), "DHEMVLT1", StringComparison.Ordinal) ||
                     BitConverter.ToUInt32(assemblyMv, 8) != 1)
                 {
                     throw new InvalidDataException("DHE MV binary header is invalid for " + assemblyPlan.assemblyName);
                 }
+                byte[] assemblyExpectedBaselineHash = Slice(assemblyMv, 24, 32);
+                byte[] assemblyExpectedCurrentHash = Slice(assemblyMv, 56, 32);
                 int assemblyNameSize = checked((int)BitConverter.ToUInt32(assemblyMv, 12));
                 if (assemblyNameSize <= 0 || 88 + assemblyNameSize > assemblyMv.Length ||
                     !string.Equals(System.Text.Encoding.UTF8.GetString(assemblyMv, 88, assemblyNameSize), assemblyPlan.assemblyName, StringComparison.Ordinal))
@@ -97,22 +96,33 @@ namespace HybridCLR.Lab
                     throw new InvalidDataException("DHE MV assembly identity does not match runtime plan for " + assemblyPlan.assemblyName);
                 }
                 byte[] assemblyCurrentHash = Sha256(assemblyCurrent);
-                byte[] assemblyBaselineHash = Sha256(assemblyBaseline);
+                byte[] assemblyMvHash = Sha256(assemblyMv);
+                byte[] assemblySnapshotHash = Sha256(assemblySnapshot);
+                // The baseline image is compiled into the Player. Its identity
+                // is carried by the MV header and the 32-byte snapshot asset;
+                // no baseline DLL is shipped as a runtime asset.
+                byte[] assemblyBaselineHash = assemblyExpectedBaselineHash;
                 string actualCurrentHash = ToHex(assemblyCurrentHash);
                 string actualBaselineHash = ToHex(assemblyBaselineHash);
+                string actualMvHash = ToHex(assemblyMvHash);
+                string actualSnapshotHash = ToHex(assemblySnapshotHash);
                 string mvCurrentHash = ToHex(assemblyExpectedCurrentHash);
                 string mvBaselineHash = ToHex(assemblyExpectedBaselineHash);
                 string snapshotHash = ToHex(assemblySnapshot);
                 if (!string.Equals(assemblyPlan.currentSha256, actualCurrentHash, StringComparison.OrdinalIgnoreCase) ||
-                    !string.Equals(assemblyPlan.baselineSha256, actualBaselineHash, StringComparison.OrdinalIgnoreCase) ||
-                    !ByteArraysEqual(assemblyCurrentHash, assemblyExpectedCurrentHash) || !ByteArraysEqual(assemblyBaselineHash, assemblyExpectedBaselineHash) ||
+                    (!string.IsNullOrWhiteSpace(assemblyPlan.baselineSha256) &&
+                        !string.Equals(assemblyPlan.baselineSha256, actualBaselineHash, StringComparison.OrdinalIgnoreCase)) ||
+                    !string.Equals(assemblyPlan.mvSha256, actualMvHash, StringComparison.OrdinalIgnoreCase) ||
+                    !string.Equals(assemblyPlan.snapshotSha256, actualSnapshotHash, StringComparison.OrdinalIgnoreCase) ||
+                    !ByteArraysEqual(assemblyCurrentHash, assemblyExpectedCurrentHash) ||
                     !ByteArraysEqual(assemblySnapshot, assemblyExpectedBaselineHash))
                 {
                     throw new InvalidDataException("DHE runtime plan hash binding failed for " +
                         assemblyPlan.assemblyName + "; current=" + actualCurrentHash +
                         "/plan=" + assemblyPlan.currentSha256 + "/mv=" + mvCurrentHash +
                         "; baseline=" + actualBaselineHash + "/plan=" + assemblyPlan.baselineSha256 +
-                        "/mv=" + mvBaselineHash + "; snapshot=" + snapshotHash);
+                        "/mv=" + mvBaselineHash + "; snapshot=" + snapshotHash +
+                        "/plan=" + assemblyPlan.snapshotSha256);
                 }
                 int assemblyChangedMethodCount = checked((int)BitConverter.ToUInt32(assemblyMv, 16));
                 changedMethodCount = checked(changedMethodCount + assemblyChangedMethodCount);
@@ -164,13 +174,12 @@ namespace HybridCLR.Lab
 
             LoadedDheAssembly mainLoaded = loadedAssemblies[MainAssemblyName];
             byte[] current = ReadStreamingAssetBytes(mainLoaded.plan.current);
-            byte[] baseline = ReadStreamingAssetBytes(mainLoaded.plan.baseline);
             byte[] mv = ReadStreamingAssetBytes(mainLoaded.plan.mv);
             byte[] snapshot = ReadStreamingAssetBytes(mainLoaded.plan.snapshot);
             DheBuildIdentityData buildIdentity = JsonUtility.FromJson<DheBuildIdentityData>(
                 System.Text.Encoding.UTF8.GetString(ReadStreamingAssetBytes(BuildIdentityFile)));
             byte[] currentHash = Sha256(current);
-            byte[] baselineHash = Sha256(baseline);
+            byte[] baselineHash = mainLoaded.baselineHash;
             byte[] expectedCurrentHash = mainLoaded.mvCurrentHash;
             byte[] expectedBaselineHash = mainLoaded.mvBaselineHash;
             LoadImageErrorCode loadError = LoadImageErrorCode.OK;
@@ -875,11 +884,12 @@ namespace HybridCLR.Lab
             public string assemblyName;
             public string target;
             public string current;
-            public string baseline;
             public string mv;
             public string snapshot;
             public string currentSha256;
             public string baselineSha256;
+            public string mvSha256;
+            public string snapshotSha256;
         }
 
         private sealed class LoadedDheAssembly

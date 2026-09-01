@@ -283,7 +283,22 @@ namespace HybridCLR.Lab.Editor
         {
             BuildTargetGroup group = BuildPipeline.GetBuildTargetGroup(target);
             PlayerSettings.SetScriptingBackend(group, ScriptingImplementation.IL2CPP);
-            if (target == BuildTarget.Android)
+            if (group == BuildTargetGroup.Standalone)
+            {
+                // Unity 2021 can retain an interactive Visual Studio export
+                // setting in Library. DHE smoke expects a real Player binary.
+                EditorUserBuildSettings.SetPlatformSettings("Standalone", "CreateSolution", "false");
+                EditorUserBuildSettings.selectedStandaloneTarget = target;
+                EditorUserBuildSettings.standaloneBuildSubtarget = StandaloneBuildSubtarget.Player;
+                System.Reflection.MethodInfo method = typeof(EditorUserBuildSettings).GetMethod(
+                    "SetSelectedSubtargetFor", System.Reflection.BindingFlags.Static |
+                    System.Reflection.BindingFlags.NonPublic);
+                if (method == null)
+                    throw new BuildFailedException(
+                        "Unity does not expose the selected standalone subtarget API required by DHE.");
+                method.Invoke(null, new object[] { target, (int)StandaloneBuildSubtarget.Player });
+            }
+            else if (target == BuildTarget.Android)
             {
                 PlayerSettings.Android.targetArchitectures = AndroidArchitecture.ARM64;
                 EditorUserBuildSettings.buildAppBundle = false;
