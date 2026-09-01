@@ -131,7 +131,14 @@ namespace HybridCLR.Lab.Editor
 
         public static void BuildFinalPlayer()
         {
-            BuildPlayer(false);
+            try
+            {
+                BuildPlayer(false);
+            }
+            finally
+            {
+                RestoreBuildIdentityTemplate();
+            }
         }
 
         private static void BuildPlayer(bool scriptsOnly)
@@ -378,6 +385,24 @@ namespace HybridCLR.Lab.Editor
             if (identity == null || identity.nativeManifestSha256 != guard.NativeManifestSha256 ||
                 identity.nativeGuardSourceSha256 != guard.NativeGuardSourceSha256)
                 throw new BuildFailedException("DHE final native identity changed after the Player was compiled.");
+        }
+
+        private static void RestoreBuildIdentityTemplate()
+        {
+            const string source = "namespace HybridCLR.Lab\n{\n" +
+                "    internal static class HybridCLRDheBuildIdentity\n    {\n" +
+                "        public const int IdentityVersion = 2;\n" +
+                "        public const string BaselineAssemblySha256 = \"0000000000000000000000000000000000000000000000000000000000000000\";\n" +
+                "        public const string AotSnapshotSha256 = \"0000000000000000000000000000000000000000000000000000000000000000\";\n" +
+                "        public const string AotSnapshotKind = \"uninitialized-template\";\n" +
+                "        public const string NativeGuardSourceSha256 = \"0000000000000000000000000000000000000000000000000000000000000000\";\n" +
+                "        public const string NativeManifestSha256 = \"0000000000000000000000000000000000000000000000000000000000000000\";\n" +
+                "    }\n}\n";
+            string sourcePath = Path.Combine(ProjectRoot(), "Assets", "Runtime",
+                "HybridCLRDheBuildIdentity.cs");
+            File.WriteAllText(sourcePath, source, new System.Text.UTF8Encoding(false));
+            AssetDatabase.ImportAsset("Assets/Runtime/HybridCLRDheBuildIdentity.cs",
+                ImportAssetOptions.ForceUpdate | ImportAssetOptions.ForceSynchronousImport);
         }
 
         private static string Sha256NamedByteSet(IEnumerable<KeyValuePair<string, byte[]>> records)

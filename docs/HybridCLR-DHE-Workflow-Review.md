@@ -47,7 +47,8 @@ Editor 版本、未登记 package 文件或 runtime tree 漂移都会失败。
 5. final Player 编译该 identity；第二次 native finalize 必须证明 guard 和 immutable native
    manifest 没有漂移。`guard-block-set-v1` 只认证 manifest 声明的完整 begin/end guard 块，
    不把同一 C++ 文件中由 build identity 引起的无关变化计入 guard 身份；缺失、重复或内容不符
-   的块必须失败。
+   的块必须失败。项目 adapter 在 Player 和 smoke 完成后必须在 `finally` 中恢复临时 build
+   identity 源码模板，成功和异常路径都不得污染工作区。
 6. Player smoke 验证程序集集合、payload hash、changed/interpreter 路径、unchanged/AOT
    路径以及失败事务回滚重试。no-op 更新必须证明解释器和 native changed 计数均为零。
 7. release gate 从原始 DLL、MV、runtime plan、native manifest、Player 和资源报告实时重算
