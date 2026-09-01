@@ -803,6 +803,10 @@ internal static partial class Program
         catch { unboundNativeRejected = true; }
         AddRegressionCheck(checks, errors, "evidence-native-runtime-binding", unboundNativeRejected,
             "native release evidence must bind the live runtime, headers, locks, and source commits");
+        var runtimeSource = File.ReadAllText(Path.Combine(cli.Root, "tool", "LabCommands.cs"));
+        AddRegressionCheck(checks, errors, "runtime-package-source-binding",
+            runtimeSource.Contains("ValidateRepoIdentity(\"hybridclr_unity\"", StringComparison.Ordinal),
+            "runtime assembly must fail closed on the locked package source identity");
 
         var weakNoOpRejected = false;
         try

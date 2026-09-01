@@ -392,12 +392,16 @@ internal static class LabCommands
         var repos = ResolveReposRoot(lab, lockDoc, cli.Optional("reposroot"));
         var hybridclr = ResolvePath(lab, cli.Optional("hybridclrsource") ?? Path.Combine(repos, "hybridclr"));
         var il2cpp = ResolvePath(lab, cli.Optional("il2cppplussource") ?? Path.Combine(repos, "il2cpp_plus"));
+        var hybridclrUnity = Path.Combine(repos, "hybridclr_unity");
         RequireDirectory(Path.Combine(hybridclr, "hybridclr")); RequireDirectory(Path.Combine(il2cpp, "libil2cpp"));
         var dhe = profile is "DHE-Tuanjie2022" or "DHE-Unity2022" or "DHE-Unity2021";
         if (dhe && cli.Has("allowdirty")) throw new InvalidOperationException("Publishable DHE runtime cannot use -AllowDirty.");
         var expected = StringProperty(workflow.GetProperty("il2cppPlus"), "commit");
         ValidateRepoIdentity("hybridclr", hybridclr, StringProperty(lockDoc.GetProperty("repositories").GetProperty("hybridclr"), "commit"), cli.Has("allowdirty"));
         ValidateRepoIdentity("il2cpp_plus", il2cpp, expected, cli.Has("allowdirty"));
+        ValidateRepoIdentity("hybridclr_unity", hybridclrUnity,
+            StringProperty(lockDoc.GetProperty("repositories").GetProperty("hybridclr_unity"), "commit"),
+            cli.Has("allowdirty"));
         var output = ResolvePath(lab, cli.Optional("outputroot") ?? "staging/runtime"); var stage = Path.Combine(output, profile); SafeDelete(stage, output); Directory.CreateDirectory(stage);
         var stagedRuntime = Path.Combine(stage, "libil2cpp"); var stagedExternal = Path.Combine(stage, "external");
         CopyDirectory(Path.Combine(il2cpp, "libil2cpp"), stagedRuntime);
@@ -412,7 +416,7 @@ internal static class LabCommands
         var instrumented = profile is "Baseline-Instrumented" or "Metadata-Instrumented"; var fgs = profile.Contains("Fgs", StringComparison.OrdinalIgnoreCase) || profile.Contains("Compatibility", StringComparison.OrdinalIgnoreCase);
         if (instrumented || fgs) WriteText(Path.Combine(stagedRuntime, "hybridclr/lab/InstrumentationConfig.h"), "#pragma once\n" + (instrumented ? "#define HYBRIDCLR_LAB_INSTRUMENTED 1\n" : "") + (fgs ? "#define HYBRIDCLR_LAB_FGS_TESTS 1\n" : ""));
         var runtimeLockPath = Path.Combine(lab, "manifests/dhe-runtime-lock.json"); var runtimeLock = ReadJson(runtimeLockPath);
-        var manifest = new { schemaVersion = 1, format = "hybridclr.dhe-runtime-manifest.json", profile, dheEnabled = dhe, pathSemantics = "workspace-absolute-v1", createdAtUtc = DateTimeOffset.UtcNow, engineWorkflow = workflowId, engine, fullGenericSharingDiagnostics = fgs, externalHeaders = new { sourcePath = external, stagedPath = stagedExternal, stagedTreeSha256 = TreeHash(stagedExternal), surrogate = !editorAvailable, editorAvailable, explicitlyAllowed = !editorAvailable && cli.Has("allowsurrogateexternalheaders") }, source = new { hybridclr = SourceRecord(lockDoc, "hybridclr", hybridclr, Path.Combine(hybridclr, "hybridclr")), il2cpp_plus = SourceRecord(lockDoc, "il2cpp_plus", il2cpp, Path.Combine(il2cpp, "libil2cpp")), hybridclr_unity = SourceRecord(lockDoc, "hybridclr_unity", Path.Combine(repos, "hybridclr_unity"), Path.Combine(repos, "hybridclr_unity")) }, stagedLibil2cpp = stagedRuntime, stagedRuntimeSha256 = TreeHash(stagedRuntime), dheRuntimeLock = runtimeLockPath, dheRuntimeLockSha256 = Sha256File(runtimeLockPath), dheRuntimeSourceMode = StringProperty(runtimeLock, "sourceMode"), dhePatches = runtimeLock.GetProperty("patches") };
+        var manifest = new { schemaVersion = 1, format = "hybridclr.dhe-runtime-manifest.json", profile, dheEnabled = dhe, pathSemantics = "workspace-absolute-v1", createdAtUtc = DateTimeOffset.UtcNow, engineWorkflow = workflowId, engine, fullGenericSharingDiagnostics = fgs, externalHeaders = new { sourcePath = external, stagedPath = stagedExternal, stagedTreeSha256 = TreeHash(stagedExternal), surrogate = !editorAvailable, editorAvailable, explicitlyAllowed = !editorAvailable && cli.Has("allowsurrogateexternalheaders") }, source = new { hybridclr = SourceRecord(lockDoc, "hybridclr", hybridclr, Path.Combine(hybridclr, "hybridclr")), il2cpp_plus = SourceRecord(lockDoc, "il2cpp_plus", il2cpp, Path.Combine(il2cpp, "libil2cpp")), hybridclr_unity = SourceRecord(lockDoc, "hybridclr_unity", hybridclrUnity, hybridclrUnity) }, stagedLibil2cpp = stagedRuntime, stagedRuntimeSha256 = TreeHash(stagedRuntime), dheRuntimeLock = runtimeLockPath, dheRuntimeLockSha256 = Sha256File(runtimeLockPath), dheRuntimeSourceMode = StringProperty(runtimeLock, "sourceMode"), dhePatches = runtimeLock.GetProperty("patches") };
         WriteJson(Path.Combine(stage, "runtime-manifest.json"), manifest); Console.WriteLine("Assembled " + profile + " runtime: " + stagedRuntime); return 0;
     }
 
