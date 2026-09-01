@@ -793,6 +793,21 @@ internal static partial class Program
         AddRegressionCheck(checks, errors, "archive-safe-replace", unsafeArchiveRejected,
             "non-archive directory replacement must be rejected without deleting contents");
         RunGuardBlockHashRegressions(regressionRoot, checks, errors);
+        var layoutDocument = ReadJson<JsonElement>(Path.Combine(cli.Root, "manifests",
+            "dhe-toolchain-layout.json"));
+        var layoutPaths = layoutDocument.GetProperty("exactPaths").EnumerateArray()
+            .Where(value => value.ValueKind == JsonValueKind.String)
+            .Select(value => value.GetString() ?? "").ToHashSet(StringComparer.Ordinal);
+        var releaseRoleSchemas = new[]
+        {
+            "schemas/dhe-regression.schema.json",
+            "schemas/dhe-workflow-report.schema.json",
+            "schemas/dhe-native-gate.schema.json",
+            "schemas/dhe-toolchain-release-evidence.schema.json",
+        };
+        AddRegressionCheck(checks, errors, "layout-release-role-schemas",
+            releaseRoleSchemas.All(layoutPaths.Contains),
+            "the authenticated package layout must include every release evidence role schema");
         var schemasRoot = Path.Combine(cli.Root, "schemas");
         var workflowSchema = ReadJson<JsonElement>(Path.Combine(schemasRoot, "dhe-workflow-config.schema.json"));
         var validConfig = ReadJson<JsonElement>(Path.Combine(cli.Root, "templates", "dhe-workflow-config.json"));

@@ -31,6 +31,7 @@
     "schemas/dhe-build-identity.schema.json",
     "schemas/dhe-clean-checkout-gate.schema.json",
     "schemas/dhe-mv.schema.json",
+    "schemas/dhe-native-gate.schema.json",
     "schemas/dhe-native-manifest.schema.json",
     "schemas/dhe-package-lock.schema.json",
     "schemas/dhe-player-result.schema.json",

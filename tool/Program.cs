@@ -19,6 +19,7 @@ internal static partial class Program
         "verify-extra-source", "verify-release-bit-tamper", "evidence-role-format", "archive-safe-replace",
         "native-guard-unrelated-source-stable", "native-guard-block-tamper",
         "native-guard-duplicate-marker", "native-guard-missing-end-marker",
+        "layout-release-role-schemas",
         "schema-valid-document", "schema-maximum-rejected", "schema-additional-type-rejected",
         "schema-unsupported-keyword-rejected", "schema-gate-contract"
     };
