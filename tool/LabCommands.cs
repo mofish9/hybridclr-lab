@@ -350,9 +350,12 @@ internal static class LabCommands
     private static int NativeTests(Cli cli)
     {
         var lab = LabRoot(cli); var profile = cli.Optional("profile") ?? "Baseline-Clean"; var configuration = cli.Optional("configuration") ?? "Release";
-        var runtimeRoot = Path.Combine(lab, "staging/runtime", profile); var runtimeManifest = ReadJson(Path.Combine(runtimeRoot, "runtime-manifest.json"));
-        var source = Path.Combine(lab, "native-unit-tests"); var build = Path.Combine(lab, "artifacts/native-tests", profile);
-        if (!Directory.Exists(source)) throw new DirectoryNotFoundException(source); SafeDelete(build, Path.Combine(lab, "artifacts/native-tests")); Directory.CreateDirectory(build);
+        var runtimeBase = ResolvePath(lab, cli.Optional("runtimeroot") ?? "staging/runtime");
+        var runtimeRoot = Path.Combine(runtimeBase, profile); var runtimeManifest = ReadJson(Path.Combine(runtimeRoot, "runtime-manifest.json"));
+        var source = Path.Combine(lab, "native-unit-tests");
+        var outputRoot = ResolvePath(lab, cli.Optional("outputroot") ?? "artifacts/native-tests");
+        var build = Path.Combine(outputRoot, profile);
+        if (!Directory.Exists(source)) throw new DirectoryNotFoundException(source); SafeDelete(build, outputRoot); Directory.CreateDirectory(build);
         var runtime = Path.Combine(runtimeRoot, "libil2cpp"); var external = Path.Combine(runtimeRoot, "external");
         if (runtimeManifest.TryGetProperty("externalHeaders", out var externalHeaders) && externalHeaders.TryGetProperty("surrogate", out var surrogate) && surrogate.ValueKind == JsonValueKind.True && !cli.Has("allowsurrogateexternalheaders"))
             throw new InvalidOperationException("Native tests refuse surrogate external headers; pass -AllowSurrogateExternalHeaders for exploratory validation.");

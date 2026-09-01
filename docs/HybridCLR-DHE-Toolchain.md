@@ -21,7 +21,8 @@ dotnet run --project tool/HybridCLR.DheTool.csproj -- assemble-runtime \
   -LabRoot . -Profile DHE-Tuanjie2022 -EngineWorkflow Tuanjie2022Fgs \
   -Il2CppPlusSource C:/repos/il2cpp_plus
 dotnet run --project tool/HybridCLR.DheTool.csproj -- native-tests \
-  -LabRoot . -Profile DHE-Tuanjie2022
+  -LabRoot . -Profile DHE-Tuanjie2022 \
+  -RuntimeRoot C:/build/runtime -OutputRoot C:/build/native-tests
 ```
 
 These commands use direct .NET process execution and fail closed when an
