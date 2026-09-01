@@ -247,7 +247,29 @@ internal static partial class Program
                     var project = Path.GetFullPath(cli.Optional("projectpath") ?? ".");
                     if (!output.Equals(project, StringComparison.OrdinalIgnoreCase) && Directory.Exists(output))
                     {
-                        var stage = (string name, string? path) => new { passed = path != null && File.Exists(path), report = path };
+                        var stage = (string name, string? path) =>
+                        {
+                            bool passed = path != null && File.Exists(path);
+                            if (passed)
+                            {
+                                try
+                                {
+                                    var report = ReadJson<JsonElement>(path!);
+                                    if (report.ValueKind == JsonValueKind.Object &&
+                                        report.TryGetProperty("passed", out var value) &&
+                                        (value.ValueKind == JsonValueKind.True ||
+                                         value.ValueKind == JsonValueKind.False))
+                                    {
+                                        passed = value.GetBoolean();
+                                    }
+                                }
+                                catch
+                                {
+                                    passed = false;
+                                }
+                            }
+                            return new { passed, report = path };
+                        };
                         WriteJson(Path.Combine(output, "project-workflow-failure.json"), new
                         {
                             schemaVersion = 1, format = "hybridclr.dhe-project-workflow-failure.json", generatedAtUtc = DateTimeOffset.UtcNow,
