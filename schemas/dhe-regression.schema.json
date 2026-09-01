@@ -1,0 +1,33 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://github.com/mofish9/hybridclr-lab/schemas/dhe-regression.schema.json",
+  "title": "HybridCLR DHE CSharp Regression Report",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schemaVersion", "format", "generatedAtUtc", "sourceHead", "sourceTree", "sourceClean", "passed", "checks", "errors", "warnings"],
+  "properties": {
+    "schemaVersion": { "const": 1 },
+    "format": { "const": "hybridclr.dhe-regression.json" },
+    "generatedAtUtc": { "type": "string", "format": "date-time" },
+    "sourceHead": { "type": "string", "pattern": "^[0-9a-fA-F]{40,64}$" },
+    "sourceTree": { "type": "string", "pattern": "^[0-9a-fA-F]{40,64}$" },
+    "sourceClean": { "type": "boolean" },
+    "passed": { "type": "boolean" },
+    "checks": {
+      "type": "array",
+      "minItems": 17,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["name", "passed", "details"],
+        "properties": {
+          "name": { "type": "string", "minLength": 1 },
+          "passed": { "type": "boolean" },
+          "details": { "type": "string" }
+        }
+      }
+    },
+    "errors": { "type": "array", "items": { "type": "string" } },
+    "warnings": { "type": "array", "items": { "type": "string" } }
+  }
+}

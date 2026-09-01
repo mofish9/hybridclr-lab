@@ -22,8 +22,9 @@ Its formal entry points, generated-output boundary, and complete four-assembly
 Player evidence are documented in
 `docs/HybridCLR-DHE-Toolchain.md`,
 `docs/HybridCLR-DHE-Workflow-Review.md` and
-`docs/HybridCLR-DHE-Formal-Project-Validation.md`. It is not yet a production
-replacement for the existing BattleAOT path.
+`docs/HybridCLR-DHE-Formal-Project-Validation.md`. Toolchain `0.1.12` is the
+project-trial line; projects must install an authenticated package whose
+manifest has `releaseReady=true` and pin its exact package ID.
 The workflow also emits versioned MV/native/workflow schemas and an independent
 artifact validator; it verifies the exact supported+unsupported changed-token set,
 and the versioned `il2cpp-generated-cpp-signature-v2` ABI adapter contract.
@@ -51,14 +52,15 @@ dotnet run --project tool/HybridCLR.DheTool.csproj --configuration Release --no-
   doctor -Root artifacts/dhe-toolchain -Output artifacts/dhe-toolchain-doctor.json
 ```
 
-The published package is authenticated by its manifest and `verify-package`
-rejects any `.ps1` file. `doctor` reports the installed .NET host, package
+The published package is authenticated by its manifest and complete file set.
+`doctor` reports the installed .NET host, package
 identity, and optional Unity project readiness. These checks do not claim
 Player or native ABI coverage. Native compile/CTest and Unity/Xcode remain
 separate environment gates.
 
-JSON schemas under `schemas/` remain the compatibility contract and can be
-validated by any CI JSON-schema implementation; no shell host is required.
+JSON schemas under `schemas/` are enforced by the distributed `schema-validate`
+and `schema-gate` commands. The gate rejects unknown DHE formats and unsupported
+schema assertions, and validates its own report before returning success.
 
 The formal DHE-lite lane is reproducible from clean runtime inputs. Assemble the
 locked runtime (the `-ReposRoot` path may point at a new checkout), then run the

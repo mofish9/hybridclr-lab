@@ -47,7 +47,7 @@
     {
       "if": { "properties": { "passed": { "const": true } }, "required": ["passed"] },
       "then": {
-        "required": ["loadError", "plannedDheAssemblies", "loadedDheAssemblies", "changedMethodCount", "retryValidated", "retryAssemblyName", "retryFailure", "transactionStatus", "assemblyValidations", "multiAssemblyValidated", "buildIdentityValidated", "identityVersion", "aotSnapshotKind", "nativeGuardSourceSha256", "nativeManifestSha256", "expectedChangedMethodCount", "dispatchProbeValidated", "changedProbeChanged", "unchangedProbeChanged"],
+        "required": ["loadError", "target", "plannedDheAssemblies", "loadedDheAssemblies", "changedMethodCount", "retryValidated", "retryAssemblyName", "retryFailure", "transactionStatus", "assemblyValidations", "multiAssemblyValidated", "buildIdentityValidated", "identityVersion", "aotSnapshotKind", "nativeGuardSourceSha256", "nativeManifestSha256", "expectedChangedMethodCount", "dispatchProbeValidated", "changedProbeChanged", "unchangedProbeChanged"],
         "properties": {
           "loadError": { "const": "OK" },
           "plannedDheAssemblies": { "type": "array", "minItems": 1, "uniqueItems": true },

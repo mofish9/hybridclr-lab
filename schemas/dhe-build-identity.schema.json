@@ -6,6 +6,7 @@
   "additionalProperties": true,
   "required": [
     "schemaVersion",
+    "format",
     "workflow",
     "target",
     "baselineAssemblySha256",
@@ -17,10 +18,12 @@
     "nativeManifestSha256",
     "generatedCppRoot",
     "generatedCppPaths",
-    "nativeManifestPath"
+    "nativeManifestPath",
+    "assemblies"
   ],
   "properties": {
     "schemaVersion": { "const": 1 },
+    "format": { "const": "hybridclr.dhe-build-identity.json" },
     "workflow": { "type": "string", "minLength": 1 },
     "target": { "type": "string", "pattern": "^[A-Za-z0-9._-]+$" },
     "baselineAssemblySha256": { "type": "string", "pattern": "^[0-9a-fA-F]{64}$" },
@@ -38,6 +41,22 @@
       "items": { "type": "string", "minLength": 1 }
     },
     "nativeManifestPath": { "type": "string", "minLength": 1 },
+    "mainBaselineAssemblySha256": { "type": "string", "pattern": "^[0-9a-fA-F]{64}$" },
+    "mainSnapshotSha256": { "type": "string", "pattern": "^[0-9a-fA-F]{64}$" },
+    "assemblies": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "type": "object",
+        "required": ["assemblyName", "baselinePath", "baselineSha256", "snapshotSha256"],
+        "properties": {
+          "assemblyName": { "type": "string", "minLength": 1 },
+          "baselinePath": { "type": "string", "minLength": 1 },
+          "baselineSha256": { "type": "string", "pattern": "^[0-9a-fA-F]{64}$" },
+          "snapshotSha256": { "type": "string", "pattern": "^[0-9a-fA-F]{64}$" }
+        }
+      }
+    },
     "runtimeSource": { "type": ["string", "null"] }
   }
 }

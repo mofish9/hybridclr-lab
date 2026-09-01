@@ -1,26 +1,17 @@
 # HybridCLR DHE Toolchain
 
-The DHE workflow is implemented in C# and runs as a normal cross-platform
-.NET process. The distributed tool has no PowerShell dependency and can run on
-Windows, macOS, or Linux. Unity-specific compilation remains in the embedded
-HybridCLR package and the project's C# adapter.
+The DHE workflow is a cross-platform .NET host plus a Unity C# project adapter.
+The same host runs on Windows, macOS, and Linux; Unity-specific compilation
+remains in the embedded HybridCLR package and the project adapter.
 
 ## Layout
 
-`tool/HybridCLR.DheTool.csproj` is the entry point. `tool/Program.cs` owns
-settings parsing, dnlib assembly inspection, MV generation, batch/project-plan
-creation, baseline manifests, artifact checks, archive copying, and Unity
-process orchestration. `tool/dnlib.dll` is the pinned dependency used by both
-the host and the Unity package. JSON schemas remain the compatibility contract.
+`tool/HybridCLR.DheTool.csproj` is the entry point. `tool/Program.cs` owns the
+CLI and project orchestration; `tool/ProductionGates.cs` owns source, checkout,
+artifact, release, archive, and regression validation. `tool/dnlib.dll` is the
+pinned assembly inspection dependency. JSON schemas are the report contract.
 
-The package does not contain a shell script or a PowerShell script. Other lab
-experiments used to have platform-specific helpers; those helpers have been
-removed from this branch as well. The repository's lab-only operations are
-available as C# host commands, so a macOS/iOS build machine does not need
-PowerShell.
-
-The current DHE lab commands are intentionally explicit and replace the
-helpers that participate in this workflow: `assemble-runtime`, `native-tests`, `build-managed-cases`,
+The current DHE lab commands include `assemble-runtime`, `native-tests`, `build-managed-cases`,
 `generate-test-manifest`, `generate-metadata-stress-source`, `reference`,
 `compare-results`, `check-environment`, `prepare-engine-test-project`,
 `bootstrap-repos`, `clear-unity-project-locks`, and `wait-editor`. For example:
@@ -91,6 +82,27 @@ dotnet run --project tool/HybridCLR.DheTool.csproj -- batch \
 All paths are explicit. Output paths are checked against the input roots and
 are never allowed to overwrite an assembly or settings file.
 
+## JSON contract gates
+
+Validate one document or every registered DHE report below an output root with
+the same host distributed to the project:
+
+```text
+dotnet HybridCLR.DheTool.dll schema-validate \
+  -Schema C:/tools/HybridCLRDhe/schemas/dhe-workflow-config.schema.json \
+  -Document C:/project/Assets/Editor/DHE/dhe-workflow-config.json \
+  -Output C:/build/dhe/config-schema-validation.json
+dotnet HybridCLR.DheTool.dll schema-gate \
+  -SchemasRoot C:/tools/HybridCLRDhe/schemas \
+  -InputRoot C:/build/dhe \
+  -Output C:/build/dhe-schema-gate.json \
+  -RequireKnownFormats
+```
+
+The gate builds its format registry from the distributed schemas, rejects an
+unsupported assertion keyword instead of silently ignoring it, and validates
+its own evidence document before returning success.
+
 ## Project workflow
 
 The project provides a C# class containing these Unity execute-methods:
@@ -112,7 +124,7 @@ The project provides a C# class containing these Unity execute-methods:
   the editor-owned Bee graph, and invokes `NativeFinalizeResultCallback` before
   temporary baseline assembly inputs are restored.
 
-The host starts Unity directly with `ProcessStartInfo`; no shell is involved.
+The host starts Unity directly with `ProcessStartInfo`.
 The final-player phase binds `HYBRIDCLR_DHE_AOT_BASELINE_ROOT`, while
 current-generation clears that variable and always regenerates the current
 stripped image. This is the key correctness boundary for baseline/current
@@ -144,10 +156,34 @@ dotnet run --project tool/HybridCLR.DheTool.csproj -- workflow \
   -SettingsFile C:/project/ProjectSettings/HybridCLRSettings.asset \
   -OutputRoot C:/build/dhe \
   -BaselineAotRoot C:/release/stripped-aot \
+  -BaselineManifestPath C:/release/stripped-aot/dhe-baseline-manifest.json \
+  -RuntimeManifestPath C:/release/runtime/runtime-manifest.json \
+  -PackageLockPath C:/project/Assets/Editor/DHE/dhe-package-lock.json \
+  -SourceBoundaryPath C:/project/Assets/Editor/DHE/dhe-source-boundary.json \
+  -ToolchainRoot C:/project/Tools/HybridCLRDhe \
+  -ExpectedToolchainPackageId <64-hex-package-id> \
+  -ArchiveRoot C:/build/dhe-archive \
   -Target Android \
   -AdapterMethod MyGame.Editor.DheWorkflowBuild.Prepare \
-  -Unity /path/to/Unity -RunPlayer
+  -Unity /path/to/Unity -Mode Release -RunPlayer
 ```
+
+Use `-Mode Exploratory -StopAfterPreflight` while first integrating an adapter.
+Exploratory runs may omit runtime/baseline manifests and may use a dirty project,
+but they never produce `releaseReady=true`. A Release run requires every input
+shown above and rechecks source/package identity both before and after Unity.
+
+The final reports are:
+
+- `project-workflow-report.json`: complete orchestrator stages and paths.
+- `player-workflow-report.json`: Player, MV, native guard, identity, and runtime
+  evidence consumed by `release-gate`.
+- `release-gate.json` and `release-gate.artifact-validation.json`: independent
+  live revalidation of DLLs, MV JSON/binary, runtime plan, native manifest,
+  resource evidence, and Player results.
+- `archive-gate.json` plus `dhe-archive-manifest.json`: hash-verified portable
+  evidence. The archive excludes the large Player backup directory and includes
+  only referenced generated C++ guard sources.
 
 ## Android and iOS
 
@@ -188,11 +224,17 @@ tool directory should be outside an SVN working copy or explicitly ignored.
 
 ## Release boundary
 
-Release publication additionally requires an explicit `-ReleaseReady` switch
-after the native, Player, archive, and source gates have passed; the host never
-infers release readiness from a successful copy alone. Release requires equal hot-update/DHE assembly sets, compatible method-body
-diffs, complete native guard coverage, a target-bound previous baseline, clean
-source/package/runtime provenance, portable archive evidence, and a real
-Player smoke result. The C# host fails closed on missing evidence. Native
-compilation and iOS/Xcode execution remain environment gates, not claims made
-by a Windows-only run.
+Project Release readiness is derived only from passing source, clean checkout,
+project preflight, Player, independent artifact, release, and archive gates.
+It requires equal hot-update/DHE assembly sets, strict method-body-only diffs,
+complete native guard coverage, a target-bound previous baseline, clean
+source/package/runtime provenance, and a real Player smoke result. A no-op
+release is valid when all changed/interpreter/native counts are zero and the
+transaction status is `notApplicable`.
+
+Publishing the toolchain itself in `-Mode Release` requires
+`-ReleaseEvidence <report>`. That report must match the exact source HEAD/tree
+and bind passing `regression`, `demo-changed`, `demo-noop`, and `native` JSON
+reports by SHA-256. A command-line readiness flag cannot promote a package.
+Native compilation and iOS/Xcode execution remain target environment gates;
+a Windows result is not iOS evidence.

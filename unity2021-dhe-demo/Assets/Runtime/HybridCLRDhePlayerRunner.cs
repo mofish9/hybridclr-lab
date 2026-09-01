@@ -251,12 +251,17 @@ namespace HybridCLR.Lab
             bool embeddedSnapshotHashValidated = !string.IsNullOrWhiteSpace(embeddedSnapshotHash) &&
                 string.Equals(ToHex(snapshot), embeddedSnapshotHash, StringComparison.OrdinalIgnoreCase);
             bool snapshotHashValidated = ByteArraysEqual(snapshot, expectedBaselineHash) && embeddedSnapshotHashValidated;
+            string expectedTarget = GetArgument("-labTarget");
             bool buildIdentityValidated = buildIdentity != null && buildIdentity.identityVersion == 2 &&
                 string.Equals(buildIdentity.aotSnapshotKind, "managed-assembly-plus-generated-cpp-v1", StringComparison.Ordinal) &&
-                string.Equals(buildIdentity.baselineAssemblySha256, ToHex(baselineHash), StringComparison.OrdinalIgnoreCase) &&
-                string.Equals(buildIdentity.aotSnapshotSha256, ToHex(snapshot), StringComparison.OrdinalIgnoreCase) &&
+                string.Equals(buildIdentity.target, expectedTarget, StringComparison.OrdinalIgnoreCase) &&
+                string.Equals(buildIdentity.mainBaselineAssemblySha256, ToHex(baselineHash), StringComparison.OrdinalIgnoreCase) &&
+                string.Equals(buildIdentity.mainSnapshotSha256, ToHex(snapshot), StringComparison.OrdinalIgnoreCase) &&
                 IsSha256(buildIdentity.nativeGuardSourceSha256) &&
-                IsSha256(buildIdentity.nativeManifestSha256);
+                IsSha256(buildIdentity.nativeManifestSha256) &&
+                !string.Equals(buildIdentity.nativeManifestSha256, new string('0', 64), StringComparison.Ordinal) &&
+                string.Equals(buildIdentity.nativeGuardSourceSha256, HybridCLRDheBuildIdentity.NativeGuardSourceSha256, StringComparison.OrdinalIgnoreCase) &&
+                string.Equals(buildIdentity.nativeManifestSha256, HybridCLRDheBuildIdentity.NativeManifestSha256, StringComparison.OrdinalIgnoreCase);
             bool changedBehaviorValidated = changedMethodCount == 0 ||
                 (addResult == 101 && stableResult == 4 &&
                     addViaStableResult == 104 && addPairResult == 107 && wideResult == 1005L &&
@@ -368,6 +373,7 @@ namespace HybridCLR.Lab
                 capabilityGenericVirtualResult = capability.genericVirtualResult,
                 plannedDheAssemblies = GetAssemblyNames(runtimePlan),
                 loadedDheAssemblies = GetAssemblyNames(loadedAssemblies),
+                target = GetArgument("-labTarget"),
                 changedMethodCount = changedMethodCount,
                 expectedChangedMethodCount = changedMethodCount,
                 dispatchProbeValidated = dispatchProbeValidated,
@@ -802,6 +808,7 @@ namespace HybridCLR.Lab
         private sealed class DheAssemblyPlanData
         {
             public string assemblyName;
+            public string target;
             public string current;
             public string baseline;
             public string mv;
@@ -930,8 +937,11 @@ namespace HybridCLR.Lab
         private sealed class DheBuildIdentityData
         {
             public int identityVersion;
+            public string target;
             public string baselineAssemblySha256;
             public string aotSnapshotSha256;
+            public string mainBaselineAssemblySha256;
+            public string mainSnapshotSha256;
             public string aotSnapshotKind;
             public string nativeGuardSourceSha256;
             public string nativeManifestSha256;
@@ -942,6 +952,7 @@ namespace HybridCLR.Lab
         {
             public int schemaVersion = 1;
             public string format = "hybridclr.dhe-player-result.json";
+            public string target;
             public bool passed;
             public string error;
             public string loadError;

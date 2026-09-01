@@ -6,7 +6,11 @@ on:
 
 jobs:
   static:
-    runs-on: windows-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [windows-latest, macos-latest]
+    runs-on: ${{ matrix.os }}
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -28,6 +32,23 @@ jobs:
           dotnet run --project tool/HybridCLR.DheTool.csproj --configuration Release --no-restore --
           verify-package -PackageRoot artifacts/dhe-csharp-toolchain
 
+      - name: Build the distributed package and verify it again
+        shell: bash
+        run: |
+          dotnet build artifacts/dhe-csharp-toolchain/tool/HybridCLR.DheTool.csproj --configuration Release
+          dotnet artifacts/dhe-csharp-toolchain/tool/bin/Release/net6.0/HybridCLR.DheTool.dll \
+            verify-package -PackageRoot artifacts/dhe-csharp-toolchain
+
+      - name: Validate distributed package JSON contracts
+        shell: bash
+        run: >-
+          dotnet artifacts/dhe-csharp-toolchain/tool/bin/Release/net6.0/HybridCLR.DheTool.dll
+          schema-gate
+          -SchemasRoot artifacts/dhe-csharp-toolchain/schemas
+          -InputRoot artifacts/dhe-csharp-toolchain
+          -Output artifacts/dhe-package-schema-gate.json
+          -RequireKnownFormats
+
       - name: Run MV and batch regression
         shell: bash
         run: >-
@@ -37,9 +58,40 @@ jobs:
           -AssemblyNames HybridCLR.ManagedCasesAot
           -OutputRoot artifacts/dhe-csharp-batch
 
+      - name: Build strict-layout regression fixtures
+        shell: bash
+        run: |
+          dotnet build tool/fixtures/layout-baseline/LayoutFixture.csproj --configuration Release
+          dotnet build tool/fixtures/layout-current/LayoutFixture.csproj --configuration Release
+
+      - name: Run production gate regressions
+        shell: bash
+        run: >-
+          dotnet run --project tool/HybridCLR.DheTool.csproj --configuration Release --no-build --
+          regression
+          -LayoutBaseline tool/fixtures/layout-baseline/bin/Release/netstandard2.1/HybridCLR.Dhe.LayoutFixture.dll
+          -LayoutCurrent tool/fixtures/layout-current/bin/Release/netstandard2.1/HybridCLR.Dhe.LayoutFixture.dll
+          -PackageRoot artifacts/dhe-csharp-toolchain
+          -Output artifacts/dhe-regression.json
+
+      - name: Validate generated batch and regression reports
+        shell: bash
+        run: |
+          dotnet artifacts/dhe-csharp-toolchain/tool/bin/Release/net6.0/HybridCLR.DheTool.dll \
+            schema-gate \
+            -SchemasRoot artifacts/dhe-csharp-toolchain/schemas \
+            -InputRoot artifacts/dhe-csharp-batch \
+            -Output artifacts/dhe-batch-schema-gate.json \
+            -RequireKnownFormats
+          dotnet artifacts/dhe-csharp-toolchain/tool/bin/Release/net6.0/HybridCLR.DheTool.dll \
+            schema-validate \
+            -Schema artifacts/dhe-csharp-toolchain/schemas/dhe-regression.schema.json \
+            -Document artifacts/dhe-regression.json \
+            -Output artifacts/dhe-regression-schema-validation.json
+
       - name: Upload C# workflow reports
         if: always()
         uses: actions/upload-artifact@v4
         with:
-          name: dhe-csharp-static-reports
+          name: dhe-csharp-static-reports-${{ matrix.os }}
           path: artifacts/**

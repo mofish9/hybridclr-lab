@@ -28,7 +28,7 @@
       "minItems": 1,
       "items": {
         "type": "object",
-        "required": ["assemblyName", "current", "baseline", "mv", "snapshot", "baselineSha256", "currentSha256"],
+        "required": ["assemblyName", "current", "baseline", "mv", "snapshot", "baselineSha256", "currentSha256", "mvSha256", "snapshotSha256"],
         "properties": {
           "assemblyName": { "type": "string", "minLength": 1 },
           "current": { "type": "string", "minLength": 1 },
@@ -36,7 +36,9 @@
           "mv": { "type": "string", "minLength": 1 },
           "snapshot": { "type": "string", "minLength": 1 },
           "baselineSha256": { "type": "string", "pattern": "^[0-9a-fA-F]{64}$" },
-          "currentSha256": { "type": "string", "pattern": "^[0-9a-fA-F]{64}$" }
+          "currentSha256": { "type": "string", "pattern": "^[0-9a-fA-F]{64}$" },
+          "mvSha256": { "type": "string", "pattern": "^[0-9a-fA-F]{64}$" },
+          "snapshotSha256": { "type": "string", "pattern": "^[0-9a-fA-F]{64}$" }
         }
       }
     }

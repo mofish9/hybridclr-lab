@@ -1,0 +1,7 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <TargetFramework>netstandard2.1</TargetFramework>
+    <AssemblyName>HybridCLR.Dhe.LayoutFixture</AssemblyName>
+    <RootNamespace>HybridCLR.Dhe.LayoutFixture</RootNamespace>
+  </PropertyGroup>
+</Project>

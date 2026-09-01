@@ -13,6 +13,7 @@
     <DheDnlibPath Condition="'$(DheDnlibPath)' == ''">$(MSBuildThisFileDirectory)dnlib.dll</DheDnlibPath>
   </PropertyGroup>
   <ItemGroup>
+    <Compile Remove="fixtures/**/*.cs" />
     <Reference Include="dnlib">
       <HintPath>$(DheDnlibPath)</HintPath>
       <Private>true</Private>

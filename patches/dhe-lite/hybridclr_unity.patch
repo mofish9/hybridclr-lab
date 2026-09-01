@@ -94,7 +94,7 @@ index 8c56588ee539285685feb386dda6f6858cea81a4..5a969ae6c2edad71f702e2777e68f46a
                  foreach (string assemblyPath in assemblies)
                  {
 diff --git a/Editor/Commands/DheBuildPipeline.cs b/Editor/Commands/DheBuildPipeline.cs
-index 2947fe97539a75345243ed3fa8ce0a7ce6cd31dc..6dd1ec80d38e4cec11e0dd91df10a11151932fa5 100644
+index 2947fe97539a75345243ed3fa8ce0a7ce6cd31dc..ec92e84fd68ef13b18a28f0458d471ecd2d641f6 100644
 --- a/Editor/Commands/DheBuildPipeline.cs
 +++ b/Editor/Commands/DheBuildPipeline.cs
 @@ -3,6 +3,9 @@ using System.Collections.Generic;
@@ -270,7 +270,15 @@ index 2947fe97539a75345243ed3fa8ce0a7ce6cd31dc..6dd1ec80d38e4cec11e0dd91df10a111
              HashSet<string> names = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
              foreach (DheProjectAssembly assembly in plan.assemblies)
              {
-@@ -123,26 +246,35 @@ namespace HybridCLR.Editor.Commands
+@@ -116,6 +239,7 @@ namespace HybridCLR.Editor.Commands
+                 string mvPath = RequireFile(ResolvePlanReference(planDirectory, assembly.mvBytes),
+                     assemblyName + " MV binary");
+                 byte[] currentBytes = File.ReadAllBytes(currentPath);
++                byte[] mvBytes = File.ReadAllBytes(mvPath);
+                 if (options.CurrentAssemblyTransform != null)
+                 {
+                     currentBytes = options.CurrentAssemblyTransform(assemblyName, currentBytes) ??
+@@ -123,26 +247,38 @@ namespace HybridCLR.Editor.Commands
                  }
  
                  string dllFileName = assemblyName + DllBytesExtension;
@@ -280,9 +288,11 @@ index 2947fe97539a75345243ed3fa8ce0a7ce6cd31dc..6dd1ec80d38e4cec11e0dd91df10a111
                  File.WriteAllBytes(Path.Combine(currentAssetRoot, dllFileName), currentBytes);
 -                File.Copy(mvPath, Path.Combine(currentAssetRoot, mvFileName), true);
                  byte[] baselineBytes = File.ReadAllBytes(baselinePath);
+-                File.WriteAllBytes(Path.Combine(currentAssetRoot, snapshotFileName), Sha256(baselineBytes));
++                byte[] snapshotBytes = Sha256(baselineBytes);
 +                File.WriteAllBytes(Path.Combine(currentAssetRoot, baselineFileName), baselineBytes);
-+                File.Copy(mvPath, Path.Combine(currentAssetRoot, mvFileName), true);
-                 File.WriteAllBytes(Path.Combine(currentAssetRoot, snapshotFileName), Sha256(baselineBytes));
++                File.WriteAllBytes(Path.Combine(currentAssetRoot, mvFileName), mvBytes);
++                File.WriteAllBytes(Path.Combine(currentAssetRoot, snapshotFileName), snapshotBytes);
  
                  runtimeRecords.Add(new DheRuntimePlanAssembly
                  {
@@ -300,6 +310,8 @@ index 2947fe97539a75345243ed3fa8ce0a7ce6cd31dc..6dd1ec80d38e4cec11e0dd91df10a111
 +                        Path.Combine(currentAssetRoot, snapshotFileName)),
 +                    currentSha256 = Sha256Hex(currentBytes),
 +                    baselineSha256 = Sha256Hex(baselineBytes),
++                    mvSha256 = Sha256Hex(mvBytes),
++                    snapshotSha256 = Sha256Hex(snapshotBytes),
                  });
  
                  string handoffCurrent = assemblyName + ".current.dll";
@@ -311,12 +323,14 @@ index 2947fe97539a75345243ed3fa8ce0a7ce6cd31dc..6dd1ec80d38e4cec11e0dd91df10a111
                  File.Copy(baselinePath, Path.Combine(handoffRoot, handoffBaseline), true);
                  File.Copy(mvPath, Path.Combine(handoffRoot, handoffMv), true);
                  File.Copy(Path.Combine(currentAssetRoot, snapshotFileName),
-@@ -155,11 +287,28 @@ namespace HybridCLR.Editor.Commands
+@@ -155,11 +291,30 @@ namespace HybridCLR.Editor.Commands
                      mv = handoffMv,
                      snapshot = handoffSnapshot,
                      baselineSha256 = Sha256Hex(baselineBytes),
 -                    currentSha256 = Sha256Hex(File.ReadAllBytes(currentPath)),
 +                    currentSha256 = Sha256Hex(currentBytes),
++                    mvSha256 = Sha256Hex(mvBytes),
++                    snapshotSha256 = Sha256Hex(snapshotBytes),
                  });
              }
  
@@ -342,7 +356,7 @@ index 2947fe97539a75345243ed3fa8ce0a7ce6cd31dc..6dd1ec80d38e4cec11e0dd91df10a111
                  .Select(name => name + DllExtension).ToArray();
              if (options.HotfixLoadOrderResolver != null)
              {
-@@ -173,14 +322,65 @@ namespace HybridCLR.Editor.Commands
+@@ -173,14 +328,65 @@ namespace HybridCLR.Editor.Commands
                  options.DependencyMapWriter(currentAssetRoot);
              }
  
@@ -411,7 +425,7 @@ index 2947fe97539a75345243ed3fa8ce0a7ce6cd31dc..6dd1ec80d38e4cec11e0dd91df10a111
              }
              File.WriteAllText(Path.Combine(currentAssetRoot, "AotFileList.txt"),
                  SerializeStringArray(NormalizeAssemblyNames(aotAssemblies)),
-@@ -189,20 +389,24 @@ namespace HybridCLR.Editor.Commands
+@@ -189,20 +395,24 @@ namespace HybridCLR.Editor.Commands
              DheRuntimePlanDocument runtimePlan = new DheRuntimePlanDocument
              {
                  schemaVersion = 1,
@@ -440,7 +454,7 @@ index 2947fe97539a75345243ed3fa8ce0a7ce6cd31dc..6dd1ec80d38e4cec11e0dd91df10a111
              AssetDatabase.Refresh(ImportAssetOptions.ForceUpdate | ImportAssetOptions.ForceSynchronousImport);
              return new DheRuntimePlanResult
              {
-@@ -228,61 +432,1005 @@ namespace HybridCLR.Editor.Commands
+@@ -228,61 +438,1005 @@ namespace HybridCLR.Editor.Commands
                  throw new BuildFailedException("DHE Player build requires at least one scene.");
              }
  
@@ -653,7 +667,7 @@ index 2947fe97539a75345243ed3fa8ce0a7ce6cd31dc..6dd1ec80d38e4cec11e0dd91df10a111
 +                if (insertions.Count > 0 && !Regex.IsMatch(source, @"(?m)^#include\s+""hybridclr/DheRuntime\.h"""))
 +                    source = "#include \"hybridclr/DheRuntime.h\"\r\n#include \"hybridclr/Il2CppCompatibleDef.h\"\r\n" + source;
 +                if (insertions.Count > 0) File.WriteAllText(pair.Key, source, new UTF8Encoding(false));
-             }
++            }
 +
 +            string manifestPath = Path.GetFullPath(options.OutputManifestPath ??
 +                Path.Combine(generatedRoot, "dhe-native-manifest.json"));
@@ -987,9 +1001,9 @@ index 2947fe97539a75345243ed3fa8ce0a7ce6cd31dc..6dd1ec80d38e4cec11e0dd91df10a111
 +            {
 +                RestoreBaselineAssemblyInputs();
 +                throw;
-+            }
-+        }
-+
+             }
+         }
+ 
 +        internal static void RestoreBaselineAssemblyInputs()
 +        {
 +            if (BaselineAssemblyBackups.Count == 0)
@@ -1026,8 +1040,8 @@ index 2947fe97539a75345243ed3fa8ce0a7ce6cd31dc..6dd1ec80d38e4cec11e0dd91df10a111
 +                throw new BuildFailedException("Unable to switch active build target to " + target);
 +            }
 +            return group;
-         }
- 
++        }
++
          private static void ClearRuntimeAssets(string root)
          {
 -            foreach (string pattern in new[] { "*.dll.bytes", "*.mv.bytes", "*.aot-snapshot.bytes" })
@@ -1071,15 +1085,15 @@ index 2947fe97539a75345243ed3fa8ce0a7ce6cd31dc..6dd1ec80d38e4cec11e0dd91df10a111
 +            }
 +            foreach (string path in Directory.GetFiles(root, "*.aot-snapshot.bytes",
 +                SearchOption.TopDirectoryOnly))
-+            {
+             {
+-                foreach (string path in Directory.GetFiles(root, pattern, SearchOption.TopDirectoryOnly))
 +                string fileName = Path.GetFileName(path);
 +                generatedAssemblies.Add(fileName.Substring(0,
 +                    fileName.Length - ".aot-snapshot.bytes".Length));
 +            }
 +
 +            foreach (string name in generatedAssemblies)
-             {
--                foreach (string path in Directory.GetFiles(root, pattern, SearchOption.TopDirectoryOnly))
++            {
 +                foreach (string suffix in new[] { ".dll.bytes", ".baseline.dll.bytes", ".mv.bytes", ".aot-snapshot.bytes" })
                  {
 -                    File.Delete(path);
@@ -1462,7 +1476,7 @@ index 2947fe97539a75345243ed3fa8ce0a7ce6cd31dc..6dd1ec80d38e4cec11e0dd91df10a111
                  .ToArray();
          }
  
-@@ -329,6 +1477,30 @@ namespace HybridCLR.Editor.Commands
+@@ -329,6 +1483,30 @@ namespace HybridCLR.Editor.Commands
              return resolved;
          }
  
@@ -1493,7 +1507,7 @@ index 2947fe97539a75345243ed3fa8ce0a7ce6cd31dc..6dd1ec80d38e4cec11e0dd91df10a111
          private static string RequireFile(string path, string description)
          {
              string resolved = Path.GetFullPath(path ?? string.Empty);
-@@ -342,13 +1514,42 @@ namespace HybridCLR.Editor.Commands
+@@ -342,13 +1520,42 @@ namespace HybridCLR.Editor.Commands
              return Path.GetFullPath(Path.IsPathRooted(path) ? path : Path.Combine(projectRoot, path));
          }
  
@@ -1538,7 +1552,7 @@ index 2947fe97539a75345243ed3fa8ce0a7ce6cd31dc..6dd1ec80d38e4cec11e0dd91df10a111
          }
  
          private static string RequireProjectChild(string projectRoot, string path, string description)
-@@ -373,6 +1574,167 @@ namespace HybridCLR.Editor.Commands
+@@ -373,6 +1580,167 @@ namespace HybridCLR.Editor.Commands
              return BitConverter.ToString(Sha256(bytes)).Replace("-", string.Empty).ToLowerInvariant();
          }
  
@@ -1706,7 +1720,7 @@ index 2947fe97539a75345243ed3fa8ce0a7ce6cd31dc..6dd1ec80d38e4cec11e0dd91df10a111
          private static string SerializeStringArray(IEnumerable<string> values)
          {
              System.Text.StringBuilder builder = new System.Text.StringBuilder("[");
-@@ -389,6 +1751,107 @@ namespace HybridCLR.Editor.Commands
+@@ -389,6 +1757,107 @@ namespace HybridCLR.Editor.Commands
              return builder.ToString();
          }
  
@@ -1814,7 +1828,7 @@ index 2947fe97539a75345243ed3fa8ce0a7ce6cd31dc..6dd1ec80d38e4cec11e0dd91df10a111
          [Serializable]
          public sealed class DheProjectPlan
          {
-@@ -405,6 +1868,7 @@ namespace HybridCLR.Editor.Commands
+@@ -405,6 +1874,7 @@ namespace HybridCLR.Editor.Commands
              public string status;
              public string current;
              public string baseline;
@@ -1822,7 +1836,7 @@ index 2947fe97539a75345243ed3fa8ce0a7ce6cd31dc..6dd1ec80d38e4cec11e0dd91df10a111
              public string mvBytes;
          }
  
-@@ -413,6 +1877,8 @@ namespace HybridCLR.Editor.Commands
+@@ -413,6 +1883,8 @@ namespace HybridCLR.Editor.Commands
          {
              public int schemaVersion;
              public string format;
@@ -1831,7 +1845,7 @@ index 2947fe97539a75345243ed3fa8ce0a7ce6cd31dc..6dd1ec80d38e4cec11e0dd91df10a111
              public DheRuntimePlanAssembly[] assemblies;
          }
  
-@@ -421,6 +1887,8 @@ namespace HybridCLR.Editor.Commands
+@@ -421,6 +1893,8 @@ namespace HybridCLR.Editor.Commands
          {
              public int schemaVersion;
              public string format;
@@ -1840,7 +1854,7 @@ index 2947fe97539a75345243ed3fa8ce0a7ce6cd31dc..6dd1ec80d38e4cec11e0dd91df10a111
              public DheRuntimePlanHandoffAssembly[] assemblies;
          }
  
-@@ -435,8 +1903,60 @@ namespace HybridCLR.Editor.Commands
+@@ -435,8 +1909,62 @@ namespace HybridCLR.Editor.Commands
          {
              public string assemblyName;
              public string current;
@@ -1849,6 +1863,8 @@ index 2947fe97539a75345243ed3fa8ce0a7ce6cd31dc..6dd1ec80d38e4cec11e0dd91df10a111
              public string snapshot;
 +            public string currentSha256;
 +            public string baselineSha256;
++            public string mvSha256;
++            public string snapshotSha256;
 +        }
 +
 +        [Serializable]
@@ -1901,7 +1917,12 @@ index 2947fe97539a75345243ed3fa8ce0a7ce6cd31dc..6dd1ec80d38e4cec11e0dd91df10a111
          }
  
          [Serializable]
-@@ -452,14 +1972,129 @@ namespace HybridCLR.Editor.Commands
+@@ -449,17 +1977,134 @@ namespace HybridCLR.Editor.Commands
+             public string snapshot;
+             public string baselineSha256;
+             public string currentSha256;
++            public string mvSha256;
++            public string snapshotSha256;
          }
      }
  
@@ -2031,7 +2052,7 @@ index 2947fe97539a75345243ed3fa8ce0a7ce6cd31dc..6dd1ec80d38e4cec11e0dd91df10a111
          public Func<string, byte[], byte[]> CurrentAssemblyTransform;
          public Func<string[], string[]> HotfixLoadOrderResolver;
          public Action<string> DependencyMapWriter;
-@@ -481,6 +2116,32 @@ namespace HybridCLR.Editor.Commands
+@@ -481,6 +2126,32 @@ namespace HybridCLR.Editor.Commands
          public string BaselineAotRoot;
          public BuildTarget Target;
          public BuildOptions BuildOptions;

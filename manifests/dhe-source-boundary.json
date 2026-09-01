@@ -5,6 +5,8 @@
   "exactPaths": [
     ".gitattributes",
     ".gitignore",
+    "Directory.Build.props",
+    "Directory.Build.targets",
     ".github/workflows/dhe-static.yml",
     ".github/workflows/dhe-native.yml",
     "docs/HybridCLR-DHE-Formal-Project-Validation.md",
@@ -35,16 +37,24 @@
     "native-unit-tests/CMakeLists.txt",
     "native-unit-tests/hybridclr_native_tests.cpp",
     "native-unit-tests/native_runtime_stubs.cpp",
-    "native-unit-tests/native_test_hooks.h"
+    "native-unit-tests/native_test_hooks.h",
+    "tool/HybridCLR.DheTool.csproj",
+    "tool/ArchiveSupport.cs",
+    "tool/LabCommands.cs",
+    "tool/Program.cs",
+    "tool/SchemaValidation.cs",
+    "tool/ProductionGates.cs",
+    "tool/dnlib.dll"
   ],
   "prefixes": [
     "patches/dhe-lite/",
-    "schemas/dhe-*",
+    "schemas/",
     "unity2021-dhe-demo/Assets/Editor/",
     "unity2021-dhe-demo/Assets/Runtime/",
     "unity2021-dhe-demo/Assets/Scenes/",
     "unity2021-dhe-demo/Packages/com.code-philosophy.hybridclr/",
-    "unity2021-dhe-demo/ProjectSettings/"
+    "unity2021-dhe-demo/ProjectSettings/",
+    "tool/fixtures/"
   ],
   "generatedPrefixes": [
     "**/bin/",

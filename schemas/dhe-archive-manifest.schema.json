@@ -11,6 +11,8 @@
     "artifactValidation",
     "buildIdentity",
     "nativeManifest",
+    "immutableNativeManifest",
+    "immutableNativeManifestSha256",
     "runtimeManifest",
     "runtimePlan",
     "projectPlan",
@@ -22,7 +24,8 @@
     "fileCount",
     "fileSetSha256",
     "pathSemantics",
-    "sourceIdentities"
+    "sourceIdentities",
+    "offlineReleaseRevalidated"
   ],
   "properties": {
     "schemaVersion": { "const": 1 },
@@ -43,6 +46,8 @@
     "artifactValidation": { "type": "string", "minLength": 1 },
     "buildIdentity": { "type": "string", "minLength": 1 },
     "nativeManifest": { "type": "string", "minLength": 1 },
+    "immutableNativeManifest": { "type": "string", "minLength": 1 },
+    "immutableNativeManifestSha256": { "type": "string", "pattern": "^[0-9a-fA-F]{64}$" },
     "runtimeManifest": { "type": "string", "minLength": 1 },
     "runtimePlan": { "type": "string", "minLength": 1 },
     "projectPlan": { "type": "string", "minLength": 1 },
@@ -83,7 +88,8 @@
       }
     },
     "fileCount": { "type": "integer", "minimum": 1 },
-    "fileSetSha256": { "type": "string", "pattern": "^[0-9a-fA-F]{64}$" }
+    "fileSetSha256": { "type": "string", "pattern": "^[0-9a-fA-F]{64}$" },
+    "offlineReleaseRevalidated": { "type": "boolean" }
   },
   "$defs": {
     "sourceIdentity": {
