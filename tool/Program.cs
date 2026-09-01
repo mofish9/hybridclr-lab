@@ -16,7 +16,8 @@ internal static partial class Program
     {
         "mv-field-order", "mv-switch-target", "mv-assembly-metadata", "mv-flags-tamper",
         "mv-token-tamper", "verify-require-release", "verify-expected-id", "verify-package-id-recompute",
-        "verify-extra-source", "verify-release-bit-tamper", "evidence-role-format", "archive-safe-replace",
+        "verify-extra-source", "verify-release-bit-tamper", "evidence-role-format",
+        "evidence-native-runtime-binding", "archive-safe-replace",
         "native-guard-unrelated-source-stable", "native-guard-block-tamper",
         "native-guard-duplicate-marker", "native-guard-missing-end-marker",
         "layout-release-role-schemas",
@@ -453,7 +454,7 @@ internal static partial class Program
         return GetString(ReadJson<JsonElement>(path), property) ?? new string('0', 64);
     }
 
-    private static void ValidateEvidenceFiles(JsonElement evidence, string baseDirectory)
+    private static void ValidateEvidenceFiles(JsonElement evidence, string baseDirectory, string sourceRoot)
     {
         if (!evidence.TryGetProperty("files", out var files) || files.ValueKind != JsonValueKind.Array || files.GetArrayLength() < 4)
             throw new DheException("Release evidence must contain regression, changed, no-op, and native reports.");
@@ -475,14 +476,14 @@ internal static partial class Program
                 throw new DheException("Release evidence file hash mismatch: " + path);
             var report = ReadJson<JsonElement>(full);
             if (!GetBool(report, "passed")) throw new DheException("Release evidence report is not a passing result: " + path);
-            ValidateEvidenceRole(role, report, full, sourceHead!, sourceTree!);
+            ValidateEvidenceRole(role, report, full, sourceHead!, sourceTree!, sourceRoot);
         }
         foreach (var required in new[] { "regression", "demo-changed", "demo-noop", "native" })
             if (!roles.Contains(required)) throw new DheException("Release evidence is missing role: " + required);
     }
 
     private static void ValidateEvidenceRole(string role, JsonElement report, string reportPath,
-        string sourceHead, string sourceTree)
+        string sourceHead, string sourceTree, string sourceRoot)
     {
         switch (role)
         {
@@ -524,14 +525,78 @@ internal static partial class Program
                 break;
             case "native":
                 RequireEvidenceFormat(report, "hybridclr.dhe-native-gate.json", role);
-                if (GetInt(report, "nativeExitCode") != 0 || GetBool(report, "surrogateHeadersAllowed") ||
+                if (GetInt(report, "nativeExitCode") != 0 || !GetBool(report, "mergeReady") ||
+                    GetBool(report, "surrogateHeadersAllowed") ||
                     !IsHex(GetString(report, "runtimeTreeSha256"), 64, 64) ||
                     !IsHex(GetString(report, "externalTreeSha256"), 64, 64))
                     throw new DheException("Native evidence does not prove a real-header passing native gate.");
+                ValidateNativeReleaseEvidence(report, reportPath, sourceRoot);
                 break;
             default:
                 throw new DheException("Unknown release evidence role: " + role);
         }
+    }
+
+    private static void ValidateNativeReleaseEvidence(JsonElement report, string reportPath, string sourceRoot)
+    {
+        sourceRoot = RequireDirectory(sourceRoot, "DHE release source root");
+        var reportRoot = Path.GetDirectoryName(reportPath)!;
+        var runtimeManifestPath = ResolveEvidencePath(GetString(report, "runtimeManifest"), reportRoot,
+            "Native evidence runtime manifest");
+        var runtimeManifestHash = Sha256File(runtimeManifestPath);
+        if (!runtimeManifestHash.Equals(GetString(report, "runtimeManifestSha256"),
+                StringComparison.OrdinalIgnoreCase))
+            throw new DheException("Native evidence runtime manifest hash is invalid.");
+        var runtime = ReadJson<JsonElement>(runtimeManifestPath);
+        RequireEvidenceFormat(runtime, "hybridclr.dhe-runtime-manifest.json", "Native runtime manifest");
+        if (GetString(runtime, "profile") != "DHE-Tuanjie2022" ||
+            GetString(runtime, "engineWorkflow") != "Tuanjie2022Fgs")
+            throw new DheException("Native evidence uses an unexpected runtime profile or engine workflow.");
+
+        var runtimeRoot = RequireDirectory(GetString(report, "runtimeRoot") ?? "", "Native runtime root");
+        var manifestRuntimeRoot = RequireDirectory(GetString(runtime, "stagedLibil2cpp") ?? "",
+            "Native manifest runtime root");
+        if (!Path.GetFullPath(runtimeRoot).Equals(Path.GetFullPath(manifestRuntimeRoot),
+                StringComparison.OrdinalIgnoreCase))
+            throw new DheException("Native evidence runtime root does not match its manifest.");
+        var runtimeTree = TreeHashForRelease(runtimeRoot, Array.Empty<string>());
+        if (!runtimeTree.Equals(GetString(report, "runtimeTreeSha256"), StringComparison.OrdinalIgnoreCase) ||
+            !runtimeTree.Equals(GetString(runtime, "stagedRuntimeSha256"), StringComparison.OrdinalIgnoreCase))
+            throw new DheException("Native evidence runtime tree is not bound to its live staged runtime.");
+
+        var headers = runtime.GetProperty("externalHeaders");
+        if (GetBool(headers, "surrogate") || GetBool(headers, "explicitlyAllowed"))
+            throw new DheException("Native evidence uses surrogate external headers.");
+        var externalRoot = RequireDirectory(GetString(headers, "stagedPath") ?? "",
+            "Native external headers root");
+        var externalTree = TreeHashForRelease(externalRoot, Array.Empty<string>());
+        if (!externalTree.Equals(GetString(report, "externalTreeSha256"), StringComparison.OrdinalIgnoreCase) ||
+            !externalTree.Equals(GetString(headers, "stagedTreeSha256"), StringComparison.OrdinalIgnoreCase))
+            throw new DheException("Native evidence external header tree is not bound to its live staged headers.");
+
+        var currentRuntimeLock = RequireFile(Path.Combine(sourceRoot, "manifests", "dhe-runtime-lock.json"),
+            "Current DHE runtime lock");
+        if (!Sha256File(currentRuntimeLock).Equals(GetString(runtime, "dheRuntimeLockSha256"),
+                StringComparison.OrdinalIgnoreCase))
+            throw new DheException("Native evidence runtime lock does not match the release source.");
+        var repoLock = ReadJson<JsonElement>(RequireFile(Path.Combine(sourceRoot, "manifests", "repo-lock.json"),
+            "Current repository lock"));
+        var runtimeSources = runtime.GetProperty("source");
+        foreach (var repository in new[] { "hybridclr", "il2cpp_plus", "hybridclr_unity" })
+        {
+            var expected = GetString(repoLock.GetProperty("repositories").GetProperty(repository), "commit");
+            var actual = runtimeSources.GetProperty(repository);
+            if (!string.Equals(expected, GetString(actual, "commit"), StringComparison.OrdinalIgnoreCase) ||
+                GetBool(actual, "dirty") || !IsHex(GetString(actual, "treeSha256"), 64, 64))
+                throw new DheException("Native evidence source identity is invalid: " + repository);
+        }
+        var workflows = ReadJson<JsonElement>(RequireFile(Path.Combine(sourceRoot, "manifests",
+            "runtime-workflows.json"), "Current runtime workflows"));
+        var workflow = workflows.GetProperty("workflows").EnumerateArray().Single(item =>
+            GetString(item, "id") == GetString(runtime, "engineWorkflow"));
+        var expectedHeaders = GetString(workflow.GetProperty("engine"), "externalHeadersTreeSha256");
+        if (!externalTree.Equals(expectedHeaders, StringComparison.OrdinalIgnoreCase))
+            throw new DheException("Native evidence headers do not match the locked engine workflow.");
     }
 
     private static void ValidateEvidenceToolIdentity(JsonElement report, string reportPath, string sourceHead,
@@ -1008,7 +1073,7 @@ internal static partial class Program
             if (!string.Equals(GetString(evidence, "sourceHead"), sourceHead, StringComparison.OrdinalIgnoreCase) ||
                 !string.Equals(GetString(evidence, "sourceTree"), sourceTree, StringComparison.OrdinalIgnoreCase))
                 throw new DheException("Toolchain release evidence does not match the source HEAD/tree being published.");
-            ValidateEvidenceFiles(evidence, Path.GetDirectoryName(evidencePath)!);
+            ValidateEvidenceFiles(evidence, Path.GetDirectoryName(evidencePath)!, root);
             releaseReady = true;
         }
         if (releaseReady && (!clean || !tracked)) throw new DheException("Release publishing requires a clean Git-tracked source tree.");

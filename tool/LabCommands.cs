@@ -376,7 +376,8 @@ internal static class LabCommands
         var surrogateHeadersAllowed = cli.Has("allowsurrogateexternalheaders");
         var logPath = Path.Combine(build, "native-test.log");
         WriteText(logPath, "CMake build and CTest completed successfully.\n");
-        WriteJson(Path.Combine(build, "native-gate.json"), new { schemaVersion = 1, format = "hybridclr.dhe-native-gate.json", passed = true, mergeReady = !(runtimeManifest.TryGetProperty("externalHeaders", out var headers) && headers.TryGetProperty("surrogate", out var surrogateValue) && surrogateValue.ValueKind == JsonValueKind.True), profile, configuration, runtimeRoot = runtime, runtimeManifest = Path.Combine(runtimeRoot, "runtime-manifest.json"), runtimeTreeSha256 = TreeHash(runtime), externalTreeSha256 = TreeHash(external), nativeExitCode = 0, surrogateHeadersAllowed, log = logPath, errors = Array.Empty<string>(), generatedAtUtc = DateTimeOffset.UtcNow });
+        var runtimeManifestPath = Path.Combine(runtimeRoot, "runtime-manifest.json");
+        WriteJson(Path.Combine(build, "native-gate.json"), new { schemaVersion = 1, format = "hybridclr.dhe-native-gate.json", passed = true, mergeReady = !(runtimeManifest.TryGetProperty("externalHeaders", out var headers) && headers.TryGetProperty("surrogate", out var surrogateValue) && surrogateValue.ValueKind == JsonValueKind.True), profile, configuration, runtimeRoot = runtime, runtimeManifest = runtimeManifestPath, runtimeManifestSha256 = Sha256File(runtimeManifestPath), runtimeTreeSha256 = TreeHash(runtime), externalTreeSha256 = TreeHash(external), nativeExitCode = 0, surrogateHeadersAllowed, log = logPath, errors = Array.Empty<string>(), generatedAtUtc = DateTimeOffset.UtcNow });
         return 0;
     }
 

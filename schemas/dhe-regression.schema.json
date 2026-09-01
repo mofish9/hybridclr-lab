@@ -15,7 +15,7 @@
     "passed": { "type": "boolean" },
     "checks": {
       "type": "array",
-      "minItems": 22,
+      "minItems": 23,
       "items": {
         "type": "object",
         "additionalProperties": false,

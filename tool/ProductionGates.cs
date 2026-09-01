@@ -779,11 +779,30 @@ internal static partial class Program
         try
         {
             using var wrongRole = JsonDocument.Parse("{\"schemaVersion\":1,\"format\":\"hybridclr.dhe-regression.json\",\"passed\":true}");
-            ValidateEvidenceRole("native", wrongRole.RootElement, output, new string('a', 40), new string('b', 40));
+            ValidateEvidenceRole("native", wrongRole.RootElement, output, new string('a', 40),
+                new string('b', 40), cli.Root);
         }
         catch { roleRejected = true; }
         AddRegressionCheck(checks, errors, "evidence-role-format", roleRejected,
             "release evidence role must enforce its report format");
+
+        var unboundNativeRejected = false;
+        try
+        {
+            using var unboundNative = JsonDocument.Parse("{\"schemaVersion\":1," +
+                "\"format\":\"hybridclr.dhe-native-gate.json\",\"passed\":true," +
+                "\"mergeReady\":true,\"profile\":\"DHE-Tuanjie2022\"," +
+                "\"configuration\":\"Release\",\"runtimeManifest\":\"missing.json\"," +
+                "\"runtimeManifestSha256\":\"" + new string('a', 64) + "\"," +
+                "\"runtimeRoot\":\"missing\",\"runtimeTreeSha256\":\"" + new string('b', 64) + "\"," +
+                "\"externalTreeSha256\":\"" + new string('c', 64) + "\"," +
+                "\"nativeExitCode\":0,\"surrogateHeadersAllowed\":false,\"errors\":[]}");
+            ValidateEvidenceRole("native", unboundNative.RootElement, output, new string('a', 40),
+                new string('b', 40), cli.Root);
+        }
+        catch { unboundNativeRejected = true; }
+        AddRegressionCheck(checks, errors, "evidence-native-runtime-binding", unboundNativeRejected,
+            "native release evidence must bind the live runtime, headers, locks, and source commits");
 
         var unsafeArchive = Path.Combine(regressionRoot, "not-an-archive");
         Directory.CreateDirectory(unsafeArchive);
