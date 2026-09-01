@@ -90,8 +90,8 @@
         "then": {
           "properties": {
             "retryValidated": { "const": false },
-            "retryAssemblyName": { "const": "" },
-            "retryFailure": { "const": "" }
+            "retryAssemblyName": { "anyOf": [{ "type": "null" }, { "const": "" }] },
+            "retryFailure": { "anyOf": [{ "type": "null" }, { "const": "" }] }
           }
         }
       },
