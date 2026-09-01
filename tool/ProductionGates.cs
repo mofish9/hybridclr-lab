@@ -60,8 +60,13 @@ internal static partial class Program
         var sets = Settings.Read(settingsPath);
         AddCheck(checks, errors, "settings:dhe-coverage", sets.Hot.Length > 0 && SetEquals(sets.Hot, sets.Dhe),
             "hotUpdateAssemblies and dheAotAssemblies must be non-empty and equal.");
-        var packageLockPath = ResolveOptionalFile(cli.Optional("packagelockpath"), project,
-            Path.Combine("Assets", "Editor", "DHE", "dhe-package-lock.json"));
+        var explicitPackageLockPath = cli.Optional("packagelockpath");
+        var packageLockPath = ResolveOptionalFile(explicitPackageLockPath, project,
+            Path.Combine("ProjectSettings", "DHE", "dhe-package-lock.json")) ??
+            (string.IsNullOrWhiteSpace(explicitPackageLockPath)
+                ? ResolveOptionalFile(null, project,
+                    Path.Combine("Assets", "Editor", "DHE", "dhe-package-lock.json"))
+                : null);
         var baselineManifestPath = ResolveOptionalFile(cli.Optional("baselinemanifestpath"), baselineRoot,
             "dhe-baseline-manifest.json");
         runtimeManifestPath = ResolveOptionalFile(cli.Optional("runtimemanifestpath"), project, "runtime-manifest.json");
@@ -286,9 +291,17 @@ internal static partial class Program
     private static bool WriteCleanCheckout(Cli cli, bool release, string project, string toolRoot, string output)
     {
         var errors = new List<string>();
-        var boundaryPath = ResolveOptionalFile(cli.Optional("sourceboundarypath"), project,
-            Path.Combine("Assets", "Editor", "DHE", "dhe-source-boundary.json")) ??
-            ResolveOptionalFile(null, project, Path.Combine("manifests", "dhe-source-boundary.json"));
+        var explicitBoundaryPath = cli.Optional("sourceboundarypath");
+        var boundaryPath = ResolveOptionalFile(explicitBoundaryPath, project,
+            Path.Combine("ProjectSettings", "DHE", "dhe-source-boundary.json")) ??
+            (string.IsNullOrWhiteSpace(explicitBoundaryPath)
+                ? ResolveOptionalFile(null, project,
+                    Path.Combine("Assets", "Editor", "DHE", "dhe-source-boundary.json"))
+                : null) ??
+            (string.IsNullOrWhiteSpace(explicitBoundaryPath)
+                ? ResolveOptionalFile(null, project,
+                    Path.Combine("manifests", "dhe-source-boundary.json"))
+                : null);
         if (release && boundaryPath == null) errors.Add("Release requires SourceBoundaryPath.");
         var boundaryHash = boundaryPath == null ? null : Sha256File(boundaryPath);
         var boundaryErrors = new List<string>();

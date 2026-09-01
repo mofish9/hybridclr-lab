@@ -37,11 +37,11 @@ project-owned resource, signing, and smoke policies:
 ```text
 dotnet run --project tool/HybridCLR.DheTool.csproj -- new-adapter \
   -Root . -Namespace MyGame.Editor \
-  -Output C:/project/Assets/Editor/DHE/DheWorkflowBuild.cs
+  -Output C:/project/Assets/Scripts/Editor/DHE/DheWorkflowBuild.cs
 dotnet run --project tool/HybridCLR.DheTool.csproj -- new-config \
-  -Output C:/project/Assets/Editor/DHE/dhe-workflow-config.json
+  -Output C:/project/ProjectSettings/DHE/dhe-workflow-config.json
 dotnet run --project tool/HybridCLR.DheTool.csproj -- workflow \
-  -Config C:/project/Assets/Editor/DHE/dhe-workflow-config.json
+  -Config C:/project/ProjectSettings/DHE/dhe-workflow-config.json
 ```
 
 The generated adapter is a compilable StreamingAssets implementation, not a
@@ -91,7 +91,7 @@ the same host distributed to the project:
 ```text
 dotnet HybridCLR.DheTool.dll schema-validate \
   -Schema C:/tools/HybridCLRDhe/schemas/dhe-workflow-config.schema.json \
-  -Document C:/project/Assets/Editor/DHE/dhe-workflow-config.json \
+  -Document C:/project/ProjectSettings/DHE/dhe-workflow-config.json \
   -Output C:/build/dhe/config-schema-validation.json
 dotnet HybridCLR.DheTool.dll schema-gate \
   -SchemasRoot C:/tools/HybridCLRDhe/schemas \
@@ -168,8 +168,8 @@ dotnet run --project tool/HybridCLR.DheTool.csproj -- workflow \
   -BaselineAotRoot C:/release/stripped-aot \
   -BaselineManifestPath C:/release/stripped-aot/dhe-baseline-manifest.json \
   -RuntimeManifestPath C:/release/runtime/runtime-manifest.json \
-  -PackageLockPath C:/project/Assets/Editor/DHE/dhe-package-lock.json \
-  -SourceBoundaryPath C:/project/Assets/Editor/DHE/dhe-source-boundary.json \
+  -PackageLockPath C:/project/ProjectSettings/DHE/dhe-package-lock.json \
+  -SourceBoundaryPath C:/project/ProjectSettings/DHE/dhe-source-boundary.json \
   -ToolchainRoot C:/project/Tools/HybridCLRDhe \
   -ExpectedToolchainPackageId <64-hex-package-id> \
   -ArchiveRoot C:/build/dhe-archive \
