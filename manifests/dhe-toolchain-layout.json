@@ -1,7 +1,7 @@
 {
   "schemaVersion": 1,
   "format": "hybridclr.dhe-toolchain-layout.json",
-  "toolchainVersion": "0.1.12",
+  "toolchainVersion": "0.1.13",
   "contractVersion": 1,
   "exactPaths": [
     ".gitattributes",
@@ -21,6 +21,10 @@
     "manifests/dhe-toolchain-layout.json",
     "manifests/repo-lock.json",
     "manifests/runtime-workflows.json",
+    "schemas/dhe-adapter-native-finalize.schema.json",
+    "schemas/dhe-adapter-native-guards.schema.json",
+    "schemas/dhe-adapter-player-build.schema.json",
+    "schemas/dhe-adapter-stage.schema.json",
     "schemas/dhe-archive-gate.schema.json",
     "schemas/dhe-archive-manifest.schema.json",
     "schemas/dhe-aot-metadata-manifest.schema.json",
@@ -97,6 +101,7 @@
     "prepare-engine-test-project",
     "reference",
     "regression",
+    "release-evidence",
     "release-gate",
     "schema-gate",
     "schema-validate",

@@ -50,7 +50,8 @@ Editor 版本、未登记 package 文件或 runtime tree 漂移都会失败。
    的块必须失败。项目 adapter 在 Player 和 smoke 完成后必须在 `finally` 中恢复临时 build
    identity 源码模板，成功和异常路径都不得污染工作区。
 6. Player smoke 验证程序集集合、payload hash、changed/interpreter 路径、unchanged/AOT
-   路径以及失败事务回滚重试。no-op 更新必须证明解释器和 native changed 计数均为零。
+   路径以及失败事务回滚重试。no-op 更新必须证明解释器和 native changed 计数均为零，并
+   实际校验四程序集基线结果、direct/reflection 能力和无解释器调度，不能只检查计数。
 7. release gate 从原始 DLL、MV、runtime plan、native manifest、Player 和资源报告实时重算
    结果，不能只信任报告中的 `passed`。
 8. archive gate 生成无绝对路径的可移植证据，保留 immutable native manifest 原始字节并在
@@ -66,12 +67,16 @@ DHE format、未支持的 schema 断言关键字、额外属性、错误类型�
 ## 发布证据
 
 工具包只能从 clean、tracked 的精确提交发布。`-Mode Release` 需要一份绑定同一 HEAD/tree
-的 release evidence，并且以下四个角色各出现一次、文件 hash 正确且报告格式匹配：
+的 release evidence，并且以下六个角色各出现一次、文件 hash 正确且报告格式匹配：
 
 - `regression`：全部生产负例和 package/schema 认证通过；
 - `demo-changed`：真实 changed-method Player 路径通过；
 - `demo-noop`：零变化 Player 路径通过；
-- `native`：锁定 runtime、真实外部 headers、CMake/CTest 通过。
+- `native-tuanjie2022`：团结 2022 锁定 runtime、真实外部 headers、CMake/CTest 通过；
+- `native-unity2022`：Unity 2022 锁定 runtime、真实外部 headers、CMake/CTest 通过；
+- `native-unity2021`：Unity 2021 锁定 runtime、真实外部 headers、CMake/CTest 通过。
+
+六角色证据必须由 `release-evidence` 命令从 clean HEAD 自动生成，不能手工拼装后直接发布。
 
 发布后的 `dhe-toolchain-manifest.json` 必须同时满足 `mode=Release`、
 `releaseReady=true`、`sourceIdentity.clean=true`，并通过包外和包内两次

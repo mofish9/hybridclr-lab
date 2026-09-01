@@ -11,7 +11,7 @@ implementation:
 
 - `hybridclr@9e4fc7219724a3c63ff845e0b2acaa7d10c2430b` is the formal
   `optimize/v8.13.0` commit and annotated tag `v8.13.0-opt4`.
-- `hybridclr_unity@fbb83b4edd7b8a643518910496f5d97f934ea41e` is the formal
+- `hybridclr_unity@f1b1740c91130f40068c56f3e00944fbcdd75d09` is the formal
   `optimize/v8.13.0` package commit. The package does not receive an opt tag.
 - `il2cpp_plus` has no DHE source change in this round and continues to use the
   three opt3 engine tags.
@@ -94,11 +94,11 @@ must be invoked by a project adapter or CI job that writes the corresponding
 JSON evidence before a Release package is published. No DHE gate requires a
 PowerShell script.
 
-The current verification is conditional: Tuanjie 2022 and Unity 2021 native
-compilation/CTest pass, and Unity 2022 native compilation passes with surrogate
-headers because Unity 2022.3.63f1 is not installed on this machine. No Android,
-Unity 2022 Player, or production-project result is implied by this source
-integration.
+The release contract requires separate real-header CMake/CTest evidence for
+Tuanjie 2022, Unity 2022, and Unity 2021. The `release-evidence` command binds
+all three native reports to their live staged trees and rejects a surrogate or
+missing engine lane. Native evidence does not imply Android, iOS, Unity 2022
+Player, or production-project correctness; those remain target Player gates.
 
 ## Rollback
 

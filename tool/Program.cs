@@ -18,11 +18,18 @@ internal static partial class Program
         "mv-token-tamper", "verify-require-release", "verify-expected-id", "verify-package-id-recompute",
         "verify-extra-source", "verify-release-bit-tamper", "evidence-role-format",
         "evidence-native-runtime-binding", "archive-safe-replace",
+        "evidence-noop-aot-proof", "evidence-native-matrix-roles",
         "native-guard-unrelated-source-stable", "native-guard-block-tamper",
         "native-guard-duplicate-marker", "native-guard-missing-end-marker",
         "layout-release-role-schemas",
         "schema-valid-document", "schema-maximum-rejected", "schema-additional-type-rejected",
-        "schema-unsupported-keyword-rejected", "schema-gate-contract"
+        "schema-unsupported-keyword-rejected", "schema-gate-contract",
+        "schema-workflow-output-contract"
+    };
+    private static readonly string[] RequiredReleaseEvidenceRoles =
+    {
+        "regression", "demo-changed", "demo-noop", "native-tuanjie2022",
+        "native-unity2022", "native-unity2021"
     };
 
     public static int Main(string[] args)
@@ -48,6 +55,7 @@ internal static partial class Program
                 "archive" => Archive(cli),
                 "doctor" => Doctor(cli),
                 "verify-package" => VerifyPackage(cli),
+                "release-evidence" => ReleaseEvidence(cli),
                 "publish" => Publish(cli),
                 "install" => Install(cli),
                 "new-adapter" => NewAdapter(cli),
@@ -213,7 +221,10 @@ internal static partial class Program
         WriteJson(planValidationPath, new { schemaVersion = 1, format = "hybridclr.dhe-project-plan-validation.json", generatedAtUtc = DateTimeOffset.UtcNow, pathSemantics = "workspace-absolute-v1", passed = planComplete, complete = planComplete, coverageRequired = cli.Has("requirecompletecoverage"), coverageComplete = planComplete && (!cli.Has("requirecompletecoverage") || batchCode == 0), plan = planPath, assemblies = planRecords, errors = planComplete ? Array.Empty<string>() : new[] { "DHE project plan contains missing, incompatible, or error assemblies." }, warnings = Array.Empty<string>() });
         var reportPath = Path.Combine(output, "project-preflight-report.json");
         var passed = batchCode == 0;
-        var dnlibPath = cli.Optional("dnlibpath") ?? Path.Combine(AppContext.BaseDirectory, "dnlib.dll");
+        var configuredDnlibPath = cli.Optional("dnlibpath");
+        var dnlibPath = string.IsNullOrWhiteSpace(configuredDnlibPath)
+            ? Path.Combine(AppContext.BaseDirectory, "dnlib.dll")
+            : Path.GetFullPath(configuredDnlibPath);
         WriteJson(reportPath, new { schemaVersion = 1, format = "hybridclr.dhe-project-preflight.json", generatedAtUtc = DateTimeOffset.UtcNow, passed, generationPassed = passed, validationPassed = passed && planComplete, coverageRequired = cli.Has("requirecompletecoverage"), dheCoverageRequired = cli.Has("requiredheequalshotupdate"), configurationPassed = batch.GetProperty("configurationPassed").GetBoolean(), configurationErrors = batch.GetProperty("configurationErrors"), hotUpdateAssemblies = Settings.Read(settings).Hot, dheAotAssemblies = names, dheEqualsHotUpdate = SetEquals(Settings.Read(settings).Hot, names), coverageComplete = passed && planComplete, artifactReady = passed && planComplete && cli.Has("requirecompletecoverage"), releaseReady = false, sourcePreflight = (string?)null, sourcePreflightPassed = true, settingsFile = settings, projectRoot = cli.Optional("projectroot"), baselineRoot = baseline, currentRoot = current, batchReport = batchPath, projectPlan = planPath, projectPlanValidation = planValidationPath, batchExitCode = batchCode, counts = batch.GetProperty("counts"), assemblies, nativeAbiCoverage = "not-evaluated-by-offline-preflight", dnlibPath });
         Console.WriteLine("DHE project preflight: " + reportPath);
         return passed ? 0 : 1;
@@ -299,7 +310,9 @@ internal static partial class Program
             ["settingsfile"] = settings, ["baselineroot"] = baselineCopy, ["currentroot"] = current,
             ["outputroot"] = preflightRoot, ["projectroot"] = project,
             ["requiredheequalshotupdate"] = "true", ["requirecompletecoverage"] = "true",
-            ["dnlibpath"] = cli.Optional("dnlibpath") ?? ""
+            ["dnlibpath"] = string.IsNullOrWhiteSpace(cli.Optional("dnlibpath"))
+                ? Path.Combine(AppContext.BaseDirectory, "dnlib.dll")
+                : Path.GetFullPath(cli.Optional("dnlibpath")!)
         });
         if (Preflight(preflight) != 0) throw new DheException("DHE project preflight failed.");
         var planPath = Path.Combine(preflightRoot, "dhe-project-plan.json");
@@ -308,6 +321,7 @@ internal static partial class Program
             var reportPath = Path.Combine(output, "project-workflow-report.json");
             WriteJson(reportPath, ProjectWorkflowReport(output, mode, target, project, settings, adapterClass,
                 productionEvidence, preparePath, null, null, null, null, false, null, null));
+            RunWorkflowSchemaGate(cli, output);
             Console.WriteLine("DHE workflow preflight passed: " + reportPath);
             return 0;
         }
@@ -355,8 +369,25 @@ internal static partial class Program
         WriteJson(projectWorkflowPath, ProjectWorkflowReport(output, mode, target, project, settings, adapterClass,
             productionEvidence, preparePath, playerPath, nativePath, identityPath, runtimePlanPath, true,
             archiveGatePath, gatePath));
+        RunWorkflowSchemaGate(cli, output);
         Console.WriteLine("DHE workflow passed: " + projectWorkflowPath);
         return 0;
+    }
+
+    private static void RunWorkflowSchemaGate(Cli cli, string output)
+    {
+        var toolchainRoot = Path.GetFullPath(cli.Optional("toolchainroot") ?? cli.Root);
+        var schemaGatePath = Path.Combine(output, "schema-gate.json");
+        if (SchemaGate(new Cli("schema-gate", new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase)
+        {
+            ["schemasroot"] = Path.Combine(toolchainRoot, "schemas"),
+            ["inputroot"] = output,
+            ["output"] = schemaGatePath,
+            ["requireknownformats"] = "true"
+        })) != 0)
+        {
+            throw new DheException("DHE workflow schema gate failed: " + schemaGatePath);
+        }
     }
 
     private static object ProjectWorkflowReport(string output, string mode, string target, string project, string settings,
@@ -454,15 +485,83 @@ internal static partial class Program
         return GetString(ReadJson<JsonElement>(path), property) ?? new string('0', 64);
     }
 
+    private static int ReleaseEvidence(Cli cli)
+    {
+        var sourceRoot = RequireDirectory(cli.Optional("labroot") ?? cli.Root, "DHE release source root");
+        var sourceHead = GitValue(sourceRoot, "rev-parse", "HEAD");
+        var sourceTree = GitValue(sourceRoot, "rev-parse", "HEAD^{tree}");
+        var sourceClean = !string.IsNullOrWhiteSpace(sourceHead) &&
+            string.IsNullOrWhiteSpace(GitValue(sourceRoot, "status", "--porcelain"));
+        if (!sourceClean || !IsHex(sourceHead, 40, 64) || !IsHex(sourceTree, 40, 64))
+            throw new DheException("Release evidence generation requires a clean Git-tracked source HEAD/tree.");
+
+        var inputs = new[]
+        {
+            (Role: "regression", Option: "regression"),
+            (Role: "demo-changed", Option: "demochanged"),
+            (Role: "demo-noop", Option: "demonoop"),
+            (Role: "native-tuanjie2022", Option: "nativetuanjie2022"),
+            (Role: "native-unity2022", Option: "nativeunity2022"),
+            (Role: "native-unity2021", Option: "nativeunity2021")
+        }.Select(item => (item.Role, Path: RequireFile(cli.Require(item.Option), item.Role + " evidence"))).ToArray();
+        var outputRoot = SafeOutputRoot(cli.Require("outputroot"), inputs.Select(item => item.Path).Append(sourceRoot));
+        EnsureOutputOutsideRoot(outputRoot, sourceRoot);
+        var outputPrefix = outputRoot.TrimEnd(Path.DirectorySeparatorChar, Path.AltDirectorySeparatorChar) +
+            Path.DirectorySeparatorChar;
+        if (inputs.Any(item => item.Path.StartsWith(outputPrefix, StringComparison.OrdinalIgnoreCase)))
+            throw new DheException("Release evidence output cannot contain one of its input reports.");
+        if (Directory.Exists(outputRoot))
+        {
+            if (!cli.Has("forceoutput") && Directory.EnumerateFileSystemEntries(outputRoot).Any())
+                throw new DheException("Release evidence output is not empty: " + outputRoot);
+            if (cli.Has("forceoutput")) Directory.Delete(outputRoot, true);
+        }
+        var reportsRoot = Path.Combine(outputRoot, "reports");
+        Directory.CreateDirectory(reportsRoot);
+        var files = new List<object>();
+        foreach (var item in inputs)
+        {
+            var relative = "reports/" + item.Role + ".json";
+            var destination = Path.Combine(outputRoot, relative.Replace('/', Path.DirectorySeparatorChar));
+            File.Copy(item.Path, destination, true);
+            files.Add(new { role = item.Role, path = relative, sha256 = Sha256File(destination) });
+        }
+        var evidencePath = Path.Combine(outputRoot, "dhe-toolchain-release-evidence.json");
+        WriteJson(evidencePath, new
+        {
+            schemaVersion = 1,
+            format = "hybridclr.dhe-toolchain-release-evidence.json",
+            generatedAtUtc = DateTimeOffset.UtcNow,
+            passed = true,
+            sourceHead,
+            sourceTree,
+            files
+        });
+        var evidence = ReadJson<JsonElement>(evidencePath);
+        var schema = ReadJson<JsonElement>(RequireFile(Path.Combine(sourceRoot, "schemas",
+            "dhe-toolchain-release-evidence.schema.json"), "Release evidence schema"));
+        var schemaErrors = new List<string>();
+        ValidateSchemaVocabulary(schema, "$", schemaErrors);
+        if (schemaErrors.Count == 0) ValidateJsonSchema(schema, evidence, schema, "$", schemaErrors);
+        if (schemaErrors.Count > 0)
+            throw new DheException("Generated release evidence violates its schema: " + string.Join("; ", schemaErrors));
+        ValidateEvidenceFiles(evidence, outputRoot, sourceRoot);
+        Console.WriteLine("DHE release evidence: " + evidencePath);
+        return 0;
+    }
+
     private static void ValidateEvidenceFiles(JsonElement evidence, string baseDirectory, string sourceRoot)
     {
-        if (!evidence.TryGetProperty("files", out var files) || files.ValueKind != JsonValueKind.Array || files.GetArrayLength() < 4)
-            throw new DheException("Release evidence must contain regression, changed, no-op, and native reports.");
+        if (!evidence.TryGetProperty("files", out var files) || files.ValueKind != JsonValueKind.Array ||
+            files.GetArrayLength() != RequiredReleaseEvidenceRoles.Length)
+            throw new DheException("Release evidence must contain the complete managed and three-engine native matrix.");
         var sourceHead = GetString(evidence, "sourceHead");
         var sourceTree = GetString(evidence, "sourceTree");
         if (!IsHex(sourceHead, 40, 64) || !IsHex(sourceTree, 40, 64))
             throw new DheException("Release evidence source identity is invalid.");
         var roles = new HashSet<string>(StringComparer.Ordinal);
+        var roleHashes = new Dictionary<string, string>(StringComparer.Ordinal);
+        JsonElement? regressionReport = null;
         foreach (var item in files.EnumerateArray())
         {
             var path = GetString(item, "path");
@@ -477,9 +576,21 @@ internal static partial class Program
             var report = ReadJson<JsonElement>(full);
             if (!GetBool(report, "passed")) throw new DheException("Release evidence report is not a passing result: " + path);
             ValidateEvidenceRole(role, report, full, sourceHead!, sourceTree!, sourceRoot);
+            roleHashes[role!] = expected!;
+            if (role == "regression") regressionReport = report;
         }
-        foreach (var required in new[] { "regression", "demo-changed", "demo-noop", "native" })
+        foreach (var required in RequiredReleaseEvidenceRoles)
             if (!roles.Contains(required)) throw new DheException("Release evidence is missing role: " + required);
+        if (!regressionReport.HasValue || !regressionReport.Value.TryGetProperty("workflowOutputs", out var workflowOutputs) ||
+            workflowOutputs.ValueKind != JsonValueKind.Array || workflowOutputs.GetArrayLength() != 2)
+            throw new DheException("Regression evidence does not bind the changed and no-op workflow reports.");
+        foreach (var workflow in workflowOutputs.EnumerateArray())
+        {
+            var role = GetString(workflow, "role") ?? "";
+            if (!roleHashes.TryGetValue(role, out var evidenceHash) ||
+                !string.Equals(evidenceHash, GetString(workflow, "sha256"), StringComparison.OrdinalIgnoreCase))
+                throw new DheException("Regression workflow output hash does not match release evidence: " + role);
+        }
     }
 
     private static void ValidateEvidenceRole(string role, JsonElement report, string reportPath,
@@ -500,6 +611,24 @@ internal static partial class Program
                 foreach (var required in RequiredRegressionChecks)
                     if (!checkNames.Contains(required))
                         throw new DheException("Regression evidence is missing check: " + required);
+                if (!GetBool(report, "realWorkflowOutputsValidated") ||
+                    !report.TryGetProperty("workflowOutputs", out var workflowOutputs) ||
+                    workflowOutputs.ValueKind != JsonValueKind.Array || workflowOutputs.GetArrayLength() != 2)
+                    throw new DheException("Regression evidence did not validate real changed and no-op output trees.");
+                var workflowRoles = new HashSet<string>(StringComparer.Ordinal);
+                foreach (var workflow in workflowOutputs.EnumerateArray())
+                {
+                    var workflowRole = GetString(workflow, "role") ?? "";
+                    var workflowPath = ResolveEvidencePath(GetString(workflow, "path"),
+                        Path.GetDirectoryName(reportPath)!, "Regression workflow output");
+                    if (!workflowRoles.Add(workflowRole) || !Sha256File(workflowPath).Equals(
+                            GetString(workflow, "sha256"), StringComparison.OrdinalIgnoreCase))
+                        throw new DheException("Regression workflow output identity is invalid: " + workflowRole);
+                    RequireEvidenceFormat(ReadJson<JsonElement>(workflowPath),
+                        "hybridclr.dhe-project-player-workflow.json", workflowRole);
+                }
+                if (!workflowRoles.SetEquals(new[] { "demo-changed", "demo-noop" }))
+                    throw new DheException("Regression workflow output roles are incomplete.");
                 break;
             case "demo-changed":
             case "demo-noop":
@@ -518,26 +647,37 @@ internal static partial class Program
                         GetString(player, "transactionStatus") != "validated")
                         throw new DheException("Changed Demo evidence does not prove interpreter/AOT dispatch and rollback.");
                 }
-                else if (changed != 0 || GetInt(player, "changedMethodCount") != 0 ||
-                    GetInt(player, "interpreterEntryCount") != 0 || GetBool(player, "changedProbeChanged") ||
-                    GetBool(player, "unchangedProbeChanged") || GetString(player, "transactionStatus") != "notApplicable")
-                    throw new DheException("No-op Demo evidence contains changed/interpreter activity.");
+                else
+                {
+                    if (changed != 0) throw new DheException("No-op Demo workflow contains changed methods.");
+                    ValidateNoOpPlayerEvidence(player);
+                }
                 break;
-            case "native":
+            case "native-tuanjie2022":
+            case "native-unity2022":
+            case "native-unity2021":
                 RequireEvidenceFormat(report, "hybridclr.dhe-native-gate.json", role);
                 if (GetInt(report, "nativeExitCode") != 0 || !GetBool(report, "mergeReady") ||
                     GetBool(report, "surrogateHeadersAllowed") ||
                     !IsHex(GetString(report, "runtimeTreeSha256"), 64, 64) ||
                     !IsHex(GetString(report, "externalTreeSha256"), 64, 64))
                     throw new DheException("Native evidence does not prove a real-header passing native gate.");
-                ValidateNativeReleaseEvidence(report, reportPath, sourceRoot);
+                var nativeRequirement = role switch
+                {
+                    "native-tuanjie2022" => (Profile: "DHE-Tuanjie2022", Workflow: "Tuanjie2022Fgs"),
+                    "native-unity2022" => (Profile: "DHE-Unity2022", Workflow: "Unity2022Fgs"),
+                    _ => (Profile: "DHE-Unity2021", Workflow: "Unity2021Standard")
+                };
+                ValidateNativeReleaseEvidence(report, reportPath, sourceRoot,
+                    nativeRequirement.Profile, nativeRequirement.Workflow);
                 break;
             default:
                 throw new DheException("Unknown release evidence role: " + role);
         }
     }
 
-    private static void ValidateNativeReleaseEvidence(JsonElement report, string reportPath, string sourceRoot)
+    private static void ValidateNativeReleaseEvidence(JsonElement report, string reportPath, string sourceRoot,
+        string expectedProfile, string expectedWorkflow)
     {
         sourceRoot = RequireDirectory(sourceRoot, "DHE release source root");
         var reportRoot = Path.GetDirectoryName(reportPath)!;
@@ -549,8 +689,8 @@ internal static partial class Program
             throw new DheException("Native evidence runtime manifest hash is invalid.");
         var runtime = ReadJson<JsonElement>(runtimeManifestPath);
         RequireEvidenceFormat(runtime, "hybridclr.dhe-runtime-manifest.json", "Native runtime manifest");
-        if (GetString(runtime, "profile") != "DHE-Tuanjie2022" ||
-            GetString(runtime, "engineWorkflow") != "Tuanjie2022Fgs")
+        if (GetString(runtime, "profile") != expectedProfile ||
+            GetString(runtime, "engineWorkflow") != expectedWorkflow)
             throw new DheException("Native evidence uses an unexpected runtime profile or engine workflow.");
 
         var runtimeRoot = RequireDirectory(GetString(report, "runtimeRoot") ?? "", "Native runtime root");
@@ -581,19 +721,21 @@ internal static partial class Program
             throw new DheException("Native evidence runtime lock does not match the release source.");
         var repoLock = ReadJson<JsonElement>(RequireFile(Path.Combine(sourceRoot, "manifests", "repo-lock.json"),
             "Current repository lock"));
+        var workflows = ReadJson<JsonElement>(RequireFile(Path.Combine(sourceRoot, "manifests",
+            "runtime-workflows.json"), "Current runtime workflows"));
+        var workflow = workflows.GetProperty("workflows").EnumerateArray().Single(item =>
+            GetString(item, "id") == expectedWorkflow);
         var runtimeSources = runtime.GetProperty("source");
         foreach (var repository in new[] { "hybridclr", "il2cpp_plus", "hybridclr_unity" })
         {
-            var expected = GetString(repoLock.GetProperty("repositories").GetProperty(repository), "commit");
+            var expected = repository == "il2cpp_plus"
+                ? GetString(workflow.GetProperty("il2cppPlus"), "commit")
+                : GetString(repoLock.GetProperty("repositories").GetProperty(repository), "commit");
             var actual = runtimeSources.GetProperty(repository);
             if (!string.Equals(expected, GetString(actual, "commit"), StringComparison.OrdinalIgnoreCase) ||
                 GetBool(actual, "dirty") || !IsHex(GetString(actual, "treeSha256"), 64, 64))
                 throw new DheException("Native evidence source identity is invalid: " + repository);
         }
-        var workflows = ReadJson<JsonElement>(RequireFile(Path.Combine(sourceRoot, "manifests",
-            "runtime-workflows.json"), "Current runtime workflows"));
-        var workflow = workflows.GetProperty("workflows").EnumerateArray().Single(item =>
-            GetString(item, "id") == GetString(runtime, "engineWorkflow"));
         var expectedHeaders = GetString(workflow.GetProperty("engine"), "externalHeadersTreeSha256");
         if (!externalTree.Equals(expectedHeaders, StringComparison.OrdinalIgnoreCase))
             throw new DheException("Native evidence headers do not match the locked engine workflow.");
@@ -617,6 +759,17 @@ internal static partial class Program
     {
         if (GetInt(report, "schemaVersion") != 1 || GetString(report, "format") != expected)
             throw new DheException(description + " evidence has an invalid format.");
+    }
+
+    private static void ValidateNoOpPlayerEvidence(JsonElement player)
+    {
+        if (GetInt(player, "changedMethodCount") != 0 || GetInt(player, "interpreterEntryCount") != 0 ||
+            GetBool(player, "changedProbeChanged") || GetBool(player, "unchangedProbeChanged") ||
+            GetString(player, "transactionStatus") != "notApplicable" ||
+            !GetBool(player, "dispatchProbeValidated") || !GetBool(player, "noOpAotBehaviorValidated") ||
+            !GetBool(player, "multiAssemblyValidated") || !GetBool(player, "capabilityDirectPassed") ||
+            !GetBool(player, "capabilityPassed") || !GetBool(player, "secondaryAssemblyDirectValidated"))
+            throw new DheException("No-op Demo evidence does not prove unchanged AOT behavior.");
     }
 
     private static int Validate(Cli cli)
@@ -1289,7 +1442,7 @@ internal static partial class Program
         }
     }
 
-    private static void PrintHelp() => Console.WriteLine("HybridCLR DHE C# tool\nCommands: version, mv, batch, baseline-manifest, aot-metadata-manifest, preflight, workflow, release-gate, regression, schema-validate, schema-gate, validate, archive, doctor, verify-package, publish, install, new-adapter, new-config, assemble-runtime, native-tests, build-managed-cases, generate-test-manifest, generate-metadata-stress-source, reference, compare-results, check-environment, clear-unity-project-locks, wait-editor, prepare-engine-test-project, bootstrap-repos, tree-hash, file-hash\nExample: dotnet run --project tool/HybridCLR.DheTool.csproj -- workflow -Config <project/dhe-workflow-config.json>");
+    private static void PrintHelp() => Console.WriteLine("HybridCLR DHE C# tool\nCommands: version, mv, batch, baseline-manifest, aot-metadata-manifest, preflight, workflow, release-gate, regression, schema-validate, schema-gate, validate, archive, doctor, verify-package, release-evidence, publish, install, new-adapter, new-config, assemble-runtime, native-tests, build-managed-cases, generate-test-manifest, generate-metadata-stress-source, reference, compare-results, check-environment, clear-unity-project-locks, wait-editor, prepare-engine-test-project, bootstrap-repos, tree-hash, file-hash\nExample: dotnet run --project tool/HybridCLR.DheTool.csproj -- workflow -Config <project/dhe-workflow-config.json>");
 
     private static string ResolveUnity(Cli cli, string project) => RequireFile(cli.Optional("unity") ?? Environment.GetEnvironmentVariable("DHE_UNITY_EXE") ?? throw new DheException("Set -Unity or DHE_UNITY_EXE."), "Unity editor");
     private static void RunUnity(string executable, string workingDirectory, IEnumerable<string> arguments, IDictionary<string, string> environment, string logPath, int timeoutSeconds)

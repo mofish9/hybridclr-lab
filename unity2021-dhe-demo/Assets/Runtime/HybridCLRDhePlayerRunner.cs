@@ -262,8 +262,26 @@ namespace HybridCLR.Lab
                 !string.Equals(buildIdentity.nativeManifestSha256, new string('0', 64), StringComparison.Ordinal) &&
                 string.Equals(buildIdentity.nativeGuardSourceSha256, HybridCLRDheBuildIdentity.NativeGuardSourceSha256, StringComparison.OrdinalIgnoreCase) &&
                 string.Equals(buildIdentity.nativeManifestSha256, HybridCLRDheBuildIdentity.NativeManifestSha256, StringComparison.OrdinalIgnoreCase);
-            bool changedBehaviorValidated = changedMethodCount == 0 ||
-                (addResult == 101 && stableResult == 4 &&
+            bool noOpCapabilityDirectValidated = ValidateNoOpCapabilityDirect(directCapability);
+            bool noOpCapabilityReflectionValidated = ValidateNoOpCapabilityReflection(capability);
+            bool noOpMainBehaviorValidated = addResult == 2 && stableResult == 4 &&
+                addViaStableResult == 5 && addPairResult == 8 && wideResult == 6L && touchValue == 12 &&
+                instanceAddResult == 3 && instanceStableResult == 6 && instanceAddViaStableResult == 8 &&
+                !addChanged && !stableChanged && !addViaStableChanged && !addPairChanged && !wideChanged &&
+                !touchChanged && !instanceStableChanged && !instanceAddChanged && !instanceAddViaStableChanged;
+            bool noOpMultiAssemblyValidated = loadedAssemblies.Count >= 4 && metadataStressResult > 0 &&
+                !managedSecondaryChanged && !managedSecondaryUnchanged && !metadataSecondaryChanged &&
+                !crossSecondaryChanged && managedSecondaryDirectResult == 13 &&
+                managedSecondaryUnchangedDirectResult == 6 && metadataSecondaryDirectResult == 13 &&
+                crossSecondaryDirectResult == 13 && metadataSecondaryReflectionResult == 13 &&
+                crossSecondaryReflectionResult == 13 &&
+                string.Equals(crossAssemblyResult, "derived:26:34", StringComparison.Ordinal);
+            bool noOpAotBehaviorValidated = changedMethodCount == 0 && noOpMainBehaviorValidated &&
+                noOpMultiAssemblyValidated && noOpCapabilityDirectValidated &&
+                noOpCapabilityReflectionValidated && mainInterpreterEntryCount == 0;
+            bool changedBehaviorValidated = changedMethodCount == 0
+                ? noOpAotBehaviorValidated
+                : (addResult == 101 && stableResult == 4 &&
                     addViaStableResult == 104 && addPairResult == 107 && wideResult == 1005L &&
                     touchValue == 705 && instanceAddResult == 201 && instanceStableResult == 6 &&
                     instanceAddViaStableResult == 206 && addChanged && !stableChanged &&
@@ -281,8 +299,7 @@ namespace HybridCLR.Lab
             string transactionStatus = changedMethodCount == 0
                 ? "notApplicable"
                 : (retryValidated ? "validated" : "failed");
-            bool dispatchProbeValidated = loadError == LoadImageErrorCode.OK &&
-                (changedMethodCount == 0 || changedBehaviorValidated);
+            bool dispatchProbeValidated = loadError == LoadImageErrorCode.OK && changedBehaviorValidated;
 
             return new DheRun
             {
@@ -304,7 +321,9 @@ namespace HybridCLR.Lab
                 instanceAddResult = instanceAddResult,
                 instanceStableResult = instanceStableResult,
                 instanceAddViaStableResult = instanceAddViaStableResult,
-                capabilityDirectPassed = directCapability.passed,
+                capabilityDirectPassed = changedMethodCount == 0
+                    ? noOpCapabilityDirectValidated
+                    : directCapability.passed,
                 capabilityDirectError = directCapability.error,
                 capabilityDirectInterpreterEntryCount = directCapability.interpreterEntryCount,
                 capabilityDirectAotEntryCount = directCapability.aotEntryCount,
@@ -322,13 +341,18 @@ namespace HybridCLR.Lab
                 crossSecondaryDirectResult = crossSecondaryDirectResult,
                 metadataSecondaryReflectionResult = metadataSecondaryReflectionResult,
                 crossSecondaryReflectionResult = crossSecondaryReflectionResult,
-                secondaryAssemblyDirectValidated = managedSecondaryDirectResult == 103 &&
-                    managedSecondaryUnchangedDirectResult == 6 && metadataSecondaryDirectResult == 103 &&
-                    crossSecondaryDirectResult == 103,
-                secondaryAssemblyChangedValidated = managedSecondaryChanged && !managedSecondaryUnchanged &&
-                    metadataSecondaryChanged && crossSecondaryChanged && metadataSecondaryReflectionResult == 103 &&
-                    crossSecondaryReflectionResult == 103,
-                capabilityPassed = capability.passed,
+                secondaryAssemblyDirectValidated = changedMethodCount == 0
+                    ? noOpMultiAssemblyValidated
+                    : managedSecondaryDirectResult == 103 && managedSecondaryUnchangedDirectResult == 6 &&
+                        metadataSecondaryDirectResult == 103 && crossSecondaryDirectResult == 103,
+                secondaryAssemblyChangedValidated = changedMethodCount == 0
+                    ? noOpMultiAssemblyValidated
+                    : managedSecondaryChanged && !managedSecondaryUnchanged && metadataSecondaryChanged &&
+                        crossSecondaryChanged && metadataSecondaryReflectionResult == 103 &&
+                        crossSecondaryReflectionResult == 103,
+                capabilityPassed = changedMethodCount == 0
+                    ? noOpCapabilityReflectionValidated
+                    : capability.passed,
                 capabilityError = capability.error,
                 capabilityInterfaceChanged = capability.interfaceChanged,
                 capabilityDelegateChanged = capability.delegateChanged,
@@ -377,6 +401,7 @@ namespace HybridCLR.Lab
                 changedMethodCount = changedMethodCount,
                 expectedChangedMethodCount = changedMethodCount,
                 dispatchProbeValidated = dispatchProbeValidated,
+                noOpAotBehaviorValidated = noOpAotBehaviorValidated,
                 changedProbeChanged = addChanged,
                 unchangedProbeChanged = stableChanged,
                 dispatchProbeError = dispatchProbeValidated ? null : "DHE changed/unchanged dispatch assertions failed.",
@@ -395,9 +420,11 @@ namespace HybridCLR.Lab
                         hashValidated = true,
                         loadError = LoadImageErrorCode.OK.ToString(),
                     }).ToArray(),
-                multiAssemblyValidated = loadedAssemblies.Count >= 4 && metadataStressResult > 0 &&
-                    metadataSecondaryReflectionResult == 103 && crossSecondaryReflectionResult == 103 &&
-                    string.Equals(crossAssemblyResult, "derived:26:34", StringComparison.Ordinal),
+                multiAssemblyValidated = changedMethodCount == 0
+                    ? noOpMultiAssemblyValidated
+                    : loadedAssemblies.Count >= 4 && metadataStressResult > 0 &&
+                        metadataSecondaryReflectionResult == 103 && crossSecondaryReflectionResult == 103 &&
+                        string.Equals(crossAssemblyResult, "derived:26:34", StringComparison.Ordinal),
                 metadataStressResult = metadataStressResult,
                 crossAssemblyResult = crossAssemblyResult,
                 changedMethod = addChanged ? "interpreter" : "aot",
@@ -433,6 +460,44 @@ namespace HybridCLR.Lab
                 unchangedInstanceToken = instanceStableMethod.MetadataToken,
                 changedInstanceCallingUnchangedToken = instanceAddViaStableMethod.MetadataToken,
             };
+        }
+
+        private static bool ValidateNoOpCapabilityDirect(CapabilityDirectRun result)
+        {
+            return string.IsNullOrEmpty(result.error) && result.interfaceResult == 7 &&
+                result.delegateResult == 7 && result.genericSelectResult == 9 &&
+                !result.genericSelectNullPassed && result.genericConstrainedResult == 7 &&
+                result.genericVirtualResult == 7 && result.mutateValueResult.Number == 4 &&
+                result.mutateValueResult.Wide == 5L && result.boxValueResult.Number == 3 &&
+                result.boxValueResult.Wide == 4L && result.refOutResult == 5 && result.asyncResult == 4 &&
+                result.iteratorResult == "4,5" && result.genericContainerResult == 8 &&
+                result.nullableResult == 4 && result.delegateClosedInstanceResult == 9 &&
+                result.delegateOpenInstanceResult == 9 && result.delegateMulticastResult == 19 &&
+                result.exceptionFinallyResult == 4 && result.virtualResult == 4 &&
+                result.unchangedVirtualResult == 9 && result.interpreterEntryCount == 0;
+        }
+
+        private static bool ValidateNoOpCapabilityReflection(CapabilityRun result)
+        {
+            bool noChangedMethods = !result.interfaceChanged && !result.delegateChanged &&
+                !result.genericSelectChanged && !result.genericConstrainedChanged &&
+                !result.mutateValueChanged && !result.boxValueChanged && !result.refOutValueChanged &&
+                !result.asyncValueChanged && !result.iterateValueChanged &&
+                !result.asyncStateMachineChanged && !result.iteratorStateMachineChanged &&
+                !result.genericContainerChanged && !result.nullableChanged &&
+                !result.delegateClosedInstanceChanged && !result.delegateOpenInstanceChanged &&
+                !result.delegateMulticastChanged && !result.exceptionFinallyChanged &&
+                !result.virtualChanged && !result.genericVirtualChanged;
+            return string.IsNullOrEmpty(result.error) && noChangedMethods && result.interfaceResult == 7 &&
+                result.delegateResult == 7 && result.genericSelectResult == 9 &&
+                !result.genericSelectNullPassed && result.genericConstrainedResult == 7 &&
+                result.genericVirtualResult == 7 && result.valueNumber == 4 && result.valueWide == 5L &&
+                result.boxNumber == 3 && result.boxWide == 4L && result.refOutResult == 5 &&
+                result.asyncResult == 4 && result.iteratorResult == "4,5" &&
+                result.genericContainerResult == 8 && result.nullableResult == 4 &&
+                result.delegateClosedInstanceResult == 9 && result.delegateOpenInstanceResult == 9 &&
+                result.delegateMulticastResult == 19 && result.exceptionFinallyResult == 4 &&
+                result.virtualResult == 4;
         }
 
         private static CapabilityDirectRun ExecuteCapabilityDirect()
@@ -962,6 +1027,7 @@ namespace HybridCLR.Lab
             public int changedMethodCount;
             public int expectedChangedMethodCount;
             public bool dispatchProbeValidated;
+            public bool noOpAotBehaviorValidated;
             public bool changedProbeChanged;
             public bool unchangedProbeChanged;
             public string dispatchProbeError;

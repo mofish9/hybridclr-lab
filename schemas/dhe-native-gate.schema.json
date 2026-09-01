@@ -11,7 +11,7 @@
     "generatedAtUtc": { "type": "string", "format": "date-time" },
     "passed": { "type": "boolean" },
     "mergeReady": { "type": "boolean" },
-    "profile": { "const": "DHE-Tuanjie2022" },
+    "profile": { "enum": ["DHE-Tuanjie2022", "DHE-Unity2022", "DHE-Unity2021"] },
     "configuration": { "const": "Release" },
     "runtimeRoot": { "type": "string", "minLength": 1 },
     "runtimeManifest": { "type": "string", "minLength": 1 },

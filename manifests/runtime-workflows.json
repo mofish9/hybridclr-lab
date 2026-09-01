@@ -36,13 +36,12 @@
       "nativeTestProfile": "Compatibility-Unity2022-Fgs",
       "engine": {
         "family": "Unity",
-        "version": "2022.3.63f1",
-        "unityVersion": "2022.3.63f1",
-        "unityVersionNumber": 20220363,
+        "version": "2022.3.62f3",
+        "unityVersion": "2022.3.62f3",
+        "unityVersionNumber": 20220362,
         "tuanjieVersionNumber": 0,
-        "executablePath": "C:/Program Files/Unity/Hub/Editor/2022.3.63f1/Editor/Unity.exe",
-        "nativeTestExternalPath": "C:/Program Files/Tuanjie/Hub/Editor/2022.3.62t12/Editor/Data/il2cpp/external",
-        "externalHeadersTreeSha256": "EBCDC7C61490DEFAD29B65D003FC0451F870316982A4CE75AEC4F8515A1D91D6"
+        "executablePath": "C:/Program Files/Unity/Hub/Editor/2022.3.62f3/Editor/Unity.exe",
+        "externalHeadersTreeSha256": "D0037168A9A28B05FD8DF11EDA27812DAEAA458DC0CDFAD7765F3BE75E83EE99"
       },
       "il2cppPlus": {
         "tag": "v2022-8.11.0-opt3",

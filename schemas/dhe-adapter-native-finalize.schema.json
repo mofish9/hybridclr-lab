@@ -1,0 +1,22 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://github.com/mofish9/hybridclr-lab/schemas/dhe-adapter-native-finalize.schema.json",
+  "title": "HybridCLR DHE Adapter Native Finalize Report",
+  "type": "object",
+  "additionalProperties": true,
+  "required": ["schemaVersion", "format", "generatedAtUtc", "passed", "target", "generatedCppRoot", "manifestPath", "beeBackendPath", "dagPath", "logPath", "attempts", "exitCode"],
+  "properties": {
+    "schemaVersion": { "const": 1 },
+    "format": { "const": "hybridclr.dhe-adapter-native-finalize.json" },
+    "generatedAtUtc": { "type": "string", "format": "date-time" },
+    "passed": { "const": true },
+    "target": { "type": "string", "pattern": "^[A-Za-z0-9._-]+$" },
+    "generatedCppRoot": { "type": "string", "minLength": 1 },
+    "manifestPath": { "type": "string", "minLength": 1 },
+    "beeBackendPath": { "type": "string", "minLength": 1 },
+    "dagPath": { "type": "string", "minLength": 1 },
+    "logPath": { "type": "string", "minLength": 1 },
+    "attempts": { "type": "integer", "minimum": 1 },
+    "exitCode": { "const": 0 }
+  }
+}

@@ -779,7 +779,7 @@ internal static partial class Program
         try
         {
             using var wrongRole = JsonDocument.Parse("{\"schemaVersion\":1,\"format\":\"hybridclr.dhe-regression.json\",\"passed\":true}");
-            ValidateEvidenceRole("native", wrongRole.RootElement, output, new string('a', 40),
+            ValidateEvidenceRole("native-tuanjie2022", wrongRole.RootElement, output, new string('a', 40),
                 new string('b', 40), cli.Root);
         }
         catch { roleRejected = true; }
@@ -797,12 +797,51 @@ internal static partial class Program
                 "\"runtimeRoot\":\"missing\",\"runtimeTreeSha256\":\"" + new string('b', 64) + "\"," +
                 "\"externalTreeSha256\":\"" + new string('c', 64) + "\"," +
                 "\"nativeExitCode\":0,\"surrogateHeadersAllowed\":false,\"errors\":[]}");
-            ValidateEvidenceRole("native", unboundNative.RootElement, output, new string('a', 40),
+            ValidateEvidenceRole("native-tuanjie2022", unboundNative.RootElement, output, new string('a', 40),
                 new string('b', 40), cli.Root);
         }
         catch { unboundNativeRejected = true; }
         AddRegressionCheck(checks, errors, "evidence-native-runtime-binding", unboundNativeRejected,
             "native release evidence must bind the live runtime, headers, locks, and source commits");
+
+        var weakNoOpRejected = false;
+        try
+        {
+            using var weakNoOp = JsonDocument.Parse("{\"changedMethodCount\":0," +
+                "\"interpreterEntryCount\":0,\"changedProbeChanged\":false," +
+                "\"unchangedProbeChanged\":false,\"transactionStatus\":\"notApplicable\"," +
+                "\"dispatchProbeValidated\":true,\"noOpAotBehaviorValidated\":false," +
+                "\"multiAssemblyValidated\":true,\"capabilityDirectPassed\":true," +
+                "\"capabilityPassed\":true,\"secondaryAssemblyDirectValidated\":true}");
+            ValidateNoOpPlayerEvidence(weakNoOp.RootElement);
+        }
+        catch { weakNoOpRejected = true; }
+        AddRegressionCheck(checks, errors, "evidence-noop-aot-proof", weakNoOpRejected,
+            "no-op release evidence must prove unchanged AOT behavior");
+
+        var matrixEvidenceSchema = ReadJson<JsonElement>(Path.Combine(cli.Root, "schemas",
+            "dhe-toolchain-release-evidence.schema.json"));
+        using var matrixEvidence = JsonDocument.Parse(JsonSerializer.Serialize(new
+        {
+            schemaVersion = 1,
+            format = "hybridclr.dhe-toolchain-release-evidence.json",
+            generatedAtUtc = DateTimeOffset.UtcNow,
+            passed = true,
+            sourceHead = new string('a', 40),
+            sourceTree = new string('b', 40),
+            files = RequiredReleaseEvidenceRoles.Select(role => new
+            {
+                role,
+                path = "reports/" + role + ".json",
+                sha256 = new string('c', 64)
+            }).ToArray()
+        }));
+        var matrixEvidenceErrors = new List<string>();
+        ValidateJsonSchema(matrixEvidenceSchema, matrixEvidence.RootElement, matrixEvidenceSchema, "$",
+            matrixEvidenceErrors);
+        AddRegressionCheck(checks, errors, "evidence-native-matrix-roles",
+            RequiredReleaseEvidenceRoles.Length == 6 && matrixEvidenceErrors.Count == 0,
+            "release evidence must require changed, no-op, and all three native engine lanes");
 
         var unsafeArchive = Path.Combine(regressionRoot, "not-an-archive");
         Directory.CreateDirectory(unsafeArchive);
@@ -879,11 +918,65 @@ internal static partial class Program
         }
         AddRegressionCheck(checks, errors, "schema-gate-contract", schemaGatePassed,
             "distributed package documents and schema gate evidence must validate");
+        var workflowSchemaPassed = false;
+        var realWorkflowOutputsValidated = false;
+        var workflowOutputs = new List<object>();
+        var changedWorkflowRoot = cli.Optional("workflowchangedroot");
+        var noOpWorkflowRoot = cli.Optional("workflownooproot");
+        if (!string.IsNullOrWhiteSpace(packageRoot) && Directory.Exists(packageRoot) &&
+            !string.IsNullOrWhiteSpace(changedWorkflowRoot) && Directory.Exists(changedWorkflowRoot) &&
+            !string.IsNullOrWhiteSpace(noOpWorkflowRoot) && Directory.Exists(noOpWorkflowRoot))
+        {
+            var workflowRoots = new[]
+            {
+                (Name: "changed", Root: Path.GetFullPath(changedWorkflowRoot)),
+                (Name: "noop", Root: Path.GetFullPath(noOpWorkflowRoot))
+            };
+            workflowSchemaPassed = workflowRoots.All(item => SchemaGate(new Cli("schema-gate", new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase)
+            {
+                ["schemasroot"] = Path.Combine(packageRoot, "schemas"),
+                ["inputroot"] = item.Root,
+                ["output"] = Path.Combine(regressionRoot, "schema-gate-" + item.Name + ".json"),
+                ["requireknownformats"] = "true"
+            })) == 0);
+            realWorkflowOutputsValidated = workflowSchemaPassed;
+            if (workflowSchemaPassed)
+            {
+                foreach (var item in workflowRoots)
+                {
+                    var reportPath = RequireFile(Path.Combine(item.Root, "player-workflow-report.json"),
+                        item.Name + " workflow report");
+                    workflowOutputs.Add(new
+                    {
+                        role = item.Name == "changed" ? "demo-changed" : "demo-noop",
+                        path = reportPath,
+                        sha256 = Sha256File(reportPath)
+                    });
+                }
+            }
+        }
+        else if (!string.IsNullOrWhiteSpace(packageRoot) && Directory.Exists(packageRoot))
+        {
+            var requiredOutputSchemas = new[]
+            {
+                "dhe-adapter-native-finalize.schema.json", "dhe-adapter-native-guards.schema.json",
+                "dhe-adapter-player-build.schema.json", "dhe-adapter-stage.schema.json",
+                "dhe-mv.schema.json", "dhe-native-manifest.schema.json",
+                "dhe-player-result.schema.json", "dhe-project-preflight.schema.json",
+                "dhe-workflow-report.schema.json"
+            };
+            workflowSchemaPassed = requiredOutputSchemas.All(name => File.Exists(Path.Combine(packageRoot,
+                "schemas", name)));
+        }
+        AddRegressionCheck(checks, errors, "schema-workflow-output-contract", workflowSchemaPassed,
+            realWorkflowOutputsValidated
+                ? "real changed and no-op workflow output trees passed the distributed schema gate"
+                : "the distributed package must contain every workflow output schema");
         var sourceHead = GitValue(cli.Root, "rev-parse", "HEAD");
         var sourceTree = GitValue(cli.Root, "rev-parse", "HEAD^{tree}");
         var sourceClean = !string.IsNullOrWhiteSpace(sourceHead) && string.IsNullOrWhiteSpace(GitValue(cli.Root, "status", "--porcelain"));
         var passed = errors.Count == 0;
-        WriteJson(output, new { schemaVersion = 1, format = "hybridclr.dhe-regression.json", generatedAtUtc = DateTimeOffset.UtcNow, sourceHead, sourceTree, sourceClean, passed, checks, errors, warnings = Array.Empty<string>() });
+        WriteJson(output, new { schemaVersion = 1, format = "hybridclr.dhe-regression.json", generatedAtUtc = DateTimeOffset.UtcNow, sourceHead, sourceTree, sourceClean, passed, realWorkflowOutputsValidated, workflowOutputs, checks, errors, warnings = Array.Empty<string>() });
         Console.WriteLine("DHE regression " + (passed ? "passed: " : "failed: ") + output);
         return passed ? 0 : 1;
     }

@@ -34,18 +34,28 @@
       "type": "array",
       "items": {
         "type": "object",
-        "required": ["functionName", "returnType", "parameters", "sourceFile", "assemblyName", "declaringType", "methodName", "methodToken", "managedId", "bridgeKind", "usesHiddenReturnBuffer", "fullySharedParameterIndexes", "isStatic", "hasThis", "managedParameterCount"],
+        "required": ["functionName", "returnType", "parameters", "sourceFile", "assemblyName", "declaringType", "methodName", "methodToken", "managedReturnType", "managedParameterTypes", "managedHasThis", "declaringTypeIsValueType", "genericParameterCount", "declaringTypeGenericParameterCount", "bridgeKind", "usesHiddenReturnBuffer", "isStatic", "hasThis", "managedParameterCount"],
         "properties": {
           "functionName": { "type": "string", "minLength": 1 },
           "returnType": { "type": "string", "minLength": 1 },
-          "parameters": { "type": "array" },
+          "parameters": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "required": ["Type", "Name"],
+              "properties": {
+                "Type": { "type": "string", "minLength": 1 },
+                "Name": { "type": "string", "minLength": 1 }
+              }
+            }
+          },
           "sourceFile": { "type": "string", "minLength": 1 },
           "assemblyName": { "type": "string", "minLength": 1 },
           "declaringType": { "type": "string" },
           "methodName": { "type": "string", "minLength": 1 },
           "methodToken": { "type": "integer", "minimum": 1 },
           "managedId": { "type": "string", "minLength": 1 },
-          "managedReturnType": { "type": "string" },
+          "managedReturnType": { "type": "string", "minLength": 1 },
           "managedParameterTypes": { "type": "array", "items": { "type": "string" } },
           "managedHasThis": { "type": "boolean" },
           "declaringTypeIsValueType": { "type": "boolean" },

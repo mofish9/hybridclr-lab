@@ -101,7 +101,9 @@ dotnet HybridCLR.DheTool.dll schema-gate \
 
 The gate builds its format registry from the distributed schemas, rejects an
 unsupported assertion keyword instead of silently ignoring it, and validates
-its own evidence document before returning success.
+its own evidence document before returning success. `workflow` invokes this
+gate over its complete output root before returning success, including when it
+stops after preflight.
 
 ## Project workflow
 
@@ -237,11 +239,30 @@ It requires equal hot-update/DHE assembly sets, strict method-body-only diffs,
 complete native guard coverage, a target-bound previous baseline, clean
 source/package/runtime provenance, and a real Player smoke result. A no-op
 release is valid when all changed/interpreter/native counts are zero and the
-transaction status is `notApplicable`.
+transaction status is `notApplicable`. The Player must also set
+`noOpAotBehaviorValidated=true` after checking baseline results, the complete
+multi-assembly scope, direct/reflection capability probes, and the absence of
+interpreter dispatch.
 
 Publishing the toolchain itself in `-Mode Release` requires
-`-ReleaseEvidence <report>`. That report must match the exact source HEAD/tree
-and bind passing `regression`, `demo-changed`, `demo-noop`, and `native` JSON
-reports by SHA-256. A command-line readiness flag cannot promote a package.
+`-ReleaseEvidence <report>`. Generate it from a clean source identity with the
+same host:
+
+```text
+dotnet HybridCLR.DheTool.dll release-evidence \
+  -LabRoot C:/src/hybridclr-lab \
+  -OutputRoot C:/build/dhe-release-evidence \
+  -Regression C:/build/regression.json \
+  -DemoChanged C:/build/demo-changed/player-workflow-report.json \
+  -DemoNoop C:/build/demo-noop/player-workflow-report.json \
+  -NativeTuanjie2022 C:/build/native-tuanjie/native-gate.json \
+  -NativeUnity2022 C:/build/native-unity2022/native-gate.json \
+  -NativeUnity2021 C:/build/native-unity2021/native-gate.json
+```
+
+The generated report must match the exact source HEAD/tree and binds all six
+reports by SHA-256. Each native role is revalidated against its own locked
+runtime workflow, source commits, live runtime tree, and real Editor header
+tree. A command-line readiness flag cannot promote a package.
 Native compilation and iOS/Xcode execution remain target environment gates;
 a Windows result is not iOS evidence.

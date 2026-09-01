@@ -52,7 +52,7 @@
     },
     "method": {
       "type": "object",
-      "required": ["id", "kind", "name", "declaringType", "signature", "currentToken", "tokenStable", "shapeStable"],
+      "required": ["id", "kind", "name", "declaringType", "returnType", "parameterTypes", "currentToken", "tokenStable", "shapeStable"],
       "properties": {
         "id": { "type": "string", "minLength": 1 },
         "kind": { "enum": ["added", "removed", "changed", "tokenChanged", "shapeChanged", "unchanged"] },

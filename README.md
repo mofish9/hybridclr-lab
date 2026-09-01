@@ -22,7 +22,7 @@ Its formal entry points, generated-output boundary, and complete four-assembly
 Player evidence are documented in
 `docs/HybridCLR-DHE-Toolchain.md`,
 `docs/HybridCLR-DHE-Workflow-Review.md` and
-`docs/HybridCLR-DHE-Formal-Project-Validation.md`. Toolchain `0.1.12` is the
+`docs/HybridCLR-DHE-Formal-Project-Validation.md`. Toolchain `0.1.13` is the
 project-trial line; projects must install an authenticated package whose
 manifest has `releaseReady=true` and pin its exact package ID.
 The workflow also emits versioned MV/native/workflow schemas and an independent
@@ -59,8 +59,10 @@ Player or native ABI coverage. Native compile/CTest and Unity/Xcode remain
 separate environment gates.
 
 JSON schemas under `schemas/` are enforced by the distributed `schema-validate`
-and `schema-gate` commands. The gate rejects unknown DHE formats and unsupported
-schema assertions, and validates its own report before returning success.
+and `schema-gate` commands. The `workflow` command runs the complete output tree
+through this gate before returning success. The gate rejects unknown DHE formats
+and unsupported schema assertions, and validates its own report before returning
+success.
 
 The formal DHE-lite lane is reproducible from clean runtime inputs. Assemble the
 locked runtime (the `-ReposRoot` path may point at a new checkout), then run the
@@ -92,7 +94,9 @@ scripts-only, and final Player builds. The historical Demo evidence was
 `nativeEntryCount=34`; it covers direct/reflection generic calls, a null generic
 reference, generic virtual dispatch, value-type state-machine paths, secondary
 assemblies, and the invalid-MV same-process retry. A new release must reproduce
-this evidence after migration. The Player also checks the snapshot hash compiled
+this evidence after migration. The no-op lane executes and validates baseline
+behavior across all four AOT assemblies; a zero changed-method count alone is not
+accepted as proof. The Player also checks the snapshot hash compiled
 into `HybridCLRDheBuildIdentity`, so a mutable
 `StreamingAssets` snapshot cannot stand in for the actual AOT build. The workflow
 also archives a self-contained `runtime-plan/` directory and validates its

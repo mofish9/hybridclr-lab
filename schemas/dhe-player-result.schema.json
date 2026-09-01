@@ -39,15 +39,18 @@
     "target": { "type": ["string", "null"], "pattern": "^[A-Za-z0-9._-]+$" },
     "expectedChangedMethodCount": { "type": "integer", "minimum": 0 },
     "dispatchProbeValidated": { "type": "boolean" },
+    "noOpAotBehaviorValidated": { "type": "boolean" },
     "changedProbeChanged": { "type": "boolean" },
     "unchangedProbeChanged": { "type": "boolean" },
-    "dispatchProbeError": { "type": ["string", "null"] }
+    "dispatchProbeError": { "type": ["string", "null"] },
+    "interpreterEntryCount": { "type": "integer", "minimum": 0 },
+    "aotEntryCount": { "type": "integer", "minimum": 0 }
   },
   "allOf": [
     {
       "if": { "properties": { "passed": { "const": true } }, "required": ["passed"] },
       "then": {
-        "required": ["loadError", "target", "plannedDheAssemblies", "loadedDheAssemblies", "changedMethodCount", "retryValidated", "retryAssemblyName", "retryFailure", "transactionStatus", "assemblyValidations", "multiAssemblyValidated", "buildIdentityValidated", "identityVersion", "aotSnapshotKind", "nativeGuardSourceSha256", "nativeManifestSha256", "expectedChangedMethodCount", "dispatchProbeValidated", "changedProbeChanged", "unchangedProbeChanged"],
+        "required": ["loadError", "target", "plannedDheAssemblies", "loadedDheAssemblies", "changedMethodCount", "retryValidated", "retryAssemblyName", "retryFailure", "transactionStatus", "assemblyValidations", "multiAssemblyValidated", "buildIdentityValidated", "identityVersion", "aotSnapshotKind", "nativeGuardSourceSha256", "nativeManifestSha256", "expectedChangedMethodCount", "dispatchProbeValidated", "noOpAotBehaviorValidated", "changedProbeChanged", "unchangedProbeChanged", "interpreterEntryCount", "aotEntryCount"],
         "properties": {
           "loadError": { "const": "OK" },
           "plannedDheAssemblies": { "type": "array", "minItems": 1, "uniqueItems": true },
@@ -87,8 +90,27 @@
         "then": {
           "properties": {
             "retryValidated": { "const": false },
-            "retryAssemblyName": { "type": "null" },
-            "retryFailure": { "type": "null" }
+            "retryAssemblyName": { "const": "" },
+            "retryFailure": { "const": "" }
+          }
+        }
+      },
+      {
+        "if": {
+          "properties": { "changedMethodCount": { "const": 0 } },
+          "required": ["changedMethodCount"]
+        },
+        "then": {
+          "properties": {
+            "noOpAotBehaviorValidated": { "const": true },
+            "interpreterEntryCount": { "const": 0 }
+          }
+        },
+        "else": {
+          "properties": {
+            "noOpAotBehaviorValidated": { "const": false },
+            "interpreterEntryCount": { "minimum": 1 },
+            "aotEntryCount": { "minimum": 1 }
           }
         }
       },

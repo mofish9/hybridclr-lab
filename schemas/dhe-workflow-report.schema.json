@@ -60,8 +60,8 @@
           "then": {
             "properties": {
               "retryValidated": { "const": false },
-              "retryAssemblyName": { "type": "null" },
-              "retryFailure": { "type": "null" }
+              "retryAssemblyName": { "const": "" },
+              "retryFailure": { "const": "" }
             }
           }
         },
