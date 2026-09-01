@@ -178,6 +178,31 @@ namespace HybridCLR.Editor.Commands
             }
         }
 
+        /// <summary>
+        /// Builds the first DHE-capable Player for a target. The freshly
+        /// generated stripped image is both the AOT Player input and the
+        /// baseline retained for later differential releases.
+        /// </summary>
+        public static BuildReport BuildBootstrapPlayer(DheBootstrapPlayerOptions options)
+        {
+            if (options == null) throw new ArgumentNullException(nameof(options));
+            if (options.BuildPlayerCallback == null)
+                throw new BuildFailedException("DHE bootstrap requires a project Player callback.");
+            ValidateAssemblyScope(true, out _, out _);
+            GenerateCurrentArtifacts(options.Target);
+            string baselineRoot = Path.GetFullPath(
+                SettingsUtil.GetAssembliesPostIl2CppStripDir(options.Target));
+            return BuildPlayer(new DhePlayerBuildOptions
+            {
+                OutputPath = options.OutputPath,
+                BaselineAotRoot = baselineRoot,
+                Target = options.Target,
+                BuildOptions = options.BuildOptions,
+                Scenes = options.Scenes,
+                BuildPlayerCallback = options.BuildPlayerCallback,
+            });
+        }
+
         public static DheRuntimePlanResult StageRuntimePlan(DheRuntimePlanOptions options)
         {
             if (options == null)
@@ -252,13 +277,11 @@ namespace HybridCLR.Editor.Commands
                 }
 
                 string dllFileName = assemblyName + DllBytesExtension;
-                string baselineFileName = assemblyName + ".baseline.dll.bytes";
                 string mvFileName = assemblyName + ".mv.bytes";
                 string snapshotFileName = assemblyName + ".aot-snapshot.bytes";
                 File.WriteAllBytes(Path.Combine(currentAssetRoot, dllFileName), currentBytes);
                 byte[] baselineBytes = File.ReadAllBytes(baselinePath);
                 byte[] snapshotBytes = Sha256(baselineBytes);
-                File.WriteAllBytes(Path.Combine(currentAssetRoot, baselineFileName), baselineBytes);
                 File.WriteAllBytes(Path.Combine(currentAssetRoot, mvFileName), mvBytes);
                 File.WriteAllBytes(Path.Combine(currentAssetRoot, snapshotFileName), snapshotBytes);
 
@@ -267,8 +290,6 @@ namespace HybridCLR.Editor.Commands
                     assemblyName = assemblyName,
                     current = ResolveRuntimeAssetPath(options, projectRoot,
                         Path.Combine(currentAssetRoot, dllFileName)),
-                    baseline = ResolveRuntimeAssetPath(options, projectRoot,
-                        Path.Combine(currentAssetRoot, baselineFileName)),
                     mv = ResolveRuntimeAssetPath(options, projectRoot,
                         Path.Combine(currentAssetRoot, mvFileName)),
                     snapshot = ResolveRuntimeAssetPath(options, projectRoot,
@@ -2016,7 +2037,6 @@ namespace HybridCLR.Editor.Commands
         {
             public string assemblyName;
             public string current;
-            public string baseline;
             public string mv;
             public string snapshot;
             public string currentSha256;
@@ -2225,6 +2245,15 @@ namespace HybridCLR.Editor.Commands
         public string HandoffRoot;
         public string HandoffPlanPath;
         public string[] AssemblyNames;
+    }
+
+    public sealed class DheBootstrapPlayerOptions
+    {
+        public string OutputPath;
+        public BuildTarget Target = BuildTarget.NoTarget;
+        public BuildOptions BuildOptions;
+        public string[] Scenes;
+        public Func<BuildPlayerOptions, BuildReport> BuildPlayerCallback;
     }
 
     public sealed class DhePlayerBuildOptions
