@@ -985,13 +985,27 @@ internal static partial class Program
             string baseId = new string('a', 64);
             using var first = JsonDocument.Parse("{\"selectedBaseId\":\"" + baseId + "\"}");
             using var second = JsonDocument.Parse("{\"selectedBaseId\":\"" + baseId + "\"}");
-            ValidateMultiBaseChangedEvidence((first.RootElement, output),
-                (second.RootElement, output));
+            ValidateMultiBaseChangedEvidence(new[]
+            {
+                (first.RootElement, output), (second.RootElement, output)
+            }, false);
         }
         catch { duplicateBaseRejected = true; }
         AddRegressionCheck(checks, errors, "evidence-multibase-current-binding",
             duplicateBaseRejected,
             "release evidence must reject duplicate Base identities before accepting a shared current payload");
+        bool extensiblePlayerMatrixPassed;
+        try
+        {
+            extensiblePlayerMatrixPassed = RunExtensiblePlayerMatrixRegression(regressionRoot);
+        }
+        catch
+        {
+            extensiblePlayerMatrixPassed = false;
+        }
+        AddRegressionCheck(checks, errors, "evidence-extensible-player-engine-matrix",
+            extensiblePlayerMatrixPassed,
+            "release evidence must accept additional Base Players while requiring all three engine workflows");
         var runtimeSource = File.ReadAllText(Path.Combine(cli.Root, "tool", "LabCommands.cs"));
         AddRegressionCheck(checks, errors, "runtime-package-source-binding",
             runtimeSource.Contains("ValidateRepoIdentity(\"hybridclr_unity\"", StringComparison.Ordinal),
@@ -1013,6 +1027,12 @@ internal static partial class Program
             gitRootBoundaryPassed, gitRootBoundaryPassed
                 ? "git-root-v1 boundary resolves from a nested Unity project to the repository root"
                 : string.Join("; ", boundaryErrors));
+        string relativeGitRoot = GitValue(".", "rev-parse", "--show-toplevel");
+        AddRegressionCheck(checks, errors, "git-relative-root-resolution",
+            !string.IsNullOrWhiteSpace(relativeGitRoot) &&
+            Path.GetFullPath(relativeGitRoot).Equals(Path.GetFullPath(cli.Root),
+                StringComparison.OrdinalIgnoreCase),
+            "Git identity checks must resolve a relative -Root without duplicating the working path");
         string staleLockRoot = Path.Combine(regressionRoot, "unity-stale-lock", "Temp");
         Directory.CreateDirectory(staleLockRoot);
         string staleLock = Path.Combine(staleLockRoot, "UnityLockfile");
@@ -1048,6 +1068,24 @@ internal static partial class Program
 
         var matrixEvidenceSchema = ReadJson<JsonElement>(Path.Combine(cli.Root, "schemas",
             "dhe-toolchain-release-evidence.schema.json"));
+        var matrixFiles = new List<object>();
+        matrixFiles.AddRange(RequiredStaticReleaseEvidenceRoles.Select(role => (object)new
+        {
+            role,
+            path = "reports/" + role + ".json",
+            sha256 = new string('c', 64)
+        }));
+        for (int index = 0; index < RequiredPlayerEngineWorkflows.Length; index++)
+        {
+            matrixFiles.Add(new
+            {
+                role = "player-changed",
+                engineWorkflow = RequiredPlayerEngineWorkflows[index],
+                baseId = new string((char)('d' + index), 64),
+                path = "reports/player-changed-" + (index + 1).ToString("D3") + ".json",
+                sha256 = new string('c', 64)
+            });
+        }
         using var matrixEvidence = JsonDocument.Parse(JsonSerializer.Serialize(new
         {
             schemaVersion = 1,
@@ -1056,19 +1094,16 @@ internal static partial class Program
             passed = true,
             sourceHead = new string('a', 40),
             sourceTree = new string('b', 40),
-            files = RequiredReleaseEvidenceRoles.Select(role => new
-            {
-                role,
-                path = "reports/" + role + ".json",
-                sha256 = new string('c', 64)
-            }).ToArray()
+            files = matrixFiles
         }));
         var matrixEvidenceErrors = new List<string>();
         ValidateJsonSchema(matrixEvidenceSchema, matrixEvidence.RootElement, matrixEvidenceSchema, "$",
             matrixEvidenceErrors);
         AddRegressionCheck(checks, errors, "evidence-native-matrix-roles",
-            RequiredReleaseEvidenceRoles.Length == 10 && matrixEvidenceErrors.Count == 0,
-            "release evidence must require two changed Bases, no-op, and all three resolver/native engine lanes");
+            RequiredStaticReleaseEvidenceRoles.Length == 8 && matrixFiles.Count == 11 &&
+            matrixEvidenceErrors.Count == 0,
+            "release evidence must require an extensible three-engine changed Base matrix, no-op, " +
+            "and all three resolver/native engine lanes");
 
         var unsafeArchive = Path.Combine(regressionRoot, "not-an-archive");
         Directory.CreateDirectory(unsafeArchive);
@@ -1226,20 +1261,34 @@ internal static partial class Program
         var realWorkflowOutputsValidated = false;
         var resourcePlayerEvidenceBindingPassed = false;
         var workflowOutputs = new List<object>();
-        var changedWorkflowRoot = cli.Optional("workflowchangedroot");
-        var changedBase2WorkflowRoot = cli.Optional("workflowchangedbase2root");
+        var changedWorkflowRoots = cli.GetList("workflowchangedroots");
+        if (changedWorkflowRoots.Count == 0)
+        {
+            foreach (string option in new[]
+                     { "workflowchangedroot", "workflowchangedbase2root", "workflowchangedbase3root" })
+            {
+                string? value = cli.Optional(option);
+                if (!string.IsNullOrWhiteSpace(value)) changedWorkflowRoots.Add(value);
+            }
+        }
+        changedWorkflowRoots = changedWorkflowRoots.Select(Path.GetFullPath)
+            .Distinct(StringComparer.OrdinalIgnoreCase).ToList();
+        if (changedWorkflowRoots.Count > MaxChangedPlayerEvidenceCount)
+            throw new DheException("Regression changed Player root count exceeds " +
+                MaxChangedPlayerEvidenceCount + ".");
         var noOpWorkflowRoot = cli.Optional("workflownooproot");
+        bool anyWorkflowInput = changedWorkflowRoots.Count > 0 ||
+            !string.IsNullOrWhiteSpace(noOpWorkflowRoot);
         if (!string.IsNullOrWhiteSpace(packageRoot) && Directory.Exists(packageRoot) &&
-            !string.IsNullOrWhiteSpace(changedWorkflowRoot) && Directory.Exists(changedWorkflowRoot) &&
-            !string.IsNullOrWhiteSpace(changedBase2WorkflowRoot) && Directory.Exists(changedBase2WorkflowRoot) &&
+            changedWorkflowRoots.Count >= RequiredPlayerEngineWorkflows.Length &&
+            changedWorkflowRoots.All(Directory.Exists) &&
             !string.IsNullOrWhiteSpace(noOpWorkflowRoot) && Directory.Exists(noOpWorkflowRoot))
         {
-            var workflowRoots = new[]
-            {
-                (Name: "changed", Role: "demo-changed", Root: Path.GetFullPath(changedWorkflowRoot)),
-                (Name: "changed-base2", Role: "demo-changed-base2", Root: Path.GetFullPath(changedBase2WorkflowRoot)),
-                (Name: "noop", Role: "demo-noop", Root: Path.GetFullPath(noOpWorkflowRoot))
-            };
+            var workflowRoots = changedWorkflowRoots.Select((root, index) =>
+                    (Name: "changed-" + (index + 1).ToString("D3"),
+                        Role: "player-changed", Root: root))
+                .Append((Name: "noop", Role: "demo-noop", Root: Path.GetFullPath(noOpWorkflowRoot)))
+                .ToArray();
             workflowSchemaPassed = workflowRoots.All(item => SchemaGate(new Cli("schema-gate", new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase)
             {
                 ["schemasroot"] = Path.Combine(packageRoot, "schemas"),
@@ -1252,40 +1301,54 @@ internal static partial class Program
             {
                 foreach (var item in workflowRoots)
                 {
-                    var reportName = item.Name.StartsWith("changed", StringComparison.Ordinal)
+                    bool changedWorkflow = item.Role == "player-changed";
+                    var reportName = changedWorkflow
                         ? "resource-player-workflow-report.json"
                         : "player-workflow-report.json";
                     var reportPath = RequireFile(Path.Combine(item.Root, reportName),
                         item.Name + " workflow report");
-                    if (item.Name.StartsWith("changed", StringComparison.Ordinal))
+                    JsonElement workflowReport = ReadJson<JsonElement>(reportPath);
+                    if (changedWorkflow)
                     {
-                        JsonElement resourceWorkflow = ReadJson<JsonElement>(reportPath);
-                        RequireEvidenceFormat(resourceWorkflow,
+                        RequireEvidenceFormat(workflowReport,
                             "hybridclr.dhe-resource-player-workflow.json",
                             "changed resource workflow");
-                        ValidateResourcePlayerEvidenceBindings(resourceWorkflow, reportPath);
+                        ValidateResourcePlayerEvidenceBindings(workflowReport, reportPath);
                     }
-                    ValidateManagedReleaseEvidence(ReadJson<JsonElement>(reportPath), reportPath,
-                        cli.Root);
-                    workflowOutputs.Add(new
+                    ValidateManagedReleaseEvidence(workflowReport, reportPath, cli.Root);
+                    if (changedWorkflow)
                     {
-                        role = item.Role,
-                        path = reportPath,
-                        sha256 = Sha256File(reportPath)
-                    });
+                        var identity = GetChangedPlayerEvidenceIdentity(workflowReport, reportPath);
+                        workflowOutputs.Add(new
+                        {
+                            role = item.Role,
+                            engineWorkflow = identity.EngineWorkflow,
+                            baseId = identity.BaseId,
+                            path = reportPath,
+                            sha256 = Sha256File(reportPath)
+                        });
+                    }
+                    else
+                    {
+                        workflowOutputs.Add(new
+                        {
+                            role = item.Role,
+                            path = reportPath,
+                            sha256 = Sha256File(reportPath)
+                        });
+                    }
                 }
-                var changedReports = workflowRoots.Where(item =>
-                        item.Name.StartsWith("changed", StringComparison.Ordinal))
+                var changedReports = workflowRoots.Where(item => item.Role == "player-changed")
                     .Select(item =>
                     {
                         string path = Path.Combine(item.Root, "resource-player-workflow-report.json");
                         return (Report: ReadJson<JsonElement>(path), Path: path);
                     }).ToArray();
-                ValidateMultiBaseChangedEvidence(changedReports[0], changedReports[1]);
+                ValidateMultiBaseChangedEvidence(changedReports, true);
                 resourcePlayerEvidenceBindingPassed = true;
             }
         }
-        else if (!string.IsNullOrWhiteSpace(packageRoot) && Directory.Exists(packageRoot))
+        else if (!anyWorkflowInput && !string.IsNullOrWhiteSpace(packageRoot) && Directory.Exists(packageRoot))
         {
             var requiredOutputSchemas = new[]
             {
@@ -1303,12 +1366,12 @@ internal static partial class Program
         }
         AddRegressionCheck(checks, errors, "schema-workflow-output-contract", workflowSchemaPassed,
             realWorkflowOutputsValidated
-                ? "two changed Base and no-op workflow output trees passed the distributed schema gate"
+                ? "the extensible three-engine changed Base and no-op output trees passed the distributed schema gate"
                 : "the distributed package must contain every workflow output schema");
         AddRegressionCheck(checks, errors, "resource-player-evidence-binding",
             resourcePlayerEvidenceBindingPassed,
             realWorkflowOutputsValidated
-                ? "two resource-only changed Base results share one revalidated current payload"
+                ? "all three-engine resource-only changed Base results share one revalidated current payload"
                 : "the distributed package contains the resource Player evidence implementation");
         using var releaseResourceBase = JsonDocument.Parse("{\"mode\":\"Release\",\"releaseReady\":true}");
         using var incompleteResourceBase = JsonDocument.Parse("{\"mode\":\"Release\",\"releaseReady\":false}");
@@ -1332,6 +1395,63 @@ internal static partial class Program
     {
         checks.Add(new { name, passed, details });
         if (!passed) errors.Add(name + ": " + details);
+    }
+
+    private static bool RunExtensiblePlayerMatrixRegression(string regressionRoot)
+    {
+        string root = Path.Combine(regressionRoot, "extensible-player-matrix");
+        Directory.CreateDirectory(root);
+        string[] baseIds = Enumerable.Range(1, 4)
+            .Select(index => new string((char)('a' + index), 64)).ToArray();
+        string manifestPath = Path.Combine(root, "dhe-resource-update.json");
+        WriteJson(manifestPath, new
+        {
+            schemaVersion = 1,
+            format = "hybridclr.dhe-resource-update.json",
+            supportedBases = baseIds.Select(baseId => new { baseId }).ToArray()
+        });
+
+        var workflows = new[]
+        {
+            "Unity2021Standard", "Unity2022Fgs", "Tuanjie2022Fgs", "Unity2021Standard"
+        };
+        var reports = new List<(JsonElement Report, string Path)>();
+        for (int index = 0; index < workflows.Length; index++)
+        {
+            string runtimePath = Path.Combine(root, "runtime-" + index + ".json");
+            WriteJson(runtimePath, new
+            {
+                schemaVersion = 1,
+                format = "hybridclr.dhe-runtime-manifest.json",
+                engineWorkflow = workflows[index]
+            });
+            string reportPath = Path.Combine(root, "player-" + index + ".json");
+            WriteJson(reportPath, new
+            {
+                schemaVersion = 1,
+                format = "hybridclr.dhe-resource-player-workflow.json",
+                selectedBaseId = baseIds[index],
+                runtimeSource = runtimePath,
+                target = "StandaloneWindows64",
+                currentAssemblySetSha256 = new string('1', 64),
+                resourceUpdateManifestSha256 = new string('2', 64),
+                resourceUpdateValidationSha256 = new string('3', 64),
+                resourceUpdateManifest = manifestPath
+            });
+            reports.Add((ReadJson<JsonElement>(reportPath), reportPath));
+        }
+
+        ValidateMultiBaseChangedEvidence(reports.Take(3).ToArray(), true);
+        ValidateMultiBaseChangedEvidence(reports, true);
+        try
+        {
+            ValidateMultiBaseChangedEvidence(new[] { reports[0], reports[1], reports[3] }, true);
+            return false;
+        }
+        catch (DheException)
+        {
+            return true;
+        }
     }
 
     private static void RunIntegratedSourceLockRegressions(string regressionRoot,

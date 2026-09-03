@@ -113,12 +113,12 @@ This command revalidates the selected Base, live staged manifest/validation/plan
 bytes, build identity, native manifest, immutable Player files, assembly scope,
 changed dispatch, remaining AOT entries, structural/reflection probes, and
 transaction rollback. It replaces rebuilding a changed Player merely to obtain
-the `demo-changed` release role; Base Players must retain universal guards.
-Formal toolchain release evidence runs this smoke against at least two distinct
-Base identities and requires both reports to reference exactly one shared current
-payload. Additional online Bases remain mandatory inputs to `resource-update`
-even though the fixed toolchain qualification matrix records two representative
-Player executions.
+the `player-changed` release role; Base Players must retain universal guards.
+Formal toolchain release evidence runs this smoke against at least three distinct
+Base identities, requires Unity 2021, Unity 2022, and Tuanjie 2022 coverage, and
+requires every report to reference exactly one shared current payload. The input
+is extensible, so additional representative Base reports can be bound as the
+matrix grows. Every online Base remains a mandatory input to `resource-update`.
 
 ## Runtime proof
 

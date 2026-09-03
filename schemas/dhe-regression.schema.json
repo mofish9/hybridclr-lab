@@ -16,13 +16,15 @@
     "realWorkflowOutputsValidated": { "type": "boolean" },
     "workflowOutputs": {
       "type": "array",
-      "maxItems": 3,
+      "maxItems": 1025,
       "items": {
         "type": "object",
         "additionalProperties": false,
         "required": ["role", "path", "sha256"],
         "properties": {
-          "role": { "enum": ["demo-changed", "demo-changed-base2", "demo-noop"] },
+          "role": { "enum": ["player-changed", "demo-noop"] },
+          "engineWorkflow": { "enum": ["Unity2021Standard", "Unity2022Fgs", "Tuanjie2022Fgs"] },
+          "baseId": { "type": "string", "pattern": "^[0-9a-fA-F]{64}$" },
           "path": { "type": "string", "minLength": 1 },
           "sha256": { "type": "string", "pattern": "^[0-9a-fA-F]{64}$" }
         }
@@ -63,7 +65,7 @@
   "allOf": [
     {
       "if": { "properties": { "realWorkflowOutputsValidated": { "const": true } }, "required": ["realWorkflowOutputsValidated"] },
-      "then": { "properties": { "workflowOutputs": { "minItems": 3, "maxItems": 3 } } },
+      "then": { "properties": { "workflowOutputs": { "minItems": 4, "maxItems": 1025 } } },
       "else": { "properties": { "workflowOutputs": { "maxItems": 0 } } }
     },
     {

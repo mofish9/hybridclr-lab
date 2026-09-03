@@ -108,9 +108,10 @@ SHA-256；任一文件缺失或篡改都拒绝整包，不留下可接受的部�
 
 真实 Player/device smoke 完成后，运行 `resource-player-evidence`，把该 Player result、上述
 stage report、资源发布目录和归档的 Base `player-workflow-report.json` 绑定为
-`resource-player-workflow-report.json`。工具链发布时的 `demo-changed` 角色只接受这份资源更新
-证据，并额外要求第二个不同 Base 的 `demo-changed-base2` 证据；两者必须绑定同一个 current
-manifest、validation 和 assembly set。不再要求、也不允许通过重建非 universal-guard 的
+`resource-player-workflow-report.json`。0.1.19 起以可扩展的 `player-changed` 列表记录所有
+代表性 Base，至少覆盖 Unity 2021、Unity 2022、团结 2022 三个不同 Base；所有记录必须绑定
+同一个 current manifest、validation 和 assembly set。不再要求、也不允许通过重建非
+universal-guard 的
 changed Player 来伪造线上流程。
 
 ## 客户端选择与本地求差
@@ -170,8 +171,8 @@ managed runtime 后旧 Player 不会被误认为可安全消费新 plan。缺少
 
 identity 1 的同一 structural current payload 已在两个不同 Base Player 上完成本地 MetaVersion
 求差：current set 为
-`808f854c3e2171fe2dd932aa7dd8fff4999faccc98c6698aa1cb26143e46f318`，两个 Base 分别识别
-71 和 72 个 changed 方法，并同时通过解释器/AOT、结构演进、custom attribute、事务回滚
+`808f854c3e2171fe2dd932aa7dd8fff4999faccc98c6698aa1cb26143e46f318`，两个 Base 都识别
+72 个 changed 方法，并同时通过解释器/AOT、结构演进、custom attribute、事务回滚
 和重试。启用补充 metadata 时，两次 staging 都写入相同 8 个 current DLL/MetaVersion 和
 4 个 AOT metadata payload；删除测试 Player 副本中的旧根目录 metadata 后仍通过，证明
 runtime 按受哈希保护的 plan 从 `payload/` 加载。Base MetaVersion、Player executable 和

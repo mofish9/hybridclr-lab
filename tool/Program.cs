@@ -29,8 +29,9 @@ internal static partial class Program
         "resource-player-evidence-binding",
         "resource-player-release-readiness",
         "evidence-managed-release-binding", "evidence-multibase-current-binding",
+        "evidence-extensible-player-engine-matrix",
         "bootstrap-engine-workflow-matrix",
-        "source-boundary-git-root-resolution",
+        "source-boundary-git-root-resolution", "git-relative-root-resolution",
         "unity-stale-lock-recovery",
         "native-universal-body-filter",
         "integrated-source-lock-line-ending-stable",
@@ -42,12 +43,17 @@ internal static partial class Program
         "schema-unsupported-keyword-rejected", "schema-gate-contract",
         "schema-workflow-output-contract"
     };
-    private static readonly string[] RequiredReleaseEvidenceRoles =
+    private static readonly string[] RequiredStaticReleaseEvidenceRoles =
     {
-        "regression", "demo-changed", "demo-changed-base2", "demo-noop", "native-tuanjie2022",
+        "regression", "demo-noop", "native-tuanjie2022",
         "native-unity2022", "native-unity2021", "resolver-tuanjie2022", "resolver-unity2022",
         "resolver-unity2021"
     };
+    private static readonly string[] RequiredPlayerEngineWorkflows =
+    {
+        "Unity2021Standard", "Unity2022Fgs", "Tuanjie2022Fgs"
+    };
+    private const int MaxChangedPlayerEvidenceCount = 1024;
     private static readonly string[] RequiredResolverChecks =
     {
         "methoddef-token-overload-no-comments", "generic-method-table-overload-no-comments",
@@ -1151,11 +1157,9 @@ internal static partial class Program
         if (!sourceClean || !IsHex(sourceHead, 40, 64) || !IsHex(sourceTree, 40, 64))
             throw new DheException("Release evidence generation requires a clean Git-tracked source HEAD/tree.");
 
-        var inputs = new[]
+        var staticInputs = new[]
         {
             (Role: "regression", Option: "regression"),
-            (Role: "demo-changed", Option: "demochanged"),
-            (Role: "demo-changed-base2", Option: "demochangedbase2"),
             (Role: "demo-noop", Option: "demonoop"),
             (Role: "native-tuanjie2022", Option: "nativetuanjie2022"),
             (Role: "native-unity2022", Option: "nativeunity2022"),
@@ -1164,11 +1168,31 @@ internal static partial class Program
             (Role: "resolver-unity2022", Option: "resolverunity2022"),
             (Role: "resolver-unity2021", Option: "resolverunity2021")
         }.Select(item => (item.Role, Path: RequireFile(cli.Require(item.Option), item.Role + " evidence"))).ToArray();
-        var outputRoot = SafeOutputRoot(cli.Require("outputroot"), inputs.Select(item => item.Path).Append(sourceRoot));
+        var changedPlayerPaths = cli.GetList("changedplayers");
+        if (changedPlayerPaths.Count == 0)
+        {
+            foreach (string option in new[] { "demochanged", "demochangedbase2", "demochangedbase3" })
+            {
+                string? value = cli.Optional(option);
+                if (!string.IsNullOrWhiteSpace(value)) changedPlayerPaths.Add(value);
+            }
+        }
+        changedPlayerPaths = changedPlayerPaths
+            .Select(path => RequireFile(path, "changed Player evidence"))
+            .Distinct(StringComparer.OrdinalIgnoreCase).ToList();
+        if (changedPlayerPaths.Count < RequiredPlayerEngineWorkflows.Length)
+            throw new DheException("Release evidence requires at least three changed Base Player reports " +
+                "covering Unity 2021, Unity 2022, and Tuanjie 2022.");
+        if (changedPlayerPaths.Count > MaxChangedPlayerEvidenceCount)
+            throw new DheException("Release evidence changed Player report count exceeds " +
+                MaxChangedPlayerEvidenceCount + ".");
+
+        var allInputs = staticInputs.Select(item => item.Path).Concat(changedPlayerPaths).ToArray();
+        var outputRoot = SafeOutputRoot(cli.Require("outputroot"), allInputs.Append(sourceRoot));
         EnsureOutputOutsideRoot(outputRoot, sourceRoot);
         var outputPrefix = outputRoot.TrimEnd(Path.DirectorySeparatorChar, Path.AltDirectorySeparatorChar) +
             Path.DirectorySeparatorChar;
-        if (inputs.Any(item => item.Path.StartsWith(outputPrefix, StringComparison.OrdinalIgnoreCase)))
+        if (allInputs.Any(path => path.StartsWith(outputPrefix, StringComparison.OrdinalIgnoreCase)))
             throw new DheException("Release evidence output cannot contain one of its input reports.");
         if (Directory.Exists(outputRoot))
         {
@@ -1179,12 +1203,29 @@ internal static partial class Program
         var reportsRoot = Path.Combine(outputRoot, "reports");
         Directory.CreateDirectory(reportsRoot);
         var files = new List<object>();
-        foreach (var item in inputs)
+        foreach (var item in staticInputs)
         {
             var relative = "reports/" + item.Role + ".json";
             var destination = Path.Combine(outputRoot, relative.Replace('/', Path.DirectorySeparatorChar));
             File.Copy(item.Path, destination, true);
             files.Add(new { role = item.Role, path = relative, sha256 = Sha256File(destination) });
+        }
+        for (int index = 0; index < changedPlayerPaths.Count; index++)
+        {
+            string source = changedPlayerPaths[index];
+            JsonElement report = ReadJson<JsonElement>(source);
+            var identity = GetChangedPlayerEvidenceIdentity(report, source);
+            string relative = "reports/player-changed-" + (index + 1).ToString("D3") + ".json";
+            string destination = Path.Combine(outputRoot, relative.Replace('/', Path.DirectorySeparatorChar));
+            File.Copy(source, destination, true);
+            files.Add(new
+            {
+                role = "player-changed",
+                engineWorkflow = identity.EngineWorkflow,
+                baseId = identity.BaseId,
+                path = relative,
+                sha256 = Sha256File(destination)
+            });
         }
         var evidencePath = Path.Combine(outputRoot, "dhe-toolchain-release-evidence.json");
         WriteJson(evidencePath, new
@@ -1213,15 +1254,18 @@ internal static partial class Program
     private static void ValidateEvidenceFiles(JsonElement evidence, string baseDirectory, string sourceRoot)
     {
         if (!evidence.TryGetProperty("files", out var files) || files.ValueKind != JsonValueKind.Array ||
-            files.GetArrayLength() != RequiredReleaseEvidenceRoles.Length)
-            throw new DheException("Release evidence must contain the complete managed, resolver, and native matrix.");
+            files.GetArrayLength() < RequiredStaticReleaseEvidenceRoles.Length +
+                RequiredPlayerEngineWorkflows.Length ||
+            files.GetArrayLength() > RequiredStaticReleaseEvidenceRoles.Length +
+                MaxChangedPlayerEvidenceCount)
+            throw new DheException("Release evidence must contain the complete Player, resolver, and native matrix.");
         var sourceHead = GetString(evidence, "sourceHead");
         var sourceTree = GetString(evidence, "sourceTree");
         if (!IsHex(sourceHead, 40, 64) || !IsHex(sourceTree, 40, 64))
             throw new DheException("Release evidence source identity is invalid.");
-        var roles = new HashSet<string>(StringComparer.Ordinal);
-        var roleHashes = new Dictionary<string, string>(StringComparer.Ordinal);
-        var changedReports = new Dictionary<string, (JsonElement Report, string Path)>(StringComparer.Ordinal);
+        var staticRoles = new HashSet<string>(StringComparer.Ordinal);
+        var evidenceHashes = new Dictionary<string, string>(StringComparer.Ordinal);
+        var changedReports = new List<(JsonElement Report, string Path)>();
         JsonElement? regressionReport = null;
         foreach (var item in files.EnumerateArray())
         {
@@ -1230,29 +1274,38 @@ internal static partial class Program
             var role = GetString(item, "role");
             if (string.IsNullOrWhiteSpace(path) || string.IsNullOrWhiteSpace(expected) || Path.IsPathRooted(path) || path.Contains("..", StringComparison.Ordinal))
                 throw new DheException("Release evidence contains an unsafe file entry.");
-            if (string.IsNullOrWhiteSpace(role) || !roles.Add(role)) throw new DheException("Release evidence contains a missing or duplicate role.");
+            if (string.IsNullOrWhiteSpace(role))
+                throw new DheException("Release evidence contains a missing role.");
+            bool changedPlayer = string.Equals(role, "player-changed", StringComparison.Ordinal);
+            if (!changedPlayer && !staticRoles.Add(role))
+                throw new DheException("Release evidence contains a duplicate static role: " + role + ".");
             var full = RequireFile(Path.Combine(baseDirectory, path), "Release evidence file");
             if (!Sha256File(full).Equals(expected, StringComparison.OrdinalIgnoreCase))
                 throw new DheException("Release evidence file hash mismatch: " + path);
             var report = ReadJson<JsonElement>(full);
             if (!GetBool(report, "passed")) throw new DheException("Release evidence report is not a passing result: " + path);
             ValidateEvidenceRole(role, report, full, sourceHead!, sourceTree!, sourceRoot);
-            roleHashes[role!] = expected!;
+            string key = GetReleaseEvidenceKey(item, report, full);
+            if (!evidenceHashes.TryAdd(key, expected!))
+                throw new DheException("Release evidence contains a duplicate identity: " + key + ".");
             if (role == "regression") regressionReport = report;
-            if (role is "demo-changed" or "demo-changed-base2")
-                changedReports[role] = (report, full);
+            if (changedPlayer) changedReports.Add((report, full));
         }
-        foreach (var required in RequiredReleaseEvidenceRoles)
-            if (!roles.Contains(required)) throw new DheException("Release evidence is missing role: " + required);
+        foreach (var required in RequiredStaticReleaseEvidenceRoles)
+            if (!staticRoles.Contains(required)) throw new DheException("Release evidence is missing role: " + required);
         if (!regressionReport.HasValue || !regressionReport.Value.TryGetProperty("workflowOutputs", out var workflowOutputs) ||
-            workflowOutputs.ValueKind != JsonValueKind.Array || workflowOutputs.GetArrayLength() != 3)
-            throw new DheException("Regression evidence does not bind both changed Base workflows and the no-op workflow.");
+            workflowOutputs.ValueKind != JsonValueKind.Array ||
+            workflowOutputs.GetArrayLength() != changedReports.Count + 1)
+            throw new DheException("Regression evidence does not bind every changed Base and the no-op workflow.");
         foreach (var workflow in workflowOutputs.EnumerateArray())
         {
-            var role = GetString(workflow, "role") ?? "";
-            if (!roleHashes.TryGetValue(role, out var evidenceHash) ||
+            string workflowPath = ResolveEvidencePath(GetString(workflow, "path"),
+                baseDirectory, "Regression workflow output");
+            JsonElement workflowReport = ReadJson<JsonElement>(workflowPath);
+            string key = GetReleaseEvidenceKey(workflow, workflowReport, workflowPath);
+            if (!evidenceHashes.TryGetValue(key, out var evidenceHash) ||
                 !string.Equals(evidenceHash, GetString(workflow, "sha256"), StringComparison.OrdinalIgnoreCase))
-                throw new DheException("Regression workflow output hash does not match release evidence: " + role);
+                throw new DheException("Regression workflow output hash does not match release evidence: " + key);
         }
         if (!regressionReport.Value.TryGetProperty("resolverOutputs", out var resolverOutputs) ||
             resolverOutputs.ValueKind != JsonValueKind.Array || resolverOutputs.GetArrayLength() != 3)
@@ -1260,12 +1313,11 @@ internal static partial class Program
         foreach (var resolver in resolverOutputs.EnumerateArray())
         {
             var role = GetString(resolver, "role") ?? "";
-            if (!roleHashes.TryGetValue(role, out var evidenceHash) ||
+            if (!evidenceHashes.TryGetValue(role, out var evidenceHash) ||
                 !string.Equals(evidenceHash, GetString(resolver, "sha256"), StringComparison.OrdinalIgnoreCase))
                 throw new DheException("Regression resolver output hash does not match release evidence: " + role);
         }
-        ValidateMultiBaseChangedEvidence(changedReports["demo-changed"],
-            changedReports["demo-changed-base2"]);
+        ValidateMultiBaseChangedEvidence(changedReports, true);
     }
 
     private static void ValidateEvidenceRole(string role, JsonElement report, string reportPath,
@@ -1288,25 +1340,36 @@ internal static partial class Program
                         throw new DheException("Regression evidence is missing check: " + required);
                 if (!GetBool(report, "realWorkflowOutputsValidated") ||
                     !report.TryGetProperty("workflowOutputs", out var workflowOutputs) ||
-                    workflowOutputs.ValueKind != JsonValueKind.Array || workflowOutputs.GetArrayLength() != 3)
-                    throw new DheException("Regression evidence did not validate both changed Base outputs and the no-op output tree.");
-                var workflowRoles = new HashSet<string>(StringComparer.Ordinal);
+                    workflowOutputs.ValueKind != JsonValueKind.Array ||
+                    workflowOutputs.GetArrayLength() < RequiredPlayerEngineWorkflows.Length + 1)
+                    throw new DheException("Regression evidence did not validate the three-engine changed Base matrix and no-op output tree.");
+                var workflowKeys = new HashSet<string>(StringComparer.Ordinal);
+                var regressionChangedReports = new List<(JsonElement Report, string Path)>();
+                int noOpWorkflowCount = 0;
                 foreach (var workflow in workflowOutputs.EnumerateArray())
                 {
                     var workflowRole = GetString(workflow, "role") ?? "";
                     var workflowPath = ResolveEvidencePath(GetString(workflow, "path"),
                         Path.GetDirectoryName(reportPath)!, "Regression workflow output");
-                    if (!workflowRoles.Add(workflowRole) || !Sha256File(workflowPath).Equals(
-                            GetString(workflow, "sha256"), StringComparison.OrdinalIgnoreCase))
-                        throw new DheException("Regression workflow output identity is invalid: " + workflowRole);
                     var workflowReport = ReadJson<JsonElement>(workflowPath);
-                    var expectedFormat = workflowRole is "demo-changed" or "demo-changed-base2"
+                    bool changedWorkflow = workflowRole == "player-changed";
+                    if (!changedWorkflow && workflowRole != "demo-noop")
+                        throw new DheException("Regression workflow output has an unknown role: " + workflowRole);
+                    var expectedFormat = changedWorkflow
                         ? "hybridclr.dhe-resource-player-workflow.json"
                         : "hybridclr.dhe-project-player-workflow.json";
                     RequireEvidenceFormat(workflowReport, expectedFormat, workflowRole);
+                    string key = GetReleaseEvidenceKey(workflow, workflowReport, workflowPath);
+                    if (!workflowKeys.Add(key) || !Sha256File(workflowPath).Equals(
+                            GetString(workflow, "sha256"), StringComparison.OrdinalIgnoreCase))
+                        throw new DheException("Regression workflow output identity is invalid: " + key);
+                    if (changedWorkflow) regressionChangedReports.Add((workflowReport, workflowPath));
+                    else noOpWorkflowCount++;
                 }
-                if (!workflowRoles.SetEquals(new[] { "demo-changed", "demo-changed-base2", "demo-noop" }))
+                if (noOpWorkflowCount != 1 ||
+                    regressionChangedReports.Count < RequiredPlayerEngineWorkflows.Length)
                     throw new DheException("Regression workflow output roles are incomplete.");
+                ValidateMultiBaseChangedEvidence(regressionChangedReports, true);
                 if (!GetBool(report, "realResolverOutputsValidated") ||
                     !report.TryGetProperty("resolverOutputs", out var resolverOutputs) ||
                     resolverOutputs.ValueKind != JsonValueKind.Array || resolverOutputs.GetArrayLength() != 3)
@@ -1326,10 +1389,9 @@ internal static partial class Program
                     { "resolver-unity2021", "resolver-unity2022", "resolver-tuanjie2022" }))
                     throw new DheException("Regression resolver output roles are incomplete.");
                 break;
-            case "demo-changed":
-            case "demo-changed-base2":
+            case "player-changed":
             case "demo-noop":
-                bool changedRole = role is "demo-changed" or "demo-changed-base2";
+                bool changedRole = role == "player-changed";
                 RequireEvidenceFormat(report, changedRole
                     ? "hybridclr.dhe-resource-player-workflow.json"
                     : "hybridclr.dhe-project-player-workflow.json", role);
@@ -1540,22 +1602,74 @@ internal static partial class Program
         }
     }
 
-    private static void ValidateMultiBaseChangedEvidence(
-        (JsonElement Report, string Path) first, (JsonElement Report, string Path) second)
+    private static string GetReleaseEvidenceKey(JsonElement record, JsonElement report, string reportPath)
     {
-        string firstBase = GetString(first.Report, "selectedBaseId") ?? string.Empty;
-        string secondBase = GetString(second.Report, "selectedBaseId") ?? string.Empty;
-        if (!IsHex(firstBase, 64, 64) || !IsHex(secondBase, 64, 64) ||
-            firstBase.Equals(secondBase, StringComparison.OrdinalIgnoreCase))
-            throw new DheException("Multi-Base changed evidence must select two distinct Base identities.");
+        string role = GetString(record, "role") ?? string.Empty;
+        if (role != "player-changed")
+        {
+            if (record.TryGetProperty("engineWorkflow", out _) || record.TryGetProperty("baseId", out _))
+                throw new DheException("Static release evidence must not declare a Player identity: " + role + ".");
+            return role;
+        }
+        var identity = GetChangedPlayerEvidenceIdentity(report, reportPath);
+        if (!string.Equals(GetString(record, "engineWorkflow"), identity.EngineWorkflow,
+                StringComparison.Ordinal) ||
+            !string.Equals(GetString(record, "baseId"), identity.BaseId,
+                StringComparison.OrdinalIgnoreCase))
+            throw new DheException("Changed Player evidence record does not match its runtime/Base identity.");
+        return role + "/" + identity.EngineWorkflow + "/" + identity.BaseId.ToLowerInvariant();
+    }
+
+    private static (string EngineWorkflow, string BaseId) GetChangedPlayerEvidenceIdentity(
+        JsonElement report, string reportPath)
+    {
+        RequireEvidenceFormat(report, "hybridclr.dhe-resource-player-workflow.json",
+            "Changed Player workflow");
+        string baseId = GetString(report, "selectedBaseId") ?? string.Empty;
+        if (!IsHex(baseId, 64, 64))
+            throw new DheException("Changed Player workflow has an invalid selected Base ID.");
+        string runtimePath = ResolveEvidencePath(GetString(report, "runtimeSource"),
+            Path.GetDirectoryName(reportPath)!, "Changed Player runtime manifest");
+        JsonElement runtime = ReadJson<JsonElement>(runtimePath);
+        RequireEvidenceFormat(runtime, "hybridclr.dhe-runtime-manifest.json",
+            "Changed Player runtime manifest");
+        string engineWorkflow = GetString(runtime, "engineWorkflow") ?? string.Empty;
+        if (!RequiredPlayerEngineWorkflows.Contains(engineWorkflow, StringComparer.Ordinal))
+            throw new DheException("Changed Player workflow uses an unsupported engine workflow: " +
+                engineWorkflow + ".");
+        return (engineWorkflow, baseId);
+    }
+
+    private static void ValidateMultiBaseChangedEvidence(
+        IReadOnlyCollection<(JsonElement Report, string Path)> reports, bool requireEngineMatrix)
+    {
+        if (reports.Count < 2)
+            throw new DheException("Multi-Base changed evidence requires at least two Base Players.");
+        string[] baseIds = reports.Select(item =>
+            GetString(item.Report, "selectedBaseId") ?? string.Empty).ToArray();
+        if (baseIds.Any(baseId => !IsHex(baseId, 64, 64)) ||
+            baseIds.Distinct(StringComparer.OrdinalIgnoreCase).Count() != baseIds.Length)
+            throw new DheException("Multi-Base changed evidence contains invalid or duplicate Base identities.");
+        var identities = reports.Select(item =>
+            (Item: item, Identity: GetChangedPlayerEvidenceIdentity(item.Report, item.Path))).ToArray();
+        if (requireEngineMatrix)
+        {
+            var workflows = identities.Select(item => item.Identity.EngineWorkflow)
+                .ToHashSet(StringComparer.Ordinal);
+            if (!RequiredPlayerEngineWorkflows.All(workflows.Contains))
+                throw new DheException("Changed Player evidence does not cover Unity 2021, Unity 2022, " +
+                    "and Tuanjie 2022.");
+        }
+
+        var first = identities[0].Item;
         foreach (string property in new[] { "currentAssemblySetSha256", "resourceUpdateManifestSha256",
                      "resourceUpdateValidationSha256" })
-            if (!string.Equals(GetString(first.Report, property), GetString(second.Report, property),
-                    StringComparison.OrdinalIgnoreCase))
+            if (identities.Skip(1).Any(item => !string.Equals(GetString(first.Report, property),
+                    GetString(item.Item.Report, property), StringComparison.OrdinalIgnoreCase)))
                 throw new DheException("Multi-Base changed evidence does not share one current payload: " +
                     property + ".");
-        if (!string.Equals(GetString(first.Report, "target"), GetString(second.Report, "target"),
-                StringComparison.OrdinalIgnoreCase))
+        if (identities.Skip(1).Any(item => !string.Equals(GetString(first.Report, "target"),
+                GetString(item.Item.Report, "target"), StringComparison.OrdinalIgnoreCase)))
             throw new DheException("Multi-Base changed evidence targets different platforms.");
 
         string manifestPath = ResolveEvidencePath(GetString(first.Report, "resourceUpdateManifest"),
@@ -1564,8 +1678,9 @@ internal static partial class Program
         var supported = manifest.GetProperty("supportedBases").EnumerateArray()
             .Select(item => GetString(item, "baseId") ?? string.Empty)
             .ToHashSet(StringComparer.OrdinalIgnoreCase);
-        if (supported.Count < 2 || !supported.Contains(firstBase) || !supported.Contains(secondBase))
-            throw new DheException("The shared current payload does not declare both proven Base identities.");
+        if (supported.Count < identities.Length ||
+            identities.Any(item => !supported.Contains(item.Identity.BaseId)))
+            throw new DheException("The shared current payload does not declare every proven Base identity.");
     }
 
     private static void ValidateResourcePlayerEvidenceBindings(JsonElement report, string reportPath)
@@ -2698,7 +2813,7 @@ internal static partial class Program
     private static bool GetBool(JsonElement e, string key) => e.ValueKind == JsonValueKind.Object && e.TryGetProperty(key, out var p) && p.ValueKind is JsonValueKind.True or JsonValueKind.False && p.GetBoolean();
     private static void CopyDirectory(string source, string destination) { Directory.CreateDirectory(destination); foreach (var file in Directory.GetFiles(source, "*", SearchOption.AllDirectories)) { var relative = Path.GetRelativePath(source, file); var target = Path.Combine(destination, relative); Directory.CreateDirectory(Path.GetDirectoryName(target)!); File.Copy(file, target, true); } }
     private static void CopyRelative(string sourceRoot, string destinationRoot, string relative) { var source = Path.Combine(sourceRoot, relative.Replace('/', Path.DirectorySeparatorChar)); if (!File.Exists(source)) throw new DheException("Layout source file was not found: " + source); var destination = Path.Combine(destinationRoot, relative.Replace('/', Path.DirectorySeparatorChar)); Directory.CreateDirectory(Path.GetDirectoryName(destination)!); File.Copy(source, destination, true); }
-    private static string GitValue(string root, params string[] arguments) { try { var start = new ProcessStartInfo("git") { WorkingDirectory = root, UseShellExecute = false, RedirectStandardOutput = true, RedirectStandardError = true }; start.ArgumentList.Add("-C"); start.ArgumentList.Add(root); foreach (var arg in arguments) start.ArgumentList.Add(arg); using var process = Process.Start(start); if (process == null) return ""; var output = process.StandardOutput.ReadToEnd().Trim(); process.WaitForExit(); return process.ExitCode == 0 ? output : ""; } catch { return ""; } }
+    private static string GitValue(string root, params string[] arguments) { try { root = Path.GetFullPath(root); var start = new ProcessStartInfo("git") { WorkingDirectory = root, UseShellExecute = false, RedirectStandardOutput = true, RedirectStandardError = true }; start.ArgumentList.Add("-C"); start.ArgumentList.Add(root); foreach (var arg in arguments) start.ArgumentList.Add(arg); using var process = Process.Start(start); if (process == null) return ""; var output = process.StandardOutput.ReadToEnd().Trim(); process.WaitForExit(); return process.ExitCode == 0 ? output : ""; } catch { return ""; } }
     private static string Sha256Text(string value) => Convert.ToHexString(SHA256.HashData(Encoding.UTF8.GetBytes(value))).ToLowerInvariant();
 
     private sealed class AssemblyRecord { public AssemblyRecord(string assemblyName, string sha256) { AssemblyName = assemblyName; Sha256 = sha256; } public string AssemblyName { get; } public string Sha256 { get; } }

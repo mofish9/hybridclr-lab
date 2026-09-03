@@ -146,7 +146,7 @@ before copying. The complete lifecycle and current compatibility subset are in
 Run `resource-player-evidence` after the real Player/device smoke. It binds the
 resource manifest, stage report, Player result, and immutable Base workflow into
 `resource-player-workflow-report.json`. This is the only supported
-`demo-changed` input for toolchain release evidence; a non-bootstrap changed
+`player-changed` input for toolchain release evidence; a non-bootstrap changed
 Player build is intentionally rejected because online Base Players require
 universal guards.
 
@@ -328,15 +328,16 @@ locked Editor and pass `-dheResolverEngineWorkflow Unity2021Standard`,
 and the SHA-256 of the package's `DheBuildPipeline.cs`. The production
 `regression` command must receive all three reports through
 `-ResolverUnity2021`, `-ResolverUnity2022`, and `-ResolverTuanjie2022`; a
-partial matrix or a report from a different package source is rejected.
+partial matrix or a report from a different package source is rejected. Its
+`-WorkflowChangedRoots` argument is the comma-separated list of changed Player
+evidence directories; `-WorkflowNoopRoot` supplies the no-op directory.
 
 ```text
 dotnet HybridCLR.DheTool.dll release-evidence \
   -LabRoot C:/src/hybridclr-lab \
   -OutputRoot C:/build/dhe-release-evidence \
   -Regression C:/build/regression.json \
-  -DemoChanged C:/build/demo-changed/resource-player-workflow-report.json \
-  -DemoChangedBase2 C:/build/demo-changed-base2/resource-player-workflow-report.json \
+  -ChangedPlayers C:/build/unity2021/resource-player-workflow-report.json,C:/build/unity2022/resource-player-workflow-report.json,C:/build/tuanjie2022/resource-player-workflow-report.json \
   -DemoNoop C:/build/demo-noop/player-workflow-report.json \
   -NativeTuanjie2022 C:/build/native-tuanjie/native-gate.json \
   -NativeUnity2022 C:/build/native-unity2022/native-gate.json \
@@ -346,10 +347,12 @@ dotnet HybridCLR.DheTool.dll release-evidence \
   -ResolverUnity2021 C:/build/resolver-unity2021/dhe-cpp-resolver-regression.json
 ```
 
-The generated report must match the exact source HEAD/tree and binds all ten
-reports by SHA-256. Both changed roles must be Release-ready Player results for
-distinct Base identities, backed by the same resource manifest, validation,
-current assembly set, and target. Each managed role is rebound to its integrated
+The generated report must match the exact source HEAD/tree and binds eight fixed
+reports plus every `player-changed` report by SHA-256. `-ChangedPlayers` accepts
+a comma-separated list, requires at least three distinct Base identities, and
+must cover `Unity2021Standard`, `Unity2022Fgs`, and `Tuanjie2022Fgs`. Additional
+Base reports may be supplied. Every changed result must be backed by the same
+resource manifest, validation, current assembly set, and target. Each managed role is rebound to its integrated
 runtime manifest, clean tracked sources, real Editor headers, and the authenticated
 release toolchain that executed it. This toolchain may be the preceding release;
 the clean current host independently revalidates the complete evidence to avoid a

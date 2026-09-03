@@ -37,9 +37,11 @@ artifact validator; it verifies the exact supported+unsupported changed-token se
 and the versioned `il2cpp-generated-cpp-signature-v2` ABI adapter contract.
 The current MetaVersion Player result covers method bodies, field/type/method evolution,
 logical property/event metadata, custom attributes, reflection, and
-cross-assembly calls. Two independently built Base Players consumed the same
-four-assembly current payload while computing their own local changed-method
-sets (71 and 72 changed methods).
+cross-assembly calls. Two independently built Unity 2021 Base Players consumed
+the same four-assembly current payload while computing 72 changed methods each.
+The 0.1.19 release contract extends this proof to an arbitrary changed-Player
+evidence list and requires Unity 2021, Unity 2022, and Tuanjie 2022 coverage
+over one shared current payload.
 `releaseReady=true` additionally requires `Mode Release`, clean
 and tracked project and tool source identities (each bound to its Git commit,
 HEAD tree, and source-boundary hash), clean locked runtime sources, and matching
