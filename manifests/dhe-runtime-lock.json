@@ -59,10 +59,10 @@
       "repository": "hybridclr_unity",
       "sourceMode": "integrated",
       "baseCommit": "623073baafd5a1d12ea46df8145de9fddc899fac",
-      "integratedCommit": "c19e2357848c5d87c04706333dee3947c3d4cf5c",
-      "expectedTreeSha256": "CE25BE8434CEFD6283A08A02B5CD3D465017616402922089F36405DD32D535D6",
+      "integratedCommit": "e88958aab182141f882d48459ddab4e640612e7f",
+      "expectedTreeSha256": "B85B10D1B78FFC438703EAC329CA53C321A5EB562865D786E0CB5A145BB825B4",
       "path": "patches/dhe-lite/hybridclr_unity.patch",
-      "sha256": "E7D835308482B7249F861EFA25518A3D420883D5FE4BC29228C382B1A6114468",
+      "sha256": "AA28FD60E68E522D52E3D1580390BDD8A47F1606C21B68FC717305DDE84C40C2",
       "applyRoot": "package",
       "stripComponents": 1
     }

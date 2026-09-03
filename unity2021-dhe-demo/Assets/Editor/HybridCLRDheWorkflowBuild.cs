@@ -37,6 +37,10 @@ namespace HybridCLR.Lab.Editor
                         Directory.Exists(configuredBaseline) ? Path.GetFullPath(configuredBaseline) : null,
                     BaselineOutputRoot = baselineRoot,
                     CurrentOutputRoot = currentRoot,
+                    Bootstrap = string.Equals(OptionalArgument("-dheBootstrap"), "true",
+                        StringComparison.OrdinalIgnoreCase) ||
+                        string.Equals(OptionalArgument("-dheBootstrap"), "1",
+                            StringComparison.OrdinalIgnoreCase),
                     RequireDheEqualsHotUpdate = true,
                     BeforeCurrentGeneration = names =>
                     {
