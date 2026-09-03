@@ -2385,17 +2385,36 @@ internal static partial class Program
         var start = new ProcessStartInfo(executable) { WorkingDirectory = workingDirectory, UseShellExecute = false, RedirectStandardOutput = true, RedirectStandardError = true };
         foreach (var arg in arguments) start.ArgumentList.Add(arg); foreach (var pair in environment) start.Environment[pair.Key] = pair.Value;
         using var process = Process.Start(start) ?? throw new DheException("Unable to start Unity editor.");
-        var stdout = process.StandardOutput.ReadToEndAsync();
-        var stderr = process.StandardError.ReadToEndAsync();
+        var outputLock = new object();
+        var stdout = new StringBuilder();
+        var stderr = new StringBuilder();
+        process.OutputDataReceived += (_, eventArgs) =>
+        {
+            if (eventArgs.Data == null) return;
+            lock (outputLock) stdout.AppendLine(eventArgs.Data);
+        };
+        process.ErrorDataReceived += (_, eventArgs) =>
+        {
+            if (eventArgs.Data == null) return;
+            lock (outputLock) stderr.AppendLine(eventArgs.Data);
+        };
+        process.BeginOutputReadLine();
+        process.BeginErrorReadLine();
         if (!process.WaitForExit(timeoutSeconds * 1000))
         {
             try { process.Kill(entireProcessTree: true); } catch { }
             throw new DheException($"Unity timed out after {timeoutSeconds} seconds.");
         }
-        Task.WaitAll(stdout, stderr);
+        // Unity may leave a compiler service alive with inherited pipe handles. Stop
+        // the asynchronous readers after the editor itself exits instead of waiting
+        // forever for a descendant-owned EOF.
+        try { process.CancelOutputRead(); } catch (InvalidOperationException) { }
+        try { process.CancelErrorRead(); } catch (InvalidOperationException) { }
         WaitForUnityProjectRelease(workingDirectory, startedAt.AddSeconds(timeoutSeconds));
         Directory.CreateDirectory(Path.GetDirectoryName(Path.GetFullPath(logPath))!);
-        File.WriteAllText(logPath, stdout.Result + Environment.NewLine + stderr.Result, new UTF8Encoding(false));
+        string processOutput;
+        lock (outputLock) processOutput = stdout + Environment.NewLine + stderr;
+        File.WriteAllText(logPath, processOutput, new UTF8Encoding(false));
         if (process.ExitCode != 0) throw new DheException($"Unity exited with code {process.ExitCode}. See {logPath}.");
         var argumentList = arguments.ToArray();
         var unityLogIndex = Array.FindIndex(argumentList, value =>
