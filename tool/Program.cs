@@ -29,6 +29,7 @@ internal static partial class Program
         "resource-player-evidence-binding",
         "evidence-managed-release-binding", "evidence-multibase-current-binding",
         "bootstrap-engine-workflow-matrix",
+        "source-boundary-git-root-resolution",
         "integrated-source-lock-line-ending-stable",
         "integrated-source-lock-valid", "integrated-source-lock-commit-tamper",
         "integrated-source-lock-tree-tamper", "integrated-source-lock-patch-tamper",

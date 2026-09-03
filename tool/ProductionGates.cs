@@ -409,7 +409,20 @@ internal static partial class Program
         {
             var boundary = ReadJson<JsonElement>(boundaryPath);
             RequireFormat(boundary, "hybridclr.dhe-source-boundary.json", "Source boundary", errors);
-            var baseRoot = GetString(boundary, "pathBase") == "manifest-directory-v1" ? Path.GetDirectoryName(boundaryPath)! : project;
+            string pathBase = GetString(boundary, "pathBase") ?? string.Empty;
+            string baseRoot = pathBase switch
+            {
+                "manifest-directory-v1" => Path.GetDirectoryName(boundaryPath)!,
+                "project-root-v1" => project,
+                "git-root-v1" => GitValue(project, "rev-parse", "--show-toplevel"),
+                _ => string.Empty,
+            };
+            if (string.IsNullOrWhiteSpace(baseRoot) || !Directory.Exists(baseRoot))
+            {
+                errors.Add("Source boundary pathBase cannot be resolved: " + pathBase);
+                return false;
+            }
+            baseRoot = Path.GetFullPath(baseRoot);
             var complete = true;
             foreach (var entry in boundary.GetProperty("exactPaths").EnumerateArray())
             {
@@ -990,6 +1003,13 @@ internal static partial class Program
                 GetString(item, "id"), false).Length == 1);
         AddRegressionCheck(checks, errors, "bootstrap-engine-workflow-matrix", bootstrapMatrixPassed,
             "bootstrap must resolve all three distinct il2cpp_plus workflow commits and each single lane");
+        var boundaryErrors = new List<string>();
+        bool gitRootBoundaryPassed = ValidateBoundary(Path.Combine(cli.Root, "unity2021-dhe-demo"),
+            Path.Combine(cli.Root, "manifests", "dhe-source-boundary.json"), boundaryErrors);
+        AddRegressionCheck(checks, errors, "source-boundary-git-root-resolution",
+            gitRootBoundaryPassed, gitRootBoundaryPassed
+                ? "git-root-v1 boundary resolves from a nested Unity project to the repository root"
+                : string.Join("; ", boundaryErrors));
         RunIntegratedSourceLockRegressions(regressionRoot, checks, errors);
 
         var weakNoOpRejected = false;
