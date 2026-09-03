@@ -1,5 +1,5 @@
 diff --git a/Data~/hybridclr_version.json b/Data~/hybridclr_version.json
-index b68c3b37171d9dfa435793d9b542127d967f4758..043ee04c5e7a8ef4b4d4f6a378b154ae4bf9147e 100644
+index b68c3b3..043ee04 100644
 --- a/Data~/hybridclr_version.json
 +++ b/Data~/hybridclr_version.json
 @@ -12,18 +12,18 @@
@@ -28,7 +28,7 @@ index b68c3b37171d9dfa435793d9b542127d967f4758..043ee04c5e7a8ef4b4d4f6a378b154ae
      {
          "unity_version":"2023",
 diff --git a/Documentation~/dhe-project-integration.md b/Documentation~/dhe-project-integration.md
-index 148b890f266395de26231aedb2b24fac74530650..e78b677abb6cb01aa5bbef17074d17fd71a8c53e 100644
+index 148b890..e78b677 100644
 --- a/Documentation~/dhe-project-integration.md
 +++ b/Documentation~/dhe-project-integration.md
 @@ -1,80 +1,140 @@
@@ -229,7 +229,7 @@ index 148b890f266395de26231aedb2b24fac74530650..e78b677abb6cb01aa5bbef17074d17fd
 +remote delta or reimplement MV parsing, Base identity matching, transaction
 +retry, changed-method dispatch, or native identity checks.
 diff --git a/Editor/Commands/CompileDllCommand.cs b/Editor/Commands/CompileDllCommand.cs
-index 583368e10eca9d9b2a9c89c64cd27cd7ea13de5d..52b9504f5216e66050b0ce5089e97d5b7b8dbacd 100644
+index 583368e..52b9504 100644
 --- a/Editor/Commands/CompileDllCommand.cs
 +++ b/Editor/Commands/CompileDllCommand.cs
 @@ -20,6 +20,12 @@ namespace HybridCLR.Editor.Commands
@@ -246,7 +246,7 @@ index 583368e10eca9d9b2a9c89c64cd27cd7ea13de5d..52b9504f5216e66050b0ce5089e97d5b
              ScriptCompilationResult scriptCompilationResult = PlayerBuildInterface.CompilePlayerScripts(scriptCompilationSettings, buildDir);
  #if UNITY_2022
 diff --git a/Editor/Commands/DheBuildPipeline.cs b/Editor/Commands/DheBuildPipeline.cs
-index aa81ffd609dfc43593ccbb898655c106fcf084c3..5de85134ec8c1d78f1cb6abc3c76c84224dda0cc 100644
+index aa81ffd..696d55b 100644
 --- a/Editor/Commands/DheBuildPipeline.cs
 +++ b/Editor/Commands/DheBuildPipeline.cs
 @@ -24,11 +24,39 @@ namespace HybridCLR.Editor.Commands
@@ -619,7 +619,7 @@ index aa81ffd609dfc43593ccbb898655c106fcf084c3..5de85134ec8c1d78f1cb6abc3c76c842
                      });
                  }
              }
-@@ -584,35 +663,61 @@ namespace HybridCLR.Editor.Commands
+@@ -584,35 +663,63 @@ namespace HybridCLR.Editor.Commands
              Dictionary<string, List<DheCppDefinition>> definitions = requested.Count == 0
                  ? new Dictionary<string, List<DheCppDefinition>>(StringComparer.OrdinalIgnoreCase)
                  : IndexCppDefinitions(generatedRoot);
@@ -671,7 +671,9 @@ index aa81ffd609dfc43593ccbb898655c106fcf084c3..5de85134ec8c1d78f1cb6abc3c76c842
 +                            !ManagedSignatureMatches(method, definition.ManagedSignature))
 +                        {
 +                            throw new BuildFailedException("DHE IL2CPP method index conflicts with the managed " +
-+                                "signature comment for '" + functionName + "'.");
++                                "signature comment for '" + functionName + "'. Assembly='" +
++                                method.AssemblyName + "', token=" + method.MethodToken + ", managedId='" +
++                                method.ManagedId + "', comment='" + definition.ManagedSignature + "'.");
 +                        }
 +                        matches.Add(definition);
 +                    }
@@ -698,7 +700,7 @@ index aa81ffd609dfc43593ccbb898655c106fcf084c3..5de85134ec8c1d78f1cb6abc3c76c842
                  foreach (DheCppDefinition definition in matches)
                  {
                      DheNativeManifestMethod resolved = ResolveNativeMethod(method, definition);
-@@ -622,9 +727,19 @@ namespace HybridCLR.Editor.Commands
+@@ -622,9 +729,19 @@ namespace HybridCLR.Editor.Commands
                      }
                      catch (Exception exception)
                      {
@@ -719,7 +721,7 @@ index aa81ffd609dfc43593ccbb898655c106fcf084c3..5de85134ec8c1d78f1cb6abc3c76c842
                      manifestMethods.Add(resolved);
                      if (!methodsByFile.TryGetValue(definition.File, out List<DheNativeManifestMethod> fileMethods))
                      {
-@@ -635,22 +750,23 @@ namespace HybridCLR.Editor.Commands
+@@ -635,22 +752,23 @@ namespace HybridCLR.Editor.Commands
                  }
              }
              if (options.RequireCompleteCoverage && unsupported.Count > 0)
@@ -749,7 +751,7 @@ index aa81ffd609dfc43593ccbb898655c106fcf084c3..5de85134ec8c1d78f1cb6abc3c76c842
                          string expected = NormalizeGuardBlock(CreateGuard(method));
                          if (!string.Equals(actual, expected, StringComparison.Ordinal))
                          {
-@@ -659,27 +775,15 @@ namespace HybridCLR.Editor.Commands
+@@ -659,27 +777,15 @@ namespace HybridCLR.Editor.Commands
                          }
                          continue;
                      }
@@ -783,7 +785,7 @@ index aa81ffd609dfc43593ccbb898655c106fcf084c3..5de85134ec8c1d78f1cb6abc3c76c842
                  if (insertions.Count > 0 && !Regex.IsMatch(source, @"(?m)^#include\s+""hybridclr/DheRuntime\.h"""))
                      source = "#include \"hybridclr/DheRuntime.h\"\r\n#include \"hybridclr/Il2CppCompatibleDef.h\"\r\n" + source;
                  if (insertions.Count > 0) File.WriteAllText(pair.Key, source, new UTF8Encoding(false));
-@@ -694,13 +798,22 @@ namespace HybridCLR.Editor.Commands
+@@ -694,13 +800,22 @@ namespace HybridCLR.Editor.Commands
                  resolverVersion = 3,
                  abiContract = "il2cpp-generated-cpp-signature-v2",
                  guardHashContract = NativeGuardHashContract,
@@ -810,7 +812,7 @@ index aa81ffd609dfc43593ccbb898655c106fcf084c3..5de85134ec8c1d78f1cb6abc3c76c842
              };
              File.WriteAllText(manifestPath, JsonUtility.ToJson(manifest, true), new UTF8Encoding(false));
              string[] generatedCppPaths = manifestMethods.Select(method => Path.GetFullPath(method.sourceFile))
-@@ -708,10 +821,19 @@ namespace HybridCLR.Editor.Commands
+@@ -708,10 +823,19 @@ namespace HybridCLR.Editor.Commands
              return new DheNativeGuardResult
              {
                  ManifestPath = manifestPath,
@@ -830,7 +832,7 @@ index aa81ffd609dfc43593ccbb898655c106fcf084c3..5de85134ec8c1d78f1cb6abc3c76c842
                  GeneratedCppPaths = generatedCppPaths,
                  NativeManifestSha256 = Sha256Hex(File.ReadAllBytes(manifestPath)),
                  NativeGuardSourceSha256 = Sha256GuardBlockSet(manifestMethods, generatedRoot),
-@@ -747,8 +869,8 @@ namespace HybridCLR.Editor.Commands
+@@ -747,8 +871,8 @@ namespace HybridCLR.Editor.Commands
                  throw new BuildFailedException("DHE project plan contains an empty or duplicate assembly.");
              }
              string[] mvPaths = plan.assemblies.Select(assembly => RequireFile(
@@ -841,7 +843,7 @@ index aa81ffd609dfc43593ccbb898655c106fcf084c3..5de85134ec8c1d78f1cb6abc3c76c842
                  .ToArray();
              string generatedCppRoot = string.IsNullOrWhiteSpace(options.GeneratedCppRoot)
                  ? FindGeneratedCppRoot(projectRoot, assemblyNames)
-@@ -762,6 +884,7 @@ namespace HybridCLR.Editor.Commands
+@@ -762,6 +886,7 @@ namespace HybridCLR.Editor.Commands
                  GeneratedCppRoot = generatedCppRoot,
                  OutputManifestPath = manifestPath,
                  RequireCompleteCoverage = options.RequireCompleteCoverage,
@@ -849,7 +851,7 @@ index aa81ffd609dfc43593ccbb898655c106fcf084c3..5de85134ec8c1d78f1cb6abc3c76c842
              });
              DheBeeRebuildResult rebuild = null;
              if (options.RebuildPlayer)
-@@ -1099,6 +1222,12 @@ namespace HybridCLR.Editor.Commands
+@@ -1099,6 +1224,12 @@ namespace HybridCLR.Editor.Commands
                  generatedAssemblies.Add(fileName.Substring(0,
                      fileName.Length - ".mv.bytes".Length));
              }
@@ -862,7 +864,7 @@ index aa81ffd609dfc43593ccbb898655c106fcf084c3..5de85134ec8c1d78f1cb6abc3c76c842
              foreach (string path in Directory.GetFiles(root, "*.aot-snapshot.bytes",
                  SearchOption.TopDirectoryOnly))
              {
-@@ -1109,19 +1238,60 @@ namespace HybridCLR.Editor.Commands
+@@ -1109,19 +1240,60 @@ namespace HybridCLR.Editor.Commands
  
              foreach (string name in generatedAssemblies)
              {
@@ -925,7 +927,7 @@ index aa81ffd609dfc43593ccbb898655c106fcf084c3..5de85134ec8c1d78f1cb6abc3c76c842
              }
          }
  
-@@ -1141,10 +1311,6 @@ namespace HybridCLR.Editor.Commands
+@@ -1141,10 +1313,6 @@ namespace HybridCLR.Editor.Commands
              {
                  assemblyName = ReadJsonString(json, "assemblyName"),
                  methods = Array.Empty<DheMvMethod>(),
@@ -936,7 +938,7 @@ index aa81ffd609dfc43593ccbb898655c106fcf084c3..5de85134ec8c1d78f1cb6abc3c76c842
              };
              int methodsKey = json.IndexOf("\"methods\"", StringComparison.Ordinal);
              int arrayStart = methodsKey < 0 ? -1 : json.IndexOf('[', methodsKey);
-@@ -1154,9 +1320,11 @@ namespace HybridCLR.Editor.Commands
+@@ -1154,9 +1322,11 @@ namespace HybridCLR.Editor.Commands
              {
                  methods.Add(new DheMvMethod
                  {
@@ -950,7 +952,64 @@ index aa81ffd609dfc43593ccbb898655c106fcf084c3..5de85134ec8c1d78f1cb6abc3c76c842
                      declaringType = ReadJsonString(objectText, "declaringType"),
                      returnType = ReadJsonString(objectText, "returnType"),
                      parameterTypes = ReadJsonStringArray(objectText, "parameterTypes"),
-@@ -1277,15 +1445,41 @@ namespace HybridCLR.Editor.Commands
+@@ -1233,12 +1403,52 @@ namespace HybridCLR.Editor.Commands
+         private static string[] ReadJsonStringArray(string json, string property)
+         {
+             Match match = Regex.Match(json,
+-                "\\\"" + Regex.Escape(property) + "\\\"\\s*:\\s*\\[(?<value>.*?)\\]",
++                "\\\"" + Regex.Escape(property) + "\\\"\\s*:\\s*\\[",
+                 RegexOptions.Singleline);
+             if (!match.Success) return Array.Empty<string>();
+-            return Regex.Matches(match.Groups["value"].Value,
+-                    "\\\"(?<value>(?:\\\\.|[^\\\"\\\\])*)\\\"")
+-                .Cast<Match>().Select(item => UnescapeJsonString(item.Groups["value"].Value)).ToArray();
++            List<string> values = new List<string>();
++            int cursor = match.Index + match.Length;
++            while (cursor < json.Length)
++            {
++                while (cursor < json.Length && char.IsWhiteSpace(json[cursor])) cursor++;
++                if (cursor < json.Length && json[cursor] == ']') return values.ToArray();
++                if (cursor >= json.Length || json[cursor] != '"')
++                    throw new BuildFailedException("DHE JSON property '" + property +
++                        "' is not an array of strings.");
++
++                int valueStart = ++cursor;
++                bool escaped = false;
++                while (cursor < json.Length)
++                {
++                    char character = json[cursor];
++                    if (escaped)
++                    {
++                        escaped = false;
++                    }
++                    else if (character == '\\')
++                    {
++                        escaped = true;
++                    }
++                    else if (character == '"')
++                    {
++                        break;
++                    }
++                    cursor++;
++                }
++                if (cursor >= json.Length)
++                    throw new BuildFailedException("DHE JSON property '" + property +
++                        "' contains an unterminated string.");
++                values.Add(UnescapeJsonString(json.Substring(valueStart, cursor - valueStart)));
++                cursor++;
++                while (cursor < json.Length && char.IsWhiteSpace(json[cursor])) cursor++;
++                if (cursor < json.Length && json[cursor] == ']') return values.ToArray();
++                if (cursor >= json.Length || json[cursor] != ',')
++                    throw new BuildFailedException("DHE JSON property '" + property +
++                        "' has an invalid string array separator.");
++                cursor++;
++            }
++            throw new BuildFailedException("DHE JSON property '" + property +
++                "' contains an unterminated string array.");
+         }
+ 
+         private static string UnescapeJsonString(string value)
+@@ -1277,15 +1487,41 @@ namespace HybridCLR.Editor.Commands
          private static Dictionary<string, List<DheCppDefinition>> IndexCppDefinitions(string root)
          {
              Regex pattern = new Regex(
@@ -994,20 +1053,20 @@ index aa81ffd609dfc43593ccbb898655c106fcf084c3..5de85134ec8c1d78f1cb6abc3c76c842
                      string function = match.Groups["function"].Value;
                      if (!result.TryGetValue(function, out List<DheCppDefinition> definitions))
                      {
-@@ -1298,12 +1492,481 @@ namespace HybridCLR.Editor.Commands
+@@ -1298,12 +1534,492 @@ namespace HybridCLR.Editor.Commands
                          Signature = match.Groups["signature"].Value,
                          FunctionName = function,
                          ParametersText = match.Groups["parameters"].Value,
 +                        BodyStart = brace + 1,
 +                        ManagedSignature = ReadPreviousManagedSignature(text, lineStart),
-                     });
++                    });
 +                    if (newline < 0) break;
 +                    lineStart = newline + 1;
-                 }
-             }
-             return result;
-         }
- 
++                }
++            }
++            return result;
++        }
++
 +        private static Dictionary<string, List<string>> IndexGeneratedMethodFunctions(string root,
 +            IReadOnlyCollection<DheGuardMethod> requestedMethods)
 +        {
@@ -1108,9 +1167,9 @@ index aa81ffd609dfc43593ccbb898655c106fcf084c3..5de85134ec8c1d78f1cb6abc3c76c842
 +                    {
 +                        AssemblyName = assemblyName,
 +                        MethodPointers = pointers,
-+                    });
-+                }
-+            }
+                     });
+                 }
+             }
 +            if (modules.Count == 0)
 +                throw new BuildFailedException("DHE generated C++ contains no Il2CppCodeGenModule definitions.");
 +            return modules;
@@ -1284,9 +1343,9 @@ index aa81ffd609dfc43593ccbb898655c106fcf084c3..5de85134ec8c1d78f1cb6abc3c76c842
 +                    throw new BuildFailedException("DHE cannot find the requested generic MethodDef in global metadata: " +
 +                        key + ".");
 +            }
-+            return result;
-+        }
-+
+             return result;
+         }
+ 
 +        private static string[] ParseFunctionPointerInitializer(string body, int expectedCount, string sourcePath)
 +        {
 +            string withoutComments = Regex.Replace(body, @"/\*.*?\*/", string.Empty, RegexOptions.Singleline);
@@ -1445,30 +1504,41 @@ index aa81ffd609dfc43593ccbb898655c106fcf084c3..5de85134ec8c1d78f1cb6abc3c76c842
 +            nextIndex = openIndex;
 +            if (openIndex < 0 || openIndex >= text.Length || text[openIndex] != open)
 +                return false;
-+            int depth = 0;
++            Stack<char> delimiters = new Stack<char>();
++            delimiters.Push(close);
 +            bool hasContent = false;
-+            for (int index = openIndex; index < text.Length; index++)
++            for (int index = openIndex + 1; index < text.Length; index++)
 +            {
 +                char character = text[index];
-+                if (character == open)
++                if (character == '(')
 +                {
-+                    depth++;
++                    delimiters.Push(')');
 +                    continue;
 +                }
-+                if (character == close)
++                if (character == '<')
 +                {
-+                    depth--;
-+                    if (depth == 0)
++                    delimiters.Push('>');
++                    continue;
++                }
++                if (character == '[')
++                {
++                    delimiters.Push(']');
++                    continue;
++                }
++                if (character == ')' || character == '>' || character == ']')
++                {
++                    if (delimiters.Count == 0 || delimiters.Peek() != character) return false;
++                    delimiters.Pop();
++                    if (delimiters.Count == 0)
 +                    {
 +                        itemCount = hasContent ? itemCount + 1 : 0;
 +                        nextIndex = index + 1;
 +                        return true;
 +                    }
-+                    if (depth < 0) return false;
 +                    continue;
 +                }
-+                if (depth == 1 && character == ',') itemCount++;
-+                else if (depth == 1 && !char.IsWhiteSpace(character)) hasContent = true;
++                if (delimiters.Count == 1 && character == ',') itemCount++;
++                else if (delimiters.Count == 1 && !char.IsWhiteSpace(character)) hasContent = true;
 +            }
 +            return false;
 +        }
@@ -1476,7 +1546,7 @@ index aa81ffd609dfc43593ccbb898655c106fcf084c3..5de85134ec8c1d78f1cb6abc3c76c842
          private static DheNativeManifestMethod ResolveNativeMethod(DheGuardMethod method,
              DheCppDefinition definition)
          {
-@@ -1335,6 +1998,8 @@ namespace HybridCLR.Editor.Commands
+@@ -1335,6 +2051,8 @@ namespace HybridCLR.Editor.Commands
              return new DheNativeManifestMethod
              {
                  functionName = definition.FunctionName,
@@ -1485,7 +1555,7 @@ index aa81ffd609dfc43593ccbb898655c106fcf084c3..5de85134ec8c1d78f1cb6abc3c76c842
                  returnType = returnType,
                  parameters = parameters.ToArray(),
                  sourceFile = definition.File,
-@@ -1342,14 +2007,15 @@ namespace HybridCLR.Editor.Commands
+@@ -1342,14 +2060,15 @@ namespace HybridCLR.Editor.Commands
                  declaringType = method.DeclaringType,
                  methodName = method.MethodName,
                  methodToken = method.MethodToken,
@@ -1503,7 +1573,7 @@ index aa81ffd609dfc43593ccbb898655c106fcf084c3..5de85134ec8c1d78f1cb6abc3c76c842
                  usesHiddenReturnBuffer = usesHiddenReturn,
                  isStatic = method.IsStatic,
                  hasThis = hasThis,
-@@ -1384,16 +2050,6 @@ namespace HybridCLR.Editor.Commands
+@@ -1384,16 +2103,6 @@ namespace HybridCLR.Editor.Commands
              if (tail.Length > 0) yield return tail;
          }
  
@@ -1520,7 +1590,7 @@ index aa81ffd609dfc43593ccbb898655c106fcf084c3..5de85134ec8c1d78f1cb6abc3c76c842
          private static string CreateGuard(DheNativeManifestMethod method)
          {
              string beginMarker = GetGuardMarker(NativeGuardBeginPrefix, method);
-@@ -1423,8 +2079,16 @@ namespace HybridCLR.Editor.Commands
+@@ -1423,8 +2132,16 @@ namespace HybridCLR.Editor.Commands
                      ? "reinterpret_cast<void*>(il2cppRetVal)"
                      : method.returnType == "void" ? "nullptr" : "&dheResult";
                  StringBuilder body = new StringBuilder();
@@ -1539,7 +1609,7 @@ index aa81ffd609dfc43593ccbb898655c106fcf084c3..5de85134ec8c1d78f1cb6abc3c76c842
                  if (method.returnType != "void" && !method.usesHiddenReturnBuffer)
                      body.Append("        ").Append(method.returnType).Append(" dheResult{};\r\n");
                  body.Append("        hybridclr::dhe::ExecuteInterpreterInvokeArgs(dheMethod, ")
-@@ -1476,6 +2140,7 @@ namespace HybridCLR.Editor.Commands
+@@ -1476,6 +2193,7 @@ namespace HybridCLR.Editor.Commands
                  method.assemblyName.Replace("\\", "\\\\", StringComparison.Ordinal).Replace("\"", "\\\"", StringComparison.Ordinal) +
                  "\", " + method.methodToken + ");\r\n    }\r\n" +
                  "    if (hybridclr::dhe::ShouldDispatchToInterpreter(dheMethod))\r\n    {\r\n" +
@@ -1547,7 +1617,7 @@ index aa81ffd609dfc43593ccbb898655c106fcf084c3..5de85134ec8c1d78f1cb6abc3c76c842
                  "        " + helper.Replace("\r\n", "\r\n        ", StringComparison.Ordinal) + "\r\n    }\r\n" +
                  "    // " + endMarker;
          }
-@@ -1511,6 +2176,78 @@ namespace HybridCLR.Editor.Commands
+@@ -1511,6 +2229,78 @@ namespace HybridCLR.Editor.Commands
              return NormalizeGuardBlock(source.Substring(lineStart, blockEnd - lineStart));
          }
  
@@ -1626,7 +1696,7 @@ index aa81ffd609dfc43593ccbb898655c106fcf084c3..5de85134ec8c1d78f1cb6abc3c76c842
          private static int RequireSingleMarker(string source, string marker, DheNativeManifestMethod method)
          {
              int first = source.IndexOf(marker, StringComparison.Ordinal);
-@@ -1677,6 +2414,25 @@ namespace HybridCLR.Editor.Commands
+@@ -1677,6 +2467,25 @@ namespace HybridCLR.Editor.Commands
              return BitConverter.ToString(Sha256(bytes)).Replace("-", string.Empty).ToLowerInvariant();
          }
  
@@ -1652,7 +1722,7 @@ index aa81ffd609dfc43593ccbb898655c106fcf084c3..5de85134ec8c1d78f1cb6abc3c76c842
          private static string Sha256GuardBlockSet(IEnumerable<DheNativeManifestMethod> methods,
              string relativeRoot)
          {
-@@ -1685,6 +2441,8 @@ namespace HybridCLR.Editor.Commands
+@@ -1685,6 +2494,8 @@ namespace HybridCLR.Editor.Commands
              string prefix = root + Path.DirectorySeparatorChar;
              List<DheGuardHashRecord> records = new List<DheGuardHashRecord>();
              HashSet<string> identities = new HashSet<string>(StringComparer.Ordinal);
@@ -1661,7 +1731,7 @@ index aa81ffd609dfc43593ccbb898655c106fcf084c3..5de85134ec8c1d78f1cb6abc3c76c842
              foreach (DheNativeManifestMethod method in methods ?? Array.Empty<DheNativeManifestMethod>())
              {
                  string path = Path.GetFullPath(RequireFile(method.sourceFile,
-@@ -1697,12 +2455,20 @@ namespace HybridCLR.Editor.Commands
+@@ -1697,12 +2508,20 @@ namespace HybridCLR.Editor.Commands
                  if (!identities.Add(identity))
                      throw new BuildFailedException("DHE native manifest contains a duplicate guard identity: " +
                          method.functionName + "/" + method.methodToken);
@@ -1683,7 +1753,7 @@ index aa81ffd609dfc43593ccbb898655c106fcf084c3..5de85134ec8c1d78f1cb6abc3c76c842
                  });
              }
              using (SHA256 sha = SHA256.Create())
-@@ -1881,15 +2647,16 @@ namespace HybridCLR.Editor.Commands
+@@ -1881,15 +2700,16 @@ namespace HybridCLR.Editor.Commands
          {
              public string assemblyName;
              public DheMvMethod[] methods;
@@ -1703,7 +1773,7 @@ index aa81ffd609dfc43593ccbb898655c106fcf084c3..5de85134ec8c1d78f1cb6abc3c76c842
              public string declaringType;
              public string returnType;
              public string[] parameterTypes;
-@@ -1902,15 +2669,11 @@ namespace HybridCLR.Editor.Commands
+@@ -1902,15 +2722,11 @@ namespace HybridCLR.Editor.Commands
              public int declaringTypeGenericParameterCount;
          }
  
@@ -1721,7 +1791,7 @@ index aa81ffd609dfc43593ccbb898655c106fcf084c3..5de85134ec8c1d78f1cb6abc3c76c842
              public uint MethodToken;
              public string MethodName;
              public string DeclaringType;
-@@ -1921,6 +2684,7 @@ namespace HybridCLR.Editor.Commands
+@@ -1921,6 +2737,7 @@ namespace HybridCLR.Editor.Commands
              public bool DeclaringTypeIsValueType;
              public uint GenericParameterCount;
              public uint DeclaringTypeGenericParameterCount;
@@ -1729,7 +1799,7 @@ index aa81ffd609dfc43593ccbb898655c106fcf084c3..5de85134ec8c1d78f1cb6abc3c76c842
          }
  
          private sealed class DheCppDefinition
-@@ -1929,6 +2693,21 @@ namespace HybridCLR.Editor.Commands
+@@ -1929,6 +2746,21 @@ namespace HybridCLR.Editor.Commands
              public string Signature;
              public string FunctionName;
              public string ParametersText;
@@ -1751,7 +1821,7 @@ index aa81ffd609dfc43593ccbb898655c106fcf084c3..5de85134ec8c1d78f1cb6abc3c76c842
          }
  
          [Serializable]
-@@ -1942,6 +2721,8 @@ namespace HybridCLR.Editor.Commands
+@@ -1942,6 +2774,8 @@ namespace HybridCLR.Editor.Commands
          private sealed class DheNativeManifestMethod
          {
              public string functionName;
@@ -1760,7 +1830,7 @@ index aa81ffd609dfc43593ccbb898655c106fcf084c3..5de85134ec8c1d78f1cb6abc3c76c842
              public string returnType;
              public DheNativeParameter[] parameters;
              public string sourceFile;
-@@ -1949,6 +2730,8 @@ namespace HybridCLR.Editor.Commands
+@@ -1949,6 +2783,8 @@ namespace HybridCLR.Editor.Commands
              public string declaringType;
              public string methodName;
              public uint methodToken;
@@ -1769,7 +1839,7 @@ index aa81ffd609dfc43593ccbb898655c106fcf084c3..5de85134ec8c1d78f1cb6abc3c76c842
              public string managedReturnType;
              public string[] managedParameterTypes;
              public bool managedHasThis;
-@@ -1962,6 +2745,20 @@ namespace HybridCLR.Editor.Commands
+@@ -1962,6 +2798,20 @@ namespace HybridCLR.Editor.Commands
              public int managedParameterCount;
          }
  
@@ -1790,7 +1860,7 @@ index aa81ffd609dfc43593ccbb898655c106fcf084c3..5de85134ec8c1d78f1cb6abc3c76c842
          [Serializable]
          private sealed class DheNativeManifestDocument
          {
-@@ -1969,13 +2766,22 @@ namespace HybridCLR.Editor.Commands
+@@ -1969,13 +2819,22 @@ namespace HybridCLR.Editor.Commands
              public int resolverVersion;
              public string abiContract;
              public string guardHashContract;
@@ -1814,7 +1884,7 @@ index aa81ffd609dfc43593ccbb898655c106fcf084c3..5de85134ec8c1d78f1cb6abc3c76c842
          }
  
          private sealed class DheGuardHashRecord
-@@ -2002,8 +2808,10 @@ namespace HybridCLR.Editor.Commands
+@@ -2002,8 +2861,10 @@ namespace HybridCLR.Editor.Commands
              public string status;
              public string current;
              public string baseline;
@@ -1827,7 +1897,7 @@ index aa81ffd609dfc43593ccbb898655c106fcf084c3..5de85134ec8c1d78f1cb6abc3c76c842
          }
  
          [Serializable]
-@@ -2011,6 +2819,10 @@ namespace HybridCLR.Editor.Commands
+@@ -2011,6 +2872,10 @@ namespace HybridCLR.Editor.Commands
          {
              public int schemaVersion;
              public string format;
@@ -1838,7 +1908,7 @@ index aa81ffd609dfc43593ccbb898655c106fcf084c3..5de85134ec8c1d78f1cb6abc3c76c842
              public DheRuntimePlanAotMetadata[] aotMetadata;
              public string aotMetadataManifestSha256;
              public DheRuntimePlanAssembly[] assemblies;
-@@ -2021,6 +2833,8 @@ namespace HybridCLR.Editor.Commands
+@@ -2021,6 +2886,8 @@ namespace HybridCLR.Editor.Commands
          {
              public int schemaVersion;
              public string format;
@@ -1847,7 +1917,7 @@ index aa81ffd609dfc43593ccbb898655c106fcf084c3..5de85134ec8c1d78f1cb6abc3c76c842
              public string aotMetadataManifestSha256;
              public DheRuntimePlanAotMetadata[] aotMetadata;
              public DheRuntimePlanHandoffAssembly[] assemblies;
-@@ -2037,12 +2851,10 @@ namespace HybridCLR.Editor.Commands
+@@ -2037,12 +2904,10 @@ namespace HybridCLR.Editor.Commands
          {
              public string assemblyName;
              public string current;
@@ -1863,7 +1933,7 @@ index aa81ffd609dfc43593ccbb898655c106fcf084c3..5de85134ec8c1d78f1cb6abc3c76c842
          }
  
          [Serializable]
-@@ -2100,12 +2912,14 @@ namespace HybridCLR.Editor.Commands
+@@ -2100,12 +2965,14 @@ namespace HybridCLR.Editor.Commands
              public string assemblyName;
              public string current;
              public string baseline;
@@ -1880,7 +1950,7 @@ index aa81ffd609dfc43593ccbb898655c106fcf084c3..5de85134ec8c1d78f1cb6abc3c76c842
          }
      }
  
-@@ -2115,11 +2929,20 @@ namespace HybridCLR.Editor.Commands
+@@ -2115,11 +2982,20 @@ namespace HybridCLR.Editor.Commands
          public string GeneratedCppRoot;
          public string OutputManifestPath;
          public bool RequireCompleteCoverage = true;
@@ -1901,7 +1971,7 @@ index aa81ffd609dfc43593ccbb898655c106fcf084c3..5de85134ec8c1d78f1cb6abc3c76c842
          public int RequestedMethodCount;
          public int TransformedMethodCount;
          public int NativeEntryCount;
-@@ -2127,6 +2950,12 @@ namespace HybridCLR.Editor.Commands
+@@ -2127,6 +3003,12 @@ namespace HybridCLR.Editor.Commands
          public string[] GeneratedCppPaths;
          public string NativeGuardSourceSha256;
          public string NativeManifestSha256;
@@ -1914,7 +1984,7 @@ index aa81ffd609dfc43593ccbb898655c106fcf084c3..5de85134ec8c1d78f1cb6abc3c76c842
      }
  
      public sealed class DheNativeFinalizeOptions
-@@ -2137,6 +2966,7 @@ namespace HybridCLR.Editor.Commands
+@@ -2137,6 +3019,7 @@ namespace HybridCLR.Editor.Commands
          public string OutputManifestPath;
          public string BeeLogPath;
          public bool RequireCompleteCoverage = true;
@@ -1922,7 +1992,7 @@ index aa81ffd609dfc43593ccbb898655c106fcf084c3..5de85134ec8c1d78f1cb6abc3c76c842
          public bool RebuildPlayer;
          public int BeeMaxAttempts = 3;
          public int BeeTimeoutSeconds = 600;
-@@ -2159,8 +2989,10 @@ namespace HybridCLR.Editor.Commands
+@@ -2159,8 +3042,10 @@ namespace HybridCLR.Editor.Commands
          public string BaselineOutputRoot;
          public string CurrentAotRoot;
          public string CurrentOutputRoot;
@@ -1933,7 +2003,7 @@ index aa81ffd609dfc43593ccbb898655c106fcf084c3..5de85134ec8c1d78f1cb6abc3c76c842
      }
  
      public sealed class DheProjectPrepareResult
-@@ -2204,6 +3036,7 @@ namespace HybridCLR.Editor.Commands
+@@ -2204,6 +3089,7 @@ namespace HybridCLR.Editor.Commands
          public string ProjectRoot;
          public string ProjectPlanPath;
          public string RuntimeAssetRoot;
@@ -1941,7 +2011,7 @@ index aa81ffd609dfc43593ccbb898655c106fcf084c3..5de85134ec8c1d78f1cb6abc3c76c842
          public string OutputRoot;
          public string StrippedAotRoot;
          /// <summary>
-@@ -2247,15 +3080,6 @@ namespace HybridCLR.Editor.Commands
+@@ -2247,15 +3133,6 @@ namespace HybridCLR.Editor.Commands
          public string[] AssemblyNames;
      }
  
@@ -1958,7 +2028,7 @@ index aa81ffd609dfc43593ccbb898655c106fcf084c3..5de85134ec8c1d78f1cb6abc3c76c842
      {
          public string OutputPath;
 diff --git a/Editor/Commands/DheProjectBuildSupport.cs b/Editor/Commands/DheProjectBuildSupport.cs
-index 8003bb459d996d9ff8ac4581b2bc8c21571540d4..63c4ad4fc95d559206b051f17427b73cdf8400fe 100644
+index 8003bb4..63c4ad4 100644
 --- a/Editor/Commands/DheProjectBuildSupport.cs
 +++ b/Editor/Commands/DheProjectBuildSupport.cs
 @@ -34,6 +34,7 @@ namespace HybridCLR.Editor.Commands
@@ -2492,7 +2562,7 @@ index 8003bb459d996d9ff8ac4581b2bc8c21571540d4..63c4ad4fc95d559206b051f17427b73c
          public string IdentityClassName = "DheBuildIdentity";
      }
 diff --git a/Editor/Commands/DheProjectResourceSupport.cs b/Editor/Commands/DheProjectResourceSupport.cs
-index 2b1525d838b1a73206a56242f22db7ef120a97e2..15807b59a75eae41f79525e8de39a6023dff58fc 100644
+index 2b1525d..15807b5 100644
 --- a/Editor/Commands/DheProjectResourceSupport.cs
 +++ b/Editor/Commands/DheProjectResourceSupport.cs
 @@ -168,8 +168,7 @@ namespace HybridCLR.Editor.Commands
@@ -2516,7 +2586,7 @@ index 2b1525d838b1a73206a56242f22db7ef120a97e2..15807b59a75eae41f79525e8de39a602
          private sealed class RequiredAssetSpec
          {
 diff --git a/Editor/Commands/DheProjectWorkflowRunner.cs b/Editor/Commands/DheProjectWorkflowRunner.cs
-index f24c4814d42953d715d188ba58b66994602a02bf..ab3a634105dbc2a433b2c2d8eea8e28221f0869f 100644
+index f24c481..ab3a634 100644
 --- a/Editor/Commands/DheProjectWorkflowRunner.cs
 +++ b/Editor/Commands/DheProjectWorkflowRunner.cs
 @@ -30,6 +30,7 @@ namespace HybridCLR.Editor.Commands
@@ -2568,7 +2638,7 @@ index f24c4814d42953d715d188ba58b66994602a02bf..ab3a634105dbc2a433b2c2d8eea8e282
                  string.IsNullOrWhiteSpace(adapter.IdentityNamespace) ||
                  string.IsNullOrWhiteSpace(adapter.IdentityClassName))
 diff --git a/Editor/Commands/StripAOTDllCommand.cs b/Editor/Commands/StripAOTDllCommand.cs
-index 6eaf1b06816ee67e06f949029b2b7025c1b31e4d..f37c4c40299f37027e59ae8b528383f9285c648f 100644
+index 6eaf1b0..f37c4c4 100644
 --- a/Editor/Commands/StripAOTDllCommand.cs
 +++ b/Editor/Commands/StripAOTDllCommand.cs
 @@ -135,6 +135,11 @@ namespace HybridCLR.Editor.Commands
@@ -2584,7 +2654,7 @@ index 6eaf1b06816ee67e06f949029b2b7025c1b31e4d..f37c4c40299f37027e59ae8b528383f9
                      subtarget = (int)StandaloneBuildSubtarget.Server,
  #endif
 diff --git a/Runtime/DheRuntime.cs b/Runtime/DheRuntime.cs
-index 0e5fda333a02679185da6196ad587930e12519b8..121f29df40b3932286a85457216ce5c09ba0806c 100644
+index 0e5fda3..121f29d 100644
 --- a/Runtime/DheRuntime.cs
 +++ b/Runtime/DheRuntime.cs
 @@ -1,6 +1,7 @@
@@ -3628,7 +3698,7 @@ index 0e5fda333a02679185da6196ad587930e12519b8..121f29df40b3932286a85457216ce5c0
          {
              string normalized = string.IsNullOrWhiteSpace(value) ? DefaultAssetRoot :
 diff --git a/Runtime/RuntimeApi.cs b/Runtime/RuntimeApi.cs
-index b79bf17922b27bee757b0b66f6949c6d6c7e7bef..3471579037f5f523c1cdb69646e2c78a6185ca41 100644
+index b79bf17..3471579 100644
 --- a/Runtime/RuntimeApi.cs
 +++ b/Runtime/RuntimeApi.cs
 @@ -44,28 +44,36 @@ namespace HybridCLR

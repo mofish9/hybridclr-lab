@@ -51,7 +51,8 @@ internal static partial class Program
     private static readonly string[] RequiredResolverChecks =
     {
         "methoddef-token-overload-no-comments", "generic-method-table-overload-no-comments",
-        "managed-signature-conflict-rejected", "pointer-count-tamper-rejected",
+        "managed-signature-conflict-rejected", "managed-signature-complex-parameters",
+        "pointer-count-tamper-rejected",
         "generic-native-owner-conflict-rejected"
     };
 

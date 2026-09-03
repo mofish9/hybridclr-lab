@@ -36,7 +36,7 @@ property/event 和既有成员 custom attribute。以下变化仍会在发布资
 - Unity 2021、Unity 2022、团结 2022 的 il2cpp_plus commit 分别为 `b3fdf1e`、
   `6032274`、`52968ad`，tag 分别为 `v2021-8.1.0-opt4.1`、
   `v2022-8.11.0-opt4.1`、`v2022-tuanjie-8.13.0-opt4.1`；
-- HybridCLR Unity package commit `726f54d`，位于 `optimize/v8.13.0`，package 本身不打 tag；
+- HybridCLR Unity package commit `749eaee`，位于 `optimize/v8.13.0`，package 本身不打 tag；
 - 团结引擎 `1.10.0` / Unity compatibility `2022.3.62t12`；
 - `manifests/dhe-runtime-lock.json`、`dhe-package-lock.json` 和工具包 manifest 中的
   commit、tree、文件集合及 SHA-256。

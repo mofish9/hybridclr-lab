@@ -32,6 +32,9 @@ namespace HybridCLR.Lab.Editor
                 () => ValidateGenericMethodTableOverload(Path.Combine(outputRoot, "generic-overload")));
             RunCheck(checks, errors, "managed-signature-conflict-rejected",
                 () => ValidateManagedSignatureConflict(Path.Combine(outputRoot, "signature-conflict")));
+            RunCheck(checks, errors, "managed-signature-complex-parameters",
+                () => ValidateManagedSignatureComplexParameters(
+                    Path.Combine(outputRoot, "signature-complex-parameters")));
             RunCheck(checks, errors, "pointer-count-tamper-rejected",
                 () => ValidatePointerCountTamper(Path.Combine(outputRoot, "pointer-count-tamper")));
             RunCheck(checks, errors, "generic-native-owner-conflict-rejected",
@@ -125,6 +128,39 @@ namespace HybridCLR.Lab.Editor
             ExpectFailure(() => Inject(root, cpp, mv), "conflicts with the managed signature comment");
         }
 
+        private static void ValidateManagedSignatureComplexParameters(string root)
+        {
+            string cpp = PrepareRoot(root);
+            string function = "Fixture_Resolve_m3333333333333333333333333333333333333333";
+            WriteCodeGenModule(cpp, new[] { function });
+            string sourcePath = Path.Combine(cpp, "Fixture.cpp");
+            File.WriteAllText(sourcePath,
+                "// System.Int32 Fixture.Type::Resolve(System.Byte[],System.Int32[,]" +
+                ",System.Collections.Generic.Dictionary<System.String,System.Int32[]>)\n" +
+                "IL2CPP_EXTERN_C IL2CPP_METHOD_ATTR int32_t " + function +
+                " (RuntimeArray* ___0_bytes, RuntimeArray* ___1_matrix, RuntimeObject* ___2_map, " +
+                "const RuntimeMethod* method)\n{\n    return 8;\n}\n",
+                new UTF8Encoding(false));
+            string mv = WriteMv(root, new[]
+            {
+                Method(1,
+                    "Fixture.Type::Resolve|System.Int32 (System.Byte[],System.Int32[,]" +
+                    ",System.Collections.Generic.Dictionary<System.String,System.Int32[]>)",
+                    "Resolve", 0, '3', new[]
+                    {
+                        "System.Byte[]",
+                        "System.Int32[,]",
+                        "System.Collections.Generic.Dictionary<System.String,System.Int32[]>",
+                    }),
+            });
+            DheNativeGuardResult result = Inject(root, cpp, mv);
+            Require(result.NativeEntryCount == 1 && result.TransformedMethodCount == 1,
+                "Managed signature parsing did not preserve array and nested generic parameters.");
+            Require(File.ReadAllText(sourcePath, Encoding.UTF8).Contains(
+                    "3333333333333333333333333333333333333333:100663297"),
+                "Complex managed signature was not bound to MethodDef RID 1.");
+        }
+
         private static void ValidatePointerCountTamper(string root)
         {
             string cpp = PrepareRoot(root);
@@ -211,14 +247,17 @@ namespace HybridCLR.Lab.Editor
             return path;
         }
 
-        private static string Method(int rid, string identity, string name, int genericCount, char hash)
+        private static string Method(int rid, string identity, string name, int genericCount, char hash,
+            string[] parameterTypes = null)
         {
             string stableId = new string(hash, 64);
+            if (parameterTypes == null) parameterTypes = new[] { "System.Int32" };
             return "    {\"identity\":\"" + identity + "\",\"stableId\":\"" + stableId +
                 "\",\"token\":" + (0x06000000 + rid).ToString(CultureInfo.InvariantCulture) +
                 ",\"flags\":8,\"name\":\"" + name +
                 "\",\"declaringType\":\"Fixture.Type\",\"returnType\":\"System.Int32\"," +
-                "\"parameterTypes\":[\"System.Int32\"],\"isStatic\":true,\"hasThis\":false," +
+                "\"parameterTypes\":[\"" + string.Join("\",\"", parameterTypes) +
+                "\"],\"isStatic\":true,\"hasThis\":false," +
                 "\"isAbstract\":false,\"isPInvoke\":false,\"declaringTypeIsValueType\":false," +
                 "\"genericParameterCount\":" + genericCount.ToString(CultureInfo.InvariantCulture) +
                 ",\"declaringTypeGenericParameterCount\":0}";
