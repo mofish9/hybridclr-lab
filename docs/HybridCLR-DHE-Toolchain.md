@@ -344,5 +344,12 @@ the clean current host independently revalidates the complete evidence to avoid 
 circular self-publication dependency. Each native role is revalidated against its own locked
 runtime workflow, source commits, live runtime tree, and real Editor header
 tree. A command-line readiness flag cannot promote a package.
+
+When qualifying a new toolchain release, pass the previous Release package as
+`-ToolchainRoot`/`-ExpectedToolchainPackageId` and the clean candidate Git root
+as `-ValidationSourceRoot`. Runtime locks, schemas, and clean tool identity are
+then taken from the candidate while the previous immutable package remains the
+release authority. Normal game-project builds omit `-ValidationSourceRoot`; in
+that case the installed Release package is both authority and validation source.
 Native compilation and iOS/Xcode execution remain target environment gates;
 a Windows result is not iOS evidence.

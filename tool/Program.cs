@@ -1020,7 +1020,8 @@ internal static partial class Program
 
     private static void RunWorkflowSchemaGate(Cli cli, string output)
     {
-        var toolchainRoot = Path.GetFullPath(cli.Optional("toolchainroot") ?? cli.Root);
+        var toolchainRoot = Path.GetFullPath(cli.Optional("validationsourceroot") ??
+            cli.Optional("toolchainroot") ?? cli.Root);
         var schemaGatePath = Path.Combine(output, "schema-gate.json");
         if (SchemaGate(new Cli("schema-gate", new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase)
         {
@@ -1632,14 +1633,15 @@ internal static partial class Program
 
         JsonElement packageManifest = ReadJson<JsonElement>(inspection.ManifestPath);
         JsonElement packageSource = packageManifest.GetProperty("sourceIdentity");
-        if (!string.Equals(GetString(tool, "head"), GetString(packageSource, "head"),
-                StringComparison.OrdinalIgnoreCase) ||
-            !string.Equals(GetString(tool, "tree"), GetString(packageSource, "tree"),
-                StringComparison.OrdinalIgnoreCase))
-            throw new DheException("Demo clean-checkout identity does not match its toolchain package manifest.");
-
-        _ = sourceHead;
-        _ = sourceTree;
+        bool currentSource = string.Equals(GetString(tool, "head"), sourceHead,
+                StringComparison.OrdinalIgnoreCase) &&
+            string.Equals(GetString(tool, "tree"), sourceTree, StringComparison.OrdinalIgnoreCase);
+        bool authorityPackageSource = string.Equals(GetString(tool, "head"),
+                GetString(packageSource, "head"), StringComparison.OrdinalIgnoreCase) &&
+            string.Equals(GetString(tool, "tree"), GetString(packageSource, "tree"),
+                StringComparison.OrdinalIgnoreCase);
+        if (!currentSource && !authorityPackageSource)
+            throw new DheException("Demo clean-checkout identity matches neither the current release source nor its authenticated authority package.");
     }
 
     private static void RequireEvidenceFormat(JsonElement report, string expected, string description)

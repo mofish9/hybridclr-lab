@@ -23,6 +23,7 @@ internal static partial class Program
         var release = mode == "Release";
         var expectedPackageId = cli.Optional("expectedtoolchainpackageid");
         var toolRoot = Path.GetFullPath(cli.Optional("toolchainroot") ?? cli.Root);
+        var validationSourceRoot = Path.GetFullPath(cli.Optional("validationsourceroot") ?? toolRoot);
         var toolManifest = Path.Combine(toolRoot, "dhe-toolchain-manifest.json");
         string? toolchainGate = null;
         var toolchainPassed = !release;
@@ -45,7 +46,7 @@ internal static partial class Program
         var sourcePassed = WriteSourcePreflight(cli, release, project, settingsPath, baselineRoot, target, sourcePath, out var runtimeManifest);
         if (!sourcePassed) throw new DheException("DHE source preflight failed: " + sourcePath);
         var cleanPath = Path.Combine(outputRoot, "clean-checkout", "clean-checkout-gate-report.json");
-        var cleanPassed = WriteCleanCheckout(cli, release, project, toolRoot, cleanPath);
+        var cleanPassed = WriteCleanCheckout(cli, release, project, validationSourceRoot, cleanPath);
         if (!cleanPassed) throw new DheException("DHE clean checkout gate failed: " + cleanPath);
         return new ProductionEvidence(toolchainPassed && sourcePassed && cleanPassed, toolchainPassed,
             sourcePassed, cleanPassed, toolchainGate, sourcePath, cleanPath, expectedPackageId, runtimeManifest);
@@ -250,7 +251,8 @@ internal static partial class Program
         }
 
         var runtimeLockPath = GetString(runtime, "dheRuntimeLock");
-        var packagedRuntimeLock = Path.Combine(Path.GetFullPath(cli.Optional("toolchainroot") ?? cli.Root),
+        var packagedRuntimeLock = Path.Combine(Path.GetFullPath(cli.Optional("validationsourceroot") ??
+            cli.Optional("toolchainroot") ?? cli.Root),
             "manifests", "dhe-runtime-lock.json");
         if (release && (string.IsNullOrWhiteSpace(runtimeLockPath) || !File.Exists(runtimeLockPath) ||
             !File.Exists(packagedRuntimeLock) ||
@@ -292,7 +294,8 @@ internal static partial class Program
                 !Directory.Exists(sourcePath) || !IsHex(commit, 40, 40) ||
                 !string.Equals(GitValue(sourcePath, "rev-parse", "HEAD"), commit, StringComparison.OrdinalIgnoreCase) ||
                 !string.IsNullOrWhiteSpace(GitValue(sourcePath, "status", "--porcelain")) ||
-                !Directory.Exists(treeRoot) || !TreeHashForRelease(treeRoot, Array.Empty<string>()).Equals(treeHash, StringComparison.OrdinalIgnoreCase)))
+                !Directory.Exists(treeRoot) || !LabCommands.CanonicalSourceTreeHash(treeRoot,
+                    name == "hybridclr_unity").Equals(treeHash, StringComparison.OrdinalIgnoreCase)))
             {
                 errors.Add("Runtime source identity cannot be reproduced: " + name);
                 valid = false;
