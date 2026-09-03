@@ -1605,15 +1605,39 @@ internal static partial class Program
     private static void ValidateEvidenceToolIdentity(JsonElement report, string reportPath, string sourceHead,
         string sourceTree)
     {
+        string reportRoot = Path.GetDirectoryName(reportPath)!;
         var cleanPath = ResolveEvidencePath(GetString(report, "cleanCheckoutGate"),
-            Path.GetDirectoryName(reportPath)!, "Demo clean checkout evidence");
+            reportRoot, "Demo clean checkout evidence");
         var clean = ReadJson<JsonElement>(cleanPath);
         RequireEvidenceFormat(clean, "hybridclr.dhe-clean-checkout-gate.json", "Demo clean checkout");
         var tool = clean.GetProperty("toolGit");
-        if (!GetBool(tool, "clean") || !GetBool(tool, "trackedSourcesComplete") ||
-            !string.Equals(GetString(tool, "head"), sourceHead, StringComparison.OrdinalIgnoreCase) ||
-            !string.Equals(GetString(tool, "tree"), sourceTree, StringComparison.OrdinalIgnoreCase))
-            throw new DheException("Demo evidence tool identity does not match the release source.");
+        if (!GetBool(tool, "clean") || !GetBool(tool, "trackedSourcesComplete"))
+            throw new DheException("Demo evidence tool identity is not clean and tracked.");
+
+        string expectedPackageId = GetString(report, "expectedToolchainPackageId") ?? string.Empty;
+        string gatePath = ResolveEvidencePath(GetString(report, "toolchainGate"), reportRoot,
+            "Demo toolchain gate");
+        JsonElement gate = ReadJson<JsonElement>(gatePath);
+        RequireEvidenceFormat(gate, "hybridclr.dhe-toolchain-gate.json", "Demo toolchain gate");
+        string packageRoot = RequireDirectory(GetString(gate, "packageRoot") ?? string.Empty,
+            "Demo toolchain package");
+        PackageInspection inspection = InspectPackage(packageRoot, expectedPackageId, true);
+        if (!GetBool(gate, "passed") || !GetBool(gate, "requireRelease") ||
+            !GetBool(gate, "releaseReady") || !inspection.Passed ||
+            !string.Equals(GetString(gate, "packageId"), expectedPackageId,
+                StringComparison.OrdinalIgnoreCase))
+            throw new DheException("Demo evidence was not produced by its authenticated release toolchain.");
+
+        JsonElement packageManifest = ReadJson<JsonElement>(inspection.ManifestPath);
+        JsonElement packageSource = packageManifest.GetProperty("sourceIdentity");
+        if (!string.Equals(GetString(tool, "head"), GetString(packageSource, "head"),
+                StringComparison.OrdinalIgnoreCase) ||
+            !string.Equals(GetString(tool, "tree"), GetString(packageSource, "tree"),
+                StringComparison.OrdinalIgnoreCase))
+            throw new DheException("Demo clean-checkout identity does not match its toolchain package manifest.");
+
+        _ = sourceHead;
+        _ = sourceTree;
     }
 
     private static void RequireEvidenceFormat(JsonElement report, string expected, string description)

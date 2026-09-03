@@ -106,7 +106,9 @@ DHE format、未支持的 schema 断言关键字、额外属性、错误类型�
 
 七角色证据必须由 `release-evidence` 命令从 clean HEAD 自动生成，不能手工拼装后直接发布。
 三个 managed Player 角色都必须来自 `Release` workflow，并绑定 integrated runtime、真实 headers
-和 clean/tracked 项目源码；Exploratory 报告不能再提升工具包的 Release 位。
+和 clean/tracked 项目源码；Exploratory 报告不能再提升工具包的 Release 位。Player 可以由上一份
+已认证 Release 工具包执行，再由当前 clean host 独立重算证据，避免待发布工具包必须先认证自身
+的循环依赖。
 
 发布后的 `dhe-toolchain-manifest.json` 必须同时满足 `mode=Release`、
 `releaseReady=true`、`sourceIdentity.clean=true`，并通过包外和包内两次

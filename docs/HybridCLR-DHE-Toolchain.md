@@ -338,7 +338,10 @@ The generated report must match the exact source HEAD/tree and binds all seven
 reports by SHA-256. Both changed roles must be Release-ready Player results for
 distinct Base identities, backed by the same resource manifest, validation,
 current assembly set, and target. Each managed role is rebound to its integrated
-runtime manifest, clean tracked sources, and real Editor headers. Each native role is revalidated against its own locked
+runtime manifest, clean tracked sources, real Editor headers, and the authenticated
+release toolchain that executed it. This toolchain may be the preceding release;
+the clean current host independently revalidates the complete evidence to avoid a
+circular self-publication dependency. Each native role is revalidated against its own locked
 runtime workflow, source commits, live runtime tree, and real Editor header
 tree. A command-line readiness flag cannot promote a package.
 Native compilation and iOS/Xcode execution remain target environment gates;
