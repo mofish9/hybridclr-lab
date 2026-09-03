@@ -23,8 +23,11 @@ Player evidence are documented in
 `docs/HybridCLR-DHE-Toolchain.md`,
 `docs/HybridCLR-DHE-Workflow-Review.md` and
 `docs/HybridCLR-DHE-Formal-Project-Validation.md`. Toolchain `0.1.18` is the
-project-trial line; projects must install an authenticated package whose
-manifest has `releaseReady=true` and pin its exact package ID.
+conditionally accepted source/Windows reference release; its exact evidence
+and remaining platform gates are recorded in
+`docs/HybridCLR-DHE-Opt4-Release-0.1.18.md`. Projects must install an
+authenticated package whose manifest has `releaseReady=true` and pin its exact
+package ID.
 The workflow also emits MetaVersion/native/workflow schemas and an independent
 artifact validator; it verifies the exact supported+unsupported changed-token set,
 and the versioned `il2cpp-generated-cpp-signature-v2` ABI adapter contract.
