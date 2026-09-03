@@ -1010,6 +1010,13 @@ internal static partial class Program
             gitRootBoundaryPassed, gitRootBoundaryPassed
                 ? "git-root-v1 boundary resolves from a nested Unity project to the repository root"
                 : string.Join("; ", boundaryErrors));
+        string staleLockRoot = Path.Combine(regressionRoot, "unity-stale-lock", "Temp");
+        Directory.CreateDirectory(staleLockRoot);
+        string staleLock = Path.Combine(staleLockRoot, "UnityLockfile");
+        File.WriteAllText(staleLock, string.Empty, new UTF8Encoding(false));
+        bool staleLockRemoved = TryRemoveStaleUnityLock(staleLock) && !File.Exists(staleLock);
+        AddRegressionCheck(checks, errors, "unity-stale-lock-recovery", staleLockRemoved,
+            "an unowned Unity Temp lock must not stall the C# workflow until its stage timeout");
         RunIntegratedSourceLockRegressions(regressionRoot, checks, errors);
 
         var weakNoOpRejected = false;

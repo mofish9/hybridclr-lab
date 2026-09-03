@@ -30,6 +30,7 @@ internal static partial class Program
         "evidence-managed-release-binding", "evidence-multibase-current-binding",
         "bootstrap-engine-workflow-matrix",
         "source-boundary-git-root-resolution",
+        "unity-stale-lock-recovery",
         "integrated-source-lock-line-ending-stable",
         "integrated-source-lock-valid", "integrated-source-lock-commit-tamper",
         "integrated-source-lock-tree-tamper", "integrated-source-lock-patch-tamper",
@@ -2381,6 +2382,9 @@ internal static partial class Program
     private static string ResolveUnity(Cli cli, string project) => RequireFile(cli.Optional("unity") ?? Environment.GetEnvironmentVariable("DHE_UNITY_EXE") ?? throw new DheException("Set -Unity or DHE_UNITY_EXE."), "Unity editor");
     private static void RunUnity(string executable, string workingDirectory, IEnumerable<string> arguments, IDictionary<string, string> environment, string logPath, int timeoutSeconds)
     {
+        string unityLock = Path.Combine(Path.GetFullPath(workingDirectory), "Temp", "UnityLockfile");
+        if (File.Exists(unityLock) && !TryRemoveStaleUnityLock(unityLock))
+            throw new DheException("Unity project is already open or its lock is active: " + workingDirectory);
         var startedAt = DateTime.UtcNow;
         var start = new ProcessStartInfo(executable) { WorkingDirectory = workingDirectory, UseShellExecute = false, RedirectStandardOutput = true, RedirectStandardError = true };
         foreach (var arg in arguments) start.ArgumentList.Add(arg); foreach (var pair in environment) start.Environment[pair.Key] = pair.Value;
@@ -2440,12 +2444,38 @@ internal static partial class Program
         DateTime? releasedAt = null;
         while (DateTime.UtcNow < deadline)
         {
-            if (File.Exists(lockPath)) releasedAt = null;
+            if (File.Exists(lockPath) && !TryRemoveStaleUnityLock(lockPath)) releasedAt = null;
             else if (releasedAt == null) releasedAt = DateTime.UtcNow;
             else if ((DateTime.UtcNow - releasedAt.Value).TotalSeconds >= 5) return;
             Thread.Sleep(250);
         }
         throw new DheException("Unity project lock was not released before the stage timeout: " + project);
+    }
+
+    private static bool TryRemoveStaleUnityLock(string lockPath)
+    {
+        try
+        {
+            using (File.Open(lockPath, FileMode.Open, FileAccess.ReadWrite, FileShare.None)) { }
+            File.Delete(lockPath);
+            return true;
+        }
+        catch (FileNotFoundException)
+        {
+            return true;
+        }
+        catch (DirectoryNotFoundException)
+        {
+            return true;
+        }
+        catch (IOException)
+        {
+            return false;
+        }
+        catch (UnauthorizedAccessException)
+        {
+            return false;
+        }
     }
 
     private static T ReadJson<T>(string path) => JsonSerializer.Deserialize<T>(File.ReadAllText(path), Json) ?? throw new DheException("Invalid JSON: " + path);
