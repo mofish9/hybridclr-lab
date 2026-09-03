@@ -1233,6 +1233,14 @@ internal static partial class Program
             realWorkflowOutputsValidated
                 ? "two resource-only changed Base results share one revalidated current payload"
                 : "the distributed package contains the resource Player evidence implementation");
+        using var releaseResourceBase = JsonDocument.Parse("{\"mode\":\"Release\",\"releaseReady\":true}");
+        using var incompleteResourceBase = JsonDocument.Parse("{\"mode\":\"Release\",\"releaseReady\":false}");
+        using var exploratoryResourceBase = JsonDocument.Parse("{\"mode\":\"Exploratory\",\"releaseReady\":true}");
+        AddRegressionCheck(checks, errors, "resource-player-release-readiness",
+            ResourcePlayerReleaseReady(releaseResourceBase.RootElement) &&
+            !ResourcePlayerReleaseReady(incompleteResourceBase.RootElement) &&
+            !ResourcePlayerReleaseReady(exploratoryResourceBase.RootElement),
+            "resource-only changed evidence inherits readiness only from a Release-ready Base workflow");
         var sourceHead = GitValue(cli.Root, "rev-parse", "HEAD");
         var sourceTree = GitValue(cli.Root, "rev-parse", "HEAD^{tree}");
         var sourceClean = !string.IsNullOrWhiteSpace(sourceHead) && string.IsNullOrWhiteSpace(GitValue(cli.Root, "status", "--porcelain"));

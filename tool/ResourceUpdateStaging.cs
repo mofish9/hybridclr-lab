@@ -314,7 +314,7 @@ internal static partial class Program
             mode = GetString(baseWorkflow, "mode"),
             coverageRequired = true,
             coverageGatePassed = true,
-            releaseReady = false,
+            releaseReady = ResourcePlayerReleaseReady(baseWorkflow),
             artifactValidationPassed = true,
             buildIdentityReady = true,
             identityVersion = 1,
@@ -394,6 +394,10 @@ internal static partial class Program
         Console.WriteLine("DHE resource Player workflow evidence: " + output);
         return 0;
     }
+
+    private static bool ResourcePlayerReleaseReady(JsonElement baseWorkflow) =>
+        string.Equals(GetString(baseWorkflow, "mode"), "Release", StringComparison.Ordinal) &&
+        GetBool(baseWorkflow, "releaseReady");
 
     private static JsonElement ValidateStagingBuildIdentity(string identityPath,
         JsonElement identity, JsonElement manifest)

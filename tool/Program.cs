@@ -27,6 +27,7 @@ internal static partial class Program
         "resource-stage-plan-capability-bound",
         "resource-stage-aot-metadata-capability-bound",
         "resource-player-evidence-binding",
+        "resource-player-release-readiness",
         "evidence-managed-release-binding", "evidence-multibase-current-binding",
         "bootstrap-engine-workflow-matrix",
         "source-boundary-git-root-resolution",
