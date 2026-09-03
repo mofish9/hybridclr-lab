@@ -321,6 +321,15 @@ Publishing the toolchain itself in `-Mode Release` requires
 `-ReleaseEvidence <report>`. Generate it from a clean source identity with the
 same host:
 
+Before the final regression, run
+`HybridCLR.Lab.Editor.HybridCLRDheCppResolverRegression.Run` once with each
+locked Editor and pass `-dheResolverEngineWorkflow Unity2021Standard`,
+`Unity2022Fgs`, or `Tuanjie2022Fgs`. Each report binds the exact Editor version
+and the SHA-256 of the package's `DheBuildPipeline.cs`. The production
+`regression` command must receive all three reports through
+`-ResolverUnity2021`, `-ResolverUnity2022`, and `-ResolverTuanjie2022`; a
+partial matrix or a report from a different package source is rejected.
+
 ```text
 dotnet HybridCLR.DheTool.dll release-evidence \
   -LabRoot C:/src/hybridclr-lab \
@@ -331,18 +340,21 @@ dotnet HybridCLR.DheTool.dll release-evidence \
   -DemoNoop C:/build/demo-noop/player-workflow-report.json \
   -NativeTuanjie2022 C:/build/native-tuanjie/native-gate.json \
   -NativeUnity2022 C:/build/native-unity2022/native-gate.json \
-  -NativeUnity2021 C:/build/native-unity2021/native-gate.json
+  -NativeUnity2021 C:/build/native-unity2021/native-gate.json \
+  -ResolverTuanjie2022 C:/build/resolver-tuanjie/dhe-cpp-resolver-regression.json \
+  -ResolverUnity2022 C:/build/resolver-unity2022/dhe-cpp-resolver-regression.json \
+  -ResolverUnity2021 C:/build/resolver-unity2021/dhe-cpp-resolver-regression.json
 ```
 
-The generated report must match the exact source HEAD/tree and binds all seven
+The generated report must match the exact source HEAD/tree and binds all ten
 reports by SHA-256. Both changed roles must be Release-ready Player results for
 distinct Base identities, backed by the same resource manifest, validation,
 current assembly set, and target. Each managed role is rebound to its integrated
 runtime manifest, clean tracked sources, real Editor headers, and the authenticated
 release toolchain that executed it. This toolchain may be the preceding release;
 the clean current host independently revalidates the complete evidence to avoid a
-circular self-publication dependency. Each native role is revalidated against its own locked
-runtime workflow, source commits, live runtime tree, and real Editor header
+circular self-publication dependency. Each resolver and native role is revalidated against its
+own locked engine workflow, package/runtime source commits, live runtime tree, and real Editor header
 tree. A command-line readiness flag cannot promote a package.
 
 When qualifying a new toolchain release, pass the previous Release package as

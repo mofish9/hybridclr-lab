@@ -16,7 +16,7 @@ implementation. The formal opt4.1 source identities are:
   `v2022-8.11.0-opt4.1` for Unity 2022;
 - `il2cpp_plus@52968ad6c88416f212d09d919b9a1b6afdc8a53b`, annotated tag
   `v2022-tuanjie-8.13.0-opt4.1` for Tuanjie 2022;
-- `hybridclr_unity@71a2e7b11e46119c649437d5afec02f2f2b82197` on
+- `hybridclr_unity@726f54db45e0a3b99d34d0534627ffaa6d76b56d` on
   `optimize/v8.13.0`. The package does not receive an opt tag.
 
 The old base commits and patches remain in the locks as replay and migration

@@ -36,6 +36,7 @@ internal static partial class Program
         "integrated-source-lock-line-ending-stable",
         "integrated-source-lock-valid", "integrated-source-lock-commit-tamper",
         "integrated-source-lock-tree-tamper", "integrated-source-lock-patch-tamper",
+        "generated-cpp-resolver-engine-matrix", "generated-cpp-resolver-identity-tamper",
         "layout-release-role-schemas",
         "schema-valid-document", "schema-maximum-rejected", "schema-additional-type-rejected",
         "schema-unsupported-keyword-rejected", "schema-gate-contract",
@@ -44,7 +45,14 @@ internal static partial class Program
     private static readonly string[] RequiredReleaseEvidenceRoles =
     {
         "regression", "demo-changed", "demo-changed-base2", "demo-noop", "native-tuanjie2022",
-        "native-unity2022", "native-unity2021"
+        "native-unity2022", "native-unity2021", "resolver-tuanjie2022", "resolver-unity2022",
+        "resolver-unity2021"
+    };
+    private static readonly string[] RequiredResolverChecks =
+    {
+        "methoddef-token-overload-no-comments", "generic-method-table-overload-no-comments",
+        "managed-signature-conflict-rejected", "pointer-count-tamper-rejected",
+        "generic-native-owner-conflict-rejected"
     };
 
     public static int Main(string[] args)
@@ -1150,7 +1158,10 @@ internal static partial class Program
             (Role: "demo-noop", Option: "demonoop"),
             (Role: "native-tuanjie2022", Option: "nativetuanjie2022"),
             (Role: "native-unity2022", Option: "nativeunity2022"),
-            (Role: "native-unity2021", Option: "nativeunity2021")
+            (Role: "native-unity2021", Option: "nativeunity2021"),
+            (Role: "resolver-tuanjie2022", Option: "resolvertuanjie2022"),
+            (Role: "resolver-unity2022", Option: "resolverunity2022"),
+            (Role: "resolver-unity2021", Option: "resolverunity2021")
         }.Select(item => (item.Role, Path: RequireFile(cli.Require(item.Option), item.Role + " evidence"))).ToArray();
         var outputRoot = SafeOutputRoot(cli.Require("outputroot"), inputs.Select(item => item.Path).Append(sourceRoot));
         EnsureOutputOutsideRoot(outputRoot, sourceRoot);
@@ -1202,7 +1213,7 @@ internal static partial class Program
     {
         if (!evidence.TryGetProperty("files", out var files) || files.ValueKind != JsonValueKind.Array ||
             files.GetArrayLength() != RequiredReleaseEvidenceRoles.Length)
-            throw new DheException("Release evidence must contain the complete managed and three-engine native matrix.");
+            throw new DheException("Release evidence must contain the complete managed, resolver, and native matrix.");
         var sourceHead = GetString(evidence, "sourceHead");
         var sourceTree = GetString(evidence, "sourceTree");
         if (!IsHex(sourceHead, 40, 64) || !IsHex(sourceTree, 40, 64))
@@ -1241,6 +1252,16 @@ internal static partial class Program
             if (!roleHashes.TryGetValue(role, out var evidenceHash) ||
                 !string.Equals(evidenceHash, GetString(workflow, "sha256"), StringComparison.OrdinalIgnoreCase))
                 throw new DheException("Regression workflow output hash does not match release evidence: " + role);
+        }
+        if (!regressionReport.Value.TryGetProperty("resolverOutputs", out var resolverOutputs) ||
+            resolverOutputs.ValueKind != JsonValueKind.Array || resolverOutputs.GetArrayLength() != 3)
+            throw new DheException("Regression evidence does not bind the three-engine generated-C++ resolver matrix.");
+        foreach (var resolver in resolverOutputs.EnumerateArray())
+        {
+            var role = GetString(resolver, "role") ?? "";
+            if (!roleHashes.TryGetValue(role, out var evidenceHash) ||
+                !string.Equals(evidenceHash, GetString(resolver, "sha256"), StringComparison.OrdinalIgnoreCase))
+                throw new DheException("Regression resolver output hash does not match release evidence: " + role);
         }
         ValidateMultiBaseChangedEvidence(changedReports["demo-changed"],
             changedReports["demo-changed-base2"]);
@@ -1285,6 +1306,24 @@ internal static partial class Program
                 }
                 if (!workflowRoles.SetEquals(new[] { "demo-changed", "demo-changed-base2", "demo-noop" }))
                     throw new DheException("Regression workflow output roles are incomplete.");
+                if (!GetBool(report, "realResolverOutputsValidated") ||
+                    !report.TryGetProperty("resolverOutputs", out var resolverOutputs) ||
+                    resolverOutputs.ValueKind != JsonValueKind.Array || resolverOutputs.GetArrayLength() != 3)
+                    throw new DheException("Regression evidence did not validate the three-engine generated-C++ resolver matrix.");
+                var resolverRoles = new HashSet<string>(StringComparer.Ordinal);
+                foreach (var resolver in resolverOutputs.EnumerateArray())
+                {
+                    var resolverRole = GetString(resolver, "role") ?? "";
+                    var resolverPath = ResolveEvidencePath(GetString(resolver, "path"),
+                        Path.GetDirectoryName(reportPath)!, "Regression resolver output");
+                    if (!resolverRoles.Add(resolverRole) || !Sha256File(resolverPath).Equals(
+                            GetString(resolver, "sha256"), StringComparison.OrdinalIgnoreCase))
+                        throw new DheException("Regression resolver output identity is invalid: " + resolverRole);
+                    ValidateResolverEvidence(resolverRole, ReadJson<JsonElement>(resolverPath), sourceRoot);
+                }
+                if (!resolverRoles.SetEquals(new[]
+                    { "resolver-unity2021", "resolver-unity2022", "resolver-tuanjie2022" }))
+                    throw new DheException("Regression resolver output roles are incomplete.");
                 break;
             case "demo-changed":
             case "demo-changed-base2":
@@ -1336,9 +1375,52 @@ internal static partial class Program
                 ValidateNativeReleaseEvidence(report, reportPath, sourceRoot,
                     nativeRequirement.Profile, nativeRequirement.Workflow);
                 break;
+            case "resolver-tuanjie2022":
+            case "resolver-unity2022":
+            case "resolver-unity2021":
+                ValidateResolverEvidence(role, report, sourceRoot);
+                break;
             default:
                 throw new DheException("Unknown release evidence role: " + role);
         }
+    }
+
+    private static void ValidateResolverEvidence(string role, JsonElement report, string sourceRoot)
+    {
+        RequireEvidenceFormat(report, "hybridclr.dhe-cpp-resolver-regression.json", role);
+        var requirement = role switch
+        {
+            "resolver-tuanjie2022" => (Workflow: "Tuanjie2022Fgs", UnityVersion: "2022.3.62t12"),
+            "resolver-unity2022" => (Workflow: "Unity2022Fgs", UnityVersion: "2022.3.62f3"),
+            "resolver-unity2021" => (Workflow: "Unity2021Standard", UnityVersion: "2021.3.45f2"),
+            _ => throw new DheException("Unknown resolver evidence role: " + role)
+        };
+        if (!GetBool(report, "passed") ||
+            !string.Equals(GetString(report, "engineWorkflow"), requirement.Workflow, StringComparison.Ordinal) ||
+            !string.Equals(GetString(report, "unityVersion"), requirement.UnityVersion, StringComparison.Ordinal))
+            throw new DheException(role + " does not match its locked engine workflow.");
+
+        var schema = ReadJson<JsonElement>(RequireFile(Path.Combine(sourceRoot, "schemas",
+            "dhe-cpp-resolver-regression.schema.json"), "Resolver evidence schema"));
+        var schemaErrors = new List<string>();
+        ValidateSchemaVocabulary(schema, "$", schemaErrors);
+        if (schemaErrors.Count == 0) ValidateJsonSchema(schema, report, schema, "$", schemaErrors);
+        if (schemaErrors.Count > 0)
+            throw new DheException(role + " violates its schema: " + string.Join("; ", schemaErrors));
+
+        var packageLock = ReadJson<JsonElement>(RequireFile(Path.Combine(sourceRoot, "manifests",
+            "dhe-package-lock.json"), "Resolver package lock"));
+        if (!string.Equals(GetString(report, "resolverSourceSha256"),
+                GetString(packageLock, "resolverSourceSha256"), StringComparison.OrdinalIgnoreCase))
+            throw new DheException(role + " was not executed against the locked resolver source.");
+        var checks = report.GetProperty("checks").EnumerateArray()
+            .Where(check => GetBool(check, "passed"))
+            .Select(check => GetString(check, "name") ?? "").ToHashSet(StringComparer.Ordinal);
+        foreach (var required in RequiredResolverChecks)
+            if (!checks.Contains(required))
+                throw new DheException(role + " is missing resolver check: " + required);
+        if (report.GetProperty("errors").GetArrayLength() != 0)
+            throw new DheException(role + " contains resolver errors.");
     }
 
     private static void ValidateManagedReleaseEvidence(JsonElement report, string reportPath,

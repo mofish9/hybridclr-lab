@@ -6,7 +6,7 @@ HybridCLR community runtime on Tuanjie 1.10.0.
 ## Fixed baseline
 
 - Tuanjie: `1.10.0` (`2022.3.62t12`)
-- HybridCLR package: `v8.13.0` (`optimize/v8.13.0@71a2e7b`, no package opt tag)
+- HybridCLR package: `v8.13.0` (`optimize/v8.13.0@726f54d`, no package opt tag)
 - HybridCLR runtime: `v8.13.0-opt4.1` (`f777ed7`)
 - il2cpp_plus: `v2022-tuanjie-8.13.0-opt4.1` (`52968ad`)
 
@@ -28,6 +28,10 @@ and remaining platform gates are recorded in
 `docs/HybridCLR-DHE-Opt4-Release-0.1.18.md`. Projects must install an
 authenticated package whose manifest has `releaseReady=true` and pin its exact
 package ID.
+Toolchain `0.1.19` is the active candidate. It replaces generated-function
+name guessing with IL2CPP MethodDef/MethodSpec table resolution and requires a
+source-bound resolver regression report from each of the three locked Editors
+before it can be published as Release.
 The workflow also emits MetaVersion/native/workflow schemas and an independent
 artifact validator; it verifies the exact supported+unsupported changed-token set,
 and the versioned `il2cpp-generated-cpp-signature-v2` ABI adapter contract.

@@ -4,7 +4,7 @@
   "title": "HybridCLR DHE CSharp Regression Report",
   "type": "object",
   "additionalProperties": false,
-  "required": ["schemaVersion", "format", "generatedAtUtc", "sourceHead", "sourceTree", "sourceClean", "passed", "realWorkflowOutputsValidated", "workflowOutputs", "checks", "errors", "warnings"],
+  "required": ["schemaVersion", "format", "generatedAtUtc", "sourceHead", "sourceTree", "sourceClean", "passed", "realWorkflowOutputsValidated", "workflowOutputs", "realResolverOutputsValidated", "resolverOutputs", "checks", "errors", "warnings"],
   "properties": {
     "schemaVersion": { "const": 1 },
     "format": { "const": "hybridclr.dhe-regression.json" },
@@ -23,6 +23,21 @@
         "required": ["role", "path", "sha256"],
         "properties": {
           "role": { "enum": ["demo-changed", "demo-changed-base2", "demo-noop"] },
+          "path": { "type": "string", "minLength": 1 },
+          "sha256": { "type": "string", "pattern": "^[0-9a-fA-F]{64}$" }
+        }
+      }
+    },
+    "realResolverOutputsValidated": { "type": "boolean" },
+    "resolverOutputs": {
+      "type": "array",
+      "maxItems": 3,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["role", "path", "sha256"],
+        "properties": {
+          "role": { "enum": ["resolver-unity2021", "resolver-unity2022", "resolver-tuanjie2022"] },
           "path": { "type": "string", "minLength": 1 },
           "sha256": { "type": "string", "pattern": "^[0-9a-fA-F]{64}$" }
         }
@@ -50,6 +65,11 @@
       "if": { "properties": { "realWorkflowOutputsValidated": { "const": true } }, "required": ["realWorkflowOutputsValidated"] },
       "then": { "properties": { "workflowOutputs": { "minItems": 3, "maxItems": 3 } } },
       "else": { "properties": { "workflowOutputs": { "maxItems": 0 } } }
+    },
+    {
+      "if": { "properties": { "realResolverOutputsValidated": { "const": true } }, "required": ["realResolverOutputsValidated"] },
+      "then": { "properties": { "resolverOutputs": { "minItems": 3, "maxItems": 3 } } },
+      "else": { "properties": { "resolverOutputs": { "maxItems": 0 } } }
     }
   ]
 }

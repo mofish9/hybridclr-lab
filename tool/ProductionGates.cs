@@ -1067,8 +1067,8 @@ internal static partial class Program
         ValidateJsonSchema(matrixEvidenceSchema, matrixEvidence.RootElement, matrixEvidenceSchema, "$",
             matrixEvidenceErrors);
         AddRegressionCheck(checks, errors, "evidence-native-matrix-roles",
-            RequiredReleaseEvidenceRoles.Length == 7 && matrixEvidenceErrors.Count == 0,
-            "release evidence must require two changed Bases, no-op, and all three native engine lanes");
+            RequiredReleaseEvidenceRoles.Length == 10 && matrixEvidenceErrors.Count == 0,
+            "release evidence must require two changed Bases, no-op, and all three resolver/native engine lanes");
 
         var unsafeArchive = Path.Combine(regressionRoot, "not-an-archive");
         Directory.CreateDirectory(unsafeArchive);
@@ -1078,6 +1078,82 @@ internal static partial class Program
         AddRegressionCheck(checks, errors, "archive-safe-replace", unsafeArchiveRejected,
             "non-archive directory replacement must be rejected without deleting contents");
         RunGuardBlockHashRegressions(regressionRoot, checks, errors);
+        var resolverOutputs = new List<object>();
+        var realResolverOutputsValidated = false;
+        var resolverContractValidated = false;
+        var resolverDetails = "generated-C++ resolver evidence contract validated";
+        string? resolverIdentityFixture = null;
+        var resolverInputs = new[]
+        {
+            (Role: "resolver-unity2021", Option: "resolverunity2021"),
+            (Role: "resolver-unity2022", Option: "resolverunity2022"),
+            (Role: "resolver-tuanjie2022", Option: "resolvertuanjie2022")
+        };
+        try
+        {
+            var supplied = resolverInputs.Where(item =>
+                !string.IsNullOrWhiteSpace(cli.Optional(item.Option))).ToArray();
+            if (supplied.Length != 0 && supplied.Length != resolverInputs.Length)
+                throw new DheException("Resolver regression inputs must contain all three engine workflows.");
+            if (supplied.Length == resolverInputs.Length)
+            {
+                foreach (var item in resolverInputs)
+                {
+                    var path = RequireFile(cli.Optional(item.Option)!, item.Role + " regression");
+                    ValidateResolverEvidence(item.Role, ReadJson<JsonElement>(path), cli.Root);
+                    resolverOutputs.Add(new { role = item.Role, path, sha256 = Sha256File(path) });
+                }
+                resolverIdentityFixture = File.ReadAllText(RequireFile(
+                    cli.Optional("resolverunity2021")!, "Unity 2021 resolver regression"));
+                realResolverOutputsValidated = true;
+                resolverDetails = "three real Editor resolver reports validated";
+            }
+            else
+            {
+                var packageLock = ReadJson<JsonElement>(Path.Combine(cli.Root, "manifests",
+                    "dhe-package-lock.json"));
+                resolverIdentityFixture = JsonSerializer.Serialize(new
+                {
+                    schemaVersion = 1,
+                    format = "hybridclr.dhe-cpp-resolver-regression.json",
+                    generatedAtUtc = DateTimeOffset.UtcNow,
+                    engineWorkflow = "Unity2021Standard",
+                    unityVersion = "2021.3.45f2",
+                    resolverSourceSha256 = GetString(packageLock, "resolverSourceSha256"),
+                    passed = true,
+                    checks = RequiredResolverChecks.Select(name => new { name, passed = true, error = "" }),
+                    errors = Array.Empty<string>()
+                });
+                using var fixture = JsonDocument.Parse(resolverIdentityFixture);
+                ValidateResolverEvidence("resolver-unity2021", fixture.RootElement, cli.Root);
+            }
+            resolverContractValidated = true;
+        }
+        catch (Exception exception)
+        {
+            resolverDetails = exception.Message;
+            resolverOutputs.Clear();
+        }
+        AddRegressionCheck(checks, errors, "generated-cpp-resolver-engine-matrix",
+            resolverContractValidated, resolverDetails);
+        var resolverIdentityTamperRejected = false;
+        if (resolverContractValidated && !string.IsNullOrWhiteSpace(resolverIdentityFixture))
+        {
+            try
+            {
+                var node = System.Text.Json.Nodes.JsonNode.Parse(resolverIdentityFixture)!.AsObject();
+                node["resolverSourceSha256"] = new string('0', 64);
+                using var tampered = JsonDocument.Parse(node.ToJsonString());
+                ValidateResolverEvidence("resolver-unity2021", tampered.RootElement, cli.Root);
+            }
+            catch
+            {
+                resolverIdentityTamperRejected = true;
+            }
+        }
+        AddRegressionCheck(checks, errors, "generated-cpp-resolver-identity-tamper",
+            resolverIdentityTamperRejected,
+            "resolver evidence with a different package source hash must be rejected");
         var layoutDocument = ReadJson<JsonElement>(Path.Combine(cli.Root, "manifests",
             "dhe-toolchain-layout.json"));
         var layoutPaths = layoutDocument.GetProperty("exactPaths").EnumerateArray()
@@ -1086,6 +1162,7 @@ internal static partial class Program
         var releaseRoleSchemas = new[]
         {
             "schemas/dhe-regression.schema.json",
+            "schemas/dhe-cpp-resolver-regression.schema.json",
             "schemas/dhe-workflow-report.schema.json",
             "schemas/dhe-native-gate.schema.json",
             "schemas/dhe-toolchain-release-evidence.schema.json",
@@ -1245,7 +1322,7 @@ internal static partial class Program
         var sourceTree = GitValue(cli.Root, "rev-parse", "HEAD^{tree}");
         var sourceClean = !string.IsNullOrWhiteSpace(sourceHead) && string.IsNullOrWhiteSpace(GitValue(cli.Root, "status", "--porcelain"));
         var passed = errors.Count == 0;
-        WriteJson(output, new { schemaVersion = 1, format = "hybridclr.dhe-regression.json", generatedAtUtc = DateTimeOffset.UtcNow, sourceHead, sourceTree, sourceClean, passed, realWorkflowOutputsValidated, workflowOutputs, checks, errors, warnings = Array.Empty<string>() });
+        WriteJson(output, new { schemaVersion = 1, format = "hybridclr.dhe-regression.json", generatedAtUtc = DateTimeOffset.UtcNow, sourceHead, sourceTree, sourceClean, passed, realWorkflowOutputsValidated, workflowOutputs, realResolverOutputsValidated, resolverOutputs, checks, errors, warnings = Array.Empty<string>() });
         Console.WriteLine("DHE regression " + (passed ? "passed: " : "failed: ") + output);
         return passed ? 0 : 1;
     }

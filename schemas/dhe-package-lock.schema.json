@@ -4,7 +4,7 @@
   "title": "HybridCLR DHE Embedded Package Lock",
   "type": "object",
   "additionalProperties": false,
-  "required": ["schemaVersion", "format", "repository", "baseCommit", "pathBase", "packagePath", "treeSha256", "treeHashIgnoredPaths", "patches"],
+  "required": ["schemaVersion", "format", "repository", "baseCommit", "pathBase", "packagePath", "treeSha256", "resolverSourceSha256", "treeHashIgnoredPaths", "patches"],
   "properties": {
     "schemaVersion": { "const": 1 },
     "format": { "const": "hybridclr.dhe-package-lock.json" },
@@ -18,6 +18,7 @@
       "pattern": "^Packages/com\\.code-philosophy\\.hybridclr(?:@[A-Za-z0-9._-]+)?$"
     },
     "treeSha256": { "type": "string", "pattern": "^[0-9A-Fa-f]{64}$" },
+    "resolverSourceSha256": { "type": "string", "pattern": "^[0-9A-Fa-f]{64}$" },
     "treeHashIgnoredPaths": {
       "type": "array",
       "items": {

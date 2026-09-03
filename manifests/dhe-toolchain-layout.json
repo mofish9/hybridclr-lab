@@ -1,7 +1,7 @@
 {
   "schemaVersion": 1,
   "format": "hybridclr.dhe-toolchain-layout.json",
-  "toolchainVersion": "0.1.18",
+  "toolchainVersion": "0.1.19",
   "contractVersion": 1,
   "exactPaths": [
     ".gitattributes",
@@ -43,6 +43,7 @@
     "schemas/dhe-batch-report.schema.json",
     "schemas/dhe-build-identity.schema.json",
     "schemas/dhe-clean-checkout-gate.schema.json",
+    "schemas/dhe-cpp-resolver-regression.schema.json",
     "schemas/dhe-metaversion.schema.json",
     "schemas/dhe-native-gate.schema.json",
     "schemas/dhe-native-manifest.schema.json",
