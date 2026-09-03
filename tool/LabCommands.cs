@@ -42,7 +42,9 @@ internal static class LabCommands
     private static int TreeHashCommand(Cli cli)
     {
         var root = RequireDirectory(cli.Require("path"));
-        var hash = TreeHash(root, cli.Has("excludegit"), cli.GetList("ignore"));
+        var hash = cli.Has("canonicalsource")
+            ? CanonicalSourceTreeHash(root, cli.Has("excludegit"), cli.GetList("ignore"))
+            : TreeHash(root, cli.Has("excludegit"), cli.GetList("ignore"));
         Console.WriteLine(hash);
         return 0;
     }
@@ -369,11 +371,13 @@ internal static class LabCommands
     private static int BootstrapRepos(Cli cli)
     {
         var lab = LabRoot(cli); var lockDoc = ReadJson(Path.Combine(lab, "manifests/repo-lock.json"));
+        var workflowDoc = ReadJson(Path.Combine(lab, "manifests/runtime-workflows.json"));
         var repos = ResolveReposRoot(lab, lockDoc, cli.Optional("reposroot")); Directory.CreateDirectory(repos);
-        foreach (var name in new[] { "hybridclr_unity", "hybridclr", "il2cpp_plus" })
+        foreach (var name in new[] { "hybridclr_unity", "hybridclr" })
         {
             var spec = lockDoc.GetProperty("repositories").GetProperty(name); var path = Path.Combine(repos, name);
-            if (!Directory.Exists(Path.Combine(path, ".git"))) RunProcess("git", new[] { "clone", StringProperty(spec, "fork"), path }, lab);
+            if (!Directory.Exists(Path.Combine(path, ".git")) && !File.Exists(Path.Combine(path, ".git")))
+                RunProcess("git", new[] { "clone", StringProperty(spec, "fork"), path }, lab);
             var dirty = Git(path, "status", "--porcelain");
             if (!string.IsNullOrWhiteSpace(dirty) && !cli.Has("allowdirty")) throw new InvalidOperationException($"Repository '{name}' has local changes.");
             if (!cli.Has("nocheckout"))
@@ -382,7 +386,102 @@ internal static class LabCommands
                 RunProcess("git", new[] { "-C", path, "checkout", "--detach", StringProperty(spec, "commit") }, lab);
             }
         }
+
+        var il2cppSpec = lockDoc.GetProperty("repositories").GetProperty("il2cpp_plus");
+        var il2cppRoot = Path.Combine(repos, "il2cpp_plus");
+        if (!Directory.Exists(Path.Combine(il2cppRoot, ".git")) &&
+            !File.Exists(Path.Combine(il2cppRoot, ".git")))
+            RunProcess("git", new[] { "clone", StringProperty(il2cppSpec, "fork"), il2cppRoot }, lab);
+        var il2cppDirty = Git(il2cppRoot, "status", "--porcelain");
+        if (!string.IsNullOrWhiteSpace(il2cppDirty) && !cli.Has("allowdirty"))
+            throw new InvalidOperationException("Repository 'il2cpp_plus' has local changes.");
+        if (!cli.Has("nocheckout"))
+            RunProcess("git", new[] { "-C", il2cppRoot, "fetch", "origin", "--tags", "--force" }, lab);
+
+        JsonElement[] selectedWorkflows = SelectBootstrapWorkflowRecords(workflowDoc,
+            cli.Optional("engineworkflow"), cli.Has("allengineworkflows"));
+        if (selectedWorkflows.Length == 0)
+        {
+            if (!cli.Has("nocheckout"))
+                RunProcess("git", new[] { "-C", il2cppRoot, "checkout", "--detach",
+                    StringProperty(il2cppSpec, "commit") }, lab);
+            return 0;
+        }
+
+        if (cli.Has("allengineworkflows"))
+        {
+            if (!cli.Has("nocheckout"))
+                RunProcess("git", new[] { "-C", il2cppRoot, "checkout", "--detach",
+                    StringProperty(il2cppSpec, "commit") }, lab);
+            foreach (JsonElement workflow in selectedWorkflows)
+            {
+                string workflowId = StringProperty(workflow, "id");
+                string destination = Path.Combine(repos, Il2CppWorkflowDirectoryName(workflowId));
+                string commit = StringProperty(workflow.GetProperty("il2cppPlus"), "commit");
+                EnsureWorkflowWorktree(il2cppRoot, destination, commit, cli.Has("nocheckout"), lab);
+                Console.WriteLine("Prepared " + workflowId + " il2cpp_plus at " + destination + ".");
+            }
+        }
+        else if (!cli.Has("nocheckout"))
+        {
+            string commit = StringProperty(selectedWorkflows[0].GetProperty("il2cppPlus"), "commit");
+            RunProcess("git", new[] { "-C", il2cppRoot, "checkout", "--detach", commit }, lab);
+        }
         return 0;
+    }
+
+    internal static JsonElement[] SelectBootstrapWorkflowRecords(JsonElement workflowDoc,
+        string? requestedWorkflow, bool allWorkflows)
+    {
+        if (allWorkflows && !string.IsNullOrWhiteSpace(requestedWorkflow))
+            throw new InvalidOperationException("Use either -EngineWorkflow or -AllEngineWorkflows, not both.");
+        JsonElement[] workflows = workflowDoc.GetProperty("workflows").EnumerateArray().ToArray();
+        if (allWorkflows) return workflows;
+        if (string.IsNullOrWhiteSpace(requestedWorkflow)) return Array.Empty<JsonElement>();
+        JsonElement selected = workflows.SingleOrDefault(item =>
+            StringProperty(item, "id").Equals(requestedWorkflow, StringComparison.Ordinal));
+        if (selected.ValueKind == JsonValueKind.Undefined)
+            throw new InvalidOperationException("Unknown engine workflow: " + requestedWorkflow + ".");
+        return new[] { selected };
+    }
+
+    private static string Il2CppWorkflowDirectoryName(string workflowId)
+    {
+        if (string.IsNullOrWhiteSpace(workflowId) || workflowId.Any(character =>
+                !(char.IsLetterOrDigit(character) || character is '-' or '_')))
+            throw new InvalidOperationException("Engine workflow ID is not a portable directory name: " +
+                workflowId + ".");
+        return "il2cpp_plus-" + workflowId;
+    }
+
+    private static void EnsureWorkflowWorktree(string repository, string destination, string commit,
+        bool noCheckout, string workingDirectory)
+    {
+        if (Directory.Exists(destination))
+        {
+            if (!Git(destination, "rev-parse", "--is-inside-work-tree")
+                    .Equals("true", StringComparison.OrdinalIgnoreCase))
+                throw new InvalidOperationException("il2cpp_plus workflow destination is not a Git worktree: " +
+                    destination + ".");
+            string dirty = Git(destination, "status", "--porcelain");
+            if (!string.IsNullOrWhiteSpace(dirty))
+                throw new InvalidOperationException("il2cpp_plus workflow worktree has local changes: " +
+                    destination + ".");
+            if (!Git(destination, "rev-parse", "HEAD").Equals(commit,
+                    StringComparison.OrdinalIgnoreCase))
+            {
+                if (noCheckout)
+                    throw new InvalidOperationException("il2cpp_plus workflow worktree is not at its locked commit: " +
+                        destination + ".");
+                RunProcess("git", new[] { "-C", destination, "checkout", "--detach", commit },
+                    workingDirectory);
+            }
+            return;
+        }
+        if (noCheckout)
+            throw new DirectoryNotFoundException("il2cpp_plus workflow worktree: " + destination);
+        RunProcess("git", new[] { "-C", repository, "worktree", "add", "--detach", destination,
+            commit }, workingDirectory);
     }
 
     private static int NativeTests(Cli cli)
@@ -431,7 +530,9 @@ internal static class LabCommands
         var workflow = workflowDoc.GetProperty("workflows").EnumerateArray().Single(x => StringProperty(x, "id") == workflowId); var engine = workflow.GetProperty("engine");
         var repos = ResolveReposRoot(lab, lockDoc, cli.Optional("reposroot"));
         var hybridclr = ResolvePath(lab, cli.Optional("hybridclrsource") ?? Path.Combine(repos, "hybridclr"));
-        var il2cpp = ResolvePath(lab, cli.Optional("il2cppplussource") ?? Path.Combine(repos, "il2cpp_plus"));
+        string defaultIl2Cpp = Path.Combine(repos, Il2CppWorkflowDirectoryName(workflowId));
+        if (!Directory.Exists(defaultIl2Cpp)) defaultIl2Cpp = Path.Combine(repos, "il2cpp_plus");
+        var il2cpp = ResolvePath(lab, cli.Optional("il2cppplussource") ?? defaultIl2Cpp);
         var hybridclrUnity = ResolvePath(lab, cli.Optional("hybridclrUnitySource") ??
 			Path.Combine(repos, "hybridclr_unity"));
         RequireDirectory(Path.Combine(hybridclr, "hybridclr")); RequireDirectory(Path.Combine(il2cpp, "libil2cpp"));
@@ -481,7 +582,8 @@ internal static class LabCommands
         if (string.Equals(sourceMode, "integrated", StringComparison.Ordinal))
         {
             string treeRoot = RequireDirectory(integratedTreeRoot ?? destination);
-            string actualTree = TreeHash(treeRoot, repository == "hybridclr_unity");
+            string actualTree = CanonicalSourceTreeHash(treeRoot,
+                repository == "hybridclr_unity");
             foreach (JsonElement patch in patches)
             {
                 ValidateLockedPatchReference(lab, patch, repository);
@@ -561,7 +663,7 @@ internal static class LabCommands
     private static object SourceRecord(JsonElement lockDoc, string name, string path, string tree)
     {
         var spec = lockDoc.GetProperty("repositories").GetProperty(name);
-        return new { url = StringProperty(spec, "fork"), path, commit = Git(path, "rev-parse", "HEAD"), dirty = !string.IsNullOrWhiteSpace(Git(path, "status", "--porcelain")), treeSha256 = TreeHash(tree, name == "hybridclr_unity") };
+        return new { url = StringProperty(spec, "fork"), path, commit = Git(path, "rev-parse", "HEAD"), dirty = !string.IsNullOrWhiteSpace(Git(path, "status", "--porcelain")), treeSha256 = CanonicalSourceTreeHash(tree, name == "hybridclr_unity") };
     }
 
     private static string ResolveExternalHeaders(string editor, string? explicitRoot, JsonElement engine)
@@ -638,6 +740,83 @@ internal static class LabCommands
         }
         sha.TransformFinalBlock(Array.Empty<byte>(), 0, 0);
         return Convert.ToHexString(sha.Hash!).ToUpperInvariant();
+    }
+    internal static string CanonicalSourceTreeHash(string root, bool excludeGit = false,
+        IEnumerable<string>? ignoredPaths = null)
+    {
+        root = RequireDirectory(root);
+        var ignored = new HashSet<string>((ignoredPaths ?? Array.Empty<string>())
+            .Select(path => path.Replace('\\', '/').TrimStart('/')), StringComparer.OrdinalIgnoreCase);
+        using var sha = SHA256.Create();
+        foreach (var file in Directory.GetFiles(root, "*", SearchOption.AllDirectories)
+                     .Where(path =>
+                     {
+                         var relative = Path.GetRelativePath(root, path).Replace(Path.DirectorySeparatorChar, '/');
+                         return !ignored.Contains(relative) && (!excludeGit ||
+                             !relative.Split('/')[0].Equals(".git", StringComparison.OrdinalIgnoreCase));
+                     })
+                     .OrderBy(path => Path.GetRelativePath(root, path)
+                         .Replace(Path.DirectorySeparatorChar, '/'), StringComparer.Ordinal))
+        {
+            byte[] name = Encoding.UTF8.GetBytes(Path.GetRelativePath(root, file)
+                .Replace(Path.DirectorySeparatorChar, '/') + "\n");
+            sha.TransformBlock(name, 0, name.Length, name, 0);
+            HashCanonicalSourceFile(sha, file);
+            byte[] separator = { 10 };
+            sha.TransformBlock(separator, 0, separator.Length, separator, 0);
+        }
+        sha.TransformFinalBlock(Array.Empty<byte>(), 0, 0);
+        return Convert.ToHexString(sha.Hash!).ToUpperInvariant();
+    }
+
+    private static void HashCanonicalSourceFile(HashAlgorithm sha, string path)
+    {
+        const int bufferSize = 1024 * 1024;
+        using var input = File.OpenRead(path);
+        var probe = new byte[Math.Min(8192, (int)Math.Min(input.Length, 8192))];
+        int probeLength = input.Read(probe, 0, probe.Length);
+        bool text = !probe.AsSpan(0, probeLength).Contains((byte)0);
+        input.Position = 0;
+        if (!text)
+        {
+            var raw = new byte[bufferSize];
+            int rawLength;
+            while ((rawLength = input.Read(raw, 0, raw.Length)) > 0)
+                sha.TransformBlock(raw, 0, rawLength, raw, 0);
+            return;
+        }
+
+        var source = new byte[bufferSize];
+        var normalized = new byte[bufferSize + 1];
+        bool pendingCarriageReturn = false;
+        int read;
+        while ((read = input.Read(source, 0, source.Length)) > 0)
+        {
+            int written = 0;
+            for (int index = 0; index < read; index++)
+            {
+                byte value = source[index];
+                if (pendingCarriageReturn)
+                {
+                    if (value == (byte)'\n')
+                    {
+                        normalized[written++] = (byte)'\n';
+                        pendingCarriageReturn = false;
+                        continue;
+                    }
+                    normalized[written++] = (byte)'\r';
+                    pendingCarriageReturn = false;
+                }
+                if (value == (byte)'\r') pendingCarriageReturn = true;
+                else normalized[written++] = value;
+            }
+            if (written > 0) sha.TransformBlock(normalized, 0, written, normalized, 0);
+        }
+        if (pendingCarriageReturn)
+        {
+            byte[] carriageReturn = { (byte)'\r' };
+            sha.TransformBlock(carriageReturn, 0, carriageReturn.Length, carriageReturn, 0);
+        }
     }
     private static string Git(string cwd, params string[] args) { var result = RunProcess("git", new[] { "-C", cwd }.Concat(args).ToArray(), cwd, false, false); return result.stdout.Trim(); }
     private static (int exitCode, string stdout, string stderr) RunProcess(string file, IEnumerable<string> args, string cwd, bool throwOnError = true, bool writeOutput = true)

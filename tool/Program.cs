@@ -27,6 +27,9 @@ internal static partial class Program
         "resource-stage-plan-capability-bound",
         "resource-stage-aot-metadata-capability-bound",
         "resource-player-evidence-binding",
+        "evidence-managed-release-binding", "evidence-multibase-current-binding",
+        "bootstrap-engine-workflow-matrix",
+        "integrated-source-lock-line-ending-stable",
         "integrated-source-lock-valid", "integrated-source-lock-commit-tamper",
         "integrated-source-lock-tree-tamper", "integrated-source-lock-patch-tamper",
         "layout-release-role-schemas",
@@ -36,7 +39,7 @@ internal static partial class Program
     };
     private static readonly string[] RequiredReleaseEvidenceRoles =
     {
-        "regression", "demo-changed", "demo-noop", "native-tuanjie2022",
+        "regression", "demo-changed", "demo-changed-base2", "demo-noop", "native-tuanjie2022",
         "native-unity2022", "native-unity2021"
     };
 
@@ -1138,6 +1141,7 @@ internal static partial class Program
         {
             (Role: "regression", Option: "regression"),
             (Role: "demo-changed", Option: "demochanged"),
+            (Role: "demo-changed-base2", Option: "demochangedbase2"),
             (Role: "demo-noop", Option: "demonoop"),
             (Role: "native-tuanjie2022", Option: "nativetuanjie2022"),
             (Role: "native-unity2022", Option: "nativeunity2022"),
@@ -1200,6 +1204,7 @@ internal static partial class Program
             throw new DheException("Release evidence source identity is invalid.");
         var roles = new HashSet<string>(StringComparer.Ordinal);
         var roleHashes = new Dictionary<string, string>(StringComparer.Ordinal);
+        var changedReports = new Dictionary<string, (JsonElement Report, string Path)>(StringComparer.Ordinal);
         JsonElement? regressionReport = null;
         foreach (var item in files.EnumerateArray())
         {
@@ -1217,12 +1222,14 @@ internal static partial class Program
             ValidateEvidenceRole(role, report, full, sourceHead!, sourceTree!, sourceRoot);
             roleHashes[role!] = expected!;
             if (role == "regression") regressionReport = report;
+            if (role is "demo-changed" or "demo-changed-base2")
+                changedReports[role] = (report, full);
         }
         foreach (var required in RequiredReleaseEvidenceRoles)
             if (!roles.Contains(required)) throw new DheException("Release evidence is missing role: " + required);
         if (!regressionReport.HasValue || !regressionReport.Value.TryGetProperty("workflowOutputs", out var workflowOutputs) ||
-            workflowOutputs.ValueKind != JsonValueKind.Array || workflowOutputs.GetArrayLength() != 2)
-            throw new DheException("Regression evidence does not bind the changed and no-op workflow reports.");
+            workflowOutputs.ValueKind != JsonValueKind.Array || workflowOutputs.GetArrayLength() != 3)
+            throw new DheException("Regression evidence does not bind both changed Base workflows and the no-op workflow.");
         foreach (var workflow in workflowOutputs.EnumerateArray())
         {
             var role = GetString(workflow, "role") ?? "";
@@ -1230,6 +1237,8 @@ internal static partial class Program
                 !string.Equals(evidenceHash, GetString(workflow, "sha256"), StringComparison.OrdinalIgnoreCase))
                 throw new DheException("Regression workflow output hash does not match release evidence: " + role);
         }
+        ValidateMultiBaseChangedEvidence(changedReports["demo-changed"],
+            changedReports["demo-changed-base2"]);
     }
 
     private static void ValidateEvidenceRole(string role, JsonElement report, string reportPath,
@@ -1252,8 +1261,8 @@ internal static partial class Program
                         throw new DheException("Regression evidence is missing check: " + required);
                 if (!GetBool(report, "realWorkflowOutputsValidated") ||
                     !report.TryGetProperty("workflowOutputs", out var workflowOutputs) ||
-                    workflowOutputs.ValueKind != JsonValueKind.Array || workflowOutputs.GetArrayLength() != 2)
-                    throw new DheException("Regression evidence did not validate real changed and no-op output trees.");
+                    workflowOutputs.ValueKind != JsonValueKind.Array || workflowOutputs.GetArrayLength() != 3)
+                    throw new DheException("Regression evidence did not validate both changed Base outputs and the no-op output tree.");
                 var workflowRoles = new HashSet<string>(StringComparer.Ordinal);
                 foreach (var workflow in workflowOutputs.EnumerateArray())
                 {
@@ -1264,25 +1273,28 @@ internal static partial class Program
                             GetString(workflow, "sha256"), StringComparison.OrdinalIgnoreCase))
                         throw new DheException("Regression workflow output identity is invalid: " + workflowRole);
                     var workflowReport = ReadJson<JsonElement>(workflowPath);
-                    var expectedFormat = workflowRole == "demo-changed"
+                    var expectedFormat = workflowRole is "demo-changed" or "demo-changed-base2"
                         ? "hybridclr.dhe-resource-player-workflow.json"
                         : "hybridclr.dhe-project-player-workflow.json";
                     RequireEvidenceFormat(workflowReport, expectedFormat, workflowRole);
                 }
-                if (!workflowRoles.SetEquals(new[] { "demo-changed", "demo-noop" }))
+                if (!workflowRoles.SetEquals(new[] { "demo-changed", "demo-changed-base2", "demo-noop" }))
                     throw new DheException("Regression workflow output roles are incomplete.");
                 break;
             case "demo-changed":
+            case "demo-changed-base2":
             case "demo-noop":
-                RequireEvidenceFormat(report, role == "demo-changed"
+                bool changedRole = role is "demo-changed" or "demo-changed-base2";
+                RequireEvidenceFormat(report, changedRole
                     ? "hybridclr.dhe-resource-player-workflow.json"
                     : "hybridclr.dhe-project-player-workflow.json", role);
                 if (!GetBool(report, "validationPassed") || !GetBool(report, "coverageGatePassed"))
                     throw new DheException(role + " evidence did not pass validation and coverage.");
                 ValidateEvidenceToolIdentity(report, reportPath, sourceHead, sourceTree);
+                ValidateManagedReleaseEvidence(report, reportPath, sourceRoot);
                 var changed = GetInt(report.GetProperty("capability"), "changedMethodCount");
                 var player = report.GetProperty("player");
-                if (role == "demo-changed")
+                if (changedRole)
                 {
                     bool resourceOnly = GetString(report, "format") ==
                         "hybridclr.dhe-resource-player-workflow.json";
@@ -1322,6 +1334,150 @@ internal static partial class Program
             default:
                 throw new DheException("Unknown release evidence role: " + role);
         }
+    }
+
+    private static void ValidateManagedReleaseEvidence(JsonElement report, string reportPath,
+        string sourceRoot)
+    {
+        if (!string.Equals(GetString(report, "mode"), "Release", StringComparison.Ordinal) ||
+            !GetBool(report, "releaseReady"))
+            throw new DheException("Managed Player release evidence must come from a Release-ready workflow.");
+
+        string reportRoot = Path.GetDirectoryName(reportPath)!;
+        string runtimePath = ResolveEvidencePath(GetString(report, "runtimeSource"), reportRoot,
+            "Managed Player runtime manifest");
+        JsonElement runtime = ReadJson<JsonElement>(runtimePath);
+        RequireEvidenceFormat(runtime, "hybridclr.dhe-runtime-manifest.json",
+            "Managed Player runtime manifest");
+        if (!GetBool(runtime, "dheEnabled") || GetString(runtime, "dheRuntimeSourceMode") != "integrated")
+            throw new DheException("Managed Player runtime evidence is not an integrated DHE runtime.");
+        JsonElement headers = runtime.GetProperty("externalHeaders");
+        if (GetBool(headers, "surrogate") || GetBool(headers, "explicitlyAllowed"))
+            throw new DheException("Managed Player runtime evidence uses surrogate external headers.");
+        string stagedRuntime = RequireDirectory(GetString(runtime, "stagedLibil2cpp") ?? string.Empty,
+            "Managed Player staged runtime");
+        if (!TreeHashForRelease(stagedRuntime, Array.Empty<string>()).Equals(
+                GetString(runtime, "stagedRuntimeSha256"), StringComparison.OrdinalIgnoreCase))
+            throw new DheException("Managed Player staged runtime tree has changed.");
+        string stagedHeaders = RequireDirectory(GetString(headers, "stagedPath") ?? string.Empty,
+            "Managed Player staged external headers");
+        string externalTree = TreeHashForRelease(stagedHeaders, Array.Empty<string>());
+        if (!externalTree.Equals(GetString(headers, "stagedTreeSha256"),
+                StringComparison.OrdinalIgnoreCase))
+            throw new DheException("Managed Player external header tree has changed.");
+        string currentRuntimeLock = RequireFile(Path.Combine(sourceRoot, "manifests",
+            "dhe-runtime-lock.json"), "Managed Player runtime lock");
+        if (!Sha256File(currentRuntimeLock).Equals(GetString(runtime, "dheRuntimeLockSha256"),
+                StringComparison.OrdinalIgnoreCase))
+            throw new DheException("Managed Player runtime lock does not match the release source.");
+
+        string preflightPath = ResolveEvidencePath(GetString(report, "sourcePreflight"), reportRoot,
+            "Managed Player source preflight");
+        JsonElement preflight = ReadJson<JsonElement>(preflightPath);
+        RequireEvidenceFormat(preflight, "hybridclr.dhe-source-preflight.json",
+            "Managed Player source preflight");
+        string preflightRuntime = ResolveEvidencePath(GetString(preflight, "runtimeSource"),
+            Path.GetDirectoryName(preflightPath)!, "Preflight runtime manifest");
+        if (!GetBool(preflight, "passed") || !GetBool(preflight, "runtimeRequired") ||
+            !GetBool(preflight, "runtimeReady") || !GetBool(preflight, "cleanRuntimeSourcesRequired") ||
+            !GetBool(preflight, "externalHeadersRequired") ||
+            !preflight.TryGetProperty("externalHeadersSurrogate", out JsonElement surrogate) ||
+            surrogate.ValueKind != JsonValueKind.False ||
+            !Path.GetFullPath(preflightRuntime).Equals(Path.GetFullPath(runtimePath),
+                StringComparison.OrdinalIgnoreCase))
+            throw new DheException("Managed Player preflight is not bound to the required real-header runtime.");
+
+        string cleanPath = ResolveEvidencePath(GetString(report, "cleanCheckoutGate"), reportRoot,
+            "Managed Player clean checkout");
+        JsonElement clean = ReadJson<JsonElement>(cleanPath);
+        RequireEvidenceFormat(clean, "hybridclr.dhe-clean-checkout-gate.json",
+            "Managed Player clean checkout");
+        if (!GetBool(clean, "passed") || !GetBool(clean, "gitCleanRequired") ||
+            !GetBool(clean, "trackedSourcesRequired") || !GetBool(clean, "trackedSourcesComplete"))
+            throw new DheException("Managed Player evidence is not bound to clean tracked project and tool sources.");
+
+        JsonElement repoLock = ReadJson<JsonElement>(RequireFile(Path.Combine(sourceRoot, "manifests",
+            "repo-lock.json"), "Managed Player repository lock"));
+        JsonElement workflowLock = ReadJson<JsonElement>(RequireFile(Path.Combine(sourceRoot, "manifests",
+            "runtime-workflows.json"), "Managed Player runtime workflows"));
+        string workflowId = GetString(runtime, "engineWorkflow") ?? string.Empty;
+        JsonElement workflow = workflowLock.GetProperty("workflows").EnumerateArray().SingleOrDefault(item =>
+            GetString(item, "id") == workflowId);
+        if (workflow.ValueKind == JsonValueKind.Undefined)
+            throw new DheException("Managed Player runtime workflow is not locked by the release source.");
+        if (!externalTree.Equals(GetString(workflow.GetProperty("engine"),
+                "externalHeadersTreeSha256"), StringComparison.OrdinalIgnoreCase))
+            throw new DheException("Managed Player headers do not match the locked engine workflow.");
+        JsonElement sources = runtime.GetProperty("source");
+        foreach (string repository in new[] { "hybridclr", "il2cpp_plus", "hybridclr_unity" })
+        {
+            string? expected = repository == "il2cpp_plus"
+                ? GetString(workflow.GetProperty("il2cppPlus"), "commit")
+                : GetString(repoLock.GetProperty("repositories").GetProperty(repository), "commit");
+            JsonElement actual = sources.GetProperty(repository);
+            if (!string.Equals(expected, GetString(actual, "commit"), StringComparison.OrdinalIgnoreCase) ||
+                GetBool(actual, "dirty") || !IsHex(GetString(actual, "treeSha256"), 64, 64))
+                throw new DheException("Managed Player runtime source identity is invalid: " + repository);
+            string sourcePath = RequireDirectory(GetString(actual, "path") ?? string.Empty,
+                "Managed Player " + repository + " source");
+            if (!string.Equals(GitValue(sourcePath, "rev-parse", "HEAD"), expected,
+                    StringComparison.OrdinalIgnoreCase) ||
+                !string.IsNullOrWhiteSpace(GitValue(sourcePath, "status", "--porcelain")))
+                throw new DheException("Managed Player runtime source checkout is not clean at its locked commit: " +
+                    repository);
+            string treeRoot = repository switch
+            {
+                "hybridclr" => RequireDirectory(Path.Combine(sourcePath, "hybridclr"),
+                    "Managed Player HybridCLR source tree"),
+                "il2cpp_plus" => RequireDirectory(Path.Combine(sourcePath, "libil2cpp"),
+                    "Managed Player il2cpp_plus source tree"),
+                _ => sourcePath,
+            };
+            string liveTree = LabCommands.CanonicalSourceTreeHash(treeRoot,
+                repository == "hybridclr_unity");
+            if (!liveTree.Equals(GetString(actual, "treeSha256"), StringComparison.OrdinalIgnoreCase))
+                throw new DheException("Managed Player runtime source tree has changed: " + repository);
+        }
+
+        if (GetString(report, "format") == "hybridclr.dhe-resource-player-workflow.json")
+        {
+            string baseWorkflowPath = ResolveEvidencePath(GetString(report, "baseWorkflowReport"),
+                reportRoot, "Resource Base workflow");
+            JsonElement baseWorkflow = ReadJson<JsonElement>(baseWorkflowPath);
+            if (GetString(baseWorkflow, "mode") != "Release" || !GetBool(baseWorkflow, "releaseReady") ||
+                !Path.GetFullPath(ResolveEvidencePath(GetString(baseWorkflow, "runtimeSource"),
+                    Path.GetDirectoryName(baseWorkflowPath)!, "Base workflow runtime manifest"))
+                    .Equals(Path.GetFullPath(runtimePath), StringComparison.OrdinalIgnoreCase))
+                throw new DheException("Resource Player evidence is not bound to a Release-ready Base workflow.");
+        }
+    }
+
+    private static void ValidateMultiBaseChangedEvidence(
+        (JsonElement Report, string Path) first, (JsonElement Report, string Path) second)
+    {
+        string firstBase = GetString(first.Report, "selectedBaseId") ?? string.Empty;
+        string secondBase = GetString(second.Report, "selectedBaseId") ?? string.Empty;
+        if (!IsHex(firstBase, 64, 64) || !IsHex(secondBase, 64, 64) ||
+            firstBase.Equals(secondBase, StringComparison.OrdinalIgnoreCase))
+            throw new DheException("Multi-Base changed evidence must select two distinct Base identities.");
+        foreach (string property in new[] { "currentAssemblySetSha256", "resourceUpdateManifestSha256",
+                     "resourceUpdateValidationSha256" })
+            if (!string.Equals(GetString(first.Report, property), GetString(second.Report, property),
+                    StringComparison.OrdinalIgnoreCase))
+                throw new DheException("Multi-Base changed evidence does not share one current payload: " +
+                    property + ".");
+        if (!string.Equals(GetString(first.Report, "target"), GetString(second.Report, "target"),
+                StringComparison.OrdinalIgnoreCase))
+            throw new DheException("Multi-Base changed evidence targets different platforms.");
+
+        string manifestPath = ResolveEvidencePath(GetString(first.Report, "resourceUpdateManifest"),
+            Path.GetDirectoryName(first.Path)!, "Multi-Base resource update manifest");
+        JsonElement manifest = ReadJson<JsonElement>(manifestPath);
+        var supported = manifest.GetProperty("supportedBases").EnumerateArray()
+            .Select(item => GetString(item, "baseId") ?? string.Empty)
+            .ToHashSet(StringComparer.OrdinalIgnoreCase);
+        if (supported.Count < 2 || !supported.Contains(firstBase) || !supported.Contains(secondBase))
+            throw new DheException("The shared current payload does not declare both proven Base identities.");
     }
 
     private static void ValidateResourcePlayerEvidenceBindings(JsonElement report, string reportPath)

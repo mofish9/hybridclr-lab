@@ -114,6 +114,11 @@ bytes, build identity, native manifest, immutable Player files, assembly scope,
 changed dispatch, remaining AOT entries, structural/reflection probes, and
 transaction rollback. It replaces rebuilding a changed Player merely to obtain
 the `demo-changed` release role; Base Players must retain universal guards.
+Formal toolchain release evidence runs this smoke against at least two distinct
+Base identities and requires both reports to reference exactly one shared current
+payload. Additional online Bases remain mandatory inputs to `resource-update`
+even though the fixed toolchain qualification matrix records two representative
+Player executions.
 
 ## Runtime proof
 

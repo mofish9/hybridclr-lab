@@ -28,6 +28,22 @@ dotnet run --project tool/HybridCLR.DheTool.csproj -- native-tests \
 These commands use direct .NET process execution and fail closed when an
 external prerequisite (Unity, CMake, compiler, git, or dotnet) is missing.
 
+Prepare every locked engine-specific `il2cpp_plus` checkout without manually
+creating worktrees:
+
+```text
+dotnet run --project tool/HybridCLR.DheTool.csproj -- bootstrap-repos \
+  -LabRoot . -ReposRoot C:/repos -AllEngineWorkflows
+```
+
+This keeps the shared `hybridclr` and `hybridclr_unity` checkouts at their
+locked commits and creates `il2cpp_plus-<engine-workflow>` worktrees for Unity
+2021, Unity 2022, and Tuanjie 2022. `assemble-runtime` automatically selects
+the matching worktree. Use `-EngineWorkflow <id>` to prepare only one lane.
+Integrated source identity hashes normalize Git's CRLF checkout conversion,
+so an equivalent clean checkout does not depend on `core.autocrlf`; binary
+bytes remain exact.
+
 ## Project Configuration
 
 The host is project-independent and does not select a Demo adapter implicitly.
@@ -311,14 +327,18 @@ dotnet HybridCLR.DheTool.dll release-evidence \
   -OutputRoot C:/build/dhe-release-evidence \
   -Regression C:/build/regression.json \
   -DemoChanged C:/build/demo-changed/resource-player-workflow-report.json \
+  -DemoChangedBase2 C:/build/demo-changed-base2/resource-player-workflow-report.json \
   -DemoNoop C:/build/demo-noop/player-workflow-report.json \
   -NativeTuanjie2022 C:/build/native-tuanjie/native-gate.json \
   -NativeUnity2022 C:/build/native-unity2022/native-gate.json \
   -NativeUnity2021 C:/build/native-unity2021/native-gate.json
 ```
 
-The generated report must match the exact source HEAD/tree and binds all six
-reports by SHA-256. Each native role is revalidated against its own locked
+The generated report must match the exact source HEAD/tree and binds all seven
+reports by SHA-256. Both changed roles must be Release-ready Player results for
+distinct Base identities, backed by the same resource manifest, validation,
+current assembly set, and target. Each managed role is rebound to its integrated
+runtime manifest, clean tracked sources, and real Editor headers. Each native role is revalidated against its own locked
 runtime workflow, source commits, live runtime tree, and real Editor header
 tree. A command-line readiness flag cannot promote a package.
 Native compilation and iOS/Xcode execution remain target environment gates;

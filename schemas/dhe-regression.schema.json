@@ -16,13 +16,13 @@
     "realWorkflowOutputsValidated": { "type": "boolean" },
     "workflowOutputs": {
       "type": "array",
-      "maxItems": 2,
+      "maxItems": 3,
       "items": {
         "type": "object",
         "additionalProperties": false,
         "required": ["role", "path", "sha256"],
         "properties": {
-          "role": { "enum": ["demo-changed", "demo-noop"] },
+          "role": { "enum": ["demo-changed", "demo-changed-base2", "demo-noop"] },
           "path": { "type": "string", "minLength": 1 },
           "sha256": { "type": "string", "pattern": "^[0-9a-fA-F]{64}$" }
         }
@@ -48,7 +48,7 @@
   "allOf": [
     {
       "if": { "properties": { "realWorkflowOutputsValidated": { "const": true } }, "required": ["realWorkflowOutputsValidated"] },
-      "then": { "properties": { "workflowOutputs": { "minItems": 2, "maxItems": 2 } } },
+      "then": { "properties": { "workflowOutputs": { "minItems": 3, "maxItems": 3 } } },
       "else": { "properties": { "workflowOutputs": { "maxItems": 0 } } }
     }
   ]

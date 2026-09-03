@@ -950,10 +950,46 @@ internal static partial class Program
         catch { unboundNativeRejected = true; }
         AddRegressionCheck(checks, errors, "evidence-native-runtime-binding", unboundNativeRejected,
             "native release evidence must bind the live runtime, headers, locks, and source commits");
+
+        var exploratoryManagedRejected = false;
+        try
+        {
+            using var exploratoryManaged = JsonDocument.Parse("{\"mode\":\"Exploratory\"," +
+                "\"releaseReady\":false}");
+            ValidateManagedReleaseEvidence(exploratoryManaged.RootElement, output, cli.Root);
+        }
+        catch { exploratoryManagedRejected = true; }
+        AddRegressionCheck(checks, errors, "evidence-managed-release-binding",
+            exploratoryManagedRejected,
+            "managed release evidence must reject exploratory or runtime-unbound Player workflows");
+
+        var duplicateBaseRejected = false;
+        try
+        {
+            string baseId = new string('a', 64);
+            using var first = JsonDocument.Parse("{\"selectedBaseId\":\"" + baseId + "\"}");
+            using var second = JsonDocument.Parse("{\"selectedBaseId\":\"" + baseId + "\"}");
+            ValidateMultiBaseChangedEvidence((first.RootElement, output),
+                (second.RootElement, output));
+        }
+        catch { duplicateBaseRejected = true; }
+        AddRegressionCheck(checks, errors, "evidence-multibase-current-binding",
+            duplicateBaseRejected,
+            "release evidence must reject duplicate Base identities before accepting a shared current payload");
         var runtimeSource = File.ReadAllText(Path.Combine(cli.Root, "tool", "LabCommands.cs"));
         AddRegressionCheck(checks, errors, "runtime-package-source-binding",
             runtimeSource.Contains("ValidateRepoIdentity(\"hybridclr_unity\"", StringComparison.Ordinal),
             "runtime assembly must fail closed on the locked package source identity");
+        var bootstrapWorkflowDoc = ReadJson<JsonElement>(Path.Combine(cli.Root, "manifests",
+            "runtime-workflows.json"));
+        JsonElement[] bootstrapWorkflows = LabCommands.SelectBootstrapWorkflowRecords(bootstrapWorkflowDoc, null, true);
+        bool bootstrapMatrixPassed = bootstrapWorkflows.Length == 3 &&
+            bootstrapWorkflows.Select(item => GetString(item.GetProperty("il2cppPlus"), "commit"))
+                .Distinct(StringComparer.OrdinalIgnoreCase).Count() == 3 &&
+            bootstrapWorkflows.All(item => LabCommands.SelectBootstrapWorkflowRecords(bootstrapWorkflowDoc,
+                GetString(item, "id"), false).Length == 1);
+        AddRegressionCheck(checks, errors, "bootstrap-engine-workflow-matrix", bootstrapMatrixPassed,
+            "bootstrap must resolve all three distinct il2cpp_plus workflow commits and each single lane");
         RunIntegratedSourceLockRegressions(regressionRoot, checks, errors);
 
         var weakNoOpRejected = false;
@@ -992,8 +1028,8 @@ internal static partial class Program
         ValidateJsonSchema(matrixEvidenceSchema, matrixEvidence.RootElement, matrixEvidenceSchema, "$",
             matrixEvidenceErrors);
         AddRegressionCheck(checks, errors, "evidence-native-matrix-roles",
-            RequiredReleaseEvidenceRoles.Length == 6 && matrixEvidenceErrors.Count == 0,
-            "release evidence must require changed, no-op, and all three native engine lanes");
+            RequiredReleaseEvidenceRoles.Length == 7 && matrixEvidenceErrors.Count == 0,
+            "release evidence must require two changed Bases, no-op, and all three native engine lanes");
 
         var unsafeArchive = Path.Combine(regressionRoot, "not-an-archive");
         Directory.CreateDirectory(unsafeArchive);
@@ -1075,15 +1111,18 @@ internal static partial class Program
         var resourcePlayerEvidenceBindingPassed = false;
         var workflowOutputs = new List<object>();
         var changedWorkflowRoot = cli.Optional("workflowchangedroot");
+        var changedBase2WorkflowRoot = cli.Optional("workflowchangedbase2root");
         var noOpWorkflowRoot = cli.Optional("workflownooproot");
         if (!string.IsNullOrWhiteSpace(packageRoot) && Directory.Exists(packageRoot) &&
             !string.IsNullOrWhiteSpace(changedWorkflowRoot) && Directory.Exists(changedWorkflowRoot) &&
+            !string.IsNullOrWhiteSpace(changedBase2WorkflowRoot) && Directory.Exists(changedBase2WorkflowRoot) &&
             !string.IsNullOrWhiteSpace(noOpWorkflowRoot) && Directory.Exists(noOpWorkflowRoot))
         {
             var workflowRoots = new[]
             {
-                (Name: "changed", Root: Path.GetFullPath(changedWorkflowRoot)),
-                (Name: "noop", Root: Path.GetFullPath(noOpWorkflowRoot))
+                (Name: "changed", Role: "demo-changed", Root: Path.GetFullPath(changedWorkflowRoot)),
+                (Name: "changed-base2", Role: "demo-changed-base2", Root: Path.GetFullPath(changedBase2WorkflowRoot)),
+                (Name: "noop", Role: "demo-noop", Root: Path.GetFullPath(noOpWorkflowRoot))
             };
             workflowSchemaPassed = workflowRoots.All(item => SchemaGate(new Cli("schema-gate", new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase)
             {
@@ -1097,27 +1136,37 @@ internal static partial class Program
             {
                 foreach (var item in workflowRoots)
                 {
-                    var reportName = item.Name == "changed"
+                    var reportName = item.Name.StartsWith("changed", StringComparison.Ordinal)
                         ? "resource-player-workflow-report.json"
                         : "player-workflow-report.json";
                     var reportPath = RequireFile(Path.Combine(item.Root, reportName),
                         item.Name + " workflow report");
-                    if (item.Name == "changed")
+                    if (item.Name.StartsWith("changed", StringComparison.Ordinal))
                     {
                         JsonElement resourceWorkflow = ReadJson<JsonElement>(reportPath);
                         RequireEvidenceFormat(resourceWorkflow,
                             "hybridclr.dhe-resource-player-workflow.json",
                             "changed resource workflow");
                         ValidateResourcePlayerEvidenceBindings(resourceWorkflow, reportPath);
-                        resourcePlayerEvidenceBindingPassed = true;
                     }
+                    ValidateManagedReleaseEvidence(ReadJson<JsonElement>(reportPath), reportPath,
+                        cli.Root);
                     workflowOutputs.Add(new
                     {
-                        role = item.Name == "changed" ? "demo-changed" : "demo-noop",
+                        role = item.Role,
                         path = reportPath,
                         sha256 = Sha256File(reportPath)
                     });
                 }
+                var changedReports = workflowRoots.Where(item =>
+                        item.Name.StartsWith("changed", StringComparison.Ordinal))
+                    .Select(item =>
+                    {
+                        string path = Path.Combine(item.Root, "resource-player-workflow-report.json");
+                        return (Report: ReadJson<JsonElement>(path), Path: path);
+                    }).ToArray();
+                ValidateMultiBaseChangedEvidence(changedReports[0], changedReports[1]);
+                resourcePlayerEvidenceBindingPassed = true;
             }
         }
         else if (!string.IsNullOrWhiteSpace(packageRoot) && Directory.Exists(packageRoot))
@@ -1134,16 +1183,16 @@ internal static partial class Program
                 "schemas", name)));
             resourcePlayerEvidenceBindingPassed = File.ReadAllText(Path.Combine(packageRoot,
                 "tool", "ResourceUpdateStaging.cs")).Contains(
-                    "resource-player-workflow-report.json", StringComparison.Ordinal);
+                    "private static int ResourcePlayerEvidence", StringComparison.Ordinal);
         }
         AddRegressionCheck(checks, errors, "schema-workflow-output-contract", workflowSchemaPassed,
             realWorkflowOutputsValidated
-                ? "real changed and no-op workflow output trees passed the distributed schema gate"
+                ? "two changed Base and no-op workflow output trees passed the distributed schema gate"
                 : "the distributed package must contain every workflow output schema");
         AddRegressionCheck(checks, errors, "resource-player-evidence-binding",
             resourcePlayerEvidenceBindingPassed,
             realWorkflowOutputsValidated
-                ? "resource-only changed evidence was revalidated against all live bindings"
+                ? "two resource-only changed Base results share one revalidated current payload"
                 : "the distributed package contains the resource Player evidence implementation");
         var sourceHead = GitValue(cli.Root, "rev-parse", "HEAD");
         var sourceTree = GitValue(cli.Root, "rev-parse", "HEAD^{tree}");
@@ -1173,7 +1222,7 @@ internal static partial class Program
         string auditPatch = Path.Combine(root, "audit.patch");
         File.WriteAllText(auditPatch, "audit-only\n", new UTF8Encoding(false));
         string commit = new string('a', 40);
-        string tree = TreeHashForRelease(source, Array.Empty<string>());
+        string tree = LabCommands.CanonicalSourceTreeHash(source, true);
         string auditHash = Sha256File(auditPatch);
 
         JsonElement Lock(string expectedTree, string? expectedCommit = null,
@@ -1216,6 +1265,25 @@ internal static partial class Program
         }
         AddRegressionCheck(checks, errors, "integrated-source-lock-valid",
             validAccepted, "an exact integrated commit/tree must pass without applying the audit patch");
+
+        bool lineEndingStable;
+        try
+        {
+            File.WriteAllText(sentinel, "integrated\r\n", new UTF8Encoding(false));
+            LabCommands.ApplyLockedOverlays(root, Lock(tree), "hybridclr_unity", source,
+                "Unity2021Standard", commit, source);
+            lineEndingStable = File.ReadAllText(sentinel) == "integrated\r\n";
+        }
+        catch
+        {
+            lineEndingStable = false;
+        }
+        finally
+        {
+            File.WriteAllText(sentinel, "integrated\n", new UTF8Encoding(false));
+        }
+        AddRegressionCheck(checks, errors, "integrated-source-lock-line-ending-stable",
+            lineEndingStable, "integrated source locks must accept equivalent LF and CRLF checkouts");
 
         bool commitTamperRejected;
         try

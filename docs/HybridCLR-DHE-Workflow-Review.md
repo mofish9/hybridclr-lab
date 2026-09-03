@@ -92,17 +92,21 @@ DHE format、未支持的 schema 断言关键字、额外属性、错误类型�
 ## 发布证据
 
 工具包只能从 clean、tracked 的精确提交发布。`-Mode Release` 需要一份绑定同一 HEAD/tree
-的 release evidence，并且以下六个角色各出现一次、文件 hash 正确且报告格式匹配：
+的 release evidence，并且以下七个角色各出现一次、文件 hash 正确且报告格式匹配：
 
 - `regression`：全部生产负例和 package/schema 认证通过；
 - `demo-changed`：真实资源更新 Player 路径通过，并由
   `hybridclr.dhe-resource-player-workflow.json` 绑定回 immutable Base；
+- `demo-changed-base2`：第二个不同 Base 使用与 `demo-changed` 完全相同的 current payload
+  完成真实资源更新 Player 路径；
 - `demo-noop`：零变化 Player 路径通过；
 - `native-tuanjie2022`：团结 2022 锁定 runtime、真实外部 headers、CMake/CTest 通过；
 - `native-unity2022`：Unity 2022 锁定 runtime、真实外部 headers、CMake/CTest 通过；
 - `native-unity2021`：Unity 2021 锁定 runtime、真实外部 headers、CMake/CTest 通过。
 
-六角色证据必须由 `release-evidence` 命令从 clean HEAD 自动生成，不能手工拼装后直接发布。
+七角色证据必须由 `release-evidence` 命令从 clean HEAD 自动生成，不能手工拼装后直接发布。
+三个 managed Player 角色都必须来自 `Release` workflow，并绑定 integrated runtime、真实 headers
+和 clean/tracked 项目源码；Exploratory 报告不能再提升工具包的 Release 位。
 
 发布后的 `dhe-toolchain-manifest.json` 必须同时满足 `mode=Release`、
 `releaseReady=true`、`sourceIdentity.clean=true`，并通过包外和包内两次

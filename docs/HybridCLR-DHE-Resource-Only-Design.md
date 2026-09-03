@@ -109,7 +109,9 @@ SHA-256；任一文件缺失或篡改都拒绝整包，不留下可接受的部�
 真实 Player/device smoke 完成后，运行 `resource-player-evidence`，把该 Player result、上述
 stage report、资源发布目录和归档的 Base `player-workflow-report.json` 绑定为
 `resource-player-workflow-report.json`。工具链发布时的 `demo-changed` 角色只接受这份资源更新
-证据，不再要求、也不允许通过重建非 universal-guard 的 changed Player 来伪造线上流程。
+证据，并额外要求第二个不同 Base 的 `demo-changed-base2` 证据；两者必须绑定同一个 current
+manifest、validation 和 assembly set。不再要求、也不允许通过重建非 universal-guard 的
+changed Player 来伪造线上流程。
 
 ## 客户端选择与本地求差
 

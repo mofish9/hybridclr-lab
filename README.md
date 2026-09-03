@@ -22,7 +22,7 @@ Its formal entry points, generated-output boundary, and complete four-assembly
 Player evidence are documented in
 `docs/HybridCLR-DHE-Toolchain.md`,
 `docs/HybridCLR-DHE-Workflow-Review.md` and
-`docs/HybridCLR-DHE-Formal-Project-Validation.md`. Toolchain `0.1.17` is the
+`docs/HybridCLR-DHE-Formal-Project-Validation.md`. Toolchain `0.1.18` is the
 project-trial line; projects must install an authenticated package whose
 manifest has `releaseReady=true` and pin its exact package ID.
 The workflow also emits MetaVersion/native/workflow schemas and an independent
