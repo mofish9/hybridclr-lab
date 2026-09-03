@@ -1020,6 +1020,15 @@ internal static partial class Program
         bool staleLockRemoved = TryRemoveStaleUnityLock(staleLock) && !File.Exists(staleLock);
         AddRegressionCheck(checks, errors, "unity-stale-lock-recovery", staleLockRemoved,
             "an unowned Unity Temp lock must not stall the C# workflow until its stage timeout");
+        string packagePipelinePath = Path.Combine(cli.Root, "unity2021-dhe-demo", "Packages",
+            "com.code-philosophy.hybridclr", "Editor", "Commands", "DheBuildPipeline.cs");
+        string packagePipelineSource = File.ReadAllText(packagePipelinePath);
+        bool bodyFilterPresent = packagePipelineSource.Contains("(item.flags & 8u) != 0",
+                StringComparison.Ordinal) &&
+            packagePipelineSource.Contains("flags = checked((uint)ReadJsonInt(objectText, \"flags\"))",
+                StringComparison.Ordinal);
+        AddRegressionCheck(checks, errors, "native-universal-body-filter", bodyFilterPresent,
+            "universal guards must exclude delegate/runtime methods without a managed IL body");
         RunIntegratedSourceLockRegressions(regressionRoot, checks, errors);
 
         var weakNoOpRejected = false;

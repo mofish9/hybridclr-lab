@@ -31,6 +31,7 @@ internal static partial class Program
         "bootstrap-engine-workflow-matrix",
         "source-boundary-git-root-resolution",
         "unity-stale-lock-recovery",
+        "native-universal-body-filter",
         "integrated-source-lock-line-ending-stable",
         "integrated-source-lock-valid", "integrated-source-lock-commit-tamper",
         "integrated-source-lock-tree-tamper", "integrated-source-lock-patch-tamper",

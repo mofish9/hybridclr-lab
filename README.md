@@ -6,7 +6,7 @@ HybridCLR community runtime on Tuanjie 1.10.0.
 ## Fixed baseline
 
 - Tuanjie: `1.10.0` (`2022.3.62t12`)
-- HybridCLR package: `v8.13.0` (`optimize/v8.13.0@e88958a`, no package opt tag)
+- HybridCLR package: `v8.13.0` (`optimize/v8.13.0@71a2e7b`, no package opt tag)
 - HybridCLR runtime: `v8.13.0-opt4.1` (`f777ed7`)
 - il2cpp_plus: `v2022-tuanjie-8.13.0-opt4.1` (`52968ad`)
 

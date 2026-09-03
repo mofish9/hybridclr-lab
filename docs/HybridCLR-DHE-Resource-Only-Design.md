@@ -187,6 +187,6 @@ capability 均会 fail closed。新能力 Player 的 Base ID 为
 
 这证明“Base 只构建一次、后续一份资源包服务多个 Base”的架构链路成立，但不等于官方旗舰版
 DHE 的全部元数据能力。正式源码身份已收口到 `v8.13.0-opt4.1`、三条 il2cpp_plus
-`opt4.1` runtime tag 和 package commit `e88958a`。Android Player、iOS/Xcode/device、性能、
+`opt4.1` runtime tag 和 package commit `71a2e7b`。Android Player、iOS/Xcode/device、性能、
 内存和现有结构限制仍是正式发布前的独立门禁；当前结论只能是 Windows Player 与三引擎
 native 有条件通过，不能声明全平台生产发布完成。
