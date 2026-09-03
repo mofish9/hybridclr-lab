@@ -57,13 +57,29 @@ add_library(hybridclr_metadata_compile_gate OBJECT
     "${HYBRIDCLR_TEST_SOURCE_ROOT}/metadata/Assembly.cpp"
     "${HYBRIDCLR_TEST_SOURCE_ROOT}/metadata/AOTHomologousImage.cpp"
     "${HYBRIDCLR_TEST_SOURCE_ROOT}/metadata/ClassFieldLayoutCalculator.cpp"
+	"${HYBRIDCLR_TEST_SOURCE_ROOT}/metadata/Image.cpp"
     "${HYBRIDCLR_TEST_SOURCE_ROOT}/metadata/InterpreterImage.cpp"
+    "${HYBRIDCLR_TEST_SOURCE_ROOT}/metadata/MetadataModule.cpp"
+    "${HYBRIDCLR_TEST_SOURCE_ROOT}/metadata/SuperSetAOTHomologousImage.cpp"
     "${HYBRIDCLR_TEST_SOURCE_ROOT}/metadata/VTableSetup.cpp"
 )
 add_dependencies(hybridclr_native_tests hybridclr_metadata_compile_gate)
 
 add_library(hybridclr_runtime_api_compile_gate OBJECT
     "${HYBRIDCLR_TEST_SOURCE_ROOT}/RuntimeApi.cpp"
+)
+
+add_library(hybridclr_interpreter_compile_gate OBJECT
+    "${HYBRIDCLR_TEST_SOURCE_ROOT}/interpreter/Interpreter_Execute.cpp"
+    "${HYBRIDCLR_TEST_SOURCE_ROOT}/transform/TransformContext.cpp"
+)
+
+add_library(hybridclr_engine_reflection_compile_gate OBJECT
+    "${HYBRIDCLR_RUNTIME_ROOT}/vm/Image.cpp"
+    "${HYBRIDCLR_RUNTIME_ROOT}/vm/Class.cpp"
+    "${HYBRIDCLR_RUNTIME_ROOT}/vm/Field.cpp"
+    "${HYBRIDCLR_RUNTIME_ROOT}/icalls/mscorlib/System.Reflection/FieldInfo.cpp"
+    "${HYBRIDCLR_RUNTIME_ROOT}/icalls/mscorlib/System.Reflection/RuntimeFieldInfo.cpp"
 )
 
 function(configure_hybridclr_target target)
@@ -115,6 +131,8 @@ endfunction()
 configure_hybridclr_target(hybridclr_native_tests)
 configure_hybridclr_target(hybridclr_metadata_compile_gate)
 configure_hybridclr_target(hybridclr_runtime_api_compile_gate)
+configure_hybridclr_target(hybridclr_interpreter_compile_gate)
+configure_hybridclr_target(hybridclr_engine_reflection_compile_gate)
 
 enable_testing()
 add_test(NAME hybridclr_native_tests COMMAND hybridclr_native_tests)

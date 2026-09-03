@@ -33,6 +33,7 @@
     "mode": { "enum": ["Release", "Exploratory"] },
     "runPlayer": { "type": "boolean" },
     "stopAfterPreflight": { "type": "boolean" },
+    "bootstrap": { "type": "boolean" },
     "unity": { "type": "string", "minLength": 1 },
     "unityTimeoutSeconds": { "type": "integer", "minimum": 10, "maximum": 3600 },
     "dnlibPath": { "type": "string", "minLength": 1 },

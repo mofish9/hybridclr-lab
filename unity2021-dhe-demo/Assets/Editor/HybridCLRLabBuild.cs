@@ -755,7 +755,7 @@ namespace HybridCLR.Lab.Editor
             }
 
             DheBuildIdentityData identity = JsonUtility.FromJson<DheBuildIdentityData>(File.ReadAllText(sourcePath));
-            if (identity == null || identity.identityVersion != 2 ||
+            if (identity == null || identity.identityVersion != 1 ||
                 string.IsNullOrWhiteSpace(identity.aotSnapshotSha256) ||
                 !string.Equals(identity.aotSnapshotKind, "managed-assembly-plus-generated-cpp-v1", StringComparison.Ordinal) ||
                 string.IsNullOrWhiteSpace(identity.nativeGuardSourceSha256) ||
@@ -763,37 +763,12 @@ namespace HybridCLR.Lab.Editor
             {
                 throw new InvalidDataException("DHE build identity is incomplete; native guard identity must be generated before Player build.");
             }
-            string baselineHash = NormalizeSha256(identity.baselineAssemblySha256, "baselineAssemblySha256");
-            string snapshotHash = NormalizeSha256(identity.aotSnapshotSha256, "aotSnapshotSha256");
-            string nativeGuardHash = NormalizeSha256(identity.nativeGuardSourceSha256, "nativeGuardSourceSha256");
-            string nativeManifestHash = NormalizeSha256(identity.nativeManifestSha256, "nativeManifestSha256");
-            string sourceCode =
-                "namespace HybridCLR.Lab\n" +
-                "{\n" +
-                "    internal static class HybridCLRDheBuildIdentity\n" +
-                "    {\n" +
-                "        public const int IdentityVersion = 2;\n" +
-                "        public const string BaselineAssemblySha256 = \"" + baselineHash + "\";\n" +
-                "        public const string AotSnapshotSha256 = \"" + snapshotHash + "\";\n" +
-                "        public const string AotSnapshotKind = \"managed-assembly-plus-generated-cpp-v1\";\n" +
-                "        public const string NativeGuardSourceSha256 = \"" + nativeGuardHash + "\";\n" +
-                "        public const string NativeManifestSha256 = \"" + nativeManifestHash + "\";\n" +
-                "    }\n" +
-                "}\n";
-            string destinationPath = Path.Combine(ProjectRoot(), "Assets", "Runtime", "HybridCLRDheBuildIdentity.cs");
-            string existingSource = File.Exists(destinationPath) ? File.ReadAllText(destinationPath) : null;
-            bool sourceChanged = !string.Equals(existingSource, sourceCode, StringComparison.Ordinal);
-            if (sourceChanged)
-            {
-                File.WriteAllText(destinationPath, sourceCode, new System.Text.UTF8Encoding(false));
-            }
+            NormalizeSha256(identity.aotSnapshotSha256, "aotSnapshotSha256");
+            NormalizeSha256(identity.nativeGuardSourceSha256, "nativeGuardSourceSha256");
+            NormalizeSha256(identity.nativeManifestSha256, "nativeManifestSha256");
             string streamingDirectory = Path.Combine(ProjectRoot(), "Assets", "StreamingAssets", "HybridCLRLab");
             Directory.CreateDirectory(streamingDirectory);
             File.Copy(sourcePath, Path.Combine(streamingDirectory, BuildIdentityFileName), true);
-            if (sourceChanged)
-            {
-                AssetDatabase.ImportAsset("Assets/Runtime/HybridCLRDheBuildIdentity.cs", ImportAssetOptions.ForceUpdate | ImportAssetOptions.ForceSynchronousImport);
-            }
         }
 
         private static string NormalizeSha256(string value, string fieldName)
@@ -810,7 +785,6 @@ namespace HybridCLR.Lab.Editor
         private sealed class DheBuildIdentityData
         {
             public int identityVersion;
-            public string baselineAssemblySha256;
             public string aotSnapshotSha256;
             public string aotSnapshotKind;
             public string nativeGuardSourceSha256;

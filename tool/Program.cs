@@ -21,6 +21,11 @@ internal static partial class Program
         "evidence-noop-aot-proof", "evidence-native-matrix-roles",
         "native-guard-unrelated-source-stable", "native-guard-block-tamper",
         "native-guard-duplicate-marker", "native-guard-missing-end-marker",
+        "reference-field-and-type-removal", "value-field-removal-rejected",
+        "runtime-contract-capability-negotiation",
+        "runtime-capability-missing-rejected", "composite-base-id-runtime-bound",
+        "resource-stage-plan-capability-bound",
+        "resource-stage-aot-metadata-capability-bound",
         "layout-release-role-schemas",
         "schema-valid-document", "schema-maximum-rejected", "schema-additional-type-rejected",
         "schema-unsupported-keyword-rejected", "schema-gate-contract",
@@ -41,8 +46,10 @@ internal static partial class Program
             return cli.Command.ToLowerInvariant() switch
             {
                 "version" => Version(cli),
-                "mv" => MetaVersion(cli),
+                "mv" or "metaversion" => GenerateMetaVersion(cli),
                 "batch" => Batch(cli),
+                "resource-update" => ResourceUpdate(cli),
+                "stage-resource-update" => StageResourceUpdate(cli),
                 "baseline-manifest" => BaselineManifest(cli),
                 "aot-metadata-manifest" => AotMetadataManifest(cli),
                 "preflight" => Preflight(cli),
@@ -80,6 +87,18 @@ internal static partial class Program
     {
         var manifest = ReadJson<Dictionary<string, JsonElement>>(Path.Combine(cli.Root, "dhe-toolchain-manifest.json"));
         Console.WriteLine($"HybridCLR DHE toolchain {GetString(manifest, "toolchainVersion")} (contract {GetInt(manifest, "contractVersion")}, packageId={GetString(manifest, "packageId")})");
+        return 0;
+    }
+
+    private static int GenerateMetaVersion(Cli cli)
+    {
+        string assembly = RequireFile(cli.Require("assembly"), "MetaVersion assembly");
+        string output = SafeReportPath(cli.Require("output"), new[] { assembly });
+        string binary = SafeReportPath(cli.Require("binary"), new[] { assembly, output });
+        MetaVersionSnapshot snapshot = MetaVersionSnapshot.Create(assembly);
+        WriteJson(output, snapshot.ToJson(assembly));
+        snapshot.WriteBinary(binary);
+        Console.WriteLine("DHE MetaVersion: " + binary);
         return 0;
     }
 
@@ -127,26 +146,6 @@ internal static partial class Program
         Console.WriteLine("DHE AOT metadata manifest: " + output); return 0;
     }
 
-    private static int MetaVersion(Cli cli)
-    {
-        var baseline = RequireFile(cli.Require("baselineassembly"), "Baseline assembly");
-        var current = RequireFile(cli.Require("currentassembly"), "Current assembly");
-        var output = SafeReportPath(cli.Require("output"), new[] { baseline, current });
-        var binary = cli.Optional("binaryoutput");
-        if (!string.IsNullOrWhiteSpace(binary)) binary = SafeReportPath(binary, new[] { baseline, current, output });
-        var strict = cli.Has("strictcompatibility");
-        var diff = AssemblyDiff.Create(baseline, current);
-        var result = diff.ToJson(strict);
-        WriteJson(output, result);
-        if (!string.IsNullOrWhiteSpace(binary))
-        {
-            if (!strict || !diff.Compatible) throw new DheException("Binary MV output requires a compatible strict diff.");
-            WriteMvBinary(binary, diff);
-        }
-        Console.WriteLine($"DHE MV {diff.AssemblyName}: {diff.ChangedMethodCount} changed method(s), status={(diff.Compatible ? "compatible" : "incompatible")}");
-        return diff.Compatible ? 0 : (strict ? 2 : 0);
-    }
-
     private static int Batch(Cli cli)
     {
         var baselineRoot = RequireDirectory(cli.Require("baselineroot"), "Baseline root");
@@ -162,31 +161,608 @@ internal static partial class Program
         names = names.Select(NormalizeName).Where(x => x.Length > 0).Distinct(StringComparer.OrdinalIgnoreCase).ToList();
         if (names.Count == 0) throw new DheException("No DHE assemblies were supplied.");
         var sets = !string.IsNullOrWhiteSpace(settingsPath) ? Settings.Read(settingsPath) : new Settings.Sets();
-        var records = new List<BatchRecord>();
+        var candidates = new List<(string Name, string Baseline, string Current,
+            MetaVersionSnapshot? BaseMetaVersion, MetaVersionSnapshot? CurrentMetaVersion,
+            string? Error)>();
         foreach (var name in names)
         {
-            var b = Path.Combine(baselineRoot, name + ".dll"); var c = Path.Combine(currentRoot, name + ".dll");
-            var jsonPath = Path.Combine(outputRoot, name + ".mv.json"); var binaryPath = Path.Combine(outputRoot, name + ".mv.bytes");
-            if (!File.Exists(b) || !File.Exists(c)) { records.Add(new(name, b, c, jsonPath, null, "missing", "Missing baseline or current assembly file.")); continue; }
+            var baseline = Path.Combine(baselineRoot, name + ".dll");
+            var current = Path.Combine(currentRoot, name + ".dll");
+            if (!File.Exists(baseline) || !File.Exists(current))
+            {
+                candidates.Add((name, baseline, current, null, null,
+                    "Missing baseline or current assembly file."));
+                continue;
+            }
             try
             {
-                var diff = AssemblyDiff.Create(b, c); var compatible = diff.Compatible;
-                WriteJson(jsonPath, diff.ToJson(true)); string? binary = null;
-                if (compatible) { WriteMvBinary(binaryPath, diff); binary = binaryPath; }
-                records.Add(new(name, b, c, jsonPath, binary, compatible ? "compatible" : "incompatible", compatible ? null : string.Join("; ", diff.Reasons)));
+                candidates.Add((name, baseline, current, MetaVersionSnapshot.Create(baseline),
+                    MetaVersionSnapshot.Create(current), null));
             }
-            catch (Exception ex) { records.Add(new(name, b, c, jsonPath, null, "error", ex.Message)); }
+            catch (Exception ex)
+            {
+                candidates.Add((name, baseline, current, null, null, ex.Message));
+            }
+        }
+        string[] addressTakenFields = candidates.Where(candidate => candidate.CurrentMetaVersion != null)
+            .SelectMany(candidate => candidate.CurrentMetaVersion!.AddressTakenFieldIdentities)
+            .Distinct(StringComparer.Ordinal).ToArray();
+        var records = new List<BatchRecord>();
+        foreach (var candidate in candidates)
+        {
+            string baseJson = Path.Combine(outputRoot, candidate.Name + ".base.mv.json");
+            string baseBinary = Path.Combine(outputRoot, candidate.Name + ".base.mv.bytes");
+            string currentJson = Path.Combine(outputRoot, candidate.Name + ".current.mv.json");
+            string currentBinary = Path.Combine(outputRoot, candidate.Name + ".current.mv.bytes");
+            if (candidate.BaseMetaVersion == null || candidate.CurrentMetaVersion == null)
+            {
+                string status = File.Exists(candidate.Baseline) && File.Exists(candidate.Current)
+                    ? "error" : "missing";
+                records.Add(new BatchRecord(candidate.Name, candidate.Baseline, candidate.Current,
+                    baseJson, baseBinary, currentJson, currentBinary, status, 0, 0, 0,
+                    0, 0, 0,
+                    Array.Empty<string>(), candidate.Error));
+                continue;
+            }
+            ResourceUpdateCompatibility compatibility = ResourceUpdateCompatibility.Analyze(
+                candidate.BaseMetaVersion, candidate.CurrentMetaVersion, addressTakenFields);
+            WriteJson(baseJson, candidate.BaseMetaVersion.ToJson(candidate.Baseline));
+            candidate.BaseMetaVersion.WriteBinary(baseBinary);
+            WriteJson(currentJson, candidate.CurrentMetaVersion.ToJson(candidate.Current));
+            candidate.CurrentMetaVersion.WriteBinary(currentBinary);
+            records.Add(new BatchRecord(candidate.Name, candidate.Baseline, candidate.Current,
+                baseJson, baseBinary, currentJson, currentBinary,
+                compatibility.Compatible ? "compatible" : "incompatible",
+                compatibility.ChangedMethodCount, compatibility.AddedMethodCount,
+                compatibility.RemovedMethodCount, compatibility.ChangedExistingTypeCount,
+                compatibility.AddedTypeCount, compatibility.RemovedTypeCount,
+                compatibility.UnsupportedChanges,
+                compatibility.Compatible ? null : string.Join("; ",
+                    compatibility.UnsupportedChanges)));
         }
         var configErrors = new List<string>();
         var requireCoverage = cli.Has("requiredheequalshotupdate");
         if (requireCoverage && !SetEquals(sets.Hot, sets.Dhe)) configErrors.Add("dheAotAssemblies must exactly match hotUpdateAssemblies.");
-        var summary = new { schemaVersion = 1, format = "hybridclr.dhe-lite.batch-report.json", generatedAtUtc = DateTimeOffset.UtcNow,
-            baselineRoot, currentRoot, strictCompatibility = true, requireDheEqualsHotUpdate = requireCoverage,
+        var summary = new { schemaVersion = 1, format = "hybridclr.dhe-batch-report.json", generatedAtUtc = DateTimeOffset.UtcNow,
+            baselineRoot, currentRoot, compatibilityPolicy = ResourceUpdateCompatibility.Policy,
+            requireDheEqualsHotUpdate = requireCoverage,
             configurationPassed = configErrors.Count == 0, configurationErrors = configErrors, hotUpdateAssemblies = sets.Hot, dheAotAssemblies = sets.Dhe,
             assemblies = records, counts = new { total = records.Count, compatible = records.Count(x => x.Status == "compatible"), incompatible = records.Count(x => x.Status == "incompatible"), missing = records.Count(x => x.Status == "missing"), error = records.Count(x => x.Status == "error") } };
         WriteJson(Path.Combine(outputRoot, "dhe-batch-summary.json"), summary);
         Console.WriteLine($"DHE batch: {summary.counts.compatible}/{summary.counts.total} compatible");
         return configErrors.Count == 0 && summary.counts.incompatible == 0 && summary.counts.missing == 0 && summary.counts.error == 0 ? 0 : 2;
+    }
+
+    /// <summary>
+    /// Builds a resource-only DHE release. The command deliberately never
+    /// invokes Unity or touches generated native output: a fixed Base Player
+    /// consumes the resulting current DLL/MV payload. Multiple baseline roots
+    /// validate every supported Base without copying Base-specific data into
+    /// the payload. The Player compares its embedded Base MetaVersion with the
+    /// one current MetaVersion shipped for each assembly.
+    /// </summary>
+    private static int ResourceUpdate(Cli cli)
+    {
+        var currentRoot = RequireDirectory(cli.Require("currentroot"), "Current root");
+        var settingsPath = RequireFile(cli.Require("settingsfile"), "HybridCLR settings");
+        var outputRoot = SafeOutputRoot(cli.Require("outputroot"), new[] { currentRoot, settingsPath });
+        var baselineRoots = (cli.Optional("baseroots") ?? cli.Require("baselineroot"))
+            .Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries)
+            .Select(path => RequireDirectory(path, "DHE base snapshot root"))
+            .Distinct(StringComparer.OrdinalIgnoreCase).ToArray();
+        if (baselineRoots.Length == 0) throw new DheException("At least one base snapshot root is required.");
+        var nativeManifestValue = cli.Optional("basenativemanifests") ?? cli.Optional("basenativemanifest") ??
+            throw new DheException("Missing -BaseNativeManifests (one universal native manifest per BaseRoot).");
+        var nativeManifestPaths = nativeManifestValue
+            .Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries)
+            .Select(path => RequireFile(path, "Base native guard manifest"))
+            .ToArray();
+        if (nativeManifestPaths.Length != baselineRoots.Length)
+            throw new DheException("BaseRoots and BaseNativeManifests must have the same number of entries.");
+        var buildIdentityValue = cli.Optional("basebuildidentities") ?? cli.Optional("basebuildidentity") ??
+            throw new DheException("Missing -BaseBuildIdentities (one immutable build identity per BaseRoot).");
+        var buildIdentityPaths = buildIdentityValue
+            .Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries)
+            .Select(path => RequireFile(path, "Base Player build identity"))
+            .ToArray();
+        if (buildIdentityPaths.Length != baselineRoots.Length)
+            throw new DheException("BaseRoots and BaseBuildIdentities must have the same number of entries.");
+        var baseIdentities = buildIdentityPaths.Select(path => ReadJson<JsonElement>(path)).ToArray();
+        if (baseIdentities.Any(identity => GetInt(identity, "identityVersion") != 1))
+            throw new DheException(
+                "Every supported Base must use the current DHE build identity.");
+        string runtimeAssetRoot = RequireCommonBaseAssetRoot(baseIdentities,
+            "runtimeAssetRoot");
+        string baseMetaVersionAssetRoot = RequireCommonBaseAssetRoot(baseIdentities,
+            "baseMetaVersionAssetRoot");
+        if (!baseMetaVersionAssetRoot.StartsWith(runtimeAssetRoot,
+                StringComparison.OrdinalIgnoreCase))
+            throw new DheException(
+                "Every Base MetaVersion asset root must be below the common runtime asset root.");
+        ValidateRequestedAssetRoot(cli.Optional("runtimeassetroot"), runtimeAssetRoot,
+            "RuntimeAssetRoot");
+        ValidateRequestedAssetRoot(cli.Optional("basemetaversionassetroot"),
+            baseMetaVersionAssetRoot, "BaseMetaVersionAssetRoot");
+        var names = Settings.Read(settingsPath).Dhe;
+        if (names.Length == 0) throw new DheException("No DHE assemblies are configured.");
+        var currentRecords = names.Select(name => new
+        {
+            name,
+            path = RequireFile(Path.Combine(currentRoot, name + ".dll"), name + " current assembly"),
+        }).ToArray();
+        var currentSetHash = NamedAssemblySetHash(currentRecords.Select(record => (record.name, record.path)));
+        var aotMetadataRoot = cli.Optional("aotmetadataroot");
+        if (!string.IsNullOrWhiteSpace(aotMetadataRoot)) aotMetadataRoot = RequireDirectory(aotMetadataRoot, "AOT metadata root");
+
+        var payloadRoot = Path.Combine(outputRoot, "payload");
+        var auditRoot = Path.Combine(outputRoot, "audit");
+        var manifestPath = Path.Combine(outputRoot, "dhe-resource-update.json");
+        var runtimePlanPath = Path.Combine(outputRoot, "dhe-runtime-plan.json");
+        var validationPath = Path.Combine(outputRoot, "dhe-resource-update-validation.json");
+        Directory.CreateDirectory(outputRoot);
+        // Invalidate publish markers before touching payload files. A failed
+        // validation must never leave a previous manifest beside new bytes.
+        File.Delete(manifestPath);
+        File.Delete(runtimePlanPath);
+        File.Delete(validationPath);
+        if (Directory.Exists(payloadRoot)) Directory.Delete(payloadRoot, true);
+        if (Directory.Exists(auditRoot)) Directory.Delete(auditRoot, true);
+        Directory.CreateDirectory(payloadRoot);
+        Directory.CreateDirectory(auditRoot);
+
+        var currentSnapshots = new Dictionary<string, MetaVersionSnapshot>(StringComparer.OrdinalIgnoreCase);
+        var payloadFiles = new List<object>();
+        var runtimeAssemblies = new List<object>();
+        foreach (var record in currentRecords)
+        {
+            var snapshot = MetaVersionSnapshot.Create(record.path);
+            currentSnapshots.Add(record.name, snapshot);
+            var dllTarget = Path.Combine(payloadRoot, record.name + ".dll.bytes");
+            var mvTarget = Path.Combine(payloadRoot, record.name + ".mv.bytes");
+            var mvJsonTarget = Path.Combine(auditRoot, record.name + ".mv.json");
+            File.Copy(record.path, dllTarget, true);
+            File.WriteAllBytes(mvTarget, snapshot.ToBinary());
+            WriteJson(mvJsonTarget, snapshot.ToJson(record.path));
+            var dllAsset = "payload/" + record.name + ".dll.bytes";
+            var mvAsset = "payload/" + record.name + ".mv.bytes";
+            payloadFiles.Add(new
+            {
+                assemblyName = record.name,
+                dll = dllAsset,
+                currentMetaVersion = mvAsset,
+                dllSha256 = Sha256File(dllTarget),
+                currentMetaVersionSha256 = Sha256File(mvTarget),
+            });
+            runtimeAssemblies.Add(new
+            {
+                assemblyName = record.name,
+                current = runtimeAssetRoot + dllAsset,
+                currentMetaVersion = runtimeAssetRoot + mvAsset,
+                baseMetaVersion = baseMetaVersionAssetRoot + record.name + ".mv.bytes",
+                currentSha256 = Sha256File(dllTarget),
+                currentMetaVersionSha256 = Sha256File(mvTarget),
+            });
+        }
+        string[] currentAddressTakenFields = currentSnapshots.Values
+            .SelectMany(snapshot => snapshot.AddressTakenFieldIdentities)
+            .Distinct(StringComparer.Ordinal).ToArray();
+
+        var runtimeAotMetadata = new List<object>();
+        if (!string.IsNullOrWhiteSpace(aotMetadataRoot))
+        {
+            foreach (var metadataName in Settings.Read(settingsPath).Patch)
+            {
+                var source = RequireFile(Path.Combine(aotMetadataRoot, metadataName + ".dll"),
+                    metadataName + " AOT metadata");
+                var target = Path.Combine(payloadRoot, metadataName + ".bytes");
+                File.Copy(source, target, true);
+                runtimeAotMetadata.Add(new
+                {
+                    assemblyName = metadataName,
+                    sourceKind = "resource-update",
+                    sha256 = Sha256File(target),
+                    manifestSha256 = "",
+                    path = runtimeAssetRoot + "payload/" + metadataName + ".bytes",
+                });
+            }
+        }
+
+        var candidateBases = new List<object>();
+        var candidateBaseIdentityKeys = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+        var releaseErrors = new List<string>();
+        for (var baseIndex = 0; baseIndex < baselineRoots.Length; baseIndex++)
+        {
+            var baselineRoot = baselineRoots[baseIndex];
+            var nativeManifestPath = nativeManifestPaths[baseIndex];
+            var buildIdentityPath = buildIdentityPaths[baseIndex];
+            var nativeManifest = ReadJson<JsonElement>(nativeManifestPath);
+            var buildIdentity = baseIdentities[baseIndex];
+            var baseTarget = GetString(buildIdentity, "target") ?? string.Empty;
+            var baseAotSnapshotSha256 = GetString(buildIdentity, "aotSnapshotSha256") ?? string.Empty;
+            var baseNativeGuardSourceSha256 = GetString(buildIdentity,
+                "nativeGuardSourceSha256") ?? string.Empty;
+            var baseRuntimeProtocol = GetString(nativeManifest, "runtimeProtocol") ?? string.Empty;
+            var baseNativeRuntimeContract = GetString(nativeManifest, "runtimeContract") ?? string.Empty;
+            var baseNativeRuntimeCapabilities = nativeManifest.TryGetProperty("runtimeCapabilities",
+                    out JsonElement capabilityValues) && capabilityValues.ValueKind == JsonValueKind.Array
+                ? capabilityValues.EnumerateArray().Where(value => value.ValueKind == JsonValueKind.String)
+                    .Select(value => value.GetString() ?? string.Empty).ToArray()
+                : Array.Empty<string>();
+            if (!string.Equals(GetString(nativeManifest, "guardMode"), "universal",
+                    StringComparison.OrdinalIgnoreCase))
+                throw new DheException("Base native guard manifest must be generated in universal mode: " +
+                    nativeManifestPath);
+            var guardedMethods = ReadNativeStableMethodIds(nativeManifest, "methods");
+            var interpreterOnlyMethods = ReadNativeStableMethodIds(nativeManifest, "interpreterOnlyMethods");
+            if (guardedMethods.Count == 0)
+                throw new DheException("Base native guard manifest contains no stable method IDs: " +
+                    nativeManifestPath + ". Rebuild the Base with the current DHE package.");
+
+            var baselineRecords = names.Select(name => new
+            {
+                name,
+                path = RequireFile(Path.Combine(baselineRoot, name + ".dll"), name + " base assembly"),
+            }).ToArray();
+            var managedAssemblySetSha256 = NamedAssemblySetHash(
+                baselineRecords.Select(record => (record.name, record.path)));
+            var baseId = GetString(buildIdentity, "baseId") ?? string.Empty;
+            var baseMvSet = new List<(string name, byte[] bytes)>();
+            var assemblyCompatibility = new List<object>();
+            var uncovered = new List<string>();
+            var unsupported = new List<string>();
+            var requiredRuntimeCapabilities = new HashSet<string>(StringComparer.Ordinal)
+            {
+                "resource-update-plan-integrity-v1",
+            };
+            if (runtimeAotMetadata.Count > 0)
+                requiredRuntimeCapabilities.Add("resource-update-aot-metadata-path-v1");
+            if (!string.Equals(baseRuntimeProtocol,
+                    ResourceUpdateCompatibility.RuntimeProtocol, StringComparison.Ordinal) ||
+                string.IsNullOrWhiteSpace(baseNativeRuntimeContract) ||
+                baseNativeRuntimeCapabilities.Length == 0 ||
+                baseNativeRuntimeCapabilities.Any(string.IsNullOrWhiteSpace) ||
+                baseNativeRuntimeCapabilities.Distinct(StringComparer.Ordinal).Count() !=
+                    baseNativeRuntimeCapabilities.Length)
+                unsupported.Add("base-native-runtime-protocol:" + nativeManifestPath);
+            foreach (var baselineRecord in baselineRecords)
+            {
+                var baselineSnapshot = MetaVersionSnapshot.Create(baselineRecord.path);
+                var baselineMvBytes = baselineSnapshot.ToBinary();
+                baseMvSet.Add((baselineRecord.name, baselineMvBytes));
+                var currentSnapshot = currentSnapshots[baselineRecord.name];
+                var compatibility = ResourceUpdateCompatibility.Analyze(baselineSnapshot,
+                    currentSnapshot, currentAddressTakenFields);
+                requiredRuntimeCapabilities.UnionWith(
+                    compatibility.RequiredRuntimeCapabilities);
+                var missingGuards = compatibility.GuardRequiredMethods.Where(method =>
+                    !guardedMethods.Contains(NativeStableMethodKey(baselineRecord.name, method.StableId)) &&
+                    !interpreterOnlyMethods.Contains(NativeStableMethodKey(baselineRecord.name,
+                        method.StableId))).ToArray();
+                uncovered.AddRange(missingGuards.Select(method => baselineRecord.name + ":" +
+                    method.StableId));
+                unsupported.AddRange(compatibility.UnsupportedChanges.Select(change =>
+                    baselineRecord.name + ":" + change));
+                assemblyCompatibility.Add(new
+                {
+                    assemblyName = baselineRecord.name,
+                    baselineAssemblySha256 = baselineSnapshot.AssemblySha256,
+                    baseMetaVersionSha256 = Sha256Bytes(baselineMvBytes),
+                    compatible = compatibility.Compatible && missingGuards.Length == 0,
+                    compatibilityPolicy = ResourceUpdateCompatibility.Policy,
+                    unchangedMethodCount = compatibility.UnchangedMethodCount,
+                    changedMethodCount = compatibility.ChangedMethodCount,
+                    bodyOnlyChangedMethodCount = compatibility.BodyOnlyChangedMethodCount,
+					dependencyChangedMethodCount = compatibility.DependencyChangedMethodCount,
+                    removedMethodCount = compatibility.RemovedMethodCount,
+                    addedMethodCount = compatibility.AddedMethodCount,
+					removedFieldCount = compatibility.RemovedFieldCount,
+					addedFieldCount = compatibility.AddedFieldCount,
+                    changedExistingTypeCount = compatibility.ChangedExistingTypeCount,
+                    removedTypeCount = compatibility.RemovedTypeCount,
+                    addedTypeCount = compatibility.AddedTypeCount,
+                    guardRequiredMethodCount = compatibility.GuardRequiredMethods.Length,
+                    guardCoveredMethodCount = compatibility.GuardRequiredMethods.Length - missingGuards.Length,
+                    uncoveredStableMethodIds = missingGuards.Select(method => method.StableId).ToArray(),
+                    unsupportedChangeCount = compatibility.UnsupportedChanges.Length,
+                    unsupportedChanges = compatibility.UnsupportedChanges,
+                });
+            }
+            var baseMvSetHash = NamedByteSetHash(baseMvSet);
+            var identityErrors = ValidateResourceBaseIdentity(buildIdentity, buildIdentityPath,
+                nativeManifestPath, managedAssemblySetSha256, baseMvSetHash,
+                runtimeAssetRoot, baseMetaVersionAssetRoot);
+            unsupported.AddRange(identityErrors);
+            string[] missingRuntimeCapabilities = requiredRuntimeCapabilities
+                .Except(baseNativeRuntimeCapabilities, StringComparer.Ordinal)
+                .OrderBy(value => value, StringComparer.Ordinal).ToArray();
+            if (!ResourceUpdateCompatibility.CanExecuteUpdate(baseRuntimeProtocol,
+                    baseNativeRuntimeContract,
+                    baseNativeRuntimeCapabilities, requiredRuntimeCapabilities) &&
+                missingRuntimeCapabilities.Length == 0)
+                unsupported.Add("base-runtime-protocol-cannot-execute-update:" +
+                    baseRuntimeProtocol);
+            unsupported.AddRange(missingRuntimeCapabilities.Select(capability =>
+                "base-missing-runtime-capability:" + capability));
+            var nativeManifestSha256 = Sha256File(nativeManifestPath);
+            var baseIdentityKey = baseId;
+            if (!candidateBaseIdentityKeys.Add(baseIdentityKey))
+                unsupported.Add("duplicate-base-identity:" + baseId);
+            bool baseCompatible = uncovered.Count == 0 && unsupported.Count == 0;
+            var baseRecord = new
+            {
+                baseId,
+                target = baseTarget,
+                managedAssemblySetSha256,
+                aotSnapshotSha256 = baseAotSnapshotSha256,
+                baseMetaVersionSetSha256 = baseMvSetHash,
+                nativeGuardSourceSha256 = baseNativeGuardSourceSha256,
+                nativeManifestSha256,
+                runtimeProtocol = baseRuntimeProtocol,
+                nativeRuntimeContract = baseNativeRuntimeContract,
+                runtimeCapabilities = baseNativeRuntimeCapabilities.OrderBy(value => value,
+                    StringComparer.Ordinal).ToArray(),
+                requiredRuntimeCapabilities = requiredRuntimeCapabilities.OrderBy(value => value,
+                    StringComparer.Ordinal).ToArray(),
+                runtimeAssetRoot,
+                baseMetaVersionAssetRoot,
+                buildIdentitySha256 = Sha256File(buildIdentityPath),
+                compatibilityPolicy = ResourceUpdateCompatibility.Policy,
+                compatible = baseCompatible,
+                guardCoverageValidated = uncovered.Count == 0,
+                unsupportedChangeCount = unsupported.Count,
+                unsupportedChanges = unsupported.OrderBy(value => value, StringComparer.Ordinal).ToArray(),
+                assemblies = assemblyCompatibility.ToArray(),
+            };
+            candidateBases.Add(baseRecord);
+            if (!baseCompatible)
+            {
+                releaseErrors.Add("Base " + baseId + " is incompatible: " +
+                    string.Join("; ", uncovered.Concat(unsupported).Take(32)) +
+                    (uncovered.Count + unsupported.Count > 32 ? " ..." : ""));
+            }
+        }
+
+        WriteJson(validationPath, new
+        {
+            schemaVersion = 1,
+            format = "hybridclr.dhe-resource-update-validation.json",
+            generatedAtUtc = DateTimeOffset.UtcNow,
+            passed = releaseErrors.Count == 0,
+            compatibilityPolicy = ResourceUpdateCompatibility.Policy,
+            runtimeProtocol = ResourceUpdateCompatibility.RuntimeProtocol,
+            currentAssemblySetSha256 = currentSetHash,
+            candidateBaseCount = candidateBases.Count,
+            compatibleBaseCount = candidateBases.Count - releaseErrors.Count,
+            bases = candidateBases.ToArray(),
+            errors = releaseErrors.ToArray(),
+        });
+        if (releaseErrors.Count > 0)
+            throw new DheException("DHE resource update is not compatible with every supported Base Player. " +
+                "See " + validationPath + ". " + releaseErrors[0]);
+
+        WriteJson(runtimePlanPath, new
+        {
+            schemaVersion = 1,
+            format = "hybridclr.dhe-runtime-asset-plan.json",
+            selection = "embedded-base-metaversion",
+            currentAssemblySetSha256 = currentSetHash,
+            runtimeAssetRoot,
+            baseMetaVersionAssetRoot,
+            aotMetadata = runtimeAotMetadata.ToArray(),
+            assemblies = runtimeAssemblies.ToArray(),
+        });
+        WriteJson(manifestPath, new
+        {
+            schemaVersion = 1,
+            format = "hybridclr.dhe-resource-update.json",
+            generatedAtUtc = DateTimeOffset.UtcNow,
+            payloadModel = "single-current-payload",
+            metaVersionSchema = 1,
+            compatibilityPolicy = ResourceUpdateCompatibility.Policy,
+            runtimeProtocol = ResourceUpdateCompatibility.RuntimeProtocol,
+            compatibilityValidated = true,
+            validation = "dhe-resource-update-validation.json",
+            validationSha256 = Sha256File(validationPath),
+            currentAssemblySetSha256 = currentSetHash,
+            playerUpdateRequired = false,
+            guardCoverageValidated = true,
+            runtimeComparison = "embedded-base-mv-vs-current-mv",
+            runtimePlan = "dhe-runtime-plan.json",
+            runtimePlanSha256 = Sha256File(runtimePlanPath),
+            runtimeAssetRoot,
+            baseMetaVersionAssetRoot,
+            aotMetadata = runtimeAotMetadata.ToArray(),
+            assemblies = payloadFiles.ToArray(),
+            supportedBases = candidateBases.ToArray(),
+        });
+        Console.WriteLine("DHE single-payload resource update: " + manifestPath);
+        return 0;
+    }
+
+    private static string[] ValidateResourceBaseIdentity(JsonElement identity, string identityPath,
+        string nativeManifestPath, string managedAssemblySetSha256,
+        string baseMetaVersionSetSha256, string runtimeAssetRoot,
+        string baseMetaVersionAssetRoot)
+    {
+        var errors = new List<string>();
+        JsonElement nativeManifest = ReadJson<JsonElement>(nativeManifestPath);
+        if (GetInt(identity, "schemaVersion") != 1 || !string.Equals(GetString(identity, "format"),
+                "hybridclr.dhe-build-identity.json", StringComparison.Ordinal))
+            errors.Add("base-build-identity-format:" + identityPath);
+        if (GetInt(identity, "identityVersion") != 1)
+            errors.Add("base-build-identity-version:" + identityPath);
+        if (!string.Equals(GetString(identity, "state"), "staged-for-final-player",
+                StringComparison.Ordinal))
+            errors.Add("base-build-identity-state:" + identityPath);
+        var target = GetString(identity, "target") ?? string.Empty;
+        if (target.Length == 0 || target.Any(character => !(char.IsLetterOrDigit(character) ||
+                character is '.' or '_' or '-')))
+            errors.Add("base-build-identity-target:" + identityPath);
+        if (!string.Equals(GetString(identity, "managedAssemblySetSha256"),
+                managedAssemblySetSha256, StringComparison.OrdinalIgnoreCase))
+            errors.Add("base-build-identity-assembly-set-mismatch:" + identityPath);
+        if (!IsHex(GetString(identity, "aotSnapshotSha256"), 64, 64))
+            errors.Add("base-build-identity-aot-snapshot:" + identityPath);
+        if (!IsHex(GetString(identity, "nativeGuardSourceSha256"), 64, 64))
+            errors.Add("base-build-identity-native-guard:" + identityPath);
+        if (!string.Equals(GetString(identity, "baseMetaVersionSetSha256"),
+                baseMetaVersionSetSha256, StringComparison.OrdinalIgnoreCase))
+            errors.Add("base-build-identity-metaversion-set-mismatch:" + identityPath);
+        if (!string.Equals(GetString(identity, "nativeManifestSha256"), Sha256File(nativeManifestPath),
+                StringComparison.OrdinalIgnoreCase))
+            errors.Add("base-build-identity-native-manifest-mismatch:" + identityPath);
+        string runtimeProtocol = GetString(identity, "runtimeProtocol") ?? string.Empty;
+        string runtimeContract = GetString(identity, "runtimeContract") ?? string.Empty;
+        string[] runtimeCapabilities = ReadStringArray(identity, "runtimeCapabilities");
+        if (!string.Equals(runtimeProtocol, ResourceUpdateCompatibility.RuntimeProtocol,
+                StringComparison.Ordinal) ||
+            !string.Equals(runtimeProtocol, GetString(nativeManifest, "runtimeProtocol"),
+                StringComparison.Ordinal) ||
+            string.IsNullOrWhiteSpace(runtimeContract) ||
+            !string.Equals(runtimeContract, GetString(nativeManifest, "runtimeContract"),
+                StringComparison.Ordinal) ||
+            runtimeCapabilities.Length == 0 ||
+            runtimeCapabilities.Any(string.IsNullOrWhiteSpace) ||
+            runtimeCapabilities.Distinct(StringComparer.Ordinal).Count() !=
+                runtimeCapabilities.Length ||
+            !new HashSet<string>(runtimeCapabilities, StringComparer.Ordinal).SetEquals(
+                ReadStringArray(nativeManifest, "runtimeCapabilities")))
+            errors.Add("base-build-identity-runtime-contract:" + identityPath);
+        if (!string.Equals(NormalizeRuntimeAssetRoot(GetString(identity, "runtimeAssetRoot") ?? ""),
+                runtimeAssetRoot, StringComparison.OrdinalIgnoreCase) ||
+            !string.Equals(NormalizeRuntimeAssetRoot(
+                    GetString(identity, "baseMetaVersionAssetRoot") ?? ""),
+                baseMetaVersionAssetRoot, StringComparison.OrdinalIgnoreCase))
+            errors.Add("base-build-identity-asset-roots:" + identityPath);
+        string computedBaseId = ComputeBaseId(target, managedAssemblySetSha256,
+            GetString(identity, "aotSnapshotSha256") ?? string.Empty,
+            baseMetaVersionSetSha256,
+            GetString(identity, "nativeGuardSourceSha256") ?? string.Empty,
+            GetString(identity, "nativeManifestSha256") ?? string.Empty,
+            runtimeProtocol, runtimeContract, runtimeCapabilities, runtimeAssetRoot,
+            baseMetaVersionAssetRoot);
+        if (!string.Equals(GetString(identity, "baseId"), computedBaseId,
+                StringComparison.OrdinalIgnoreCase))
+            errors.Add("base-build-identity-composite-id:" + identityPath);
+        return errors.ToArray();
+    }
+
+    private static HashSet<string> ReadNativeStableMethodIds(JsonElement manifest, string property)
+    {
+        var result = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+        if (!manifest.TryGetProperty(property, out var methods) || methods.ValueKind != JsonValueKind.Array)
+            return result;
+        foreach (var method in methods.EnumerateArray())
+        {
+            var assemblyName = NormalizeName(GetString(method, "assemblyName") ?? string.Empty);
+            var managedId = GetString(method, "managedId") ?? string.Empty;
+            var stableId = GetString(method, "stableMethodIdSha256") ?? string.Empty;
+            if (assemblyName.Length == 0 || managedId.Length == 0 || !IsHex(stableId, 64, 64) ||
+                !string.Equals(Sha256Text("dhe-method-id\n" + managedId), stableId,
+                    StringComparison.OrdinalIgnoreCase))
+                throw new DheException("Native manifest contains an invalid stable method identity in " +
+                    property + ".");
+            result.Add(NativeStableMethodKey(assemblyName, stableId));
+        }
+        return result;
+    }
+
+    private static string NativeStableMethodKey(string assemblyName, string stableId) =>
+        NormalizeName(assemblyName) + ":" + stableId.ToLowerInvariant();
+
+    private static string[] ReadStringArray(JsonElement value, string property)
+    {
+        return value.TryGetProperty(property, out JsonElement items) &&
+               items.ValueKind == JsonValueKind.Array
+            ? items.EnumerateArray().Where(item => item.ValueKind == JsonValueKind.String)
+                .Select(item => item.GetString() ?? string.Empty).ToArray()
+            : Array.Empty<string>();
+    }
+
+    private static string RequireCommonBaseAssetRoot(IEnumerable<JsonElement> identities,
+        string property)
+    {
+        string[] roots = identities.Select(identity => NormalizeRuntimeAssetRoot(
+                GetString(identity, property) ?? string.Empty))
+            .Distinct(StringComparer.OrdinalIgnoreCase).ToArray();
+        if (roots.Length != 1)
+            throw new DheException("Supported Base identities do not share " + property + ".");
+        return roots[0];
+    }
+
+    private static void ValidateRequestedAssetRoot(string? requested, string identityValue,
+        string description)
+    {
+        if (!string.IsNullOrWhiteSpace(requested) &&
+            !string.Equals(NormalizeRuntimeAssetRoot(requested), identityValue,
+                StringComparison.OrdinalIgnoreCase))
+            throw new DheException(description +
+                " does not match the immutable supported Base identities.");
+    }
+
+    private static string ComputeBaseId(string target, string managedAssemblySetSha256,
+        string aotSnapshotSha256, string baseMetaVersionSetSha256,
+        string nativeGuardSourceSha256, string nativeManifestSha256,
+        string runtimeProtocol, string runtimeContract, IEnumerable<string> runtimeCapabilities,
+        string runtimeAssetRoot, string baseMetaVersionAssetRoot)
+    {
+        string[] capabilities = runtimeCapabilities.Where(value => !string.IsNullOrWhiteSpace(value))
+            .Distinct(StringComparer.Ordinal).OrderBy(value => value, StringComparer.Ordinal).ToArray();
+        string canonical = "hybridclr.dhe-base-identity-v1\n" +
+            "target=" + target + "\n" +
+            "managedAssemblySetSha256=" + managedAssemblySetSha256.ToLowerInvariant() + "\n" +
+            "aotSnapshotSha256=" + aotSnapshotSha256.ToLowerInvariant() + "\n" +
+            "baseMetaVersionSetSha256=" + baseMetaVersionSetSha256.ToLowerInvariant() + "\n" +
+            "nativeGuardSourceSha256=" + nativeGuardSourceSha256.ToLowerInvariant() + "\n" +
+            "nativeManifestSha256=" + nativeManifestSha256.ToLowerInvariant() + "\n" +
+            "runtimeProtocol=" + runtimeProtocol + "\n" +
+            "runtimeContract=" + runtimeContract + "\n" +
+            "runtimeCapabilities=" + string.Join(",", capabilities) + "\n" +
+            "runtimeAssetRoot=" + NormalizeRuntimeAssetRoot(runtimeAssetRoot) + "\n" +
+            "baseMetaVersionAssetRoot=" + NormalizeRuntimeAssetRoot(baseMetaVersionAssetRoot) + "\n";
+        return Sha256Text(canonical);
+    }
+
+    private static string NamedAssemblySetHash(IEnumerable<(string name, string path)> records)
+    {
+        using var sha = SHA256.Create();
+        foreach (var record in records.OrderBy(item => item.name, StringComparer.Ordinal))
+        {
+            var name = Encoding.UTF8.GetBytes(record.name + "\n");
+            sha.TransformBlock(name, 0, name.Length, name, 0);
+            var bytes = File.ReadAllBytes(record.path);
+            sha.TransformBlock(bytes, 0, bytes.Length, bytes, 0);
+            var separator = new byte[] { (byte)'\n' };
+            sha.TransformBlock(separator, 0, separator.Length, separator, 0);
+        }
+        sha.TransformFinalBlock(Array.Empty<byte>(), 0, 0);
+        return Convert.ToHexString(sha.Hash!).ToLowerInvariant();
+    }
+
+    private static string NamedByteSetHash(IEnumerable<(string name, byte[] bytes)> records)
+    {
+        using var sha = SHA256.Create();
+        foreach (var record in records.OrderBy(item => item.name, StringComparer.Ordinal))
+        {
+            var name = Encoding.UTF8.GetBytes(record.name + "\n");
+            sha.TransformBlock(name, 0, name.Length, name, 0);
+            sha.TransformBlock(record.bytes, 0, record.bytes.Length, record.bytes, 0);
+            var separator = new byte[] { (byte)'\n' };
+            sha.TransformBlock(separator, 0, separator.Length, separator, 0);
+        }
+        sha.TransformFinalBlock(Array.Empty<byte>(), 0, 0);
+        return Convert.ToHexString(sha.Hash!).ToLowerInvariant();
+    }
+
+    private static string Sha256Bytes(byte[] bytes) =>
+        Convert.ToHexString(SHA256.HashData(bytes)).ToLowerInvariant();
+
+    private static string NormalizeRuntimeAssetRoot(string value)
+    {
+        var normalized = (value ?? string.Empty).Replace('\\', '/').Trim();
+        if (normalized.Length == 0 || normalized.StartsWith("/", StringComparison.Ordinal) || Path.IsPathRooted(normalized) || normalized.Contains("..", StringComparison.Ordinal))
+            throw new DheException("RuntimeAssetRoot must be a portable project-relative path.");
+        return normalized.EndsWith("/", StringComparison.Ordinal) ? normalized : normalized + "/";
     }
 
     private static int Preflight(Cli cli)
@@ -197,22 +773,42 @@ internal static partial class Program
         var output = SafeOutputRoot(cli.Require("outputroot"), new[] { settings, baseline, current });
         Directory.CreateDirectory(output);
         var batchArgs = new Cli("batch", new Dictionary<string, string>(cli.Values, StringComparer.OrdinalIgnoreCase));
-        batchArgs.Values["outputroot"] = Path.Combine(output, "batch"); batchArgs.Values["strictcompatibility"] = "true";
+        batchArgs.Values["outputroot"] = Path.Combine(output, "batch");
         var batchCode = Batch(batchArgs);
         var batchPath = Path.Combine(output, "batch", "dhe-batch-summary.json");
         var batch = ReadJson<JsonElement>(batchPath);
         var assemblies = new List<object>();
         foreach (var record in batch.GetProperty("assemblies").EnumerateArray())
         {
-            var status = record.GetProperty("status").GetString() ?? "error"; var mv = status == "compatible" ? ReadJson<JsonElement>(record.GetProperty("report").GetString()!) : (JsonElement?)null;
-            assemblies.Add(new { assemblyName = record.GetProperty("assemblyName").GetString(), batchStatus = status, validationPassed = status == "compatible", validationReport = (string?)null, error = record.TryGetProperty("error", out var error) ? error.GetString() : null });
+            var status = record.GetProperty("status").GetString() ?? "error";
+            assemblies.Add(new { assemblyName = record.GetProperty("assemblyName").GetString(),
+                batchStatus = status, validationPassed = status == "compatible",
+                validationReport = (string?)null,
+                error = record.TryGetProperty("error", out var error) ? error.GetString() : null });
         }
         var names = batch.GetProperty("assemblies").EnumerateArray().Select(x => x.GetProperty("assemblyName").GetString()!).ToArray();
         var planRecords = batch.GetProperty("assemblies").EnumerateArray().Select(record =>
         {
-            var status = record.GetProperty("status").GetString() ?? "error"; JsonElement? mv = null;
-            if (status == "compatible") mv = ReadJson<JsonElement>(record.GetProperty("report").GetString()!);
-            return new { assemblyName = record.GetProperty("assemblyName").GetString(), status, baseline = record.GetProperty("baseline").GetString(), current = record.GetProperty("current").GetString(), mvJson = status == "compatible" ? record.GetProperty("report").GetString() : null, mvBytes = status == "compatible" ? record.GetProperty("binary").GetString() : null, changedMethodCount = mv?.GetProperty("summary").GetProperty("changedMethodCount").GetInt32() ?? 0, compatibility = mv?.GetProperty("compatibility").GetProperty("status").GetString() };
+            var status = record.GetProperty("status").GetString() ?? "error";
+            var assemblyName = record.GetProperty("assemblyName").GetString()!;
+            var baselinePath = record.GetProperty("baseline").GetString()!;
+            var currentPath = record.GetProperty("current").GetString()!;
+            return new
+            {
+                assemblyName,
+                status,
+                baseline = baselinePath,
+                current = currentPath,
+                baseMetaVersionJson = record.GetProperty("baseMetaVersionJson").GetString(),
+                baseMetaVersionBytes = record.GetProperty("baseMetaVersionBytes").GetString(),
+                currentMetaVersionJson = record.GetProperty("currentMetaVersionJson").GetString(),
+                currentMetaVersionBytes = record.GetProperty("currentMetaVersionBytes").GetString(),
+                changedMethodCount = record.GetProperty("changedMethodCount").GetInt32(),
+                changedExistingTypeCount = record.GetProperty("changedExistingTypeCount").GetInt32(),
+                addedTypeCount = record.GetProperty("addedTypeCount").GetInt32(),
+                removedTypeCount = record.GetProperty("removedTypeCount").GetInt32(),
+                compatibility = status,
+            };
         }).ToArray();
         var planPath = Path.Combine(output, "dhe-project-plan.json");
         WriteJson(planPath, new { schemaVersion = 1, format = "hybridclr.dhe-project-plan.json", generatedAtUtc = DateTimeOffset.UtcNow, complete = batch.GetProperty("counts").GetProperty("error").GetInt32() == 0 && batch.GetProperty("counts").GetProperty("missing").GetInt32() == 0 && batch.GetProperty("counts").GetProperty("incompatible").GetInt32() == 0, requireDheEqualsHotUpdate = cli.Has("requiredheequalshotupdate"), hotUpdateAssemblies = Settings.Read(settings).Hot, dheAotAssemblies = names, dheEqualsHotUpdate = SetEquals(Settings.Read(settings).Hot, names), settingsFile = settings, baselineRoot = baseline, currentRoot = current, batchReport = batchPath, assemblies = planRecords });
@@ -302,7 +898,10 @@ internal static partial class Program
         var output = SafeOutputRoot(cli.Require("outputroot"), new[] { project });
         var target = cli.Require("target");
         var settings = RequireFile(cli.Require("settingsfile"), "HybridCLR settings");
-        var baseline = RequireDirectory(cli.Require("baselineaotroot"), "Baseline AOT root");
+        var bootstrap = cli.Has("bootstrap");
+        var baseline = bootstrap
+            ? Path.GetFullPath(Path.Combine(output, "bootstrap-baseline-source"))
+            : RequireDirectory(cli.Require("baselineaotroot"), "Baseline AOT root");
         var unity = ResolveUnity(cli, project);
         var adapterClass = cli.Require("adaptermethod");
         var mode = cli.Optional("mode") ?? "Release";
@@ -319,10 +918,15 @@ internal static partial class Program
         var prepareArguments = new List<string> { "-batchmode", "-nographics", "-quit", "-projectPath", project,
             "-executeMethod", adapterClass, "-dheTarget", target, "-dheOutputRoot", output,
             "-dheBaselineRoot", baselineCopy, "-dheCurrentRoot", current, "-dheMode", mode,
+            "-extraScriptingDefines=HYBRIDCLR_DHE_CURRENT_GENERATION",
             "-logFile", Path.Combine(output, "unity-prepare.log") };
+        if (bootstrap) prepareArguments.AddRange(new[] { "-dheBootstrap", "true" });
+        if (cli.Optional("dhecurrentinputroot") is { Length: > 0 } currentInputRoot)
+            prepareArguments.AddRange(new[] { "-dheCurrentInputRoot",
+                RequireDirectory(currentInputRoot, "DHE current assembly input root") });
         AppendUnityArguments(prepareArguments, cli);
         RunUnity(unity, project, prepareArguments,
-            new Dictionary<string, string> { ["DHE_BASELINE_ROOT"] = baseline },
+            bootstrap ? new Dictionary<string, string>() : new Dictionary<string, string> { ["DHE_BASELINE_ROOT"] = baseline },
             Path.Combine(output, "unity-prepare-process.log"), timeout);
         var preparePath = Path.Combine(output, "adapter", "prepare.json");
         RequireFile(preparePath, "DHE adapter prepare report");
@@ -351,13 +955,22 @@ internal static partial class Program
         var common = new List<string> { "-batchmode", "-nographics", "-quit", "-projectPath", project,
             "-dheTarget", target, "-dheOutputRoot", output, "-dheBaselineRoot", baselineCopy,
             "-dheCurrentRoot", current, "-dheMode", mode, "-dheProjectPlan", planPath };
+        if (cli.Has("bootstrap")) common.AddRange(new[] { "-dheBootstrap", "true" });
         AppendUnityArguments(common, cli);
         RunUnity(unity, project, common.Append("-executeMethod").Append(adapterType + ".StageRuntimePlan").Append("-logFile").Append(Path.Combine(output, "unity-stage.log")), new Dictionary<string, string> { ["DHE_BASELINE_ROOT"] = baseline }, Path.Combine(output, "unity-stage-process.log"), timeout);
         RunUnity(unity, project, common.Append("-executeMethod").Append(adapterType + ".BuildDheYooAsset").Append("-logFile").Append(Path.Combine(output, "unity-yooasset.log")), new Dictionary<string, string> { ["DHE_BASELINE_ROOT"] = baseline }, Path.Combine(output, "unity-yooasset-process.log"), timeout);
         var resourcePath = Path.Combine(output, "adapter", "resource-evidence.json");
         ValidateResourceEvidence(resourcePath, target);
         RunUnity(unity, project, common.Append("-executeMethod").Append(adapterType + ".BuildScriptsOnly").Append("-logFile").Append(Path.Combine(output, "unity-scripts.log")), new Dictionary<string, string> { ["DHE_BASELINE_ROOT"] = baseline }, Path.Combine(output, "unity-scripts-process.log"), timeout);
-        RunUnity(unity, project, common.Append("-executeMethod").Append(adapterType + ".BuildFinalPlayer").Append("-logFile").Append(Path.Combine(output, "unity-player.log")), new Dictionary<string, string> { ["DHE_BASELINE_ROOT"] = baseline }, Path.Combine(output, "unity-player-process.log"), timeout);
+        if (bootstrap)
+        {
+            RunUnity(unity, project, common.Append("-executeMethod").Append(adapterType + ".BuildFinalPlayer").Append("-logFile").Append(Path.Combine(output, "unity-player.log")), new Dictionary<string, string> { ["DHE_BASELINE_ROOT"] = baseline }, Path.Combine(output, "unity-player-process.log"), timeout);
+            Console.WriteLine("DHE bootstrap Player built with universal guards; use resource-update for later releases.");
+        }
+        else
+        {
+            RunUnity(unity, project, common.Append("-executeMethod").Append(adapterType + ".BuildFinalPlayer").Append("-logFile").Append(Path.Combine(output, "unity-player.log")), new Dictionary<string, string> { ["DHE_BASELINE_ROOT"] = baseline }, Path.Combine(output, "unity-player-process.log"), timeout);
+        }
         var playerPath = Path.Combine(output, "dhe-player-result.json");
         RequireFile(playerPath, "DHE Player result");
         var nativePath = Path.Combine(output, "native", "dhe-native-manifest.json");
@@ -462,14 +1075,11 @@ internal static partial class Program
         var changed = records.Sum(record => GetInt(record, "changedMethodCount"));
         var methodCount = records.Sum(record =>
         {
-            var path = GetString(record, "mvJson");
+            var path = GetString(record, "currentMetaVersionJson");
             return path != null && File.Exists(path) ? GetInt(ReadJson<JsonElement>(path).GetProperty("summary"), "methodCount") : 0;
         });
-        var typeChanges = records.Sum(record =>
-        {
-            var path = GetString(record, "mvJson");
-            return path != null && File.Exists(path) ? GetInt(ReadJson<JsonElement>(path).GetProperty("summary"), "typeChangeCount") : 0;
-        });
+        var typeChanges = records.Sum(record => GetInt(record, "changedExistingTypeCount") +
+            GetInt(record, "addedTypeCount") + GetInt(record, "removedTypeCount"));
         var aotNames = plan.GetProperty("dheAotAssemblies");
         var loadedNames = player.GetProperty("loadedDheAssemblies");
         var transactionStatus = GetString(player, "transactionStatus") ?? (changed == 0 ? "notApplicable" : "failed");
@@ -799,40 +1409,39 @@ internal static partial class Program
 
     private static int Validate(Cli cli)
     {
-        var input = RequireFile(cli.Require("mvjson"), "MV JSON");
+        var input = RequireFile(cli.Require("mvjson"), "MetaVersion JSON");
         var errors = new List<string>();
         JsonElement doc = default;
         try
         {
             doc = ReadJson<JsonElement>(input);
-            if (!doc.TryGetProperty("format", out var format) || format.GetString() != "hybridclr.dhe-lite.mv.json")
-                errors.Add("Invalid MV format.");
+            if (GetInt(doc, "schemaVersion") != MetaVersionSnapshot.SchemaVersion ||
+                !doc.TryGetProperty("format", out var format) ||
+                format.GetString() != "hybridclr.dhe-metaversion.json")
+                errors.Add("Invalid MetaVersion format.");
             if (!doc.TryGetProperty("assemblyName", out var assemblyName) || string.IsNullOrWhiteSpace(assemblyName.GetString()))
-                errors.Add("MV assemblyName is missing.");
-            if (doc.TryGetProperty("compatibility", out var compatibility) &&
-                compatibility.TryGetProperty("status", out var status) && status.GetString() != "compatible")
-                errors.Add("MV is not compatible.");
+                errors.Add("MetaVersion assemblyName is missing.");
         }
         catch (Exception ex) { errors.Add(ex.Message); }
 
-        var baseline = cli.Optional("baselineassembly");
-        var current = cli.Optional("currentassembly");
-        if (!string.IsNullOrWhiteSpace(baseline) || !string.IsNullOrWhiteSpace(current))
+        var assemblyPath = cli.Optional("assembly") ?? cli.Optional("currentassembly");
+        MetaVersionSnapshot? expected = null;
+        if (!string.IsNullOrWhiteSpace(assemblyPath))
         {
-            if (string.IsNullOrWhiteSpace(baseline) || string.IsNullOrWhiteSpace(current))
-                errors.Add("BaselineAssembly and CurrentAssembly must be supplied together.");
-            else
+            try
             {
-                try
-                {
-                    var diff = AssemblyDiff.Create(RequireFile(baseline!, "Baseline assembly"), RequireFile(current!, "Current assembly"));
-                    var expectedName = doc.TryGetProperty("assemblyName", out var name) ? name.GetString() : null;
-                    if (!string.Equals(expectedName, diff.AssemblyName, StringComparison.Ordinal)) errors.Add("MV assemblyName does not match the current assembly.");
-                    if (doc.TryGetProperty("baseline", out var baseDoc) && baseDoc.TryGetProperty("sha256", out var baseHash) && !string.Equals(baseHash.GetString(), diff.BaselineSha256, StringComparison.OrdinalIgnoreCase)) errors.Add("MV baseline SHA-256 does not match the baseline assembly.");
-                    if (doc.TryGetProperty("current", out var currentDoc) && currentDoc.TryGetProperty("sha256", out var currentHash) && !string.Equals(currentHash.GetString(), diff.CurrentSha256, StringComparison.OrdinalIgnoreCase)) errors.Add("MV current SHA-256 does not match the current assembly.");
-                }
-                catch (Exception ex) { errors.Add(ex.Message); }
+                assemblyPath = RequireFile(assemblyPath, "MetaVersion assembly");
+                expected = MetaVersionSnapshot.Create(assemblyPath);
+                if (!string.Equals(GetString(doc, "assemblyName"), expected.AssemblyName,
+                        StringComparison.Ordinal) ||
+                    !string.Equals(GetString(doc, "assemblyMetadataVersion"),
+                        expected.AssemblyMetadataVersion, StringComparison.OrdinalIgnoreCase) ||
+                    !doc.TryGetProperty("assembly", out JsonElement assembly) ||
+                    !string.Equals(GetString(assembly, "sha256"), expected.AssemblySha256,
+                        StringComparison.OrdinalIgnoreCase))
+                    errors.Add("MetaVersion JSON does not match the assembly.");
             }
+            catch (Exception ex) { errors.Add(ex.Message); }
         }
 
         var binary = cli.Optional("mvbytes") ?? cli.Optional("binaryoutput");
@@ -840,20 +1449,22 @@ internal static partial class Program
         {
             try
             {
-                var parsed = ReadMvBinary(RequireFile(binary!, "MV binary"));
-                var jsonTokens = ChangedTokensFromMvJson(doc);
-                if (!string.Equals(parsed.AssemblyName, GetString(doc, "assemblyName"), StringComparison.Ordinal) ||
-                    !string.Equals(parsed.BaselineSha256, GetString(doc.GetProperty("baseline"), "sha256"), StringComparison.OrdinalIgnoreCase) ||
-                    !string.Equals(parsed.CurrentSha256, GetString(doc.GetProperty("current"), "sha256"), StringComparison.OrdinalIgnoreCase) ||
-                    !parsed.ChangedTokens.SequenceEqual(jsonTokens))
-                    errors.Add("MV binary does not match the MV JSON document.");
+                binary = RequireFile(binary!, "MetaVersion binary");
+                if (expected == null)
+                    errors.Add("MetaVersion binary validation requires -Assembly.");
+                else if (!File.ReadAllBytes(binary).SequenceEqual(expected.ToBinary()))
+                    errors.Add("MetaVersion binary does not match the assembly.");
             }
             catch (Exception ex) { errors.Add(ex.Message); }
         }
 
         var output = cli.Optional("output");
         if (!string.IsNullOrWhiteSpace(output))
-            WriteJson(SafeReportPath(output, new[] { input, baseline ?? "", current ?? "", binary ?? "" }), new { schemaVersion = 1, format = "hybridclr.dhe-artifact-validation.json", generatedAtUtc = DateTimeOffset.UtcNow, passed = errors.Count == 0, errors, warnings = Array.Empty<string>(), mvJson = input, mvBytes = binary, baselineAssembly = baseline, currentAssembly = current });
+            WriteJson(SafeReportPath(output, new[] { input, assemblyPath ?? "", binary ?? "" }),
+                new { schemaVersion = 1, format = "hybridclr.dhe-artifact-validation.json",
+                    generatedAtUtc = DateTimeOffset.UtcNow, passed = errors.Count == 0, errors,
+                    warnings = Array.Empty<string>(), metaVersionJson = input,
+                    metaVersionBytes = binary, assembly = assemblyPath });
         if (errors.Count > 0) { Console.Error.WriteLine(string.Join(Environment.NewLine, errors)); return 1; }
         Console.WriteLine("DHE artifact validation passed: " + input);
         return 0;
@@ -981,7 +1592,10 @@ internal static partial class Program
         {
             assemblyName = GetString(record, "assemblyName"), status = GetString(record, "status"),
             baseline = ArchiveDocumentRelative(archive, Path.GetDirectoryName(projectPlan)!, GetString(record, "baseline")), current = ArchiveDocumentRelative(archive, Path.GetDirectoryName(projectPlan)!, GetString(record, "current")),
-            mvJson = ArchiveDocumentRelative(archive, Path.GetDirectoryName(projectPlan)!, GetString(record, "mvJson")), mvBytes = ArchiveDocumentRelative(archive, Path.GetDirectoryName(projectPlan)!, GetString(record, "mvBytes")),
+            baseMetaVersionJson = ArchiveDocumentRelative(archive, Path.GetDirectoryName(projectPlan)!, GetString(record, "baseMetaVersionJson")),
+            baseMetaVersionBytes = ArchiveDocumentRelative(archive, Path.GetDirectoryName(projectPlan)!, GetString(record, "baseMetaVersionBytes")),
+            currentMetaVersionJson = ArchiveDocumentRelative(archive, Path.GetDirectoryName(projectPlan)!, GetString(record, "currentMetaVersionJson")),
+            currentMetaVersionBytes = ArchiveDocumentRelative(archive, Path.GetDirectoryName(projectPlan)!, GetString(record, "currentMetaVersionBytes")),
             changedMethodCount = GetInt(record, "changedMethodCount")
         }).ToArray();
         WriteJson(manifestPath, new
@@ -1294,6 +1908,12 @@ internal static partial class Program
         var namespaceName = cli.Optional("namespace") ?? "YourGame.Editor";
         if (!IsCSharpNamespace(namespaceName))
             throw new DheException("Namespace must be a dotted C# identifier: " + namespaceName);
+        var identityNamespace = cli.Optional("identitynamespace") ??
+            (namespaceName.EndsWith(".Editor", StringComparison.Ordinal)
+                ? namespaceName[..^".Editor".Length] : namespaceName);
+        if (!IsCSharpNamespace(identityNamespace))
+            throw new DheException("IdentityNamespace must be a dotted C# identifier: " +
+                identityNamespace);
 
         var explicitTemplate = cli.Optional("template");
         var candidates = new[]
@@ -1311,9 +1931,33 @@ internal static partial class Program
             throw new DheException("DHE C# adapter template was not found. Pass -Root or -Template explicitly.");
 
         Directory.CreateDirectory(Path.GetDirectoryName(full)!);
-        var source = File.ReadAllText(template).Replace("__DHE_NAMESPACE__", namespaceName,
-            StringComparison.Ordinal);
+        var source = File.ReadAllText(template)
+            .Replace("__DHE_NAMESPACE__", namespaceName, StringComparison.Ordinal)
+            .Replace("__DHE_IDENTITY_NAMESPACE__", identityNamespace, StringComparison.Ordinal);
         File.WriteAllText(full, source, new UTF8Encoding(false));
+        var identityOutput = cli.Optional("identityoutput");
+        if (string.IsNullOrWhiteSpace(identityOutput))
+        {
+            DirectoryInfo? directory = new FileInfo(full).Directory;
+            while (directory != null && !string.Equals(directory.Name, "Assets",
+                       StringComparison.OrdinalIgnoreCase)) directory = directory.Parent;
+            if (directory != null)
+                identityOutput = Path.Combine(directory.FullName, "HybridCLRGenerated",
+                    "DheBuildIdentity.cs");
+        }
+        if (!string.IsNullOrWhiteSpace(identityOutput))
+        {
+            var identityFull = SafeReportPath(identityOutput, new[] { full });
+            var identityTemplate = Path.Combine(Path.GetDirectoryName(template)!,
+                "DheBuildIdentity.cs");
+            if (!File.Exists(identityTemplate))
+                throw new DheException("DHE BuildIdentity template was not found: " + identityTemplate);
+            Directory.CreateDirectory(Path.GetDirectoryName(identityFull)!);
+            File.WriteAllText(identityFull, File.ReadAllText(identityTemplate)
+                .Replace("__DHE_IDENTITY_NAMESPACE__", identityNamespace,
+                    StringComparison.Ordinal), new UTF8Encoding(false));
+            Console.WriteLine("DHE BuildIdentity template: " + identityFull);
+        }
         Console.WriteLine("DHE C# adapter template: " + full);
         return 0;
     }
@@ -1341,6 +1985,7 @@ internal static partial class Program
             mode = "Exploratory",
             runPlayer = false,
             stopAfterPreflight = true,
+            bootstrap = false,
             unityTimeoutSeconds = 600,
             unityArguments = new Dictionary<string, string>()
         };
@@ -1409,7 +2054,9 @@ internal static partial class Program
                 property.Name.Equals("dheBaselineRoot", StringComparison.OrdinalIgnoreCase) ||
                 property.Name.Equals("dheCurrentRoot", StringComparison.OrdinalIgnoreCase) ||
                 property.Name.Equals("dheMode", StringComparison.OrdinalIgnoreCase) ||
-                property.Name.Equals("dheProjectPlan", StringComparison.OrdinalIgnoreCase))
+                property.Name.Equals("dheProjectPlan", StringComparison.OrdinalIgnoreCase) ||
+                property.Name.Equals("dheCurrentInputRoot", StringComparison.OrdinalIgnoreCase) ||
+                property.Name.Equals("extraScriptingDefines", StringComparison.OrdinalIgnoreCase))
                 throw new DheException("Workflow unityArguments cannot override a host-owned argument: " + property.Name);
             if (property.Value.ValueKind != JsonValueKind.String && property.Value.ValueKind != JsonValueKind.Number && property.Value.ValueKind != JsonValueKind.True && property.Value.ValueKind != JsonValueKind.False)
                 throw new DheException("Workflow unityArguments values must be scalar: " + property.Name);
@@ -1478,11 +2125,12 @@ internal static partial class Program
         }
     }
 
-    private static void PrintHelp() => Console.WriteLine("HybridCLR DHE C# tool\nCommands: version, mv, batch, baseline-manifest, aot-metadata-manifest, preflight, workflow, release-gate, regression, schema-validate, schema-gate, validate, archive, doctor, verify-package, release-evidence, publish, install, new-adapter, new-config, assemble-runtime, native-tests, build-managed-cases, generate-test-manifest, generate-metadata-stress-source, reference, compare-results, check-environment, clear-unity-project-locks, wait-editor, prepare-engine-test-project, bootstrap-repos, tree-hash, file-hash\nExample: dotnet run --project tool/HybridCLR.DheTool.csproj -- workflow -Config <project/dhe-workflow-config.json>");
+    private static void PrintHelp() => Console.WriteLine("HybridCLR DHE C# tool\nCommands: version, mv, batch, resource-update, stage-resource-update, baseline-manifest, aot-metadata-manifest, preflight, workflow, release-gate, regression, schema-validate, schema-gate, validate, archive, doctor, verify-package, release-evidence, publish, install, new-adapter, new-config, assemble-runtime, native-tests, build-managed-cases, generate-test-manifest, generate-metadata-stress-source, reference, compare-results, check-environment, clear-unity-project-locks, wait-editor, prepare-engine-test-project, bootstrap-repos, tree-hash, file-hash\nExample: dotnet run --project tool/HybridCLR.DheTool.csproj -- workflow -Config <project/dhe-workflow-config.json>");
 
     private static string ResolveUnity(Cli cli, string project) => RequireFile(cli.Optional("unity") ?? Environment.GetEnvironmentVariable("DHE_UNITY_EXE") ?? throw new DheException("Set -Unity or DHE_UNITY_EXE."), "Unity editor");
     private static void RunUnity(string executable, string workingDirectory, IEnumerable<string> arguments, IDictionary<string, string> environment, string logPath, int timeoutSeconds)
     {
+        var startedAt = DateTime.UtcNow;
         var start = new ProcessStartInfo(executable) { WorkingDirectory = workingDirectory, UseShellExecute = false, RedirectStandardOutput = true, RedirectStandardError = true };
         foreach (var arg in arguments) start.ArgumentList.Add(arg); foreach (var pair in environment) start.Environment[pair.Key] = pair.Value;
         using var process = Process.Start(start) ?? throw new DheException("Unable to start Unity editor.");
@@ -1494,56 +2142,40 @@ internal static partial class Program
             throw new DheException($"Unity timed out after {timeoutSeconds} seconds.");
         }
         Task.WaitAll(stdout, stderr);
+        WaitForUnityProjectRelease(workingDirectory, startedAt.AddSeconds(timeoutSeconds));
         Directory.CreateDirectory(Path.GetDirectoryName(Path.GetFullPath(logPath))!);
         File.WriteAllText(logPath, stdout.Result + Environment.NewLine + stderr.Result, new UTF8Encoding(false));
         if (process.ExitCode != 0) throw new DheException($"Unity exited with code {process.ExitCode}. See {logPath}.");
-    }
-
-    private static void WriteMvBinary(string path, AssemblyDiff diff)
-    {
-        Directory.CreateDirectory(Path.GetDirectoryName(path)!); using var stream = File.Create(path); using var writer = new BinaryWriter(stream, Encoding.UTF8, false);
-        writer.Write(Encoding.ASCII.GetBytes("DHEMVLT1")); writer.Write((uint)1); var name = Encoding.UTF8.GetBytes(diff.AssemblyName); writer.Write((uint)name.Length); writer.Write((uint)diff.ChangedTokens.Count); writer.Write((uint)1); writer.Write(Convert.FromHexString(diff.BaselineSha256)); writer.Write(Convert.FromHexString(diff.CurrentSha256)); writer.Write(name); foreach (var token in diff.ChangedTokens) writer.Write(token);
-    }
-
-    private static MvBinaryDocument ReadMvBinary(string path)
-    {
-        var bytes = File.ReadAllBytes(path);
-        if (bytes.Length < 88 || Encoding.ASCII.GetString(bytes, 0, 8) != "DHEMVLT1")
-            throw new DheException("MV binary header is invalid: " + path);
-        var version = BitConverter.ToUInt32(bytes, 8);
-        var nameLength = BitConverter.ToUInt32(bytes, 12);
-        var changedCount = BitConverter.ToUInt32(bytes, 16);
-        var flags = BitConverter.ToUInt32(bytes, 20);
-        if (version != 1 || flags != 1) throw new DheException("MV binary version or flags are unsupported: " + path);
-        var expectedLength = 88L + nameLength + changedCount * 4L;
-        if (nameLength == 0 || nameLength > 4096 || expectedLength != bytes.Length)
-            throw new DheException("MV binary length is invalid: " + path);
-        string assemblyName;
-        try { assemblyName = new UTF8Encoding(false, true).GetString(bytes, 88, checked((int)nameLength)); }
-        catch (Exception ex) { throw new DheException("MV binary assembly name is invalid UTF-8: " + ex.Message); }
-        if (string.IsNullOrWhiteSpace(assemblyName)) throw new DheException("MV binary assembly name is empty.");
-        var tokens = new uint[checked((int)changedCount)];
-        var tokenOffset = checked(88 + (int)nameLength);
-        for (var index = 0; index < tokens.Length; index++)
+        var argumentList = arguments.ToArray();
+        var unityLogIndex = Array.FindIndex(argumentList, value =>
+            string.Equals(value, "-logFile", StringComparison.OrdinalIgnoreCase));
+        if (unityLogIndex >= 0 && unityLogIndex + 1 < argumentList.Length)
         {
-            tokens[index] = BitConverter.ToUInt32(bytes, tokenOffset + index * 4);
-            if ((tokens[index] & 0xff000000u) != 0x06000000u || (tokens[index] & 0x00ffffffu) == 0)
-                throw new DheException("MV binary contains a non-MethodDef token: " + tokens[index].ToString("x8"));
-            if (index > 0 && tokens[index] <= tokens[index - 1])
-                throw new DheException("MV binary method tokens must be unique and sorted.");
+            var unityLog = argumentList[unityLogIndex + 1];
+            if (File.Exists(unityLog))
+            {
+                var text = File.ReadAllText(unityLog);
+                if (text.Contains("executeMethod method", StringComparison.Ordinal) &&
+                        text.Contains("threw exception", StringComparison.Ordinal) ||
+                    text.Contains("Application will terminate with return code 1", StringComparison.Ordinal) ||
+                    text.Contains("HandleProjectAlreadyOpenInAnotherInstance", StringComparison.Ordinal))
+                    throw new DheException("Unity reported a failed batch stage. See " + unityLog + ".");
+            }
         }
-        return new MvBinaryDocument(assemblyName, Convert.ToHexString(bytes.AsSpan(24, 32)).ToLowerInvariant(),
-            Convert.ToHexString(bytes.AsSpan(56, 32)).ToLowerInvariant(), tokens);
     }
 
-    private static uint[] ChangedTokensFromMvJson(JsonElement document)
+    private static void WaitForUnityProjectRelease(string project, DateTime deadline)
     {
-        if (!document.TryGetProperty("methods", out var methods) || methods.ValueKind != JsonValueKind.Array)
-            throw new DheException("MV JSON methods are missing.");
-        return methods.EnumerateArray().Where(method => GetString(method, "kind") == "changed")
-            .Select(method => method.TryGetProperty("currentToken", out var token) && token.TryGetUInt32(out var value)
-                ? value : throw new DheException("MV JSON changed method token is invalid."))
-            .OrderBy(token => token).ToArray();
+        var lockPath = Path.Combine(Path.GetFullPath(project), "Temp", "UnityLockfile");
+        DateTime? releasedAt = null;
+        while (DateTime.UtcNow < deadline)
+        {
+            if (File.Exists(lockPath)) releasedAt = null;
+            else if (releasedAt == null) releasedAt = DateTime.UtcNow;
+            else if ((DateTime.UtcNow - releasedAt.Value).TotalSeconds >= 5) return;
+            Thread.Sleep(250);
+        }
+        throw new DheException("Unity project lock was not released before the stage timeout: " + project);
     }
 
     private static T ReadJson<T>(string path) => JsonSerializer.Deserialize<T>(File.ReadAllText(path), Json) ?? throw new DheException("Invalid JSON: " + path);
@@ -1684,8 +2316,6 @@ internal static partial class Program
 
     private sealed class AssemblyRecord { public AssemblyRecord(string assemblyName, string sha256) { AssemblyName = assemblyName; Sha256 = sha256; } public string AssemblyName { get; } public string Sha256 { get; } }
     private sealed record PackageFileEntry(string Path, long Size, string Sha256);
-    private sealed record MvBinaryDocument(string AssemblyName, string BaselineSha256, string CurrentSha256,
-        uint[] ChangedTokens);
     private sealed class PackageInspection
     {
         public bool Passed { get; set; }
@@ -1708,7 +2338,12 @@ internal static partial class Program
         public bool BoundaryValid { get; set; }
         public List<string> Errors { get; } = new();
     }
-    private sealed record BatchRecord(string AssemblyName, string Baseline, string Current, string Report, string? Binary, string Status, string? Error);
+    private sealed record BatchRecord(string AssemblyName, string Baseline, string Current,
+        string BaseMetaVersionJson, string BaseMetaVersionBytes,
+        string CurrentMetaVersionJson, string CurrentMetaVersionBytes, string Status,
+        int ChangedMethodCount, int AddedMethodCount, int RemovedMethodCount,
+        int ChangedExistingTypeCount, int AddedTypeCount, int RemovedTypeCount,
+        string[] UnsupportedChanges, string? Error);
     private sealed class DheException : Exception { public DheException(string message) : base(message) { } }
 }
 
@@ -1731,142 +2366,3 @@ internal static class Settings
     public static Sets Read(string path) { var hot = ReadList(path, "hotUpdateAssemblies"); var dhe = ReadList(path, "dheAotAssemblies"); var patch = ReadList(path, "patchAOTAssemblies"); return new Sets { Hot = hot, Dhe = dhe, Patch = patch }; }
     private static string[] ReadList(string path, string key) { var values = new List<string>(); var active = false; foreach (var raw in File.ReadLines(path)) { var line = raw.Trim(); if (line.StartsWith(key + ":", StringComparison.Ordinal)) { active = true; continue; } if (active && line.StartsWith("- ")) { var value = line[2..].Trim().Trim('\'', '"'); if (value.EndsWith(".dll", StringComparison.OrdinalIgnoreCase)) value = value[..^4]; if (value.Length > 0) values.Add(value); continue; } if (active && line.Length > 0 && !line.StartsWith("-")) active = false; } return values.Distinct(StringComparer.OrdinalIgnoreCase).ToArray(); }
 }
-
-internal sealed class AssemblyDiff
-{
-    public string AssemblyName { get; private init; } = ""; public string BaselinePath { get; private init; } = ""; public string CurrentPath { get; private init; } = ""; public string BaselineSha256 { get; private init; } = ""; public string CurrentSha256 { get; private init; } = ""; public string BaselineMvid { get; private init; } = ""; public string CurrentMvid { get; private init; } = ""; public string[] BaselineAssemblyRefs { get; private init; } = Array.Empty<string>(); public string[] CurrentAssemblyRefs { get; private init; } = Array.Empty<string>(); public List<MethodChange> Methods { get; } = new(); public List<TypeChange> TypeChanges { get; } = new(); public List<string> Reasons { get; } = new(); public bool Compatible => Reasons.Count == 0; public int ChangedMethodCount => Methods.Count(x => x.Kind != "unchanged"); public List<uint> ChangedTokens => Methods.Where(x => x.Kind == "changed" && x.CurrentToken.HasValue).OrderBy(x => x.CurrentToken).Select(x => x.CurrentToken!.Value).ToList();
-    public static AssemblyDiff Create(string baselinePath, string currentPath)
-    {
-        using var b = ModuleDefMD.Load(baselinePath); using var c = ModuleDefMD.Load(currentPath); var result = new AssemblyDiff { AssemblyName = b.Assembly?.Name.String ?? "", BaselinePath = Path.GetFullPath(baselinePath), CurrentPath = Path.GetFullPath(currentPath), BaselineSha256 = Sha256(baselinePath), CurrentSha256 = Sha256(currentPath), BaselineMvid = b.Mvid?.ToString() ?? "", CurrentMvid = c.Mvid?.ToString() ?? "", BaselineAssemblyRefs = References(b), CurrentAssemblyRefs = References(c) }; if (!string.Equals(result.AssemblyName, c.Assembly?.Name.String, StringComparison.Ordinal)) throw new InvalidOperationException("Assembly names differ.");
-        if (!result.BaselineAssemblyRefs.SequenceEqual(result.CurrentAssemblyRefs, StringComparer.Ordinal)) result.Reasons.Add("assembly references changed");
-        if (!string.Equals(ModuleShape(b), ModuleShape(c), StringComparison.Ordinal)) result.Reasons.Add("assembly or module metadata changed");
-        var bm = MethodsOf(b); var cm = MethodsOf(c); foreach (var id in bm.Keys.Union(cm.Keys).OrderBy(x => x, StringComparer.Ordinal)) { bm.TryGetValue(id, out var oldMethod); cm.TryGetValue(id, out var newMethod); var kind = oldMethod is null ? "added" : newMethod is null ? "removed" : oldMethod.BodyHash != newMethod.BodyHash ? "changed" : oldMethod.Token != newMethod.Token ? "tokenChanged" : oldMethod.Shape != newMethod.Shape ? "shapeChanged" : "unchanged"; var metadata = newMethod ?? oldMethod!; result.Methods.Add(new MethodChange(id, kind, metadata.Name, oldMethod?.Token, newMethod?.Token, oldMethod?.BodyHash, newMethod?.BodyHash, oldMethod?.Shape == newMethod?.Shape, metadata.DeclaringType, metadata.ReturnType, metadata.ParameterTypes, metadata.IsStatic, metadata.HasThis, metadata.IsAbstract, metadata.IsPInvoke, metadata.DeclaringTypeIsValueType, metadata.GenericParameterCount, metadata.DeclaringTypeGenericParameterCount)); if (kind is "added" or "removed" or "tokenChanged" or "shapeChanged" || kind == "changed" && (oldMethod!.Token != newMethod!.Token || oldMethod.Shape != newMethod.Shape)) result.Reasons.Add(kind + ": " + id); }
-        var bt = TypesOf(b); var ct = TypesOf(c); foreach (var id in bt.Keys.Union(ct.Keys).OrderBy(x => x, StringComparer.Ordinal)) { bt.TryGetValue(id, out var oldType); ct.TryGetValue(id, out var newType); var kind = oldType is null ? "added" : newType is null ? "removed" : oldType != newType ? "layoutChanged" : "unchanged"; if (kind != "unchanged") { result.TypeChanges.Add(new TypeChange(id, kind, oldType, newType)); result.Reasons.Add("type layout changed: " + id); } }
-        return result;
-    }
-    public object ToJson(bool strict) => new { schemaVersion = 1, format = "hybridclr.dhe-lite.mv.json", generatedAtUtc = DateTimeOffset.UtcNow, assemblyName = AssemblyName, baseline = new { path = BaselinePath, sha256 = BaselineSha256, mvid = BaselineMvid, assemblyRefs = BaselineAssemblyRefs }, current = new { path = CurrentPath, sha256 = CurrentSha256, mvid = CurrentMvid, assemblyRefs = CurrentAssemblyRefs }, methods = Methods, typeChanges = TypeChanges, compatibility = new { mode = strict ? "method-body-only" : "analysis", status = Compatible ? "compatible" : "incompatible", reasons = Reasons }, summary = new { methodCount = Methods.Count, changedMethodCount = ChangedMethodCount, unchangedMethodCount = Methods.Count - ChangedMethodCount, typeChangeCount = TypeChanges.Count, compatibleMethodOnlyChange = Compatible } };
-    private static Dictionary<string, MethodInfo> MethodsOf(ModuleDef module) => module.Types.SelectMany(AllTypes).SelectMany(x => x.Methods).ToDictionary(MethodId, MethodInfo.Create, StringComparer.Ordinal);
-    private static Dictionary<string, string> TypesOf(ModuleDef module) => module.Types.SelectMany(AllTypes).Where(x => x.Name != "<Module>").ToDictionary(x => x.FullName, TypeShape, StringComparer.Ordinal);
-    private static string TypeShape(TypeDef type)
-    {
-        var fields = type.Fields.Select(field => string.Join(":",
-            field.MDToken.Raw.ToString("x8"), field.Name.String, field.FieldType.FullName,
-            ((uint)field.Attributes).ToString("x8"), field.FieldOffset.ToString(),
-            ConstantShape(field.HasConstant ? field.Constant : null), field.RVA.ToString(), BytesHash(field.InitialValue),
-            field.MarshalType?.ToString() ?? "", field.ImplMap?.ToString() ?? "", CustomAttributes(field.CustomAttributes)));
-        var genericParameters = type.GenericParameters.Select(GenericParameterShape);
-        var properties = type.Properties.Select(property => string.Join(":", property.MDToken.Raw.ToString("x8"), property.Name.String,
-            property.Type?.ToString() ?? "", ((uint)property.Attributes).ToString("x8"),
-            property.GetMethod?.MDToken.Raw.ToString("x8") ?? "", property.SetMethod?.MDToken.Raw.ToString("x8") ?? "",
-            string.Join(",", property.OtherMethods.Select(method => method.MDToken.Raw.ToString("x8"))),
-            ConstantShape(property.HasConstant ? property.Constant : null), CustomAttributes(property.CustomAttributes)));
-        var events = type.Events.Select(@event => string.Join(":", @event.MDToken.Raw.ToString("x8"), @event.Name.String,
-            @event.EventType?.FullName ?? "", ((uint)@event.Attributes).ToString("x8"),
-            @event.AddMethod?.MDToken.Raw.ToString("x8") ?? "", @event.RemoveMethod?.MDToken.Raw.ToString("x8") ?? "",
-            @event.InvokeMethod?.MDToken.Raw.ToString("x8") ?? "",
-            string.Join(",", @event.OtherMethods.Select(method => method.MDToken.Raw.ToString("x8"))),
-            CustomAttributes(@event.CustomAttributes)));
-        return string.Join("|", type.MDToken.Raw.ToString("x8"), type.BaseType?.FullName,
-            ((uint)type.Attributes).ToString("x8"), type.IsValueType,
-            type.ClassLayout?.PackingSize.ToString() ?? "", type.ClassLayout?.ClassSize.ToString() ?? "",
-            string.Join(",", type.Interfaces.Select(x => string.Join(":", x.MDToken.Raw.ToString("x8"),
-                x.Interface.FullName, CustomAttributes(x.CustomAttributes)))),
-            string.Join(",", genericParameters), string.Join(",", fields),
-            string.Join(",", properties), string.Join(",", events), CustomAttributes(type.CustomAttributes),
-            DeclSecurities(type.DeclSecurities));
-    }
-    private static string GenericParameterShape(GenericParam parameter) => string.Join(":", parameter.Number,
-        parameter.MDToken.Raw.ToString("x8"), parameter.Name.String, ((uint)parameter.Flags).ToString("x8"),
-        string.Join(",", parameter.GenericParamConstraints.Select(x => x.Constraint.FullName)),
-        CustomAttributes(parameter.CustomAttributes));
-    private static string CustomAttributes(IEnumerable<CustomAttribute> attributes) => string.Join(",",
-        attributes.Select(attribute => string.Join("", attribute.Constructor?.FullName ?? attribute.TypeFullName, "(",
-            string.Join(";", attribute.ConstructorArguments.Select(AttributeArgument)), ")",
-            "{", string.Join(";", attribute.NamedArguments.Select(argument => string.Join(":",
-                argument.IsField ? "field" : "property", argument.Name.String, argument.Type?.FullName ?? "",
-                AttributeArgument(argument.Argument)))), "}")));
-    private static string AttributeArgument(CAArgument argument) => (argument.Type?.FullName ?? "") + "=" + AttributeValue(argument.Value);
-    private static string AttributeValue(object? value)
-    {
-        if (value == null) return "null";
-        if (value is IList<CAArgument> arguments) return "[" + string.Join(",", arguments.Select(AttributeArgument)) + "]";
-        if (value is UTF8String utf8) return utf8.String;
-        if (value is IType type) return type.FullName;
-        return Convert.ToString(value, System.Globalization.CultureInfo.InvariantCulture) ?? "";
-    }
-    private static string ConstantShape(Constant? constant) => constant == null ? "" :
-        ((uint)constant.Type).ToString("x8") + ":" + AttributeValue(constant.Value);
-    private static string DeclSecurities(IEnumerable<DeclSecurity> securities) => string.Join(",",
-        securities.Select(security => string.Join(":", security.MDToken.Raw.ToString("x8"),
-            ((uint)security.Action).ToString("x8"), BytesHash(security.GetBlob()), CustomAttributes(security.CustomAttributes))));
-    private static string BytesHash(byte[]? bytes) => bytes == null || bytes.Length == 0 ? "" :
-        Convert.ToHexString(SHA256.HashData(bytes)).ToLowerInvariant();
-    private static string ModuleShape(ModuleDef module)
-    {
-        var assembly = module.Assembly;
-        var assemblyShape = assembly == null ? "" : string.Join("|", assembly.FullName,
-            ((uint)assembly.Attributes).ToString("x8"), ((uint)assembly.HashAlgorithm).ToString("x8"),
-            assembly.PublicKey?.ToString() ?? "", CustomAttributes(assembly.CustomAttributes),
-            DeclSecurities(assembly.DeclSecurities));
-        var resources = module.Resources.Select(resource => string.Join(":", resource.MDToken.Raw.ToString("x8"),
-            resource.Name.String, ((uint)resource.Attributes).ToString("x8"), resource.ResourceType,
-            resource is EmbeddedResource embedded ? BytesHash(embedded.CreateReader().ToArray()) : resource.ToString(),
-            CustomAttributes(resource.CustomAttributes)));
-        var exportedTypes = module.ExportedTypes.Select(type => string.Join(":", type.MDToken.Raw.ToString("x8"),
-            type.FullName, ((uint)type.Attributes).ToString("x8"), type.TypeDefId,
-            type.Implementation?.ToString() ?? "", CustomAttributes(type.CustomAttributes)));
-        return string.Join("|", assemblyShape, module.Name.String, module.Generation, module.EncId, module.EncBaseId,
-            module.Kind, module.Characteristics, module.DllCharacteristics, module.RuntimeVersion, module.Machine,
-            module.Cor20HeaderFlags, module.Cor20HeaderRuntimeVersion, module.TablesHeaderVersion,
-            module.ManagedEntryPoint?.MDToken.Raw.ToString("x8") ?? "", CustomAttributes(module.CustomAttributes),
-            string.Join(",", resources), string.Join(",", exportedTypes));
-    }
-    private static IEnumerable<TypeDef> AllTypes(TypeDef type) { yield return type; foreach (var child in type.NestedTypes.SelectMany(AllTypes)) yield return child; }
-    private static string MethodId(MethodDef method) => (method.DeclaringType?.FullName ?? "") + "::" + method.Name + "|" + method.MethodSig;
-    private static string[] References(ModuleDef module) => module.GetAssemblyRefs().Select(x => x.FullName).OrderBy(x => x, StringComparer.Ordinal).ToArray();
-    private static string Sha256(string path) { using var sha = SHA256.Create(); return Convert.ToHexString(sha.ComputeHash(File.ReadAllBytes(path))).ToLowerInvariant(); }
-    private sealed record MethodInfo(string Name, uint Token, string BodyHash, string Shape, string DeclaringType, string ReturnType, string[] ParameterTypes, bool IsStatic, bool HasThis, bool IsAbstract, bool IsPInvoke, bool DeclaringTypeIsValueType, uint GenericParameterCount, uint DeclaringTypeGenericParameterCount)
-    {
-        public static MethodInfo Create(MethodDef method) => new(
-            method.Name.String,
-            method.MDToken.Raw,
-            BodyHash(method),
-            method.MethodSig.ToString() + ":" + method.Attributes + ":" + method.ImplAttributes + ":" +
-                string.Join(",", method.GenericParameters.Select(GenericParameterShape)) + ":" +
-                string.Join(",", method.ParamDefs.Select(parameter => string.Join("/", parameter.Sequence,
-                    parameter.MDToken.Raw.ToString("x8"), parameter.Name.String, parameter.Attributes,
-                    ConstantShape(parameter.HasConstant ? parameter.Constant : null),
-                    parameter.MarshalType?.ToString() ?? "", CustomAttributes(parameter.CustomAttributes)))) + ":" +
-                CustomAttributes(method.CustomAttributes) + ":" + method.ImplMap?.ToString() + ":" +
-                string.Join(",", method.Overrides.Select(@override => @override.ToString())) + ":" +
-                DeclSecurities(method.DeclSecurities),
-            method.DeclaringType?.FullName ?? "",
-            method.MethodSig.RetType.FullName,
-            method.MethodSig.Params.Select(parameter => parameter.FullName).ToArray(),
-            method.IsStatic,
-            method.MethodSig.HasThis,
-            method.IsAbstract,
-            method.IsPinvokeImpl,
-            method.DeclaringType?.IsValueType ?? false,
-            (uint)method.MethodSig.GenParamCount,
-            (uint)(method.DeclaringType?.GenericParameters.Count ?? 0));
-    }
-    private static string BodyHash(MethodDef method) { if (!method.HasBody) return ""; var text = new StringBuilder().Append(method.Body!.MaxStack).Append('|').Append(method.Body.InitLocals).Append('|').Append(method.Body.KeepOldMaxStack); foreach (var local in method.Body.Variables) text.Append("|local:").Append(local.Type.FullName); foreach (var instruction in method.Body.Instructions) text.Append('|').Append(instruction.OpCode.Code).Append(':').Append(Operand(instruction.Operand)); foreach (var handler in method.Body.ExceptionHandlers) text.Append("|eh:").Append(handler.HandlerType).Append(':').Append(handler.CatchType?.FullName).Append(':').Append(handler.TryStart?.Offset).Append(':').Append(handler.TryEnd?.Offset).Append(':').Append(handler.HandlerStart?.Offset).Append(':').Append(handler.HandlerEnd?.Offset).Append(':').Append(handler.FilterStart?.Offset); return Convert.ToHexString(SHA256.HashData(Encoding.UTF8.GetBytes(text.ToString()))).ToLowerInvariant(); }
-    private static string Operand(object? operand)
-    {
-        if (operand == null) return "";
-        if (operand is Instruction instruction) return "target:" + instruction.Offset;
-        if (operand is IList<Instruction> targets) return "targets:" + string.Join(",", targets.Select(target => target.Offset));
-        if (operand is Local local) return "local:" + local.Index + ":" + local.Type.FullName;
-        if (operand is Parameter parameter) return "parameter:" + parameter.Index + ":" + parameter.Type.FullName;
-        var fullName = operand.GetType().GetProperty("FullName")?.GetValue(operand)?.ToString();
-        return operand.GetType().FullName + ":" + (fullName ?? Convert.ToString(operand, System.Globalization.CultureInfo.InvariantCulture) ?? "");
-    }
-}
-
-internal sealed record MethodChange(string Id, string Kind, string Name, uint? BaselineToken, uint? CurrentToken, string? BaselineBodySha256, string? CurrentBodySha256, bool ShapeStable, string DeclaringType, string ReturnType, string[] ParameterTypes, bool IsStatic, bool HasThis, bool IsAbstract, bool IsPInvoke, bool DeclaringTypeIsValueType, uint GenericParameterCount, uint DeclaringTypeGenericParameterCount)
-{
-    public bool TokenStable => BaselineToken == CurrentToken;
-}
-
-internal sealed record TypeChange(string Id, string Kind, string? BaselineLayout, string? CurrentLayout);

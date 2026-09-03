@@ -21,4 +21,22 @@ namespace HybridCLR.Dhe.LayoutFixture
             }
         }
     }
+
+	public sealed class ReferenceFieldRemoval
+	{
+		public int Kept;
+		public object? Removed;
+		public static object? RemovedStatic;
+	}
+
+	public struct ValueFieldRemoval
+	{
+		public int Kept;
+		public int Removed;
+	}
+
+	public sealed class RemovedReferenceType
+	{
+		public int Value;
+	}
 }

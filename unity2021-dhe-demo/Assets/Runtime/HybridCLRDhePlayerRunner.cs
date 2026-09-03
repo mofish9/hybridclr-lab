@@ -17,6 +17,8 @@ namespace HybridCLR.Lab
     internal static class HybridCLRDhePlayerRunner
     {
         private const string RuntimePlanFile = "HybridCLRLab/DheDemo/DheRuntimePlan.json";
+        private const string ResourceManifestFile = "HybridCLRLab/DheDemo/dhe-resource-update.json";
+        private const string RuntimeAssetRoot = "HybridCLRLab/DheDemo/";
         private const string MainAssemblyName = "HybridCLR.ManagedCasesAot";
         private const string BuildIdentityFile = "HybridCLRLab/build-identity.json";
         private const string DefaultResultFile = "hybridclr-lab-dhe-result.json";
@@ -54,24 +56,63 @@ namespace HybridCLR.Lab
 
         private static DheRun Execute()
         {
+            StreamingAssetsProvider provider = new StreamingAssetsProvider();
+            bool resourceUpdateManifestPresent = provider.Exists(ResourceManifestFile);
+            string runtimePlanFile = RuntimePlanFile;
+            if (resourceUpdateManifestPresent)
+            {
+                ResourceManifestData resourceManifest = JsonUtility.FromJson<ResourceManifestData>(
+                    provider.LoadText(ResourceManifestFile));
+                if (resourceManifest == null || string.IsNullOrWhiteSpace(resourceManifest.runtimePlan) ||
+                    resourceManifest.runtimePlan.Contains("/") ||
+                    resourceManifest.runtimePlan.Contains("\\") ||
+                    resourceManifest.runtimePlan == "." || resourceManifest.runtimePlan == "..")
+                {
+                    throw new InvalidDataException("DHE resource manifest runtimePlan is invalid.");
+                }
+                runtimePlanFile = RuntimeAssetRoot + resourceManifest.runtimePlan;
+            }
+            DheRuntimeIdentity runtimeIdentity = HybridCLRDheBuildIdentity.Create();
+            DheRuntime.Reset();
+            string runtimeError;
+            bool initialized = resourceUpdateManifestPresent
+                ? DheRuntime.InitializeFromResourceUpdate(provider, runtimeIdentity,
+                    ResourceManifestFile, out runtimeError, RuntimeAssetRoot, true)
+                : DheRuntime.Initialize(provider, runtimeIdentity, out runtimeError,
+                    runtimePlanFile, RuntimeAssetRoot, true);
+            if (!initialized)
+            {
+                throw new InvalidDataException("DHE managed runtime initialization failed: " +
+                    runtimeError);
+            }
             DheRuntimePlanData runtimePlan = JsonUtility.FromJson<DheRuntimePlanData>(
-                System.Text.Encoding.UTF8.GetString(ReadStreamingAssetBytes(RuntimePlanFile)));
+                provider.LoadText(runtimePlanFile));
             if (runtimePlan == null || runtimePlan.schemaVersion != 1 ||
                 !string.Equals(runtimePlan.format, "hybridclr.dhe-runtime-asset-plan.json", StringComparison.Ordinal) ||
+                !string.Equals(runtimePlan.selection, "embedded-base-metaversion", StringComparison.Ordinal) ||
                 runtimePlan.assemblies == null || runtimePlan.assemblies.Length == 0)
             {
                 throw new InvalidDataException("DHE runtime plan is empty or invalid.");
+            }
+            if (!DheRuntime.LoadAotMetadataImages(provider, HomologousImageMode.SuperSet,
+                    out LoadImageErrorCode metadataError, out string metadataMessage))
+            {
+                throw new InvalidDataException("DHE AOT metadata load failed: " +
+                    metadataError + "/" + metadataMessage);
             }
             Dictionary<string, LoadedDheAssembly> loadedAssemblies = new Dictionary<string, LoadedDheAssembly>(StringComparer.OrdinalIgnoreCase);
             int changedMethodCount = 0;
             bool retryValidated = false;
             string retryAssemblyName = string.Empty;
             LoadImageErrorCode retryFailureCode = LoadImageErrorCode.OK;
+            var batchAssemblyNames = new List<string>();
+            var batchCurrentAssemblies = new List<byte[]>();
             foreach (DheAssemblyPlanData assemblyPlan in runtimePlan.assemblies)
             {
                 if (assemblyPlan == null || string.IsNullOrWhiteSpace(assemblyPlan.assemblyName) ||
                     string.IsNullOrWhiteSpace(assemblyPlan.current) ||
-                    string.IsNullOrWhiteSpace(assemblyPlan.mv) || string.IsNullOrWhiteSpace(assemblyPlan.snapshot))
+                    string.IsNullOrWhiteSpace(assemblyPlan.currentMetaVersion) ||
+                    string.IsNullOrWhiteSpace(assemblyPlan.baseMetaVersion))
                 {
                     throw new InvalidDataException("DHE runtime plan contains an incomplete assembly record.");
                 }
@@ -80,92 +121,64 @@ namespace HybridCLR.Lab
                     throw new InvalidDataException("DHE runtime plan contains duplicate assembly: " + assemblyPlan.assemblyName);
                 }
                 byte[] assemblyCurrent = ReadStreamingAssetBytes(assemblyPlan.current);
-                byte[] assemblyMv = ReadStreamingAssetBytes(assemblyPlan.mv);
-                byte[] assemblySnapshot = ReadStreamingAssetBytes(assemblyPlan.snapshot);
-                if (assemblyMv.Length < 88 || !string.Equals(System.Text.Encoding.ASCII.GetString(assemblyMv, 0, 8), "DHEMVLT1", StringComparison.Ordinal) ||
-                    BitConverter.ToUInt32(assemblyMv, 8) != 1)
-                {
-                    throw new InvalidDataException("DHE MV binary header is invalid for " + assemblyPlan.assemblyName);
-                }
-                byte[] assemblyExpectedBaselineHash = Slice(assemblyMv, 24, 32);
-                byte[] assemblyExpectedCurrentHash = Slice(assemblyMv, 56, 32);
-                int assemblyNameSize = checked((int)BitConverter.ToUInt32(assemblyMv, 12));
-                if (assemblyNameSize <= 0 || 88 + assemblyNameSize > assemblyMv.Length ||
-                    !string.Equals(System.Text.Encoding.UTF8.GetString(assemblyMv, 88, assemblyNameSize), assemblyPlan.assemblyName, StringComparison.Ordinal))
-                {
-                    throw new InvalidDataException("DHE MV assembly identity does not match runtime plan for " + assemblyPlan.assemblyName);
-                }
+                byte[] assemblyCurrentMv = ReadStreamingAssetBytes(assemblyPlan.currentMetaVersion);
+                byte[] assemblyBaseMv = ReadStreamingAssetBytes(assemblyPlan.baseMetaVersion);
+                MetaVersionInfo currentMv = ParseMetaVersion(assemblyCurrentMv,
+                    assemblyPlan.assemblyName);
+                MetaVersionInfo baseMv = ParseMetaVersion(assemblyBaseMv,
+                    assemblyPlan.assemblyName);
                 byte[] assemblyCurrentHash = Sha256(assemblyCurrent);
-                byte[] assemblyMvHash = Sha256(assemblyMv);
-                byte[] assemblySnapshotHash = Sha256(assemblySnapshot);
-                // The baseline image is compiled into the Player. Its identity
-                // is carried by the MV header and the 32-byte snapshot asset;
-                // no baseline DLL is shipped as a runtime asset.
-                byte[] assemblyBaselineHash = assemblyExpectedBaselineHash;
+                byte[] assemblyMvHash = Sha256(assemblyCurrentMv);
+                byte[] assemblyBaselineHash = baseMv.assemblyHash;
                 string actualCurrentHash = ToHex(assemblyCurrentHash);
                 string actualBaselineHash = ToHex(assemblyBaselineHash);
                 string actualMvHash = ToHex(assemblyMvHash);
-                string actualSnapshotHash = ToHex(assemblySnapshotHash);
-                string mvCurrentHash = ToHex(assemblyExpectedCurrentHash);
-                string mvBaselineHash = ToHex(assemblyExpectedBaselineHash);
-                string snapshotHash = ToHex(assemblySnapshot);
+                string mvCurrentHash = ToHex(currentMv.assemblyHash);
+                string mvBaselineHash = ToHex(baseMv.assemblyHash);
                 if (!string.Equals(assemblyPlan.currentSha256, actualCurrentHash, StringComparison.OrdinalIgnoreCase) ||
-                    (!string.IsNullOrWhiteSpace(assemblyPlan.baselineSha256) &&
-                        !string.Equals(assemblyPlan.baselineSha256, actualBaselineHash, StringComparison.OrdinalIgnoreCase)) ||
-                    !string.Equals(assemblyPlan.mvSha256, actualMvHash, StringComparison.OrdinalIgnoreCase) ||
-                    !string.Equals(assemblyPlan.snapshotSha256, actualSnapshotHash, StringComparison.OrdinalIgnoreCase) ||
-                    !ByteArraysEqual(assemblyCurrentHash, assemblyExpectedCurrentHash) ||
-                    !ByteArraysEqual(assemblySnapshot, assemblyExpectedBaselineHash))
+                    !string.Equals(assemblyPlan.currentMetaVersionSha256, actualMvHash,
+                        StringComparison.OrdinalIgnoreCase) ||
+                    !ByteArraysEqual(assemblyCurrentHash, currentMv.assemblyHash))
                 {
                     throw new InvalidDataException("DHE runtime plan hash binding failed for " +
                         assemblyPlan.assemblyName + "; current=" + actualCurrentHash +
                         "/plan=" + assemblyPlan.currentSha256 + "/mv=" + mvCurrentHash +
-                        "; baseline=" + actualBaselineHash + "/plan=" + assemblyPlan.baselineSha256 +
-                        "/mv=" + mvBaselineHash + "; snapshot=" + snapshotHash +
-                        "/plan=" + assemblyPlan.snapshotSha256);
+                        "; baseline=" + actualBaselineHash + "/mv=" + mvBaselineHash);
                 }
-                int assemblyChangedMethodCount = checked((int)BitConverter.ToUInt32(assemblyMv, 16));
+                int assemblyChangedMethodCount = CountChangedMethods(baseMv, currentMv);
                 changedMethodCount = checked(changedMethodCount + assemblyChangedMethodCount);
-
-                // Exercise the runtime transaction boundary before the first
-                // valid load: an invalid method token must retire the
-                // homologous image, allowing the same assembly to be retried
-                // without an already-loaded false positive.
-                if (!retryValidated && assemblyChangedMethodCount > 0)
-                {
-                    byte[] invalidMv = CreateInvalidMetaVersion(assemblyMv);
-                    retryFailureCode = RuntimeApi.LoadDifferentialHybridAssemblyWithMetaVersion(
-                        assemblyCurrent, invalidMv, assemblySnapshot);
-                    if (retryFailureCode != LoadImageErrorCode.DHE_MV_REGISTRATION_FAILED)
-                    {
-                        throw new InvalidOperationException(
-                            "DHE invalid-MV transaction probe returned " + retryFailureCode +
-                            " for " + assemblyPlan.assemblyName + ".");
-                    }
-                    retryAssemblyName = assemblyPlan.assemblyName;
-                }
-                LoadImageErrorCode assemblyLoadError = RuntimeApi.LoadDifferentialHybridAssemblyWithMetaVersion(
-                    assemblyCurrent, assemblyMv, assemblySnapshot);
-                if (assemblyLoadError != LoadImageErrorCode.OK)
-                {
-                    throw new InvalidOperationException("DHE load failed for " + assemblyPlan.assemblyName + ": " + assemblyLoadError);
-                }
-                Assembly assembly = Assembly.Load(assemblyCurrent);
+                batchAssemblyNames.Add(assemblyPlan.assemblyName);
+                batchCurrentAssemblies.Add(assemblyCurrent);
                 loadedAssemblies.Add(assemblyPlan.assemblyName, new LoadedDheAssembly
                 {
                     plan = assemblyPlan,
-                    assembly = assembly,
                     currentHash = assemblyCurrentHash,
                     baselineHash = assemblyBaselineHash,
-                    mvCurrentHash = assemblyExpectedCurrentHash,
-                    mvBaselineHash = assemblyExpectedBaselineHash,
+                    mvCurrentHash = currentMv.assemblyHash,
+                    mvBaselineHash = baseMv.assemblyHash,
+                    currentMetaVersion = currentMv,
+                    baseMetaVersion = baseMv,
                 });
-                if (!string.IsNullOrWhiteSpace(retryAssemblyName) &&
-                    string.Equals(assemblyPlan.assemblyName, retryAssemblyName, StringComparison.Ordinal))
-                {
-                    retryValidated = true;
-                }
             }
+            if (!DheRuntime.LoadAssemblyImages(batchAssemblyNames.ToArray(),
+                    batchCurrentAssemblies.ToArray(), out LoadImageErrorCode batchLoadError,
+                    out string batchLoadMessage))
+            {
+                throw new InvalidOperationException("DHE atomic batch load failed: " +
+                    batchLoadError + "/" + batchLoadMessage);
+            }
+            foreach (LoadedDheAssembly loaded in loadedAssemblies.Values)
+            {
+                loaded.assembly = AppDomain.CurrentDomain.GetAssemblies().FirstOrDefault(candidate =>
+                    string.Equals(candidate.GetName().Name, loaded.plan.assemblyName,
+                        StringComparison.OrdinalIgnoreCase));
+                if (loaded.assembly == null)
+                    throw new InvalidOperationException("DHE Base AOT assembly was not found: " +
+                        loaded.plan.assemblyName);
+            }
+            retryValidated = DheRuntime.TransactionRetryValidated;
+            retryAssemblyName = DheRuntime.TransactionRetryAssemblyName;
+            retryFailureCode = DheRuntime.TransactionRetryFailure;
             if (loadedAssemblies.Count != runtimePlan.assemblies.Length ||
                 !loadedAssemblies.ContainsKey(MainAssemblyName))
             {
@@ -174,8 +187,8 @@ namespace HybridCLR.Lab
 
             LoadedDheAssembly mainLoaded = loadedAssemblies[MainAssemblyName];
             byte[] current = ReadStreamingAssetBytes(mainLoaded.plan.current);
-            byte[] mv = ReadStreamingAssetBytes(mainLoaded.plan.mv);
-            byte[] snapshot = ReadStreamingAssetBytes(mainLoaded.plan.snapshot);
+            byte[] mv = ReadStreamingAssetBytes(mainLoaded.plan.currentMetaVersion);
+            byte[] snapshot = mainLoaded.baselineHash;
             DheBuildIdentityData buildIdentity = JsonUtility.FromJson<DheBuildIdentityData>(
                 System.Text.Encoding.UTF8.GetString(ReadStreamingAssetBytes(BuildIdentityFile)));
             byte[] currentHash = Sha256(current);
@@ -246,8 +259,13 @@ namespace HybridCLR.Lab
             int mainInterpreterEntryCount = RuntimeApi.GetDifferentialInterpreterEntryCount();
             int mainAotBridgeCallCount = RuntimeApi.GetDifferentialAotBridgeCallCount();
             int mainAotEntryCount = RuntimeApi.GetDifferentialAotEntryCount();
-            CapabilityDirectRun directCapability = ExecuteCapabilityDirect();
-            CapabilityRun capability = ExecuteCapabilityReflection();
+            bool structuralExpected = CountAddedTypes(mainLoaded.baseMetaVersion,
+                    mainLoaded.currentMetaVersion) > 0 ||
+                CountAddedMethods(mainLoaded.baseMetaVersion, mainLoaded.currentMetaVersion) > 0;
+            CapabilityDirectRun directCapability = ExecuteCapabilityDirect(structuralExpected);
+            CapabilityRun capability = ExecuteCapabilityReflection(structuralExpected);
+            StructuralRun structural = ExecuteStructural(mainLoaded.assembly, structuralExpected,
+                directCapability.genericContainerResult);
             long metadataStressResult = ExecuteMetadataStress(loadedAssemblies);
             int metadataSecondaryReflectionResult = ExecuteSecondaryChanged(
                 loadedAssemblies, "HybridCLR.MetadataStress", "HybridCLR.Lab.MetadataStress.DheSecondaryCases");
@@ -257,15 +275,37 @@ namespace HybridCLR.Lab
             bool currentHashValidated = ByteArraysEqual(currentHash, expectedCurrentHash);
             bool baselineHashValidated = ByteArraysEqual(baselineHash, expectedBaselineHash);
             string embeddedSnapshotHash = HybridCLRDheBuildIdentity.AotSnapshotSha256;
-            bool embeddedSnapshotHashValidated = !string.IsNullOrWhiteSpace(embeddedSnapshotHash) &&
-                string.Equals(ToHex(snapshot), embeddedSnapshotHash, StringComparison.OrdinalIgnoreCase);
+            bool embeddedSnapshotHashValidated = buildIdentity != null &&
+                !string.IsNullOrWhiteSpace(embeddedSnapshotHash) &&
+                string.Equals(buildIdentity.aotSnapshotSha256, embeddedSnapshotHash,
+                    StringComparison.OrdinalIgnoreCase) &&
+                string.Equals(buildIdentity.managedAssemblySetSha256,
+                    HybridCLRDheBuildIdentity.ManagedAssemblySetSha256,
+                    StringComparison.OrdinalIgnoreCase);
             bool snapshotHashValidated = ByteArraysEqual(snapshot, expectedBaselineHash) && embeddedSnapshotHashValidated;
             string expectedTarget = GetArgument("-labTarget");
-            bool buildIdentityValidated = buildIdentity != null && buildIdentity.identityVersion == 2 &&
+            DheBuildIdentityAssemblyData mainIdentity = buildIdentity?.assemblies?.FirstOrDefault(item =>
+                string.Equals(item?.assemblyName, MainAssemblyName, StringComparison.OrdinalIgnoreCase));
+            bool buildIdentityValidated = buildIdentity != null && buildIdentity.identityVersion == 1 &&
                 string.Equals(buildIdentity.aotSnapshotKind, "managed-assembly-plus-generated-cpp-v1", StringComparison.Ordinal) &&
                 string.Equals(buildIdentity.target, expectedTarget, StringComparison.OrdinalIgnoreCase) &&
-                string.Equals(buildIdentity.mainBaselineAssemblySha256, ToHex(baselineHash), StringComparison.OrdinalIgnoreCase) &&
-                string.Equals(buildIdentity.mainSnapshotSha256, ToHex(snapshot), StringComparison.OrdinalIgnoreCase) &&
+                string.Equals(buildIdentity.baseId, HybridCLRDheBuildIdentity.BaseId,
+                    StringComparison.OrdinalIgnoreCase) &&
+                string.Equals(buildIdentity.runtimeProtocol,
+                    HybridCLRDheBuildIdentity.RuntimeProtocol, StringComparison.Ordinal) &&
+                string.Equals(buildIdentity.runtimeContract,
+                    HybridCLRDheBuildIdentity.RuntimeContract, StringComparison.Ordinal) &&
+                string.Equals(buildIdentity.runtimeAssetRoot,
+                    HybridCLRDheBuildIdentity.RuntimeAssetRoot, StringComparison.OrdinalIgnoreCase) &&
+                string.Equals(buildIdentity.baseMetaVersionAssetRoot,
+                    HybridCLRDheBuildIdentity.BaseMetaVersionAssetRoot,
+                    StringComparison.OrdinalIgnoreCase) &&
+                new HashSet<string>(buildIdentity.runtimeCapabilities ?? Array.Empty<string>(),
+                    StringComparer.Ordinal).SetEquals(
+                    HybridCLRDheBuildIdentity.RuntimeCapabilities ?? Array.Empty<string>()) &&
+                mainIdentity != null &&
+                string.Equals(mainIdentity.baselineSha256, ToHex(baselineHash), StringComparison.OrdinalIgnoreCase) &&
+                IsSha256(buildIdentity.baseMetaVersionSetSha256) &&
                 IsSha256(buildIdentity.nativeGuardSourceSha256) &&
                 IsSha256(buildIdentity.nativeManifestSha256) &&
                 !string.Equals(buildIdentity.nativeManifestSha256, new string('0', 64), StringComparison.Ordinal) &&
@@ -288,16 +328,19 @@ namespace HybridCLR.Lab
             bool noOpAotBehaviorValidated = changedMethodCount == 0 && noOpMainBehaviorValidated &&
                 noOpMultiAssemblyValidated && noOpCapabilityDirectValidated &&
                 noOpCapabilityReflectionValidated && mainInterpreterEntryCount == 0;
+			bool stableDispatchValidated = structuralExpected
+				? stableChanged && instanceStableChanged
+				: !stableChanged && !instanceStableChanged;
             bool changedBehaviorValidated = changedMethodCount == 0
                 ? noOpAotBehaviorValidated
                 : (addResult == 101 && stableResult == 4 &&
                     addViaStableResult == 104 && addPairResult == 107 && wideResult == 1005L &&
                     touchValue == 705 && instanceAddResult == 201 && instanceStableResult == 6 &&
-                    instanceAddViaStableResult == 206 && addChanged && !stableChanged &&
-                    addViaStableChanged && addPairChanged && wideChanged && touchChanged &&
-                    !instanceStableChanged && instanceAddChanged && instanceAddViaStableChanged &&
+					instanceAddViaStableResult == 206 && addChanged && stableDispatchValidated &&
+					addViaStableChanged && addPairChanged && wideChanged && touchChanged &&
+					instanceAddChanged && instanceAddViaStableChanged &&
                     mainInterpreterEntryCount >= 7 && mainAotEntryCount >= 3 && capability.passed &&
-                    directCapability.passed && managedSecondaryChanged && !managedSecondaryUnchanged &&
+                    directCapability.passed && structural.passed && managedSecondaryChanged && !managedSecondaryUnchanged &&
                     metadataSecondaryChanged && crossSecondaryChanged &&
                     managedSecondaryDirectResult == 103 && managedSecondaryUnchangedDirectResult == 6 &&
                     metadataSecondaryDirectResult == 103 && crossSecondaryDirectResult == 103 &&
@@ -404,9 +447,91 @@ namespace HybridCLR.Lab
                 capabilityIteratorResult = capability.iteratorResult,
                 capabilityVirtualResult = capability.virtualResult,
                 capabilityGenericVirtualResult = capability.genericVirtualResult,
+                structuralExpected = structural.expected,
+                structuralPassed = structural.passed,
+                structuralError = structural.error,
+                structuralExistingEntryResult = structural.existingEntryResult,
+                structuralAddedReferenceTypeFound = structural.addedReferenceTypeFound,
+                structuralAddedGenericTypeFound = structural.addedGenericTypeFound,
+                structuralAddedNestedTypeFound = structural.addedNestedTypeFound,
+                structuralNestedDeclaringTypeValidated = structural.nestedDeclaringTypeValidated,
+                structuralAddedStaticMethodFound = structural.addedStaticMethodFound,
+                structuralAddedInstanceMethodFound = structural.addedInstanceMethodFound,
+                structuralAddedStaticFieldsFound = structural.addedStaticFieldsFound,
+                structuralAddedStaticFieldDeclaringTypeValidated =
+                    structural.addedStaticFieldDeclaringTypeValidated,
+                structuralAddedStaticFieldReflectionValueValidated =
+                    structural.addedStaticFieldReflectionValueValidated,
+				structuralAddedInstanceFieldsFound = structural.addedInstanceFieldsFound,
+				structuralAddedInstanceFieldDeclaringTypeValidated =
+					structural.addedInstanceFieldDeclaringTypeValidated,
+				structuralAddedInstanceFieldDefaultValueValidated =
+					structural.addedInstanceFieldDefaultValueValidated,
+				structuralAddedInstanceFieldReflectionValueValidated =
+					structural.addedInstanceFieldReflectionValueValidated,
+				structuralAddedInstanceFieldGcValidated =
+					structural.addedInstanceFieldGcValidated,
+				structuralRemovedMethodHidden = structural.removedMethodHidden,
+				structuralRemovedMethodGuardValidated = structural.removedMethodGuardValidated,
+				structuralRemovedFieldsHidden = structural.removedFieldsHidden,
+				structuralRemovedFieldGuardValidated = structural.removedFieldGuardValidated,
+				structuralFieldSignatureReplacementVisible =
+					structural.fieldSignatureReplacementVisible,
+				structuralFieldSignatureReplacementRoundTripValidated =
+					structural.fieldSignatureReplacementRoundTripValidated,
+				structuralLogicalPropertiesValidated = structural.logicalPropertiesValidated,
+				structuralLogicalPropertyRoundTripValidated =
+					structural.logicalPropertyRoundTripValidated,
+				structuralLogicalEventsValidated = structural.logicalEventsValidated,
+				structuralLogicalEventRoundTripValidated =
+					structural.logicalEventRoundTripValidated,
+				structuralLogicalEventAccessorsValidated =
+					structural.logicalEventAccessorsValidated,
+				structuralLogicalAddedEventAccessors = structural.logicalAddedEventAccessors,
+				structuralLogicalEvolvedEventAccessors = structural.logicalEvolvedEventAccessors,
+				structuralLogicalAddedEventAccessorTouchValue =
+					structural.logicalAddedEventAccessorTouchValue,
+				structuralLogicalEvolvedEventAccessorTouchValue =
+					structural.logicalEvolvedEventAccessorTouchValue,
+				structuralLogicalAddedEventTouchValue =
+					structural.logicalAddedEventTouchValue,
+				structuralLogicalEvolvedEventTouchValue =
+					structural.logicalEvolvedEventTouchValue,
+				structuralRemovedPropertyGuardValidated =
+					structural.removedPropertyGuardValidated,
+				structuralReplacedPropertyGuardValidated =
+					structural.replacedPropertyGuardValidated,
+				structuralRemovedEventGuardValidated = structural.removedEventGuardValidated,
+				structuralReplacedEventGuardValidated = structural.replacedEventGuardValidated,
+				structuralRemovedTypeHidden = structural.removedTypeHidden,
+				structuralRemovedTypeEnumerationHidden = structural.removedTypeEnumerationHidden,
+				structuralRemovedTypeGuardValidated = structural.removedTypeGuardValidated,
+				structuralOldSignatureHidden = structural.oldSignatureHidden,
+				structuralOldSignatureGuardValidated = structural.oldSignatureGuardValidated,
+				structuralNewSignatureFound = structural.newSignatureFound,
+                structuralAssemblyEnumerationValidated = structural.assemblyEnumerationValidated,
+                structuralTypeAssemblyMatchesBase = structural.typeAssemblyMatchesBase,
+                structuralAddedReferenceResult = structural.addedReferenceResult,
+                structuralAddedGenericResult = structural.addedGenericResult,
+                structuralAddedNestedResult = structural.addedNestedResult,
+                structuralAddedStaticResult = structural.addedStaticResult,
+                structuralAddedInstanceResult = structural.addedInstanceResult,
+                structuralAddedStaticFieldDirectResult = structural.addedStaticFieldDirectResult,
+                structuralAddedStaticFieldReflectionResult =
+                    structural.addedStaticFieldReflectionResult,
+				structuralAddedInstanceFieldDirectResult =
+					structural.addedInstanceFieldDirectResult,
+				structuralAddedInstanceFieldReflectionResult =
+					structural.addedInstanceFieldReflectionResult,
+				structuralCurrentMemberDirectResult = structural.currentMemberDirectResult,
+				structuralNewSignatureResult = structural.newSignatureResult,
                 plannedDheAssemblies = GetAssemblyNames(runtimePlan),
                 loadedDheAssemblies = GetAssemblyNames(loadedAssemblies),
                 target = GetArgument("-labTarget"),
+                resourceUpdateManifestPresent = resourceUpdateManifestPresent,
+                resourceUpdateValidated = initialized,
+                selectedBaseId = runtimeIdentity.BaseId,
+                selectedBaseMetaVersionSetSha256 = runtimeIdentity.BaseMetaVersionSetSha256,
                 changedMethodCount = changedMethodCount,
                 expectedChangedMethodCount = changedMethodCount,
                 dispatchProbeValidated = dispatchProbeValidated,
@@ -438,13 +563,17 @@ namespace HybridCLR.Lab
                 crossAssemblyResult = crossAssemblyResult,
                 changedMethod = addChanged ? "interpreter" : "aot",
                 unchangedMethod = stableChanged ? "interpreter" : "aot",
-                changedCallingUnchangedMethod = addViaStableChanged ? "interpreter + AOT callee" : "aot",
+				changedCallingUnchangedMethod = addViaStableChanged
+					? stableChanged ? "interpreter + interpreter callee" : "interpreter + AOT callee"
+					: "aot",
                 changedMultiArgumentMethod = addPairChanged ? "interpreter" : "aot",
                 changedInt64Method = wideChanged ? "interpreter" : "aot",
                 changedVoidMethod = touchChanged ? "interpreter" : "aot",
                 changedInstanceMethod = instanceAddChanged ? "interpreter" : "aot",
                 unchangedInstanceMethod = instanceStableChanged ? "interpreter" : "aot",
-                changedInstanceCallingUnchangedMethod = instanceAddViaStableChanged ? "interpreter + AOT callee" : "aot",
+				changedInstanceCallingUnchangedMethod = instanceAddViaStableChanged
+					? instanceStableChanged ? "interpreter + interpreter callee" : "interpreter + AOT callee"
+					: "aot",
                 interpreterEntryCount = mainInterpreterEntryCount,
                 aotBridgeCallCount = mainAotBridgeCallCount,
                 aotEntryCount = mainAotEntryCount,
@@ -509,7 +638,7 @@ namespace HybridCLR.Lab
                 result.virtualResult == 4;
         }
 
-        private static CapabilityDirectRun ExecuteCapabilityDirect()
+        private static CapabilityDirectRun ExecuteCapabilityDirect(bool structuralExpected)
         {
             CapabilityDirectRun result = new CapabilityDirectRun();
             try
@@ -545,7 +674,7 @@ namespace HybridCLR.Lab
                     result.mutateValueResult.Number == 103 && result.mutateValueResult.Wide == 1004L &&
                     result.boxValueResult.Number == 103 && result.boxValueResult.Wide == 4L &&
                     result.refOutResult == 203 && result.asyncResult == 103 && result.iteratorResult == "103,5" &&
-                    result.genericContainerResult == 107 && result.nullableResult == 103 &&
+                    result.genericContainerResult == (structuralExpected ? 1812 : 107) && result.nullableResult == 103 &&
                     result.delegateClosedInstanceResult == 108 && result.delegateOpenInstanceResult == 108 &&
                     result.delegateMulticastResult == 118 && result.exceptionFinallyResult == 103 &&
                     result.virtualResult == 103 && result.unchangedVirtualResult == 9 &&
@@ -573,7 +702,427 @@ namespace HybridCLR.Lab
             return Convert.ToInt32(method.Invoke(null, new object[] { 3 }));
         }
 
-        private static CapabilityRun ExecuteCapabilityReflection()
+        private static StructuralRun ExecuteStructural(Assembly assembly, bool expected,
+            int existingEntryResult)
+        {
+            StructuralRun result = new StructuralRun
+            {
+                expected = expected,
+                existingEntryResult = existingEntryResult,
+            };
+            if (!expected)
+            {
+                result.passed = true;
+                return result;
+            }
+
+            try
+            {
+                const string addedReferenceName =
+                    "HybridCLR.Lab.ManagedCasesAot.DheAddedReferenceType";
+                const string addedGenericName =
+                    "HybridCLR.Lab.ManagedCasesAot.DheAddedGenericType`1";
+                const string addedNestedName =
+                    "HybridCLR.Lab.ManagedCasesAot.DheCapabilityCases+DheAddedNestedType";
+				const string removedTypeName =
+					"HybridCLR.Lab.ManagedCasesAot.DheRemovedReferenceType";
+                Type addedReference = assembly.GetType(addedReferenceName, false);
+                Type addedGeneric = assembly.GetType(addedGenericName, false);
+                Type capability = assembly.GetType(typeof(DheCapabilityCases).FullName, true);
+                Type addedNested = assembly.GetType(addedNestedName, false) ?? capability.GetNestedType(
+                    "DheAddedNestedType", BindingFlags.Public | BindingFlags.NonPublic);
+                Type calculator = assembly.GetType(typeof(DheDemoCalculator).FullName, true);
+                MethodInfo addedStatic = capability.GetMethod("AddedStaticMethod",
+                    BindingFlags.Public | BindingFlags.Static);
+                MethodInfo addedInstance = calculator.GetMethod("AddedInstanceMethod",
+                    BindingFlags.Public | BindingFlags.Instance);
+                MethodInfo staticFieldRoundTrip = calculator.GetMethod("AddedStaticFieldRoundTrip",
+                    BindingFlags.Public | BindingFlags.Static);
+                MethodInfo readStaticFields = calculator.GetMethod("ReadAddedStaticFields",
+                    BindingFlags.Public | BindingFlags.Static);
+                FieldInfo addedStaticCounter = calculator.GetField("AddedStaticCounter",
+                    BindingFlags.Public | BindingFlags.Static);
+                FieldInfo addedStaticText = calculator.GetField("AddedStaticText",
+                    BindingFlags.Public | BindingFlags.Static);
+				MethodInfo instanceFieldRoundTrip = calculator.GetMethod("AddedInstanceFieldRoundTrip",
+					BindingFlags.Public | BindingFlags.Instance);
+				MethodInfo readInstanceFields = calculator.GetMethod("ReadAddedInstanceFields",
+					BindingFlags.Public | BindingFlags.Instance);
+				FieldInfo addedInstanceCounter = calculator.GetField("AddedInstanceCounter",
+					BindingFlags.Public | BindingFlags.Instance);
+				FieldInfo addedInstanceText = calculator.GetField("AddedInstanceText",
+					BindingFlags.Public | BindingFlags.Instance);
+				FieldInfo addedInstancePayload = calculator.GetField("AddedInstancePayload",
+					BindingFlags.Public | BindingFlags.Instance);
+				FieldInfo addedInstanceStruct = calculator.GetField("AddedInstanceStruct",
+					BindingFlags.Public | BindingFlags.Instance);
+				MethodInfo removedLegacy = calculator.GetMethod("RemovedLegacyMethod",
+					BindingFlags.Public | BindingFlags.Instance);
+				FieldInfo removedInstanceField = calculator.GetField("RemovedInstanceCounter",
+					BindingFlags.Public | BindingFlags.Instance);
+				FieldInfo removedStaticField = calculator.GetField("RemovedStaticText",
+					BindingFlags.Public | BindingFlags.Static);
+				MethodInfo removedFieldReader = calculator.GetMethod("ReadRemovedFields",
+					BindingFlags.Public | BindingFlags.Instance);
+				MethodInfo evolvedFieldRoundTrip = calculator.GetMethod("EvolvedInstanceFieldRoundTrip",
+					BindingFlags.Public | BindingFlags.Instance);
+				MethodInfo readEvolvedField = calculator.GetMethod("ReadEvolvedInstanceField",
+					BindingFlags.Public | BindingFlags.Instance);
+				PropertyInfo removedProperty = calculator.GetProperty("RemovedProperty",
+					BindingFlags.Public | BindingFlags.Instance);
+				PropertyInfo addedProperty = calculator.GetProperty("AddedProperty",
+					BindingFlags.Public | BindingFlags.Instance);
+				PropertyInfo evolvedProperty = calculator.GetProperty("EvolvedProperty",
+					BindingFlags.Public | BindingFlags.Instance);
+				EventInfo removedEvent = calculator.GetEvent("RemovedEvent",
+					BindingFlags.Public | BindingFlags.Instance);
+				EventInfo addedEvent = calculator.GetEvent("AddedEvent",
+					BindingFlags.Public | BindingFlags.Instance);
+				EventInfo evolvedEvent = calculator.GetEvent("EvolvedEvent",
+					BindingFlags.Public | BindingFlags.Instance);
+				MethodInfo exerciseCurrentMembers = calculator.GetMethod("ExerciseCurrentMembers",
+					BindingFlags.Public | BindingFlags.Instance);
+				Type removedType = assembly.GetType(removedTypeName, false);
+				MethodInfo oldSignature = calculator.GetMethod("SignatureMigrated",
+					BindingFlags.Public | BindingFlags.Instance, null, new[] { typeof(int) }, null);
+				MethodInfo newSignature = calculator.GetMethod("SignatureMigrated",
+					BindingFlags.Public | BindingFlags.Instance, null, new[] { typeof(long) }, null);
+
+                result.addedReferenceTypeFound = addedReference != null;
+                result.addedGenericTypeFound = addedGeneric != null;
+                result.addedNestedTypeFound = addedNested != null;
+                result.addedStaticMethodFound = addedStatic != null;
+                result.addedInstanceMethodFound = addedInstance != null;
+                result.addedStaticFieldsFound = addedStaticCounter != null && addedStaticText != null;
+				result.addedInstanceFieldsFound = instanceFieldRoundTrip != null &&
+					readInstanceFields != null && addedInstanceCounter != null &&
+					addedInstanceText != null && addedInstancePayload != null &&
+					addedInstanceStruct != null;
+				result.removedMethodHidden = removedLegacy == null;
+				result.removedFieldsHidden = removedStaticField == null && removedFieldReader == null &&
+					!calculator.GetFields(BindingFlags.Public | BindingFlags.Instance).Any(field =>
+						string.Equals(field.Name, "RemovedInstanceCounter", StringComparison.Ordinal) &&
+						field.FieldType == typeof(int));
+				result.fieldSignatureReplacementVisible = removedInstanceField != null &&
+					removedInstanceField.FieldType == typeof(string) && evolvedFieldRoundTrip != null &&
+					readEvolvedField != null;
+				result.logicalPropertiesValidated = removedProperty == null && addedProperty != null &&
+					addedProperty.PropertyType == typeof(int) && evolvedProperty != null &&
+					evolvedProperty.PropertyType == typeof(string) &&
+					ReferenceEquals(addedProperty.DeclaringType, calculator) &&
+					ReferenceEquals(evolvedProperty.DeclaringType, calculator) &&
+					!calculator.GetProperties(BindingFlags.Public | BindingFlags.Instance)
+						.Any(property => string.Equals(property.Name, "RemovedProperty",
+							StringComparison.Ordinal));
+				result.logicalEventsValidated = removedEvent == null && addedEvent != null &&
+					addedEvent.EventHandlerType == typeof(Action<int>) && evolvedEvent != null &&
+					evolvedEvent.EventHandlerType == typeof(Action<string>) &&
+					ReferenceEquals(addedEvent.DeclaringType, calculator) &&
+					ReferenceEquals(evolvedEvent.DeclaringType, calculator) &&
+					!calculator.GetEvents(BindingFlags.Public | BindingFlags.Instance)
+						.Any(@event => string.Equals(@event.Name, "RemovedEvent",
+							StringComparison.Ordinal));
+				result.removedTypeHidden = removedType == null;
+				result.oldSignatureHidden = oldSignature == null ||
+					oldSignature.GetParameters().Length != 1 ||
+					oldSignature.GetParameters()[0].ParameterType != typeof(int);
+				result.newSignatureFound = newSignature != null;
+                Type[] visibleTypes = assembly.GetTypes();
+                result.assemblyEnumerationValidated = visibleTypes.Any(type =>
+                        string.Equals(type.FullName, addedReferenceName, StringComparison.Ordinal)) &&
+                    visibleTypes.Any(type =>
+                        string.Equals(type.FullName, addedGenericName, StringComparison.Ordinal)) &&
+                    visibleTypes.Any(type =>
+                        string.Equals(type.FullName, addedNestedName, StringComparison.Ordinal));
+				result.removedTypeEnumerationHidden = !visibleTypes.Any(type =>
+					string.Equals(type.FullName, removedTypeName, StringComparison.Ordinal));
+
+                if (addedReference == null)
+                    addedReference = visibleTypes.FirstOrDefault(type =>
+                        string.Equals(type.FullName, addedReferenceName, StringComparison.Ordinal));
+                if (addedGeneric == null)
+                    addedGeneric = visibleTypes.FirstOrDefault(type =>
+                        string.Equals(type.FullName, addedGenericName, StringComparison.Ordinal));
+                if (addedNested == null)
+                    addedNested = visibleTypes.FirstOrDefault(type =>
+                        string.Equals(type.FullName, addedNestedName, StringComparison.Ordinal));
+
+                if (addedReference == null || addedGeneric == null || addedNested == null ||
+                    addedStatic == null || addedInstance == null || staticFieldRoundTrip == null ||
+					readStaticFields == null || addedStaticCounter == null || addedStaticText == null ||
+					!result.addedInstanceFieldsFound || newSignature == null)
+                {
+                    result.error = "Current metadata additions are not visible through Base Assembly/Type reflection.";
+                    return result;
+                }
+
+                result.typeAssemblyMatchesBase = ReferenceEquals(addedReference.Assembly, assembly) &&
+                    ReferenceEquals(addedGeneric.Assembly, assembly) &&
+                    ReferenceEquals(addedNested.Assembly, assembly);
+                result.nestedDeclaringTypeValidated = ReferenceEquals(addedNested.DeclaringType, capability) &&
+                    ReferenceEquals(capability.GetNestedType("DheAddedNestedType",
+                        BindingFlags.Public | BindingFlags.NonPublic), addedNested);
+                result.addedStaticFieldDeclaringTypeValidated =
+                    ReferenceEquals(addedStaticCounter.DeclaringType, calculator) &&
+                    ReferenceEquals(addedStaticText.DeclaringType, calculator);
+				result.addedInstanceFieldDeclaringTypeValidated =
+					ReferenceEquals(addedInstanceCounter.DeclaringType, calculator) &&
+					ReferenceEquals(addedInstanceText.DeclaringType, calculator) &&
+					ReferenceEquals(addedInstancePayload.DeclaringType, calculator) &&
+					ReferenceEquals(addedInstanceStruct.DeclaringType, calculator);
+                object referenceObject = Activator.CreateInstance(addedReference,
+                    new object[] { 300 });
+                MethodInfo apply = addedReference.GetMethod("Apply",
+                    BindingFlags.Public | BindingFlags.Instance);
+                if (apply == null)
+                    throw new MissingMethodException(addedReferenceName, "Apply");
+                result.addedReferenceResult = Convert.ToInt32(apply.Invoke(referenceObject,
+                    new object[] { 3 }));
+
+                Type closedGeneric = addedGeneric.MakeGenericType(typeof(int));
+                object genericObject = Activator.CreateInstance(closedGeneric,
+                    new object[] { result.addedReferenceResult });
+                PropertyInfo valueProperty = closedGeneric.GetProperty("Value",
+                    BindingFlags.Public | BindingFlags.Instance);
+                if (valueProperty == null)
+                    throw new MissingMemberException(addedGenericName, "Value");
+                result.addedGenericResult = Convert.ToInt32(valueProperty.GetValue(genericObject));
+                object nestedObject = Activator.CreateInstance(addedNested,
+                    new object[] { 600 });
+                MethodInfo nestedApply = addedNested.GetMethod("Apply",
+                    BindingFlags.Public | BindingFlags.Instance);
+                if (nestedApply == null)
+                    throw new MissingMethodException(addedNestedName, "Apply");
+                result.addedNestedResult = Convert.ToInt32(nestedApply.Invoke(nestedObject,
+                    new object[] { 3 }));
+                result.addedStaticResult = Convert.ToInt32(addedStatic.Invoke(null,
+                    new object[] { 3 }));
+				result.addedInstanceResult = Convert.ToInt32(addedInstance.Invoke(
+					Activator.CreateInstance(calculator), new object[] { 3 }));
+				result.newSignatureResult = Convert.ToInt32(newSignature.Invoke(
+					Activator.CreateInstance(calculator), new object[] { 3L }));
+				var legacyObject = new DheDemoCalculator();
+#if HYBRIDCLR_DHE_BASE_PLAYER
+				try
+				{
+					legacyObject.RemovedLegacyMethod(3);
+				}
+				catch (MissingMethodException)
+				{
+					result.removedMethodGuardValidated = true;
+				}
+				try
+				{
+					legacyObject.ReadRemovedFields();
+				}
+				catch (MissingMethodException)
+				{
+					result.removedFieldGuardValidated = true;
+				}
+#endif
+				if (result.fieldSignatureReplacementVisible)
+				{
+					object evolvedObject = Activator.CreateInstance(calculator);
+					int directLength = Convert.ToInt32(evolvedFieldRoundTrip.Invoke(evolvedObject,
+						new object[] { 3 }));
+					bool directValue = string.Equals(Convert.ToString(
+						removedInstanceField.GetValue(evolvedObject)), "field-3", StringComparison.Ordinal);
+					removedInstanceField.SetValue(evolvedObject, "dhe");
+					int reflectedLength = Convert.ToInt32(readEvolvedField.Invoke(evolvedObject, null));
+					result.fieldSignatureReplacementRoundTripValidated = directLength == 7 &&
+						directValue && reflectedLength == 3;
+				}
+				if (result.logicalPropertiesValidated && exerciseCurrentMembers != null)
+				{
+					object memberObject = Activator.CreateInstance(calculator);
+					addedProperty.SetValue(memberObject, 3);
+					result.logicalPropertyRoundTripValidated =
+						Convert.ToInt32(addedProperty.GetValue(memberObject)) == 1403 &&
+						string.Equals(Convert.ToString(evolvedProperty.GetValue(memberObject)),
+							"property-1500", StringComparison.Ordinal);
+					result.currentMemberDirectResult = Convert.ToInt32(
+						exerciseCurrentMembers.Invoke(memberObject, new object[] { 3 }));
+				}
+				if (result.logicalEventsValidated)
+				{
+					object memberObject = Activator.CreateInstance(calculator);
+					MethodInfo addedAddMethod = addedEvent.GetAddMethod();
+					MethodInfo addedRemoveMethod = addedEvent.GetRemoveMethod();
+					MethodInfo evolvedAddMethod = evolvedEvent.GetAddMethod();
+					MethodInfo evolvedRemoveMethod = evolvedEvent.GetRemoveMethod();
+					result.logicalEventAccessorsValidated = addedAddMethod != null &&
+						addedRemoveMethod != null && evolvedAddMethod != null &&
+						evolvedRemoveMethod != null &&
+						string.Equals(addedAddMethod.Name, "add_AddedEvent", StringComparison.Ordinal) &&
+						string.Equals(addedRemoveMethod.Name, "remove_AddedEvent", StringComparison.Ordinal) &&
+						string.Equals(evolvedAddMethod.Name, "add_EvolvedEvent", StringComparison.Ordinal) &&
+						string.Equals(evolvedRemoveMethod.Name, "remove_EvolvedEvent", StringComparison.Ordinal);
+					result.logicalAddedEventAccessors = (addedAddMethod?.Name ?? "null") + "/" +
+						(addedRemoveMethod?.Name ?? "null");
+					result.logicalEvolvedEventAccessors = (evolvedAddMethod?.Name ?? "null") + "/" +
+						(evolvedRemoveMethod?.Name ?? "null");
+					DheDemoCalculator.TouchValue = 0;
+					Action<int> addedHandler = _ => { };
+					if (result.logicalEventAccessorsValidated)
+					{
+						addedAddMethod.Invoke(memberObject, new object[] { addedHandler });
+						addedRemoveMethod.Invoke(memberObject, new object[] { addedHandler });
+						result.logicalAddedEventAccessorTouchValue = DheDemoCalculator.TouchValue;
+					}
+					DheDemoCalculator.TouchValue = 0;
+					addedEvent.AddEventHandler(memberObject, addedHandler);
+					addedEvent.RemoveEventHandler(memberObject, addedHandler);
+					result.logicalAddedEventTouchValue = DheDemoCalculator.TouchValue;
+					bool addedRoundTrip = result.logicalAddedEventTouchValue == 1760;
+					DheDemoCalculator.TouchValue = 0;
+					Action<string> evolvedHandler = _ => { };
+					if (result.logicalEventAccessorsValidated)
+					{
+						evolvedAddMethod.Invoke(memberObject, new object[] { evolvedHandler });
+						evolvedRemoveMethod.Invoke(memberObject, new object[] { evolvedHandler });
+						result.logicalEvolvedEventAccessorTouchValue = DheDemoCalculator.TouchValue;
+					}
+					DheDemoCalculator.TouchValue = 0;
+					evolvedEvent.AddEventHandler(memberObject, evolvedHandler);
+					evolvedEvent.RemoveEventHandler(memberObject, evolvedHandler);
+					result.logicalEvolvedEventTouchValue = DheDemoCalculator.TouchValue;
+					result.logicalEventRoundTripValidated = addedRoundTrip &&
+						result.logicalEvolvedEventTouchValue == 1870;
+				}
+#if HYBRIDCLR_DHE_BASE_PLAYER
+				try
+				{
+					_ = legacyObject.RemovedProperty;
+				}
+				catch (MissingMethodException)
+				{
+					result.removedPropertyGuardValidated = true;
+				}
+				try
+				{
+					_ = legacyObject.EvolvedProperty;
+				}
+				catch (MissingMethodException)
+				{
+					result.replacedPropertyGuardValidated = true;
+				}
+				try
+				{
+					Action<int> removedHandler = _ => { };
+					legacyObject.RemovedEvent += removedHandler;
+				}
+				catch (MissingMethodException)
+				{
+					result.removedEventGuardValidated = true;
+				}
+				try
+				{
+					Action<int> replacedHandler = _ => { };
+					legacyObject.EvolvedEvent += replacedHandler;
+				}
+				catch (MissingMethodException)
+				{
+					result.replacedEventGuardValidated = true;
+				}
+				try
+				{
+					_ = new DheRemovedReferenceType(3);
+				}
+				catch (MissingMethodException)
+				{
+					result.removedTypeGuardValidated = true;
+				}
+				try
+				{
+					legacyObject.SignatureMigrated(3);
+				}
+				catch (MissingMethodException)
+				{
+					result.oldSignatureGuardValidated = true;
+				}
+#endif
+				object instanceFieldObject = Activator.CreateInstance(calculator);
+				object defaultStruct = addedInstanceStruct.GetValue(instanceFieldObject);
+				result.addedInstanceFieldDefaultValueValidated =
+					Convert.ToInt32(addedInstanceCounter.GetValue(instanceFieldObject)) == 0 &&
+					addedInstanceText.GetValue(instanceFieldObject) == null &&
+					addedInstancePayload.GetValue(instanceFieldObject) == null &&
+					defaultStruct is SmallValue initialValue && initialValue.Number == 0 &&
+					initialValue.Wide == 0;
+				result.addedInstanceFieldDirectResult = Convert.ToInt32(
+					instanceFieldRoundTrip.Invoke(instanceFieldObject, new object[] { 3 }));
+				object directPayload = addedInstancePayload.GetValue(instanceFieldObject);
+				var directPayloadWeak = new WeakReference(directPayload);
+				directPayload = null;
+				GC.Collect();
+				GC.WaitForPendingFinalizers();
+				GC.Collect();
+				result.addedInstanceFieldGcValidated = directPayloadWeak.IsAlive &&
+					addedInstancePayload.GetValue(instanceFieldObject) != null;
+				object reflectedPayload = new object();
+				addedInstanceCounter.SetValue(instanceFieldObject, 1200);
+				addedInstanceText.SetValue(instanceFieldObject, "dhe");
+				addedInstancePayload.SetValue(instanceFieldObject, reflectedPayload);
+				addedInstanceStruct.SetValue(instanceFieldObject, new SmallValue(4, 5));
+				result.addedInstanceFieldReflectionResult = Convert.ToInt32(
+					readInstanceFields.Invoke(instanceFieldObject, null));
+				result.addedInstanceFieldReflectionValueValidated =
+					Convert.ToInt32(addedInstanceCounter.GetValue(instanceFieldObject)) == 1200 &&
+					string.Equals(Convert.ToString(addedInstanceText.GetValue(instanceFieldObject)),
+						"dhe", StringComparison.Ordinal) &&
+					ReferenceEquals(addedInstancePayload.GetValue(instanceFieldObject), reflectedPayload) &&
+					addedInstanceStruct.GetValue(instanceFieldObject) is SmallValue reflectedValue &&
+					reflectedValue.Number == 4 && reflectedValue.Wide == 5;
+                result.addedStaticFieldDirectResult = Convert.ToInt32(
+                    staticFieldRoundTrip.Invoke(null, new object[] { 3 }));
+                addedStaticCounter.SetValue(null, 1200);
+                addedStaticText.SetValue(null, "dhe");
+                result.addedStaticFieldReflectionResult = Convert.ToInt32(
+                    readStaticFields.Invoke(null, null));
+                result.addedStaticFieldReflectionValueValidated =
+                    Convert.ToInt32(addedStaticCounter.GetValue(null)) == 1200 &&
+                    string.Equals(Convert.ToString(addedStaticText.GetValue(null)), "dhe",
+                        StringComparison.Ordinal);
+                result.passed = result.existingEntryResult == 1812 &&
+                    result.addedReferenceResult == 303 && result.addedGenericResult == 303 &&
+                    result.addedNestedResult == 603 && result.addedStaticResult == 403 &&
+                    result.addedInstanceResult == 503 && result.assemblyEnumerationValidated &&
+                    result.typeAssemblyMatchesBase && result.nestedDeclaringTypeValidated &&
+                    result.addedStaticFieldsFound && result.addedStaticFieldDeclaringTypeValidated &&
+                    result.addedStaticFieldDirectResult == 906 &&
+                    result.addedStaticFieldReflectionResult == 1203 &&
+					result.addedStaticFieldReflectionValueValidated &&
+					result.addedInstanceFieldsFound &&
+					result.addedInstanceFieldDeclaringTypeValidated &&
+					result.addedInstanceFieldDefaultValueValidated &&
+					result.addedInstanceFieldDirectResult == 1046 &&
+					result.addedInstanceFieldReflectionResult == 1212 &&
+					result.addedInstanceFieldReflectionValueValidated &&
+					result.addedInstanceFieldGcValidated && result.removedMethodHidden &&
+					result.removedMethodGuardValidated && result.removedFieldsHidden &&
+					result.removedFieldGuardValidated && result.removedTypeHidden &&
+					result.fieldSignatureReplacementVisible &&
+					result.fieldSignatureReplacementRoundTripValidated &&
+					result.logicalPropertiesValidated &&
+					result.logicalPropertyRoundTripValidated &&
+					result.logicalEventsValidated && result.logicalEventRoundTripValidated &&
+					result.removedPropertyGuardValidated &&
+					result.replacedPropertyGuardValidated &&
+					result.removedEventGuardValidated && result.replacedEventGuardValidated &&
+					result.currentMemberDirectResult == 3163 &&
+					result.removedTypeEnumerationHidden && result.removedTypeGuardValidated &&
+					result.oldSignatureHidden &&
+					result.oldSignatureGuardValidated && result.newSignatureFound &&
+					result.newSignatureResult == 1303;
+            }
+            catch (Exception exception)
+            {
+                result.error = exception.ToString();
+            }
+            return result;
+        }
+
+        private static CapabilityRun ExecuteCapabilityReflection(bool structuralExpected)
         {
             CapabilityRun result = new CapabilityRun();
             try
@@ -718,7 +1267,7 @@ namespace HybridCLR.Lab
                     result.valueNumber == 103 && result.valueWide == 1004L && result.refOutResult == 203 &&
                     result.boxNumber == 103 && result.boxWide == 4L && result.boxValueChanged &&
                     result.asyncResult == 103 && result.iteratorResult == "103,5" &&
-                    result.genericContainerResult == 107 && result.nullableResult == 103 &&
+                    result.genericContainerResult == (structuralExpected ? 1812 : 107) && result.nullableResult == 103 &&
                     result.delegateClosedInstanceResult == 108 && result.delegateOpenInstanceResult == 108 &&
                     result.delegateMulticastResult == 118 &&
                     result.exceptionFinallyResult == 103 &&
@@ -799,6 +1348,50 @@ namespace HybridCLR.Lab
             return File.ReadAllBytes(path);
         }
 
+        private sealed class StreamingAssetsProvider : IDheRuntimeAssetProvider
+        {
+            public bool Exists(string assetPath)
+            {
+                try
+                {
+                    return File.Exists(ResolveStreamingAssetPath(assetPath));
+                }
+                catch
+                {
+                    return false;
+                }
+            }
+
+            public string LoadText(string assetPath)
+            {
+                return System.Text.Encoding.UTF8.GetString(LoadBytes(assetPath))
+                    .TrimStart('\uFEFF');
+            }
+
+            public byte[] LoadBytes(string assetPath)
+            {
+                return File.ReadAllBytes(ResolveStreamingAssetPath(assetPath));
+            }
+        }
+
+        private static string ResolveStreamingAssetPath(string relativePath)
+        {
+            if (string.IsNullOrWhiteSpace(relativePath) || Path.IsPathRooted(relativePath))
+                throw new InvalidDataException("DHE StreamingAssets path must be relative.");
+            string normalized = relativePath.Replace('\\', '/');
+            if (normalized.Split('/').Any(segment => segment.Length == 0 || segment == "." ||
+                segment == ".."))
+                throw new InvalidDataException("DHE StreamingAssets path is unsafe: " + relativePath);
+            string root = Path.GetFullPath(Application.streamingAssetsPath);
+            string path = Path.GetFullPath(Path.Combine(root,
+                normalized.Replace('/', Path.DirectorySeparatorChar)));
+            string prefix = root.TrimEnd(Path.DirectorySeparatorChar,
+                Path.AltDirectorySeparatorChar) + Path.DirectorySeparatorChar;
+            if (!path.StartsWith(prefix, StringComparison.OrdinalIgnoreCase))
+                throw new InvalidDataException("DHE StreamingAssets path escapes its root.");
+            return path;
+        }
+
         private static byte[] Sha256(byte[] bytes)
         {
             using (SHA256 sha = SHA256.Create())
@@ -834,35 +1427,77 @@ namespace HybridCLR.Lab
             return result;
         }
 
-        private static byte[] CreateInvalidMetaVersion(byte[] mvBytes)
-        {
-            if (mvBytes == null || mvBytes.Length < 88)
-            {
-                throw new InvalidDataException("DHE MV payload is too short for the transaction probe.");
-            }
-            int assemblyNameSize = checked((int)BitConverter.ToUInt32(mvBytes, 12));
-            int methodCount = checked((int)BitConverter.ToUInt32(mvBytes, 16));
-            int tokenOffset = checked(88 + assemblyNameSize);
-            if (methodCount <= 0 || tokenOffset < 88 || tokenOffset > mvBytes.Length - 4 ||
-                tokenOffset + 4 * methodCount > mvBytes.Length)
-            {
-                throw new InvalidDataException("DHE MV payload has no method token for the transaction probe.");
-            }
-            byte[] invalidMv = (byte[])mvBytes.Clone();
-            // 0x0600ffff is outside the demo assembly's method table and keeps
-            // all hash/header fields intact, so failure occurs in method
-            // preparation after the homologous image has been registered.
-            byte[] invalidToken = BitConverter.GetBytes(0x0600ffffu);
-            Buffer.BlockCopy(invalidToken, 0, invalidMv, tokenOffset, invalidToken.Length);
-            return invalidMv;
-        }
-
         private static bool ByteArraysEqual(byte[] left, byte[] right)
         {
             if (left.Length != right.Length) return false;
             int difference = 0;
             for (int i = 0; i < left.Length; i++) difference |= left[i] ^ right[i];
             return difference == 0;
+        }
+
+        private static MetaVersionInfo ParseMetaVersion(byte[] bytes, string expectedAssemblyName)
+        {
+            if (bytes == null || bytes.Length < 60 ||
+                !string.Equals(System.Text.Encoding.ASCII.GetString(bytes, 0, 8),
+                    "DHEMETA1", StringComparison.Ordinal) || BitConverter.ToUInt32(bytes, 8) != 1)
+                throw new InvalidDataException("DHE MetaVersion header is invalid for " +
+                    expectedAssemblyName + ".");
+            int nameSize = checked((int)BitConverter.ToUInt32(bytes, 16));
+            int typeCount = checked((int)BitConverter.ToUInt32(bytes, 20));
+            int methodCount = checked((int)BitConverter.ToUInt32(bytes, 24));
+            long expectedSize = 60L + nameSize + 72L * typeCount + 104L * methodCount;
+            if (nameSize <= 0 || expectedSize != bytes.Length)
+                throw new InvalidDataException("DHE MetaVersion size is invalid for " +
+                    expectedAssemblyName + ".");
+            string assemblyName = System.Text.Encoding.UTF8.GetString(bytes, 60, nameSize);
+            if (!string.Equals(assemblyName, expectedAssemblyName, StringComparison.Ordinal))
+                throw new InvalidDataException("DHE MetaVersion assembly identity mismatch: " +
+                    assemblyName + "/" + expectedAssemblyName + ".");
+            var types = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
+            int typeOffset = checked(60 + nameSize);
+            for (int index = 0; index < typeCount; index++)
+            {
+                int offset = checked(typeOffset + index * 72);
+                string stableId = ToHex(Slice(bytes, offset, 32));
+                string version = ToHex(Slice(bytes, offset + 32, 32));
+                if (types.ContainsKey(stableId))
+                    throw new InvalidDataException("DHE MetaVersion has a duplicate type stable ID.");
+                types.Add(stableId, version);
+            }
+            var methods = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
+            int methodOffset = checked(60 + nameSize + 72 * typeCount);
+            for (int index = 0; index < methodCount; index++)
+            {
+                int offset = checked(methodOffset + index * 104);
+                string stableId = ToHex(Slice(bytes, offset, 32));
+                string version = ToHex(Slice(bytes, offset + 32, 32));
+                if (methods.ContainsKey(stableId))
+                    throw new InvalidDataException("DHE MetaVersion has a duplicate method stable ID.");
+                methods.Add(stableId, version);
+            }
+            return new MetaVersionInfo
+            {
+                assemblyHash = Slice(bytes, 28, 32),
+                types = types,
+                methods = methods,
+            };
+        }
+
+        private static int CountAddedTypes(MetaVersionInfo baseline,
+            MetaVersionInfo current) => current.types.Keys.Count(id =>
+                !baseline.types.ContainsKey(id));
+
+        private static int CountAddedMethods(MetaVersionInfo baseline,
+            MetaVersionInfo current) => current.methods.Keys.Count(id =>
+                !baseline.methods.ContainsKey(id));
+
+        private static int CountChangedMethods(MetaVersionInfo baseline,
+            MetaVersionInfo current)
+        {
+            int changed = baseline.methods.Count(item => !current.methods.TryGetValue(item.Key,
+                out string version) || !string.Equals(item.Value, version,
+                StringComparison.OrdinalIgnoreCase));
+            return checked(changed + current.methods.Keys.Count(id => !baseline.methods.ContainsKey(id)));
         }
 
         private static string ToHex(byte[] bytes)
@@ -875,7 +1510,20 @@ namespace HybridCLR.Lab
         {
             public int schemaVersion;
             public string format;
+            public string selection;
             public DheAssemblyPlanData[] assemblies;
+        }
+
+        [Serializable]
+        private sealed class StringArrayWrapper
+        {
+            public string[] items;
+        }
+
+        [Serializable]
+        private sealed class ResourceManifestData
+        {
+            public string runtimePlan;
         }
 
         [Serializable]
@@ -890,6 +1538,16 @@ namespace HybridCLR.Lab
             public string baselineSha256;
             public string mvSha256;
             public string snapshotSha256;
+            public string currentMetaVersion;
+            public string baseMetaVersion;
+            public string currentMetaVersionSha256;
+        }
+
+        private sealed class MetaVersionInfo
+        {
+            public byte[] assemblyHash;
+            public Dictionary<string, string> types;
+            public Dictionary<string, string> methods;
         }
 
         private sealed class LoadedDheAssembly
@@ -900,6 +1558,8 @@ namespace HybridCLR.Lab
             public byte[] baselineHash;
             public byte[] mvCurrentHash;
             public byte[] mvBaselineHash;
+            public MetaVersionInfo currentMetaVersion;
+            public MetaVersionInfo baseMetaVersion;
         }
 
         [Serializable]
@@ -1008,18 +1668,94 @@ namespace HybridCLR.Lab
             public int aotEntryCount;
         }
 
+        private sealed class StructuralRun
+        {
+            public bool expected;
+            public bool passed;
+            public string error;
+            public int existingEntryResult;
+            public bool addedReferenceTypeFound;
+            public bool addedGenericTypeFound;
+            public bool addedNestedTypeFound;
+            public bool nestedDeclaringTypeValidated;
+            public bool addedStaticMethodFound;
+            public bool addedInstanceMethodFound;
+            public bool addedStaticFieldsFound;
+            public bool addedStaticFieldDeclaringTypeValidated;
+            public bool addedStaticFieldReflectionValueValidated;
+			public bool addedInstanceFieldsFound;
+			public bool addedInstanceFieldDeclaringTypeValidated;
+			public bool addedInstanceFieldDefaultValueValidated;
+			public bool addedInstanceFieldReflectionValueValidated;
+			public bool addedInstanceFieldGcValidated;
+			public bool removedMethodHidden;
+			public bool removedMethodGuardValidated;
+			public bool removedFieldsHidden;
+			public bool removedFieldGuardValidated;
+			public bool fieldSignatureReplacementVisible;
+			public bool fieldSignatureReplacementRoundTripValidated;
+			public bool logicalPropertiesValidated;
+			public bool logicalPropertyRoundTripValidated;
+			public bool logicalEventsValidated;
+			public bool logicalEventRoundTripValidated;
+			public bool logicalEventAccessorsValidated;
+			public string logicalAddedEventAccessors;
+			public string logicalEvolvedEventAccessors;
+			public int logicalAddedEventAccessorTouchValue;
+			public int logicalEvolvedEventAccessorTouchValue;
+			public int logicalAddedEventTouchValue;
+			public int logicalEvolvedEventTouchValue;
+			public bool removedPropertyGuardValidated;
+			public bool replacedPropertyGuardValidated;
+			public bool removedEventGuardValidated;
+			public bool replacedEventGuardValidated;
+			public bool removedTypeHidden;
+			public bool removedTypeEnumerationHidden;
+			public bool removedTypeGuardValidated;
+			public bool oldSignatureHidden;
+			public bool oldSignatureGuardValidated;
+			public bool newSignatureFound;
+            public bool assemblyEnumerationValidated;
+            public bool typeAssemblyMatchesBase;
+            public int addedReferenceResult;
+            public int addedGenericResult;
+            public int addedNestedResult;
+            public int addedStaticResult;
+            public int addedInstanceResult;
+            public int addedStaticFieldDirectResult;
+            public int addedStaticFieldReflectionResult;
+			public int addedInstanceFieldDirectResult;
+			public int addedInstanceFieldReflectionResult;
+			public int currentMemberDirectResult;
+			public int newSignatureResult;
+        }
+
         [Serializable]
         private sealed class DheBuildIdentityData
         {
             public int identityVersion;
             public string target;
-            public string baselineAssemblySha256;
+            public string baseId;
+            public string managedAssemblySetSha256;
             public string aotSnapshotSha256;
-            public string mainBaselineAssemblySha256;
-            public string mainSnapshotSha256;
             public string aotSnapshotKind;
             public string nativeGuardSourceSha256;
             public string nativeManifestSha256;
+            public string baseMetaVersionSetSha256;
+            public string runtimeProtocol;
+            public string runtimeContract;
+            public string[] runtimeCapabilities;
+            public string runtimeAssetRoot;
+            public string baseMetaVersionAssetRoot;
+            public DheBuildIdentityAssemblyData[] assemblies;
+        }
+
+        [Serializable]
+        private sealed class DheBuildIdentityAssemblyData
+        {
+            public string assemblyName;
+            public string baselineSha256;
+            public string baseMetaVersionSha256;
         }
 
         [Serializable]
@@ -1028,6 +1764,10 @@ namespace HybridCLR.Lab
             public int schemaVersion = 1;
             public string format = "hybridclr.dhe-player-result.json";
             public string target;
+            public bool resourceUpdateManifestPresent;
+            public bool resourceUpdateValidated;
+            public string selectedBaseId;
+            public string selectedBaseMetaVersionSetSha256;
             public bool passed;
             public string error;
             public string loadError;
@@ -1125,6 +1865,64 @@ namespace HybridCLR.Lab
             public string capabilityIteratorResult;
             public int capabilityVirtualResult;
             public int capabilityGenericVirtualResult;
+            public bool structuralExpected;
+            public bool structuralPassed;
+            public string structuralError;
+            public int structuralExistingEntryResult;
+            public bool structuralAddedReferenceTypeFound;
+            public bool structuralAddedGenericTypeFound;
+            public bool structuralAddedNestedTypeFound;
+            public bool structuralNestedDeclaringTypeValidated;
+            public bool structuralAddedStaticMethodFound;
+            public bool structuralAddedInstanceMethodFound;
+            public bool structuralAddedStaticFieldsFound;
+            public bool structuralAddedStaticFieldDeclaringTypeValidated;
+            public bool structuralAddedStaticFieldReflectionValueValidated;
+			public bool structuralAddedInstanceFieldsFound;
+			public bool structuralAddedInstanceFieldDeclaringTypeValidated;
+			public bool structuralAddedInstanceFieldDefaultValueValidated;
+			public bool structuralAddedInstanceFieldReflectionValueValidated;
+			public bool structuralAddedInstanceFieldGcValidated;
+			public bool structuralRemovedMethodHidden;
+			public bool structuralRemovedMethodGuardValidated;
+			public bool structuralRemovedFieldsHidden;
+			public bool structuralRemovedFieldGuardValidated;
+			public bool structuralFieldSignatureReplacementVisible;
+			public bool structuralFieldSignatureReplacementRoundTripValidated;
+			public bool structuralLogicalPropertiesValidated;
+			public bool structuralLogicalPropertyRoundTripValidated;
+			public bool structuralLogicalEventsValidated;
+			public bool structuralLogicalEventRoundTripValidated;
+			public bool structuralLogicalEventAccessorsValidated;
+			public string structuralLogicalAddedEventAccessors;
+			public string structuralLogicalEvolvedEventAccessors;
+			public int structuralLogicalAddedEventAccessorTouchValue;
+			public int structuralLogicalEvolvedEventAccessorTouchValue;
+			public int structuralLogicalAddedEventTouchValue;
+			public int structuralLogicalEvolvedEventTouchValue;
+			public bool structuralRemovedPropertyGuardValidated;
+			public bool structuralReplacedPropertyGuardValidated;
+			public bool structuralRemovedEventGuardValidated;
+			public bool structuralReplacedEventGuardValidated;
+			public bool structuralRemovedTypeHidden;
+			public bool structuralRemovedTypeEnumerationHidden;
+			public bool structuralRemovedTypeGuardValidated;
+			public bool structuralOldSignatureHidden;
+			public bool structuralOldSignatureGuardValidated;
+			public bool structuralNewSignatureFound;
+            public bool structuralAssemblyEnumerationValidated;
+            public bool structuralTypeAssemblyMatchesBase;
+            public int structuralAddedReferenceResult;
+            public int structuralAddedGenericResult;
+            public int structuralAddedNestedResult;
+            public int structuralAddedStaticResult;
+            public int structuralAddedInstanceResult;
+            public int structuralAddedStaticFieldDirectResult;
+            public int structuralAddedStaticFieldReflectionResult;
+			public int structuralAddedInstanceFieldDirectResult;
+			public int structuralAddedInstanceFieldReflectionResult;
+			public int structuralCurrentMemberDirectResult;
+			public int structuralNewSignatureResult;
             public string changedMethod;
             public string unchangedMethod;
             public string changedCallingUnchangedMethod;

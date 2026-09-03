@@ -17,6 +17,7 @@
   "mode": "Exploratory",
   "runPlayer": false,
   "stopAfterPreflight": true,
+  "bootstrap": false,
   "unityTimeoutSeconds": 600,
   "unityArguments": {}
 }

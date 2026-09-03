@@ -149,17 +149,25 @@ internal static class LabCommands
         var configuration = cli.Optional("configuration") ?? "Release";
         var variant = cli.Optional("variant") ?? "default";
         if (!variant.Equals("default", StringComparison.OrdinalIgnoreCase) &&
-            !variant.Equals("current", StringComparison.OrdinalIgnoreCase))
-            throw new InvalidOperationException("build-managed-cases -Variant must be default or current.");
+            !variant.Equals("base2", StringComparison.OrdinalIgnoreCase) &&
+            !variant.Equals("current", StringComparison.OrdinalIgnoreCase) &&
+            !variant.Equals("structural", StringComparison.OrdinalIgnoreCase))
+            throw new InvalidOperationException(
+                "build-managed-cases -Variant must be default, base2, current, or structural.");
+        var isCurrent = variant.Equals("current", StringComparison.OrdinalIgnoreCase) ||
+            variant.Equals("structural", StringComparison.OrdinalIgnoreCase);
+        var isStructural = variant.Equals("structural", StringComparison.OrdinalIgnoreCase);
         GenerateTestManifest(new Cli("generate-test-manifest", new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase) { ["labroot"] = lab }));
         GenerateMetadataStressSource(new Cli("generate-metadata-stress-source", new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase) { ["labroot"] = lab }));
         var output = ResolvePath(lab, cli.Optional("outputroot") ??
-            (variant.Equals("current", StringComparison.OrdinalIgnoreCase)
-                ? $"artifacts/managed-cases-current/{target}"
+            (isCurrent
+                ? $"artifacts/managed-cases-{variant}/{target}"
                 : $"artifacts/managed-cases/{target}"));
-        var aotOutput = ResolvePath(lab, variant.Equals("current", StringComparison.OrdinalIgnoreCase)
-            ? $"artifacts/managed-cases-current-aot/{target}"
-            : $"artifacts/managed-cases-aot/{target}");
+        var aotOutput = ResolvePath(lab, isCurrent
+            ? $"artifacts/managed-cases-{variant}-aot/{target}"
+            : variant.Equals("base2", StringComparison.OrdinalIgnoreCase)
+                ? $"artifacts/managed-cases-base2-aot/{target}"
+                : $"artifacts/managed-cases-aot/{target}");
         SafeDelete(output, lab); SafeDelete(aotOutput, lab);
         Directory.CreateDirectory(output); Directory.CreateDirectory(aotOutput);
         var targetDefine = target.Equals("StandaloneWindows64", StringComparison.OrdinalIgnoreCase) ? "HYBRIDCLR_TARGET_WINDOWS" : target.Equals("Android", StringComparison.OrdinalIgnoreCase) ? "HYBRIDCLR_TARGET_ANDROID" : "";
@@ -168,8 +176,8 @@ internal static class LabCommands
         // current dependency build adds only DHE_CURRENT. Target-specific
         // symbols would change compiler-generated metadata/token ordering and
         // turn a body-only diff into a false layout/token incompatibility.
-        var dependencyDefine = variant.Equals("current", StringComparison.OrdinalIgnoreCase)
-            ? "DHE_CURRENT"
+        var dependencyDefine = isCurrent
+            ? isStructural ? "DHE_CURRENT;DHE_STRUCTURE_CURRENT" : "DHE_CURRENT"
             : targetDefine;
         var projects = new[]
         {
@@ -179,23 +187,35 @@ internal static class LabCommands
         };
         foreach (var relative in projects)
         {
-            var args = new List<string> { "build", Path.Combine(lab, relative), "--configuration", configuration, "--output", output, "--nologo", "-v:minimal" };
+			var args = new List<string> { "build", Path.Combine(lab, relative), "--configuration", configuration,
+				"--output", output, "--nologo", "--no-incremental", "-v:minimal" };
             if (!string.IsNullOrWhiteSpace(dependencyDefine))
                 args.Add("-p:DefineConstants=" + dependencyDefine.Replace(";", "%3B", StringComparison.Ordinal));
             RunProcess("dotnet", args, lab);
         }
         var aotProject = Path.Combine(lab, "managed-cases/HybridCLR.ManagedCasesAot/HybridCLR.ManagedCasesAot.csproj");
-        var aotArgs = new List<string> { "build", aotProject, "--configuration", configuration, "--output", aotOutput, "--nologo", "-v:minimal" };
-        if (variant.Equals("current", StringComparison.OrdinalIgnoreCase))
-            aotArgs.Add("-p:DefineConstants=HYBRIDCLR_AOT_BENCHMARK%3BDHE_CURRENT");
+		var aotArgs = new List<string> { "build", aotProject, "--configuration", configuration,
+			"--output", aotOutput, "--nologo", "--no-incremental", "-v:minimal" };
+        if (isCurrent)
+            aotArgs.Add("-p:DefineConstants=HYBRIDCLR_AOT_BENCHMARK%3BDHE_CURRENT" +
+                (isStructural ? "%3BDHE_STRUCTURE_CURRENT" : string.Empty));
+        else if (variant.Equals("base2", StringComparison.OrdinalIgnoreCase))
+            aotArgs.Add("-p:DefineConstants=HYBRIDCLR_AOT_BENCHMARK%3BDHE_BASE2");
+		else
+			aotArgs.Add("-p:DefineConstants=HYBRIDCLR_AOT_BENCHMARK");
         RunProcess("dotnet", aotArgs, lab);
-        var plugin = ResolvePath(lab, cli.Optional("unityprojectroot") is { } p ? Path.Combine(p, "Assets/Plugins/HybridCLRLab") : "unity-test-project/Assets/Plugins/HybridCLRLab");
-        Directory.CreateDirectory(plugin);
-        foreach (var name in new[] { "HybridCLR.BoundaryContracts.dll", "HybridCLR.ManagedCases.dll", "HybridCLR.MetadataStress.dll", "HybridCLR.CrossAssemblyDerived.dll" })
-            CopyRequired(Path.Combine(output, name), Path.Combine(plugin, name));
         var aotDll = Path.Combine(aotOutput, "HybridCLR.ManagedCasesAot.dll");
-        CopyRequired(aotDll, Path.Combine(plugin, "HybridCLR.ManagedCasesAot.dll"));
         CopyRequired(aotDll, Path.Combine(output, "HybridCLR.ManagedCasesAot.dll"));
+		if (cli.Optional("unityprojectroot") is { Length: > 0 } unityProjectRoot)
+		{
+			var plugin = ResolvePath(lab, Path.Combine(unityProjectRoot,
+				"Assets/Plugins/HybridCLRLab"));
+			Directory.CreateDirectory(plugin);
+			foreach (var name in new[] { "HybridCLR.BoundaryContracts.dll", "HybridCLR.ManagedCases.dll",
+				"HybridCLR.MetadataStress.dll", "HybridCLR.CrossAssemblyDerived.dll" })
+				CopyRequired(Path.Combine(output, name), Path.Combine(plugin, name));
+			CopyRequired(aotDll, Path.Combine(plugin, "HybridCLR.ManagedCasesAot.dll"));
+		}
         Console.WriteLine("Managed cases (" + variant + "): " + output);
         return 0;
     }
@@ -279,16 +299,24 @@ internal static class LabCommands
         var processName = Path.GetFileNameWithoutExtension(cli.Optional("editorprocessname") ?? "Tuanjie");
         var timeout = int.TryParse(cli.Optional("timeoutseconds"), out var value) ? Math.Clamp(value, 1, 7200) : 900;
         var stable = int.TryParse(cli.Optional("stableabsenceseconds"), out var stableValue) ? Math.Clamp(stableValue, 1, 60) : 5;
+        var requireObserved = cli.Has("requireobserved");
+        var observed = false;
         var deadline = DateTime.UtcNow.AddSeconds(timeout); var absentSince = (DateTime?)null;
         while (DateTime.UtcNow < deadline)
         {
-            var active = Process.GetProcessesByName(processName).Where(p => ProcessMentionsProject(p, project)).ToArray();
-            if (active.Length != 0) absentSince = null;
+            var projectLock = Path.Combine(project, "Temp", "UnityLockfile");
+            var active = File.Exists(projectLock)
+                ? Process.GetProcessesByName(processName)
+                : Process.GetProcessesByName(processName)
+                    .Where(p => ProcessMentionsProject(p, project)).ToArray();
+            if (active.Length != 0) { observed = true; absentSince = null; }
+            else if (requireObserved && !observed) absentSince = null;
             else if (absentSince == null) absentSince = DateTime.UtcNow;
             else if ((DateTime.UtcNow - absentSince.Value).TotalSeconds >= stable) return 0;
             Thread.Sleep(500);
         }
-        throw new TimeoutException("Timed out waiting for editor processes for " + project);
+        throw new TimeoutException("Timed out waiting for editor processes for " + project +
+            (requireObserved && !observed ? " (the target Editor was never observed)" : string.Empty));
     }
 
     private static int PrepareEngineTestProject(Cli cli)
@@ -303,8 +331,18 @@ internal static class LabCommands
         foreach (var folder in new[] { "Packages", "ProjectSettings" }) CopyDirectory(Path.Combine(source, folder), Path.Combine(destination, folder));
         foreach (var asset in new[] { "Editor", "Editor.meta", "Runtime", "Runtime.meta", "Scenes", "Scenes.meta" }) CopyDirectoryOrFile(Path.Combine(source, "Assets", asset), Path.Combine(destination, "Assets", asset));
         foreach (var meta in Directory.GetFiles(Path.Combine(destination, "Assets"), "*.meta", SearchOption.AllDirectories)) File.Delete(meta);
-        var repoRoot = ResolvePath(lab, "../repos/hybridclr_unity");
+        var repoLock = ReadJson(Path.Combine(lab, "manifests/repo-lock.json"));
+        var reposRoot = ResolveReposRoot(lab, repoLock, cli.Optional("reposroot"));
+        var repoRoot = ResolvePath(lab, cli.Optional("hybridclrUnitySource") ??
+            Path.Combine(reposRoot, "hybridclr_unity"));
+        ValidateRepoIdentity("hybridclr_unity", repoRoot,
+            StringProperty(repoLock.GetProperty("repositories").GetProperty("hybridclr_unity"),
+                "commit"), false);
         CopyDirectory(repoRoot, Path.Combine(destination, "Packages/com.code-philosophy.hybridclr"), new[] { ".git" });
+        var runtimeLock = ReadJson(Path.Combine(lab, "manifests/dhe-runtime-lock.json"));
+        ApplyLockedOverlays(lab, runtimeLock, "hybridclr_unity",
+            Path.Combine(destination, "Packages/com.code-philosophy.hybridclr"), workflowId,
+            Git(repoRoot, "rev-parse", "HEAD"));
         var packageManifestPath = Path.Combine(destination, "Packages", "manifest.json");
         if (File.Exists(packageManifestPath))
         {
@@ -388,11 +426,14 @@ internal static class LabCommands
     {
         var lab = LabRoot(cli); var profile = cli.Optional("profile") ?? "Baseline-Clean"; var workflowId = cli.Optional("engineworkflow") ?? "Tuanjie2022Fgs";
         var lockDoc = ReadJson(Path.Combine(lab, "manifests/repo-lock.json")); var workflowDoc = ReadJson(Path.Combine(lab, "manifests/runtime-workflows.json"));
+        var runtimeLockPath = Path.Combine(lab, "manifests/dhe-runtime-lock.json");
+        var runtimeLock = ReadJson(runtimeLockPath);
         var workflow = workflowDoc.GetProperty("workflows").EnumerateArray().Single(x => StringProperty(x, "id") == workflowId); var engine = workflow.GetProperty("engine");
         var repos = ResolveReposRoot(lab, lockDoc, cli.Optional("reposroot"));
         var hybridclr = ResolvePath(lab, cli.Optional("hybridclrsource") ?? Path.Combine(repos, "hybridclr"));
         var il2cpp = ResolvePath(lab, cli.Optional("il2cppplussource") ?? Path.Combine(repos, "il2cpp_plus"));
-        var hybridclrUnity = Path.Combine(repos, "hybridclr_unity");
+        var hybridclrUnity = ResolvePath(lab, cli.Optional("hybridclrUnitySource") ??
+			Path.Combine(repos, "hybridclr_unity"));
         RequireDirectory(Path.Combine(hybridclr, "hybridclr")); RequireDirectory(Path.Combine(il2cpp, "libil2cpp"));
         var dhe = profile is "DHE-Tuanjie2022" or "DHE-Unity2022" or "DHE-Unity2021";
         if (dhe && cli.Has("allowdirty")) throw new InvalidOperationException("Publishable DHE runtime cannot use -AllowDirty.");
@@ -408,16 +449,75 @@ internal static class LabCommands
         var stagedHybridclr = Path.Combine(stagedRuntime, "hybridclr");
         if (Directory.Exists(stagedHybridclr)) Directory.Delete(stagedHybridclr, true);
         CopyDirectory(Path.Combine(hybridclr, "hybridclr"), stagedHybridclr);
+        ApplyLockedOverlays(lab, runtimeLock, "il2cpp_plus", stagedRuntime, workflowId,
+            Git(il2cpp, "rev-parse", "HEAD"));
+        ApplyLockedOverlays(lab, runtimeLock, "hybridclr", stagedRuntime, workflowId,
+            Git(hybridclr, "rev-parse", "HEAD"));
         var editor = cli.Optional("editorexecutable") ?? StringProperty(engine, "executablePath"); var editorAvailable = File.Exists(editor); var external = ResolveExternalHeaders(editor, cli.Optional("externalheadersroot"), engine);
         if (!Directory.Exists(external)) throw new DirectoryNotFoundException("IL2CPP external headers: " + external);
         if (!editorAvailable && !cli.Has("allowsurrogateexternalheaders")) throw new InvalidOperationException("Engine editor is unavailable; pass -AllowSurrogateExternalHeaders only for exploratory native validation.");
         CopyDirectory(external, stagedExternal);
-        if (dhe && (!File.Exists(Path.Combine(stagedRuntime, "hybridclr/DheRuntime.cpp")) || !File.Exists(Path.Combine(stagedRuntime, "hybridclr/DheRuntime.h")))) throw new InvalidOperationException("Integrated DHE runtime sources are missing.");
+        if (dhe && (!File.Exists(Path.Combine(stagedRuntime, "hybridclr/DheRuntime.cpp")) || !File.Exists(Path.Combine(stagedRuntime, "hybridclr/DheRuntime.h")))) throw new InvalidOperationException("Staged DHE runtime sources are missing.");
         var instrumented = profile is "Baseline-Instrumented" or "Metadata-Instrumented"; var fgs = profile.Contains("Fgs", StringComparison.OrdinalIgnoreCase) || profile.Contains("Compatibility", StringComparison.OrdinalIgnoreCase);
         if (instrumented || fgs) WriteText(Path.Combine(stagedRuntime, "hybridclr/lab/InstrumentationConfig.h"), "#pragma once\n" + (instrumented ? "#define HYBRIDCLR_LAB_INSTRUMENTED 1\n" : "") + (fgs ? "#define HYBRIDCLR_LAB_FGS_TESTS 1\n" : ""));
-        var runtimeLockPath = Path.Combine(lab, "manifests/dhe-runtime-lock.json"); var runtimeLock = ReadJson(runtimeLockPath);
-        var manifest = new { schemaVersion = 1, format = "hybridclr.dhe-runtime-manifest.json", profile, dheEnabled = dhe, pathSemantics = "workspace-absolute-v1", createdAtUtc = DateTimeOffset.UtcNow, engineWorkflow = workflowId, engine, fullGenericSharingDiagnostics = fgs, externalHeaders = new { sourcePath = external, stagedPath = stagedExternal, stagedTreeSha256 = TreeHash(stagedExternal), surrogate = !editorAvailable, editorAvailable, explicitlyAllowed = !editorAvailable && cli.Has("allowsurrogateexternalheaders") }, source = new { hybridclr = SourceRecord(lockDoc, "hybridclr", hybridclr, Path.Combine(hybridclr, "hybridclr")), il2cpp_plus = SourceRecord(lockDoc, "il2cpp_plus", il2cpp, Path.Combine(il2cpp, "libil2cpp")), hybridclr_unity = SourceRecord(lockDoc, "hybridclr_unity", hybridclrUnity, hybridclrUnity) }, stagedLibil2cpp = stagedRuntime, stagedRuntimeSha256 = TreeHash(stagedRuntime), dheRuntimeLock = runtimeLockPath, dheRuntimeLockSha256 = Sha256File(runtimeLockPath), dheRuntimeSourceMode = StringProperty(runtimeLock, "sourceMode"), dhePatches = runtimeLock.GetProperty("patches") };
+        var appliedRuntimePatches = SelectLockedOverlays(runtimeLock, "il2cpp_plus", workflowId)
+            .Concat(SelectLockedOverlays(runtimeLock, "hybridclr", workflowId)).ToArray();
+        var manifest = new { schemaVersion = 1, format = "hybridclr.dhe-runtime-manifest.json", profile, dheEnabled = dhe, pathSemantics = "workspace-absolute-v1", createdAtUtc = DateTimeOffset.UtcNow, engineWorkflow = workflowId, engine, fullGenericSharingDiagnostics = fgs, externalHeaders = new { sourcePath = external, stagedPath = stagedExternal, stagedTreeSha256 = TreeHash(stagedExternal), surrogate = !editorAvailable, editorAvailable, explicitlyAllowed = !editorAvailable && cli.Has("allowsurrogateexternalheaders") }, source = new { hybridclr = SourceRecord(lockDoc, "hybridclr", hybridclr, Path.Combine(hybridclr, "hybridclr")), il2cpp_plus = SourceRecord(lockDoc, "il2cpp_plus", il2cpp, Path.Combine(il2cpp, "libil2cpp")), hybridclr_unity = SourceRecord(lockDoc, "hybridclr_unity", hybridclrUnity, hybridclrUnity) }, stagedLibil2cpp = stagedRuntime, stagedRuntimeSha256 = TreeHash(stagedRuntime), dheRuntimeLock = runtimeLockPath, dheRuntimeLockSha256 = Sha256File(runtimeLockPath), dheRuntimeSourceMode = StringProperty(runtimeLock, "sourceMode"), dhePatches = appliedRuntimePatches };
         WriteJson(Path.Combine(stage, "runtime-manifest.json"), manifest); Console.WriteLine("Assembled " + profile + " runtime: " + stagedRuntime); return 0;
+    }
+
+    private static void ApplyLockedOverlays(string lab, JsonElement runtimeLock,
+        string repository, string destination, string engineWorkflow, string sourceCommit)
+    {
+        if (!string.Equals(StringProperty(runtimeLock, "sourceMode"), "overlay",
+                StringComparison.Ordinal)) return;
+        JsonElement[] patches = SelectLockedOverlays(runtimeLock, repository, engineWorkflow);
+        if (patches.Length == 0)
+            throw new InvalidOperationException("DHE overlay lock has no patch for " + repository + ".");
+        foreach (JsonElement patch in patches)
+        {
+            if (!string.Equals(StringProperty(patch, "baseCommit"), sourceCommit,
+                    StringComparison.OrdinalIgnoreCase))
+                throw new InvalidOperationException("DHE overlay base commit does not match " +
+                    repository + ": " + StringProperty(patch, "baseCommit") + " != " +
+                    sourceCommit + ".");
+            if (!string.Equals(StringProperty(patch, "sourceMode"), "overlay",
+                    StringComparison.Ordinal))
+                throw new InvalidOperationException("DHE overlay patch sourceMode is invalid for " +
+                    repository + ".");
+            string patchPath = ResolvePath(lab, StringProperty(patch, "path"));
+            if (!File.Exists(patchPath) || !string.Equals(Sha256File(patchPath),
+                    StringProperty(patch, "sha256"), StringComparison.OrdinalIgnoreCase))
+                throw new InvalidOperationException("DHE overlay patch hash mismatch: " + patchPath);
+            string applyRoot = StringProperty(patch, "applyRoot");
+            string expectedRoot = repository == "hybridclr_unity" ? "package" : "libil2cpp";
+            if (!string.Equals(applyRoot, expectedRoot, StringComparison.Ordinal))
+                throw new InvalidOperationException("DHE overlay applyRoot is invalid for " + repository + ".");
+            int stripComponents = patch.GetProperty("stripComponents").GetInt32();
+            string strip = "-p" + stripComponents.ToString(System.Globalization.CultureInfo.InvariantCulture);
+            string directory = "--directory=" + Path.GetFullPath(destination)
+                .Replace(Path.DirectorySeparatorChar, '/');
+            RunProcess("git", new[] { "apply", "--check", "--unsafe-paths", strip, directory,
+                patchPath }, lab);
+            RunProcess("git", new[] { "apply", "--unsafe-paths", strip, directory, patchPath },
+                lab);
+            Console.WriteLine("Applied DHE overlay " + StringProperty(patch, "id") + " to " +
+                destination);
+        }
+    }
+
+    private static JsonElement[] SelectLockedOverlays(JsonElement runtimeLock, string repository,
+        string engineWorkflow)
+    {
+        return runtimeLock.GetProperty("patches").EnumerateArray().Where(item =>
+        {
+            if (!string.Equals(StringProperty(item, "repository"), repository,
+                    StringComparison.Ordinal)) return false;
+            if (!item.TryGetProperty("engineWorkflows", out JsonElement workflows) ||
+                workflows.ValueKind != JsonValueKind.Array) return true;
+            return workflows.EnumerateArray().Any(value => value.ValueKind == JsonValueKind.String &&
+                string.Equals(value.GetString(), engineWorkflow, StringComparison.Ordinal));
+        }).ToArray();
     }
 
     private static object SourceRecord(JsonElement lockDoc, string name, string path, string tree)
@@ -529,5 +629,13 @@ internal static class LabCommands
         }
         return candidates.Select(Path.GetFullPath).FirstOrDefault(File.Exists) ?? throw new FileNotFoundException("Executable was not found on PATH or in known tool locations: " + command);
     }
-    private static bool ProcessMentionsProject(Process process, string project) { try { return process.MainModule?.FileName?.Contains(project, StringComparison.OrdinalIgnoreCase) == true; } catch { return true; } }
+    private static bool ProcessMentionsProject(Process process, string project)
+    {
+        try
+        {
+            if (File.Exists(Path.Combine(project, "Temp", "UnityLockfile"))) return !process.HasExited;
+            return process.StartInfo.Arguments.Contains(project, StringComparison.OrdinalIgnoreCase);
+        }
+        catch { return false; }
+    }
 }

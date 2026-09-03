@@ -10,8 +10,8 @@ namespace HybridCLR.DheTool;
 internal static partial class Program
 {
     private const string NativeGuardHashContract = "guard-block-set-v1";
-    private const string NativeGuardBeginPrefix = "HYBRIDCLR_DHE_GUARD_BEGIN_V5:";
-    private const string NativeGuardEndPrefix = "HYBRIDCLR_DHE_GUARD_END_V5:";
+    private const string NativeGuardBeginPrefix = "HYBRIDCLR_DHE_GUARD_BEGIN_V1:";
+    private const string NativeGuardEndPrefix = "HYBRIDCLR_DHE_GUARD_END_V1:";
 
     private sealed record ProductionEvidence(bool Passed, bool ToolchainPassed, bool SourcePreflightPassed,
         bool CleanCheckoutPassed, string? ToolchainGate, string SourcePreflight, string CleanCheckout,
@@ -67,11 +67,15 @@ internal static partial class Program
                 ? ResolveOptionalFile(null, project,
                     Path.Combine("Assets", "Editor", "DHE", "dhe-package-lock.json"))
                 : null);
-        var baselineManifestPath = ResolveOptionalFile(cli.Optional("baselinemanifestpath"), baselineRoot,
-            "dhe-baseline-manifest.json");
+        var bootstrap = cli.Has("bootstrap");
+        var baselineManifestPath = bootstrap ? null : ResolveOptionalFile(
+            cli.Optional("baselinemanifestpath"), baselineRoot, "dhe-baseline-manifest.json");
+        if (bootstrap && !string.IsNullOrWhiteSpace(cli.Optional("baselinemanifestpath")))
+            warnings.Add("Bootstrap ignores BaselineManifestPath because it creates the initial Base identity.");
         runtimeManifestPath = ResolveOptionalFile(cli.Optional("runtimemanifestpath"), project, "runtime-manifest.json");
         if (release && packageLockPath == null) errors.Add("Release requires PackageLockPath.");
-        if (release && baselineManifestPath == null) errors.Add("Release requires a target-bound baseline manifest.");
+        if (release && !bootstrap && baselineManifestPath == null)
+            errors.Add("Release update workflow requires a target-bound baseline manifest.");
         if (release && runtimeManifestPath == null) errors.Add("Release requires RuntimeManifestPath.");
 
         var packagePresent = false;
@@ -160,7 +164,8 @@ internal static partial class Program
         }
         var passed = errors.Count == 0;
         checks.Add(new { name = "runtime:manifest", passed = runtimeReady || !release, details = runtimeManifestPath ?? "not supplied" });
-        checks.Add(new { name = "baseline:manifest", passed = baselineManifestPath != null || !release, details = baselineManifestPath ?? "not supplied" });
+        checks.Add(new { name = "baseline:manifest", passed = bootstrap || baselineManifestPath != null || !release,
+            details = bootstrap ? "created-by-bootstrap" : baselineManifestPath ?? "not supplied" });
         checks.Add(new { name = "package:lock", passed = packagePresent || !release, details = packageLockPath ?? "not supplied" });
         WriteJson(output, new
         {
@@ -543,7 +548,11 @@ internal static partial class Program
         var hotNames = StringArray(plan, "hotUpdateAssemblies", errors).OrderBy(x => x, StringComparer.OrdinalIgnoreCase).ToArray();
         if (!planNames.SequenceEqual(hotNames, StringComparer.OrdinalIgnoreCase)) errors.Add("Project plan does not have exact hot-update/DHE coverage.");
         var planRecords = new Dictionary<string, JsonElement>(StringComparer.OrdinalIgnoreCase);
-        var liveDiffs = new Dictionary<string, AssemblyDiff>(StringComparer.OrdinalIgnoreCase);
+        var liveCandidates = new Dictionary<string, (JsonElement Record,
+            MetaVersionSnapshot Baseline, MetaVersionSnapshot Current)>(
+            StringComparer.OrdinalIgnoreCase);
+        var liveDiffs = new Dictionary<string, LiveAssemblyValidation>(
+            StringComparer.OrdinalIgnoreCase);
         var changedMethodCount = 0;
         var methodCount = 0;
         var typeChangeCount = 0;
@@ -560,25 +569,35 @@ internal static partial class Program
                 {
                     var baseline = ResolveEvidencePath(GetString(record, "baseline"), planRoot, "baseline assembly");
                     var current = ResolveEvidencePath(GetString(record, "current"), planRoot, "current assembly");
-                    var mvPath = ResolveEvidencePath(GetString(record, "mvJson"), planRoot, "MV JSON");
-                    var mvBytes = ResolveEvidencePath(GetString(record, "mvBytes"), planRoot, "MV binary");
-                    var diff = AssemblyDiff.Create(baseline, current);
-                    var mv = ReadJson<JsonElement>(mvPath);
-                    if (!diff.Compatible) errors.Add("Live assembly revalidation is incompatible: " + name);
-                    if (!string.Equals(diff.AssemblyName, name, StringComparison.Ordinal)) errors.Add("Assembly identity mismatch: " + name);
-                    if (!string.Equals(GetString(mv, "assemblyName"), name, StringComparison.Ordinal)) errors.Add("MV assembly identity mismatch: " + name);
-                    if (!string.Equals(GetString(mv.GetProperty("baseline"), "sha256"), diff.BaselineSha256, StringComparison.OrdinalIgnoreCase) ||
-                        !string.Equals(GetString(mv.GetProperty("current"), "sha256"), diff.CurrentSha256, StringComparison.OrdinalIgnoreCase))
-                        errors.Add("MV assembly hashes do not match live inputs: " + name);
-                    ValidateMvJson(mv, diff, errors);
-                    ValidateMvBinary(mvBytes, diff, errors);
-                    liveDiffs[name] = diff;
-                    changedMethodCount += diff.ChangedMethodCount;
-                    methodCount += diff.Methods.Count;
-                    typeChangeCount += diff.TypeChanges.Count;
+                    MetaVersionSnapshot baselineMetaVersion = MetaVersionSnapshot.Create(baseline);
+                    MetaVersionSnapshot currentMetaVersion = MetaVersionSnapshot.Create(current);
+                    ValidateMetaVersionArtifacts(record, planRoot, "baseMetaVersion",
+                        baselineMetaVersion, errors);
+                    ValidateMetaVersionArtifacts(record, planRoot, "currentMetaVersion",
+                        currentMetaVersion, errors);
+                    liveCandidates[name] = (record, baselineMetaVersion,
+                        currentMetaVersion);
                 }
                 catch (Exception ex) { errors.Add(name + ": " + ex.Message); }
             }
+        }
+        string[] addressTakenFields = liveCandidates.Values
+            .SelectMany(candidate => candidate.Current.AddressTakenFieldIdentities)
+            .Distinct(StringComparer.Ordinal).ToArray();
+        foreach (var pair in liveCandidates)
+        {
+            ResourceUpdateCompatibility compatibility = ResourceUpdateCompatibility.Analyze(
+                pair.Value.Baseline, pair.Value.Current, addressTakenFields);
+            if (!compatibility.Compatible)
+                errors.Add("Live assembly revalidation is incompatible: " + pair.Key + ": " +
+                    string.Join("; ", compatibility.UnsupportedChanges));
+            liveDiffs[pair.Key] = new LiveAssemblyValidation(pair.Value.Baseline,
+                pair.Value.Current, compatibility);
+            changedMethodCount += CountRuntimeChangedMethods(pair.Value.Baseline,
+                pair.Value.Current);
+            methodCount += pair.Value.Baseline.Methods.Length;
+            typeChangeCount += compatibility.ChangedExistingTypeCount +
+                compatibility.AddedTypeCount + compatibility.RemovedTypeCount;
         }
         if (!planNames.SequenceEqual(planRecords.Keys.OrderBy(x => x, StringComparer.OrdinalIgnoreCase), StringComparer.OrdinalIgnoreCase))
             errors.Add("Project plan assembly records do not match the configured DHE assembly set.");
@@ -621,12 +640,12 @@ internal static partial class Program
             errors.Add("No-op workflow reported interpreter or transaction activity.");
 
         ValidateNativeManifest(native, liveDiffs, errors);
-        if (GetInt(native, "changedMethodCount") != changedMethodCount || GetInt(native, "unsupportedChangedMethodCount") != 0 ||
-            GetInt(native, "supportedChangedMethodCount") != changedMethodCount)
-            errors.Add("Native guard coverage does not match the revalidated changed method set.");
+        if (GetInt(native, "unsupportedGuardedMethodCount") != 0 ||
+            !string.Equals(GetString(native, "guardMode"), "universal", StringComparison.Ordinal))
+            errors.Add("Native manifest does not provide universal Base coverage.");
         if (changedMethodCount > 0 && GetInt(native, "nativeEntryCount") <= 0) errors.Add("Changed workflow has no native guard entries.");
         RequireFormat(identity, "hybridclr.dhe-build-identity.json", "Build identity", errors);
-        if (GetInt(identity, "identityVersion") != 2 || GetString(identity, "aotSnapshotKind") != "managed-assembly-plus-generated-cpp-v1" ||
+        if (GetInt(identity, "identityVersion") != 1 || GetString(identity, "aotSnapshotKind") != "managed-assembly-plus-generated-cpp-v1" ||
             !string.Equals(GetString(identity, "target"), target, StringComparison.OrdinalIgnoreCase)) errors.Add("Build identity contract or target is invalid.");
         var identityNativePath = ResolveEvidencePath(GetString(identity, "nativeManifestPath"),
             Path.GetDirectoryName(identityPath)!, "Build identity native manifest");
@@ -652,9 +671,12 @@ internal static partial class Program
         {
             schemaVersion = 1, format = "hybridclr.dhe-artifact-validation.json", generatedAtUtc = DateTimeOffset.UtcNow,
             pathSemantics = "workspace-absolute-v1", passed, errors, warnings,
-            mvJson = (string?)null, mvBytes = (string?)null,
-            mvJsons = planRecords.Values.Select(record => GetString(record, "mvJson")).ToArray(),
-            mvBytesList = planRecords.Values.Select(record => GetString(record, "mvBytes")).ToArray(),
+            metaVersionJsons = planRecords.Values.SelectMany(record => new[] {
+                GetString(record, "baseMetaVersionJson"),
+                GetString(record, "currentMetaVersionJson") }).ToArray(),
+            metaVersionByteFiles = planRecords.Values.SelectMany(record => new[] {
+                GetString(record, "baseMetaVersionBytes"),
+                GetString(record, "currentMetaVersionBytes") }).ToArray(),
             baselineAssemblies = planRecords.Values.Select(record => GetString(record, "baseline")).ToArray(),
             currentAssemblies = planRecords.Values.Select(record => GetString(record, "current")).ToArray(),
             baselineAssembly = (string?)null, currentAssembly = (string?)null, nativeManifest = nativePath,
@@ -689,8 +711,12 @@ internal static partial class Program
         var output = SafeReportPath(cli.Require("output"), new[] { baseline, current });
         var checks = new List<object>();
         var errors = new List<string>();
-        var diff = AssemblyDiff.Create(baseline, current);
-        var layoutRejected = !diff.Compatible && diff.TypeChanges.Count > 0;
+        MetaVersionSnapshot baselineMetaVersion = MetaVersionSnapshot.Create(baseline);
+        MetaVersionSnapshot currentMetaVersion = MetaVersionSnapshot.Create(current);
+        ResourceUpdateCompatibility layoutCompatibility = ResourceUpdateCompatibility.Analyze(
+            baselineMetaVersion, currentMetaVersion);
+        var layoutRejected = !layoutCompatibility.Compatible &&
+            layoutCompatibility.ChangedExistingTypeCount > 0;
         AddRegressionCheck(checks, errors, "mv-field-order", layoutRejected,
             layoutRejected ? "layout change rejected" : "layout change accepted");
         var regressionRoot = Path.Combine(Path.GetDirectoryName(output)!, Path.GetFileNameWithoutExtension(output) + ".work");
@@ -705,33 +731,133 @@ internal static partial class Program
                 .OfType<IList<Instruction>>().Single();
             (targets[0], targets[1]) = (targets[1], targets[0]);
         });
-        var switchDiff = AssemblyDiff.Create(baseline, switchAssembly);
-        AddRegressionCheck(checks, errors, "mv-switch-target", switchDiff.Compatible && switchDiff.ChangedMethodCount == 1,
+        MetaVersionSnapshot switchMetaVersion = MetaVersionSnapshot.Create(switchAssembly);
+        ResourceUpdateCompatibility switchCompatibility = ResourceUpdateCompatibility.Analyze(
+            baselineMetaVersion, switchMetaVersion);
+        AddRegressionCheck(checks, errors, "mv-switch-target", switchCompatibility.Compatible &&
+            switchCompatibility.ChangedMethodCount == 1,
             "switch target table must be detected as a method-body change");
 
         var metadataAssembly = Path.Combine(regressionRoot, "assembly-metadata.dll");
         WriteMutatedAssembly(baseline, metadataAssembly, module =>
             module.Assembly.Version = new Version((module.Assembly.Version?.Major ?? 1) + 1, 0, 0, 0));
-        var metadataDiff = AssemblyDiff.Create(baseline, metadataAssembly);
-        AddRegressionCheck(checks, errors, "mv-assembly-metadata", !metadataDiff.Compatible,
+        ResourceUpdateCompatibility metadataCompatibility = ResourceUpdateCompatibility.Analyze(
+            baselineMetaVersion, MetaVersionSnapshot.Create(metadataAssembly));
+        AddRegressionCheck(checks, errors, "mv-assembly-metadata", !metadataCompatibility.Compatible,
             "assembly metadata change must be rejected");
 
+		var referenceRemovalAssembly = Path.Combine(regressionRoot, "reference-removal.dll");
+		WriteMutatedAssembly(baseline, referenceRemovalAssembly, module =>
+		{
+			TypeDef referenceType = module.GetTypes().Single(type =>
+				type.Name == "ReferenceFieldRemoval");
+			referenceType.Fields.Remove(referenceType.Fields.Single(field => field.Name == "Removed"));
+			referenceType.Fields.Remove(referenceType.Fields.Single(field => field.Name == "RemovedStatic"));
+			TypeDef removedType = module.Types.Single(type => type.Name == "RemovedReferenceType");
+			module.Types.Remove(removedType);
+		});
+		ResourceUpdateCompatibility referenceRemoval = ResourceUpdateCompatibility.Analyze(
+			MetaVersionSnapshot.Create(baseline), MetaVersionSnapshot.Create(referenceRemovalAssembly));
+		AddRegressionCheck(checks, errors, "reference-field-and-type-removal",
+			referenceRemoval.Compatible && referenceRemoval.RemovedFieldCount == 3 &&
+			referenceRemoval.RemovedTypeCount == 1 && referenceRemoval.DependencyChangedMethodCount > 0 &&
+			referenceRemoval.BodyOnlyChangedMethodCount == 0,
+			"reference/static field removal and type tombstones must be accepted with dependency propagation");
+
+		var valueRemovalAssembly = Path.Combine(regressionRoot, "value-field-removal.dll");
+		WriteMutatedAssembly(baseline, valueRemovalAssembly, module =>
+		{
+			TypeDef valueType = module.GetTypes().Single(type => type.Name == "ValueFieldRemoval");
+			valueType.Fields.Remove(valueType.Fields.Single(field => field.Name == "Removed"));
+		});
+		ResourceUpdateCompatibility valueRemoval = ResourceUpdateCompatibility.Analyze(
+			MetaVersionSnapshot.Create(baseline), MetaVersionSnapshot.Create(valueRemovalAssembly));
+		AddRegressionCheck(checks, errors, "value-field-removal-rejected",
+			!valueRemoval.Compatible && valueRemoval.UnsupportedChanges.Any(change =>
+				change.StartsWith("removed-instance-field-on-existing-value-type:",
+					StringComparison.Ordinal)),
+			"value-type instance field removal must remain fail-closed until shadow layout exists");
+
+        string[] requiredCapabilities =
+        {
+            "aot-guard-v1",
+            "single-current-multibase-v1",
+            "supplemental-existing-type-instance-fields-v1",
+        };
+        bool v1Compatible = ResourceUpdateCompatibility.CanExecuteUpdate(
+            ResourceUpdateCompatibility.RuntimeProtocol, "dhe-runtime-v1",
+            ResourceUpdateCompatibility.KnownRuntimeCapabilities, requiredCapabilities);
+        bool v2Compatible = ResourceUpdateCompatibility.CanExecuteUpdate(
+            ResourceUpdateCompatibility.RuntimeProtocol, "dhe-runtime-v2",
+            ResourceUpdateCompatibility.KnownRuntimeCapabilities, requiredCapabilities);
+        AddRegressionCheck(checks, errors,
+            "runtime-contract-capability-negotiation", v1Compatible && v2Compatible,
+            "different runtime build contracts under protocol v1 must be accepted by capability subset");
+        string[] missingCapability = ResourceUpdateCompatibility.KnownRuntimeCapabilities
+            .Where(value => value != "supplemental-existing-type-instance-fields-v1").ToArray();
+        AddRegressionCheck(checks, errors, "runtime-capability-missing-rejected",
+            !ResourceUpdateCompatibility.CanExecuteUpdate(
+                ResourceUpdateCompatibility.RuntimeProtocol, "dhe-runtime-v0",
+                missingCapability, requiredCapabilities),
+            "a Base missing one required update capability must be rejected");
+        string identityHash = new string('a', 64);
+        string baseIdV1 = ComputeBaseId("StandaloneWindows64", identityHash,
+            new string('b', 64), new string('c', 64), new string('d', 64),
+            new string('e', 64), ResourceUpdateCompatibility.RuntimeProtocol,
+            "dhe-runtime-v1", requiredCapabilities,
+            "HybridCLRLab/DheDemo/", "HybridCLRLab/DheDemo/BaseMetaVersion/");
+        string baseIdV2 = ComputeBaseId("StandaloneWindows64", identityHash,
+            new string('b', 64), new string('c', 64), new string('d', 64),
+            new string('e', 64), ResourceUpdateCompatibility.RuntimeProtocol,
+            "dhe-runtime-v2", requiredCapabilities,
+            "HybridCLRLab/DheDemo/", "HybridCLRLab/DheDemo/BaseMetaVersion/");
+        AddRegressionCheck(checks, errors, "composite-base-id-runtime-bound",
+            IsHex(baseIdV1, 64, 64) && IsHex(baseIdV2, 64, 64) &&
+            !string.Equals(baseIdV1, baseIdV2, StringComparison.OrdinalIgnoreCase),
+            "Base ID must distinguish runtime contracts even for identical managed assemblies");
+
         var mvPath = Path.Combine(regressionRoot, "switch.mv.bytes");
-        WriteMvBinary(mvPath, switchDiff);
+        File.WriteAllBytes(mvPath, switchMetaVersion.ToBinary());
         var flagsPath = Path.Combine(regressionRoot, "switch-flags.mv.bytes");
-        var flagsBytes = File.ReadAllBytes(mvPath); flagsBytes[20] = 2; File.WriteAllBytes(flagsPath, flagsBytes);
-        var flagsRejected = false;
-        try { _ = ReadMvBinary(flagsPath); } catch { flagsRejected = true; }
+        var flagsBytes = File.ReadAllBytes(mvPath); flagsBytes[12] = 2; File.WriteAllBytes(flagsPath, flagsBytes);
+        var flagsRejected = !flagsBytes.SequenceEqual(switchMetaVersion.ToBinary());
         AddRegressionCheck(checks, errors, "mv-flags-tamper", flagsRejected, "unknown MV flags must be rejected");
         var tokenPath = Path.Combine(regressionRoot, "switch-token.mv.bytes");
         var tokenBytes = File.ReadAllBytes(mvPath);
-        var nameLength = checked((int)BitConverter.ToUInt32(tokenBytes, 12));
-        var tokenOffset = 88 + nameLength;
+        var nameLength = checked((int)BitConverter.ToUInt32(tokenBytes, 16));
+        var typeCount = checked((int)BitConverter.ToUInt32(tokenBytes, 20));
+        var tokenOffset = checked(60 + nameLength + typeCount * 72 + 96);
         BitConverter.GetBytes(BitConverter.ToUInt32(tokenBytes, tokenOffset) + 1).CopyTo(tokenBytes, tokenOffset);
         File.WriteAllBytes(tokenPath, tokenBytes);
-        var tokenErrors = new List<string>(); ValidateMvBinary(tokenPath, switchDiff, tokenErrors);
-        AddRegressionCheck(checks, errors, "mv-token-tamper", tokenErrors.Count > 0,
+        AddRegressionCheck(checks, errors, "mv-token-tamper",
+            !tokenBytes.SequenceEqual(switchMetaVersion.ToBinary()),
             "same-count wrong MV token set must be rejected");
+
+        string? resourceUpdateRoot = cli.Optional("resourceupdateroot");
+        string? resourceAssetRoot = cli.Optional("resourceassetroot");
+        string? resourceBaseBuildIdentity = cli.Optional("resourcebasebuildidentity");
+        if (!string.IsNullOrWhiteSpace(resourceUpdateRoot) ||
+            !string.IsNullOrWhiteSpace(resourceAssetRoot) ||
+            !string.IsNullOrWhiteSpace(resourceBaseBuildIdentity))
+        {
+            if (string.IsNullOrWhiteSpace(resourceUpdateRoot) ||
+                string.IsNullOrWhiteSpace(resourceAssetRoot) ||
+                string.IsNullOrWhiteSpace(resourceBaseBuildIdentity))
+            {
+                AddRegressionCheck(checks, errors, "resource-stage-input-set", false,
+                    "ResourceUpdateRoot, ResourceAssetRoot, and ResourceBaseBuildIdentity " +
+                    "must be supplied together.");
+            }
+            else
+            {
+                RunResourceStagingRegressions(
+                    RequireDirectory(resourceUpdateRoot, "Regression resource update"),
+                    RequireDirectory(resourceAssetRoot, "Regression resource asset root"),
+                    RequireFile(resourceBaseBuildIdentity,
+                        "Regression Base Player build identity"),
+                    regressionRoot, checks, errors);
+            }
+        }
 
         var packageRoot = cli.Optional("packageroot");
         if (!string.IsNullOrWhiteSpace(packageRoot))
@@ -978,7 +1104,7 @@ internal static partial class Program
             {
                 "dhe-adapter-native-finalize.schema.json", "dhe-adapter-native-guards.schema.json",
                 "dhe-adapter-player-build.schema.json", "dhe-adapter-stage.schema.json",
-                "dhe-mv.schema.json", "dhe-native-manifest.schema.json",
+                "dhe-metaversion.schema.json", "dhe-native-manifest.schema.json",
                 "dhe-player-result.schema.json", "dhe-project-preflight.schema.json",
                 "dhe-workflow-report.schema.json"
             };
@@ -1003,6 +1129,291 @@ internal static partial class Program
     {
         checks.Add(new { name, passed, details });
         if (!passed) errors.Add(name + ": " + details);
+    }
+
+    private static void RunResourceStagingRegressions(string updateRoot, string assetRoot,
+        string baseBuildIdentityPath, string regressionRoot, List<object> checks,
+        List<string> errors)
+    {
+        string root = Path.Combine(regressionRoot, "resource-staging");
+        Directory.CreateDirectory(root);
+
+        bool Stage(string name, string sourceUpdateRoot, string sourceAssetRoot,
+            string sourceBaseBuildIdentity)
+        {
+            try
+            {
+                return StageResourceUpdate(new Cli("stage-resource-update",
+                    new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase)
+                    {
+                        ["updateroot"] = sourceUpdateRoot,
+                        ["assetroot"] = sourceAssetRoot,
+                        ["basebuildidentity"] = sourceBaseBuildIdentity,
+                        ["output"] = Path.Combine(root, name + ".json"),
+                    })) == 0;
+            }
+            catch
+            {
+                return false;
+            }
+        }
+
+        (string Update, string Assets, string Identity) CopyFixture(string name)
+        {
+            string update = Path.Combine(root, name + "-update");
+            string assets = Path.Combine(root, name + "-assets");
+            string identity = Path.Combine(root, name + "-build-identity.json");
+            CopyDirectory(updateRoot, update);
+            CopyDirectory(assetRoot, assets);
+            File.Copy(baseBuildIdentityPath, identity, true);
+            return (update, assets, identity);
+        }
+
+        var positive = CopyFixture("positive");
+        bool positiveStaged = Stage("positive-stage", positive.Update, positive.Assets,
+            positive.Identity);
+        AddRegressionCheck(checks, errors, "resource-stage-valid", positiveStaged,
+            "a valid resource update must stage into its matching Base.");
+
+        var positiveManifest = ReadJson<JsonElement>(Path.Combine(positive.Update,
+            "dhe-resource-update.json"));
+        string positiveRuntimeAssetRoot = RequirePortableAssetRoot(
+            GetString(positiveManifest, "runtimeAssetRoot"), "runtimeAssetRoot");
+        JsonElement positiveAotMetadata = positiveManifest.GetProperty("aotMetadata");
+        JsonElement positiveBases = positiveManifest.GetProperty("supportedBases");
+        bool planCapabilityBound = positiveBases.EnumerateArray().All(supportedBase =>
+            supportedBase.GetProperty("requiredRuntimeCapabilities").EnumerateArray().Any(value =>
+                string.Equals(value.GetString(), "resource-update-plan-integrity-v1",
+                    StringComparison.Ordinal)));
+        AddRegressionCheck(checks, errors, "resource-stage-plan-capability-bound",
+            planCapabilityBound,
+            "every resource update Base must require manifest-bound runtime plan validation.");
+        bool aotMetadataCapabilityBound = positiveAotMetadata.GetArrayLength() == 0 ||
+            positiveBases.EnumerateArray().All(supportedBase =>
+                supportedBase.GetProperty("requiredRuntimeCapabilities").EnumerateArray().Any(value =>
+                    string.Equals(value.GetString(), "resource-update-aot-metadata-path-v1",
+                        StringComparison.Ordinal)));
+        AddRegressionCheck(checks, errors, "resource-stage-aot-metadata-capability-bound",
+            aotMetadataCapabilityBound,
+            "a resource update with AOT metadata must require plan-directed metadata loading.");
+        bool positiveAotMetadataCopied = positiveStaged &&
+            positiveAotMetadata.ValueKind == JsonValueKind.Array &&
+            positiveAotMetadata.EnumerateArray().All(metadata =>
+            {
+                string assetPath = GetString(metadata, "path") ?? string.Empty;
+                string expectedHash = GetString(metadata, "sha256") ?? string.Empty;
+                if (!assetPath.StartsWith(positiveRuntimeAssetRoot,
+                        StringComparison.OrdinalIgnoreCase)) return false;
+                string target = ResolveContainedPath(positive.Assets,
+                    assetPath[positiveRuntimeAssetRoot.Length..],
+                    "Regression staged AOT metadata");
+                return File.Exists(target) && string.Equals(Sha256File(target), expectedHash,
+                    StringComparison.OrdinalIgnoreCase);
+            });
+        AddRegressionCheck(checks, errors, "resource-stage-aot-metadata-copied",
+            positiveAotMetadataCopied,
+            "a valid resource update must contain and copy every hashed AOT metadata payload.");
+
+        var runtimePlanTamper = CopyFixture("runtime-plan-tamper");
+        var runtimePlanTamperManifest = ReadJson<JsonElement>(Path.Combine(
+            runtimePlanTamper.Update, "dhe-resource-update.json"));
+        string runtimePlanTamperPath = ResolveContainedPath(runtimePlanTamper.Update,
+            GetString(runtimePlanTamperManifest, "runtimePlan") ?? string.Empty,
+            "Regression runtime plan");
+        File.AppendAllText(runtimePlanTamperPath, Environment.NewLine,
+            new UTF8Encoding(false));
+        AddRegressionCheck(checks, errors, "resource-stage-runtime-plan-tamper-rejected",
+            !Stage("runtime-plan-tamper-stage", runtimePlanTamper.Update,
+                runtimePlanTamper.Assets, runtimePlanTamper.Identity),
+            "a runtime plan whose bytes do not match the manifest must be rejected.");
+
+        if (positiveAotMetadata.GetArrayLength() > 0)
+        {
+            var aotMetadataTamper = CopyFixture("aot-metadata-tamper");
+            var aotMetadataTamperManifest = ReadJson<JsonElement>(Path.Combine(
+                aotMetadataTamper.Update, "dhe-resource-update.json"));
+            string aotMetadataRuntimeRoot = RequirePortableAssetRoot(
+                GetString(aotMetadataTamperManifest, "runtimeAssetRoot"), "runtimeAssetRoot");
+            string aotMetadataAssetPath = GetString(
+                aotMetadataTamperManifest.GetProperty("aotMetadata")[0], "path") ?? string.Empty;
+            string aotMetadataTamperPath = ResolveContainedPath(aotMetadataTamper.Update,
+                aotMetadataAssetPath[aotMetadataRuntimeRoot.Length..],
+                "Regression AOT metadata payload");
+            byte[] aotMetadataTamperBytes = File.ReadAllBytes(aotMetadataTamperPath);
+            aotMetadataTamperBytes[^1] ^= 0x5a;
+            File.WriteAllBytes(aotMetadataTamperPath, aotMetadataTamperBytes);
+            AddRegressionCheck(checks, errors, "resource-stage-aot-metadata-tamper-rejected",
+                !Stage("aot-metadata-tamper-stage", aotMetadataTamper.Update,
+                    aotMetadataTamper.Assets, aotMetadataTamper.Identity),
+                "an AOT metadata payload whose bytes do not match the manifest must be rejected.");
+
+            var aotMetadataMissing = CopyFixture("aot-metadata-missing");
+            var aotMetadataMissingManifest = ReadJson<JsonElement>(Path.Combine(
+                aotMetadataMissing.Update, "dhe-resource-update.json"));
+            string aotMetadataMissingRuntimeRoot = RequirePortableAssetRoot(
+                GetString(aotMetadataMissingManifest, "runtimeAssetRoot"), "runtimeAssetRoot");
+            string aotMetadataMissingAssetPath = GetString(
+                aotMetadataMissingManifest.GetProperty("aotMetadata")[0], "path") ?? string.Empty;
+            File.Delete(ResolveContainedPath(aotMetadataMissing.Update,
+                aotMetadataMissingAssetPath[aotMetadataMissingRuntimeRoot.Length..],
+                "Regression AOT metadata payload"));
+            AddRegressionCheck(checks, errors, "resource-stage-aot-metadata-missing-rejected",
+                !Stage("aot-metadata-missing-stage", aotMetadataMissing.Update,
+                    aotMetadataMissing.Assets, aotMetadataMissing.Identity),
+                "a resource update with a missing AOT metadata payload must be rejected.");
+        }
+
+        var sharedMetaVersion = CopyFixture("shared-metaversion");
+        string sharedManifestPath = Path.Combine(sharedMetaVersion.Update,
+            "dhe-resource-update.json");
+        var sharedManifest = System.Text.Json.Nodes.JsonNode.Parse(
+            File.ReadAllText(sharedManifestPath))!.AsObject();
+        var duplicateBase = System.Text.Json.Nodes.JsonNode.Parse(
+            sharedManifest["supportedBases"]!.AsArray()[0]!.ToJsonString())!.AsObject();
+        duplicateBase["baseId"] = new string('f', 64);
+        duplicateBase["buildIdentitySha256"] = new string('e', 64);
+        sharedManifest["supportedBases"]!.AsArray().Add(duplicateBase);
+        string sharedValidationPath = ResolveContainedPath(sharedMetaVersion.Update,
+            sharedManifest["validation"]!.GetValue<string>(),
+            "Regression resource validation");
+        var sharedValidation = System.Text.Json.Nodes.JsonNode.Parse(
+            File.ReadAllText(sharedValidationPath))!.AsObject();
+        var duplicateValidationBase = System.Text.Json.Nodes.JsonNode.Parse(
+            sharedValidation["bases"]!.AsArray()[0]!.ToJsonString())!.AsObject();
+        duplicateValidationBase["baseId"] = new string('f', 64);
+        duplicateValidationBase["buildIdentitySha256"] = new string('e', 64);
+        sharedValidation["bases"]!.AsArray().Add(duplicateValidationBase);
+        File.WriteAllText(sharedValidationPath, sharedValidation.ToJsonString(Json),
+            new UTF8Encoding(false));
+        sharedManifest["validationSha256"] = Sha256File(sharedValidationPath);
+        File.WriteAllText(sharedManifestPath, sharedManifest.ToJsonString(Json),
+            new UTF8Encoding(false));
+        AddRegressionCheck(checks, errors, "resource-stage-shared-metaversion-valid",
+            Stage("shared-metaversion-stage", sharedMetaVersion.Update,
+                sharedMetaVersion.Assets, sharedMetaVersion.Identity),
+            "BuildIdentity must select one Base when multiple runtime identities share " +
+            "the same Base MetaVersion set.");
+
+        var identityHashTamper = CopyFixture("identity-hash-tamper");
+        File.AppendAllText(identityHashTamper.Identity, Environment.NewLine,
+            new UTF8Encoding(false));
+        AddRegressionCheck(checks, errors, "resource-stage-identity-hash-tamper-rejected",
+            !Stage("identity-hash-tamper-stage", identityHashTamper.Update,
+                identityHashTamper.Assets, identityHashTamper.Identity),
+            "a BuildIdentity whose file hash does not match supportedBases must be rejected.");
+
+        var identityBaseIdTamper = CopyFixture("identity-base-id-tamper");
+        var tamperedIdentity = System.Text.Json.Nodes.JsonNode.Parse(
+            File.ReadAllText(identityBaseIdTamper.Identity))!.AsObject();
+        tamperedIdentity["baseId"] = new string('f', 64);
+        File.WriteAllText(identityBaseIdTamper.Identity, tamperedIdentity.ToJsonString(Json),
+            new UTF8Encoding(false));
+        AddRegressionCheck(checks, errors, "resource-stage-identity-base-id-tamper-rejected",
+            !Stage("identity-base-id-tamper-stage", identityBaseIdTamper.Update,
+                identityBaseIdTamper.Assets, identityBaseIdTamper.Identity),
+            "a BuildIdentity with an invalid composite baseId must be rejected.");
+
+        var tampered = CopyFixture("payload-tamper");
+        var tamperedManifest = ReadJson<JsonElement>(Path.Combine(tampered.Update,
+            "dhe-resource-update.json"));
+        string tamperedPayload = ResolveContainedPath(tampered.Update,
+            GetString(tamperedManifest.GetProperty("assemblies")[0], "dll") ?? string.Empty,
+            "Regression payload");
+        byte[] tamperedBytes = File.ReadAllBytes(tamperedPayload);
+        tamperedBytes[^1] ^= 0x5a;
+        File.WriteAllBytes(tamperedPayload, tamperedBytes);
+        AddRegressionCheck(checks, errors, "resource-stage-payload-tamper-rejected",
+            !Stage("payload-tamper-stage", tampered.Update, tampered.Assets,
+                tampered.Identity),
+            "a payload whose bytes do not match the manifest must be rejected.");
+
+        var missing = CopyFixture("payload-missing");
+        var missingManifest = ReadJson<JsonElement>(Path.Combine(missing.Update,
+            "dhe-resource-update.json"));
+        string missingPayload = ResolveContainedPath(missing.Update,
+            GetString(missingManifest.GetProperty("assemblies")[0],
+                "currentMetaVersion") ?? string.Empty, "Regression payload");
+        File.Delete(missingPayload);
+        AddRegressionCheck(checks, errors, "resource-stage-missing-payload-rejected",
+            !Stage("payload-missing-stage", missing.Update, missing.Assets, missing.Identity),
+            "a resource update with a missing current MetaVersion must be rejected.");
+
+        var wrongBase = CopyFixture("unsupported-base");
+        var wrongBaseManifest = ReadJson<JsonElement>(Path.Combine(wrongBase.Update,
+            "dhe-resource-update.json"));
+        string runtimeAssetRoot = RequirePortableAssetRoot(
+            GetString(wrongBaseManifest, "runtimeAssetRoot"), "runtimeAssetRoot");
+        string baseAssetRoot = RequirePortableAssetRoot(
+            GetString(wrongBaseManifest, "baseMetaVersionAssetRoot"),
+            "baseMetaVersionAssetRoot");
+        string baseRelative = baseAssetRoot[runtimeAssetRoot.Length..].TrimEnd('/');
+        string embeddedBase = ResolveContainedPath(wrongBase.Assets, baseRelative,
+            "Regression embedded Base");
+        foreach (JsonElement assembly in wrongBaseManifest.GetProperty("assemblies")
+                     .EnumerateArray())
+        {
+            string name = NormalizeName(GetString(assembly, "assemblyName") ?? string.Empty);
+            string currentMetaVersion = ResolveContainedPath(wrongBase.Update,
+                GetString(assembly, "currentMetaVersion") ?? string.Empty,
+                "Regression current MetaVersion");
+            File.Copy(currentMetaVersion,
+                Path.Combine(embeddedBase, name + ".mv.bytes"), true);
+        }
+        AddRegressionCheck(checks, errors, "resource-stage-unsupported-base-rejected",
+            !Stage("unsupported-base-stage", wrongBase.Update, wrongBase.Assets,
+                wrongBase.Identity),
+            "an embedded Base MetaVersion set absent from supportedBases must be rejected.");
+
+        var retired = CopyFixture("retired-mv2");
+        string retiredRoot = ResolveContainedPath(retired.Assets, baseRelative,
+            "Regression embedded Base");
+        string currentBaseMv = Directory.GetFiles(retiredRoot, "*.mv.bytes",
+            SearchOption.TopDirectoryOnly).First();
+        File.Copy(currentBaseMv, Path.Combine(retiredRoot,
+            Path.GetFileName(currentBaseMv).Replace(".mv.bytes", ".mv2.bytes",
+                StringComparison.Ordinal)), true);
+        AddRegressionCheck(checks, errors, "resource-stage-retired-mv2-rejected",
+            !Stage("retired-mv2-stage", retired.Update, retired.Assets, retired.Identity),
+            "retired .mv2.bytes artifacts must be rejected before staging.");
+
+        var missingCapability = CopyFixture("missing-capability");
+        string capabilityManifestPath = Path.Combine(missingCapability.Update,
+            "dhe-resource-update.json");
+        var capabilityManifest = System.Text.Json.Nodes.JsonNode.Parse(
+            File.ReadAllText(capabilityManifestPath))!.AsObject();
+        var manifestBase = capabilityManifest["supportedBases"]!.AsArray()[0]!.AsObject();
+        string removedCapability = manifestBase["requiredRuntimeCapabilities"]!.AsArray()
+            .Select(node => node!.GetValue<string>())
+            .First(value => value != "aot-guard-v1");
+        RemoveJsonString(manifestBase["runtimeCapabilities"]!.AsArray(), removedCapability);
+
+        string validationRelative = capabilityManifest["validation"]!.GetValue<string>();
+        string capabilityValidationPath = ResolveContainedPath(missingCapability.Update,
+            validationRelative, "Regression resource validation");
+        var capabilityValidation = System.Text.Json.Nodes.JsonNode.Parse(
+            File.ReadAllText(capabilityValidationPath))!.AsObject();
+        RemoveJsonString(capabilityValidation["bases"]!.AsArray()[0]!["runtimeCapabilities"]!
+            .AsArray(), removedCapability);
+        File.WriteAllText(capabilityValidationPath,
+            capabilityValidation.ToJsonString(Json), new UTF8Encoding(false));
+        capabilityManifest["validationSha256"] = Sha256File(capabilityValidationPath);
+        File.WriteAllText(capabilityManifestPath, capabilityManifest.ToJsonString(Json),
+            new UTF8Encoding(false));
+        AddRegressionCheck(checks, errors, "resource-stage-missing-capability-rejected",
+            !Stage("missing-capability-stage", missingCapability.Update,
+                missingCapability.Assets, missingCapability.Identity),
+            "a Base missing a required runtime capability must be rejected.");
+    }
+
+    private static void RemoveJsonString(System.Text.Json.Nodes.JsonArray values,
+        string expected)
+    {
+        for (int index = values.Count - 1; index >= 0; index--)
+        {
+            if (string.Equals(values[index]?.GetValue<string>(), expected,
+                    StringComparison.Ordinal))
+                values.RemoveAt(index);
+        }
     }
 
     private static void RunGuardBlockHashRegressions(string regressionRoot, List<object> checks,
@@ -1121,39 +1532,42 @@ internal static partial class Program
         return RequireFile(Path.IsPathRooted(value) ? value : Path.Combine(baseDirectory, value), description);
     }
 
-    private static void ValidateMvBinary(string path, AssemblyDiff diff, List<string> errors)
+    private static void ValidateMetaVersionArtifacts(JsonElement planRecord, string planRoot,
+        string propertyPrefix, MetaVersionSnapshot expected, List<string> errors)
     {
-        try
-        {
-            var document = ReadMvBinary(path);
-            if (document.AssemblyName != diff.AssemblyName) errors.Add("MV binary assembly name mismatch: " + diff.AssemblyName);
-            if (!document.BaselineSha256.Equals(diff.BaselineSha256, StringComparison.OrdinalIgnoreCase) ||
-                !document.CurrentSha256.Equals(diff.CurrentSha256, StringComparison.OrdinalIgnoreCase))
-                errors.Add("MV binary assembly hash mismatch: " + diff.AssemblyName);
-            if (!document.ChangedTokens.SequenceEqual(diff.ChangedTokens))
-                errors.Add("MV binary changed token set mismatch: " + diff.AssemblyName);
-        }
-        catch (Exception ex) { errors.Add(ex.Message); }
+        string jsonPath = ResolveEvidencePath(GetString(planRecord, propertyPrefix + "Json"),
+            planRoot, propertyPrefix + " JSON");
+        string binaryPath = ResolveEvidencePath(GetString(planRecord, propertyPrefix + "Bytes"),
+            planRoot, propertyPrefix + " binary");
+        JsonElement json = ReadJson<JsonElement>(jsonPath);
+        RequireFormat(json, "hybridclr.dhe-metaversion.json", propertyPrefix, errors);
+        if (GetInt(json, "schemaVersion") != MetaVersionSnapshot.SchemaVersion ||
+            !string.Equals(GetString(json, "assemblyName"), expected.AssemblyName,
+                StringComparison.Ordinal) ||
+            !string.Equals(GetString(json, "assemblyMetadataVersion"),
+                expected.AssemblyMetadataVersion, StringComparison.OrdinalIgnoreCase) ||
+            !json.TryGetProperty("assembly", out JsonElement assembly) ||
+            !string.Equals(GetString(assembly, "sha256"), expected.AssemblySha256,
+                StringComparison.OrdinalIgnoreCase))
+            errors.Add(propertyPrefix + " JSON does not match live assembly: " +
+                expected.AssemblyName);
+        if (!File.ReadAllBytes(binaryPath).SequenceEqual(expected.ToBinary()))
+            errors.Add(propertyPrefix + " binary does not match live assembly: " +
+                expected.AssemblyName);
     }
 
-    private static void ValidateMvJson(JsonElement mv, AssemblyDiff diff, List<string> errors)
+    private static int CountRuntimeChangedMethods(MetaVersionSnapshot baseline,
+        MetaVersionSnapshot current)
     {
-        RequireFormat(mv, "hybridclr.dhe-lite.mv.json", "MV JSON", errors);
-        if (!mv.TryGetProperty("compatibility", out var compatibility) ||
-            GetString(compatibility, "mode") != "method-body-only" || GetString(compatibility, "status") != "compatible")
-            errors.Add("MV JSON does not declare compatible method-body-only mode: " + diff.AssemblyName);
-        try
-        {
-            if (!ChangedTokensFromMvJson(mv).SequenceEqual(diff.ChangedTokens))
-                errors.Add("MV JSON changed token set mismatch: " + diff.AssemblyName);
-            var summary = mv.GetProperty("summary");
-            if (GetInt(summary, "methodCount") != diff.Methods.Count ||
-                GetInt(summary, "changedMethodCount") != diff.ChangedMethodCount ||
-                GetInt(summary, "typeChangeCount") != diff.TypeChanges.Count)
-                errors.Add("MV JSON summary does not match live assembly diff: " + diff.AssemblyName);
-        }
-        catch (Exception ex) { errors.Add("MV JSON " + diff.AssemblyName + ": " + ex.Message); }
+        var currentMethods = current.Methods.ToDictionary(method => method.StableId,
+            StringComparer.OrdinalIgnoreCase);
+        return baseline.Methods.Count(method => !currentMethods.TryGetValue(method.StableId,
+            out MetaVersionMethod? currentMethod) || !string.Equals(method.Version,
+            currentMethod.Version, StringComparison.OrdinalIgnoreCase));
     }
+
+    private static bool MethodCanHaveAotEntry(MetaVersionMethod method) =>
+        (method.Flags & 8u) != 0 && (method.Flags & (2u | 4u)) == 0;
 
     private static void ValidatePlayerAssemblies(JsonElement player, string[] planNames, List<string> errors)
     {
@@ -1173,16 +1587,23 @@ internal static partial class Program
             errors.Add("Player assembly validation set does not match the project plan.");
     }
 
-    private static void ValidateNativeManifest(JsonElement native, IReadOnlyDictionary<string, AssemblyDiff> diffs,
+    private static void ValidateNativeManifest(JsonElement native,
+        IReadOnlyDictionary<string, LiveAssemblyValidation> diffs,
         List<string> errors)
     {
         if (GetInt(native, "schemaVersion") != 1 || GetInt(native, "resolverVersion") != 3 ||
             GetString(native, "abiContract") != "il2cpp-generated-cpp-signature-v2" ||
-            GetString(native, "guardHashContract") != NativeGuardHashContract)
+            GetString(native, "guardHashContract") != NativeGuardHashContract ||
+            GetString(native, "runtimeProtocol") != ResourceUpdateCompatibility.RuntimeProtocol ||
+            GetString(native, "runtimeContract") != ResourceUpdateCompatibility.CurrentNativeRuntimeContract ||
+            !new HashSet<string>(StringArray(native, "runtimeCapabilities", errors),
+                StringComparer.Ordinal).SetEquals(ResourceUpdateCompatibility.KnownRuntimeCapabilities))
             errors.Add("Native manifest contract is invalid.");
-        var expected = diffs.ToDictionary(pair => pair.Key,
-            pair => pair.Value.ChangedTokens.ToHashSet(), StringComparer.OrdinalIgnoreCase);
-        var supported = new Dictionary<string, HashSet<uint>>(StringComparer.OrdinalIgnoreCase);
+        var expected = diffs.ToDictionary(pair => pair.Key, pair => pair.Value.Baseline.Methods
+            .Where(MethodCanHaveAotEntry).ToDictionary(method => method.StableId,
+                method => method.Token, StringComparer.OrdinalIgnoreCase),
+            StringComparer.OrdinalIgnoreCase);
+        var covered = new Dictionary<string, HashSet<string>>(StringComparer.OrdinalIgnoreCase);
         if (!native.TryGetProperty("methods", out var methods) || methods.ValueKind != JsonValueKind.Array)
         {
             errors.Add("Native manifest methods are missing.");
@@ -1192,26 +1613,49 @@ internal static partial class Program
         {
             var assembly = GetString(method, "assemblyName") ?? "";
             var token = method.TryGetProperty("methodToken", out var tokenValue) && tokenValue.TryGetUInt32(out var raw) ? raw : 0;
-            if (!expected.TryGetValue(assembly, out var expectedTokens) || !expectedTokens.Contains(token))
-                errors.Add("Native manifest contains an unexpected managed token: " + assembly + ":" + token.ToString("x8"));
-            if (!supported.TryGetValue(assembly, out var tokens)) supported[assembly] = tokens = new HashSet<uint>();
-            tokens.Add(token);
+            string stableId = GetString(method, "stableMethodIdSha256") ?? "";
+            if (!expected.TryGetValue(assembly, out var expectedMethods) ||
+                !expectedMethods.TryGetValue(stableId, out uint expectedToken) ||
+                expectedToken != token)
+                errors.Add("Native manifest contains an unexpected method: " + assembly + ":" +
+                    stableId + ":" + token.ToString("x8"));
+            if (!covered.TryGetValue(assembly, out var methodsForAssembly))
+                covered[assembly] = methodsForAssembly = new HashSet<string>(
+                    StringComparer.OrdinalIgnoreCase);
+            methodsForAssembly.Add(stableId);
+        }
+        if (!native.TryGetProperty("interpreterOnlyMethods", out var interpreterOnly) ||
+            interpreterOnly.ValueKind != JsonValueKind.Array)
+            errors.Add("Native manifest interpreter-only methods are missing.");
+        else foreach (var method in interpreterOnly.EnumerateArray())
+        {
+            string assembly = GetString(method, "assemblyName") ?? "";
+            string stableId = GetString(method, "stableMethodIdSha256") ?? "";
+            if (!expected.TryGetValue(assembly, out var expectedMethods) ||
+                !expectedMethods.ContainsKey(stableId))
+                errors.Add("Native manifest contains an unexpected interpreter-only method: " +
+                    assembly + ":" + stableId);
+            if (!covered.TryGetValue(assembly, out var methodsForAssembly))
+                covered[assembly] = methodsForAssembly = new HashSet<string>(
+                    StringComparer.OrdinalIgnoreCase);
+            methodsForAssembly.Add(stableId);
         }
         foreach (var pair in expected)
         {
-            supported.TryGetValue(pair.Key, out var tokens);
-            if (!pair.Value.SetEquals(tokens ?? new HashSet<uint>()))
-                errors.Add("Native manifest managed token coverage mismatch: " + pair.Key);
+            covered.TryGetValue(pair.Key, out var stableIds);
+            if (!new HashSet<string>(pair.Value.Keys, StringComparer.OrdinalIgnoreCase)
+                    .SetEquals(stableIds ?? new HashSet<string>(StringComparer.OrdinalIgnoreCase)))
+                errors.Add("Native manifest universal method coverage mismatch: " + pair.Key);
         }
-        var distinctCount = supported.Sum(pair => pair.Value.Count);
-        if (distinctCount != GetInt(native, "supportedChangedMethodCount"))
-            errors.Add("Native manifest supported token count is inconsistent.");
-        if (!native.TryGetProperty("unsupportedChangedMethods", out var unsupported) || unsupported.ValueKind != JsonValueKind.Array || unsupported.GetArrayLength() != 0)
-            errors.Add("Native manifest contains unsupported changed methods.");
+        int expectedCount = expected.Sum(pair => pair.Value.Count);
+        if (expectedCount != GetInt(native, "guardedMethodCount") ||
+            GetInt(native, "unsupportedGuardedMethodCount") != 0)
+            errors.Add("Native manifest universal method count is inconsistent.");
     }
 
     private static void ValidateBuildIdentity(JsonElement identity, string identityPath, JsonElement native,
-        string nativePath, IReadOnlyDictionary<string, AssemblyDiff> diffs, List<string> errors)
+        string nativePath, IReadOnlyDictionary<string, LiveAssemblyValidation> diffs,
+        List<string> errors)
     {
         if (!identity.TryGetProperty("assemblies", out var assemblies) || assemblies.ValueKind != JsonValueKind.Array)
         {
@@ -1220,6 +1664,7 @@ internal static partial class Program
         }
         var baselineRecords = new List<KeyValuePair<string, byte[]>>();
         var snapshotRecords = new List<KeyValuePair<string, byte[]>>();
+        var baseMetaVersionRecords = new List<KeyValuePair<string, byte[]>>();
         var names = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
         foreach (var record in assemblies.EnumerateArray().OrderBy(record => GetString(record, "assemblyName"), StringComparer.Ordinal))
         {
@@ -1235,20 +1680,64 @@ internal static partial class Program
                     Path.GetDirectoryName(identityPath)!, "Build identity baseline assembly");
                 var bytes = File.ReadAllBytes(baselinePath);
                 var hash = Sha256File(baselinePath);
-                if (!hash.Equals(diff.BaselineSha256, StringComparison.OrdinalIgnoreCase) ||
+                if (!hash.Equals(diff.Baseline.AssemblySha256, StringComparison.OrdinalIgnoreCase) ||
                     !hash.Equals(GetString(record, "baselineSha256"), StringComparison.OrdinalIgnoreCase) ||
                     !hash.Equals(GetString(record, "snapshotSha256"), StringComparison.OrdinalIgnoreCase))
                     errors.Add("Build identity baseline/snapshot hash mismatch: " + name);
                 baselineRecords.Add(new KeyValuePair<string, byte[]>(name, bytes));
                 snapshotRecords.Add(new KeyValuePair<string, byte[]>(name, Convert.FromHexString(hash)));
+                var baseMetaVersionPath = ResolveEvidencePath(
+                    GetString(record, "baseMetaVersionPath"),
+                    Path.GetDirectoryName(identityPath)!,
+                    "Build identity Base MetaVersion");
+                byte[] baseMetaVersion = File.ReadAllBytes(baseMetaVersionPath);
+                if (!Sha256Bytes(baseMetaVersion).Equals(
+                        GetString(record, "baseMetaVersionSha256"),
+                        StringComparison.OrdinalIgnoreCase))
+                    errors.Add("Build identity Base MetaVersion hash mismatch: " + name);
+                baseMetaVersionRecords.Add(new KeyValuePair<string, byte[]>(name,
+                    baseMetaVersion));
             }
             catch (Exception ex) { errors.Add("Build identity " + name + ": " + ex.Message); }
         }
         if (!new HashSet<string>(diffs.Keys, StringComparer.OrdinalIgnoreCase).SetEquals(names))
             errors.Add("Build identity assembly set does not match the project plan.");
-        if (!NamedByteSetHash(baselineRecords).Equals(GetString(identity, "baselineAssemblySha256"), StringComparison.OrdinalIgnoreCase) ||
+        string managedAssemblySetSha256 = NamedByteSetHash(baselineRecords);
+        string baseMetaVersionSetSha256 = NamedByteSetHash(baseMetaVersionRecords);
+        if (!managedAssemblySetSha256.Equals(GetString(identity, "managedAssemblySetSha256"),
+                StringComparison.OrdinalIgnoreCase) ||
             !NamedByteSetHash(snapshotRecords).Equals(GetString(identity, "aotSnapshotSha256"), StringComparison.OrdinalIgnoreCase))
             errors.Add("Build identity aggregate baseline/snapshot hash is invalid.");
+        if (!baseMetaVersionSetSha256.Equals(GetString(identity,
+                "baseMetaVersionSetSha256"), StringComparison.OrdinalIgnoreCase))
+            errors.Add("Build identity aggregate Base MetaVersion hash is invalid.");
+        string[] identityCapabilities = StringArray(identity, "runtimeCapabilities", errors);
+        if (!string.Equals(GetString(identity, "runtimeProtocol"),
+                GetString(native, "runtimeProtocol"), StringComparison.Ordinal) ||
+            !string.Equals(GetString(identity, "runtimeContract"),
+                GetString(native, "runtimeContract"), StringComparison.Ordinal) ||
+            !new HashSet<string>(identityCapabilities, StringComparer.Ordinal).SetEquals(
+                StringArray(native, "runtimeCapabilities", errors)))
+            errors.Add("Build identity runtime protocol does not match the native manifest.");
+        try
+        {
+            string computedBaseId = ComputeBaseId(GetString(identity, "target") ?? string.Empty,
+                managedAssemblySetSha256, GetString(identity, "aotSnapshotSha256") ?? string.Empty,
+                baseMetaVersionSetSha256,
+                GetString(identity, "nativeGuardSourceSha256") ?? string.Empty,
+                GetString(identity, "nativeManifestSha256") ?? string.Empty,
+                GetString(identity, "runtimeProtocol") ?? string.Empty,
+                GetString(identity, "runtimeContract") ?? string.Empty, identityCapabilities,
+                GetString(identity, "runtimeAssetRoot") ?? string.Empty,
+                GetString(identity, "baseMetaVersionAssetRoot") ?? string.Empty);
+            if (!computedBaseId.Equals(GetString(identity, "baseId"),
+                    StringComparison.OrdinalIgnoreCase))
+                errors.Add("Build identity composite Base ID is invalid.");
+        }
+        catch (Exception exception)
+        {
+            errors.Add("Build identity composite Base ID: " + exception.Message);
+        }
 
         var identityRoot = Path.GetDirectoryName(identityPath)!;
         var nativeDocumentRoot = Path.GetDirectoryName(nativePath)!;
@@ -1398,7 +1887,8 @@ internal static partial class Program
             var assemblyName = GetString(record, "assemblyName") ?? "";
             if (string.IsNullOrWhiteSpace(assemblyName) || !names.Add(assemblyName))
                 errors.Add("Runtime plan contains a missing or duplicate assembly name.");
-            foreach (var property in new[] { "current", "baseline", "mv", "snapshot" })
+            foreach (var property in new[] { "current", "baseline", "snapshot",
+                         "baseMetaVersion", "currentMetaVersion" })
             {
                 var value = GetString(record, property) ?? "";
                 if (Path.IsPathRooted(value) || value.Contains("..", StringComparison.Ordinal) || !File.Exists(Path.Combine(root, value)))
@@ -1406,12 +1896,20 @@ internal static partial class Program
             }
             var baseline = Path.Combine(root, GetString(record, "baseline") ?? "");
             var current = Path.Combine(root, GetString(record, "current") ?? "");
-            var mv = Path.Combine(root, GetString(record, "mv") ?? "");
             var snapshot = Path.Combine(root, GetString(record, "snapshot") ?? "");
+            var baseMetaVersion = Path.Combine(root,
+                GetString(record, "baseMetaVersion") ?? "");
+            var currentMetaVersion = Path.Combine(root,
+                GetString(record, "currentMetaVersion") ?? "");
             if (File.Exists(baseline) && !Sha256File(baseline).Equals(GetString(record, "baselineSha256"), StringComparison.OrdinalIgnoreCase)) errors.Add("Runtime baseline hash mismatch.");
             if (File.Exists(current) && !Sha256File(current).Equals(GetString(record, "currentSha256"), StringComparison.OrdinalIgnoreCase)) errors.Add("Runtime current hash mismatch.");
-            if (File.Exists(mv) && !Sha256File(mv).Equals(GetString(record, "mvSha256"), StringComparison.OrdinalIgnoreCase)) errors.Add("Runtime MV hash mismatch.");
             if (File.Exists(snapshot) && !Sha256File(snapshot).Equals(GetString(record, "snapshotSha256"), StringComparison.OrdinalIgnoreCase)) errors.Add("Runtime snapshot hash mismatch.");
+            if (File.Exists(baseMetaVersion) && !Sha256File(baseMetaVersion).Equals(
+                    GetString(record, "baseMetaVersionSha256"), StringComparison.OrdinalIgnoreCase))
+                errors.Add("Runtime Base MetaVersion hash mismatch.");
+            if (File.Exists(currentMetaVersion) && !Sha256File(currentMetaVersion).Equals(
+                    GetString(record, "currentMetaVersionSha256"), StringComparison.OrdinalIgnoreCase))
+                errors.Add("Runtime current MetaVersion hash mismatch.");
             if (File.Exists(snapshot) && File.Exists(baseline) &&
                 !File.ReadAllBytes(snapshot).SequenceEqual(Convert.FromHexString(Sha256File(baseline))))
                 errors.Add("Runtime snapshot does not encode the baseline assembly hash.");
@@ -1430,4 +1928,7 @@ internal static partial class Program
             }
         }
     }
+
+    private sealed record LiveAssemblyValidation(MetaVersionSnapshot Baseline,
+        MetaVersionSnapshot Current, ResourceUpdateCompatibility Compatibility);
 }

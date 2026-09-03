@@ -43,6 +43,11 @@ namespace HybridCLR.Lab.Editor
                         if (!string.IsNullOrWhiteSpace(currentInputRoot))
                             StageCurrentAssemblyInputs(Path.GetFullPath(currentInputRoot), names);
                     },
+                    AfterCurrentGeneration = !string.IsNullOrWhiteSpace(configuredBaseline) &&
+                        Directory.Exists(configuredBaseline)
+                        ? (Action<string[]>)(names => StageCurrentAssemblyInputs(
+                            Path.GetFullPath(configuredBaseline), names))
+                        : null,
                 });
             var report = new PrepareReport
             {
@@ -131,6 +136,11 @@ namespace HybridCLR.Lab.Editor
 
         public static void BuildFinalPlayer()
         {
+            BuildTarget target = ParseTarget(Argument("-dheTarget"));
+            string outputRoot = Path.GetFullPath(Argument("-dheOutputRoot"));
+            string baselineRoot = Path.GetFullPath(Argument("-dheBaselineRoot"));
+            DheProjectBuildSupport.ValidateStagedBuildIdentity(
+                CreateIdentityOptions(target, baselineRoot, outputRoot));
             try
             {
                 BuildPlayer(false);
@@ -206,6 +216,8 @@ namespace HybridCLR.Lab.Editor
                 BeeLogPath = Path.Combine(outputRoot, "native", "bee-rebuild.log"),
                 RequireCompleteCoverage = true,
                 RebuildPlayer = rebuildPlayer,
+                GuardAllMethods = string.Equals(OptionalArgument("-dheBootstrap"), "true", StringComparison.OrdinalIgnoreCase) ||
+                    string.Equals(OptionalArgument("-dheBootstrap"), "1", StringComparison.OrdinalIgnoreCase),
                 BeeMaxAttempts = 3,
                 BeeTimeoutSeconds = 600,
             };
@@ -248,7 +260,7 @@ namespace HybridCLR.Lab.Editor
                 schemaVersion = 1,
                 format = "hybridclr.dhe-adapter-native-guards.json",
                 generatedAtUtc = DateTimeOffset.UtcNow.ToString("O"),
-                passed = result.UnsupportedMethodCount == 0 &&
+                passed = result.UnsupportedChangedMethodCount == 0 &&
                     (result.RequestedMethodCount == 0 || result.NativeEntryCount > 0),
                 generatedCppRoot = nativeResult.GeneratedCppRoot,
                 manifestPath = result.ManifestPath,
@@ -256,6 +268,12 @@ namespace HybridCLR.Lab.Editor
                 transformedMethodCount = result.TransformedMethodCount,
                 nativeEntryCount = result.NativeEntryCount,
                 unsupportedMethodCount = result.UnsupportedMethodCount,
+                guardMode = result.GuardMode,
+                guardedMethodCount = result.GuardedMethodCount,
+                supportedGuardedMethodCount = result.SupportedGuardedMethodCount,
+                unsupportedGuardedMethodCount = result.UnsupportedGuardedMethodCount,
+                interpreterOnlyMethodCount = result.InterpreterOnlyMethodCount,
+                unsupportedChangedMethodCount = result.UnsupportedChangedMethodCount,
                 target = target.ToString(),
             };
             WriteJson(Path.Combine(outputRoot, "adapter", "native-guards.json"), report);
@@ -320,74 +338,13 @@ namespace HybridCLR.Lab.Editor
         private static void StageBuildIdentity(BuildTarget target, string baselineRoot, string outputRoot,
             DheNativeFinalizeResult nativeResult)
         {
-            if (nativeResult == null || nativeResult.GuardResult == null)
-                throw new BuildFailedException("DHE build identity requires native guard evidence.");
-            string[] assemblyNames = (nativeResult.AssemblyNames ?? Array.Empty<string>())
-                .OrderBy(name => name, StringComparer.Ordinal).ToArray();
-            if (assemblyNames.Length == 0) throw new BuildFailedException("DHE build identity assembly set is empty.");
-            var baselineRecords = new List<KeyValuePair<string, byte[]>>();
-            var snapshotRecords = new List<KeyValuePair<string, byte[]>>();
-            var assemblies = new List<DheBuildIdentityAssembly>();
-            string mainHash = null;
-            foreach (string assemblyName in assemblyNames)
-            {
-                string baselinePath = Path.Combine(baselineRoot, assemblyName + ".dll");
-                if (!File.Exists(baselinePath)) throw new FileNotFoundException("DHE baseline assembly was not found", baselinePath);
-                byte[] baselineBytes = File.ReadAllBytes(baselinePath);
-                byte[] snapshotBytes = Sha256(baselineBytes);
-                string hash = ToHex(snapshotBytes);
-                if (assemblyName == "HybridCLR.ManagedCasesAot") mainHash = hash;
-                baselineRecords.Add(new KeyValuePair<string, byte[]>(assemblyName, baselineBytes));
-                snapshotRecords.Add(new KeyValuePair<string, byte[]>(assemblyName, snapshotBytes));
-                assemblies.Add(new DheBuildIdentityAssembly
-                {
-                    assemblyName = assemblyName,
-                    baselinePath = Path.GetFullPath(baselinePath),
-                    baselineSha256 = hash,
-                    snapshotSha256 = hash,
-                });
-            }
-            if (string.IsNullOrWhiteSpace(mainHash)) throw new BuildFailedException("DHE main assembly is missing from build identity.");
-            string baselineSetHash = Sha256NamedByteSet(baselineRecords);
-            string snapshotSetHash = Sha256NamedByteSet(snapshotRecords);
-            DheNativeGuardResult guard = nativeResult.GuardResult;
-            string source = "namespace HybridCLR.Lab\n{\n" +
-                "    internal static class HybridCLRDheBuildIdentity\n    {\n" +
-                "        public const int IdentityVersion = 2;\n" +
-                "        public const string Target = \"" + target + "\";\n" +
-                "        public const string BaselineAssemblySha256 = \"" + mainHash + "\";\n" +
-                "        public const string AotSnapshotSha256 = \"" + mainHash + "\";\n" +
-                "        public const string AotSnapshotKind = \"managed-assembly-plus-generated-cpp-v1\";\n" +
-                "        public const string NativeGuardSourceSha256 = \"" + guard.NativeGuardSourceSha256 + "\";\n" +
-                "        public const string NativeManifestSha256 = \"" + guard.NativeManifestSha256 + "\";\n" +
-                "    }\n}\n";
-            string sourcePath = Path.Combine(ProjectRoot(), "Assets", "Runtime", "HybridCLRDheBuildIdentity.cs");
-            File.WriteAllText(sourcePath, source, new System.Text.UTF8Encoding(false));
-            string streamingRoot = Path.Combine(ProjectRoot(), "Assets", "StreamingAssets", "HybridCLRLab");
+            DheProjectBuildSupport.StageBuildIdentity(CreateIdentityOptions(target, baselineRoot,
+                outputRoot), nativeResult);
+            string source = Path.Combine(outputRoot, "build-identity.json");
+            string streamingRoot = Path.Combine(ProjectRoot(), "Assets", "StreamingAssets",
+                "HybridCLRLab");
             Directory.CreateDirectory(streamingRoot);
-            var identity = new DheBuildIdentityReport
-            {
-                schemaVersion = 1,
-                format = "hybridclr.dhe-build-identity.json",
-                workflow = "unity2021-dhe-demo",
-                target = target.ToString(),
-                identityVersion = 2,
-                pathSemantics = "workspace-absolute-v1",
-                baselineAssemblySha256 = baselineSetHash,
-                aotSnapshotSha256 = snapshotSetHash,
-                mainBaselineAssemblySha256 = mainHash,
-                mainSnapshotSha256 = mainHash,
-                aotSnapshotKind = "managed-assembly-plus-generated-cpp-v1",
-                nativeGuardSourceSha256 = guard.NativeGuardSourceSha256,
-                nativeManifestSha256 = guard.NativeManifestSha256,
-                generatedCppRoot = nativeResult.GeneratedCppRoot,
-                generatedCppPaths = guard.GeneratedCppPaths ?? Array.Empty<string>(),
-                nativeManifestPath = guard.ManifestPath,
-                assemblies = assemblies.ToArray(),
-            };
-            WriteJson(Path.Combine(streamingRoot, "build-identity.json"), identity);
-            WriteJson(Path.Combine(outputRoot, "build-identity.json"), identity);
-            AssetDatabase.ImportAsset("Assets/Runtime/HybridCLRDheBuildIdentity.cs", ImportAssetOptions.ForceUpdate | ImportAssetOptions.ForceSynchronousImport);
+            File.Copy(source, Path.Combine(streamingRoot, "build-identity.json"), true);
         }
 
         private static void ValidateFinalNativeIdentity(string outputRoot, DheNativeFinalizeResult nativeResult)
@@ -404,20 +361,31 @@ namespace HybridCLR.Lab.Editor
 
         private static void RestoreBuildIdentityTemplate()
         {
-            const string source = "namespace HybridCLR.Lab\n{\n" +
-                "    internal static class HybridCLRDheBuildIdentity\n    {\n" +
-                "        public const int IdentityVersion = 2;\n" +
-                "        public const string BaselineAssemblySha256 = \"0000000000000000000000000000000000000000000000000000000000000000\";\n" +
-                "        public const string AotSnapshotSha256 = \"0000000000000000000000000000000000000000000000000000000000000000\";\n" +
-                "        public const string AotSnapshotKind = \"uninitialized-template\";\n" +
-                "        public const string NativeGuardSourceSha256 = \"0000000000000000000000000000000000000000000000000000000000000000\";\n" +
-                "        public const string NativeManifestSha256 = \"0000000000000000000000000000000000000000000000000000000000000000\";\n" +
-                "    }\n}\n";
-            string sourcePath = Path.Combine(ProjectRoot(), "Assets", "Runtime",
-                "HybridCLRDheBuildIdentity.cs");
-            File.WriteAllText(sourcePath, source, new System.Text.UTF8Encoding(false));
-            AssetDatabase.ImportAsset("Assets/Runtime/HybridCLRDheBuildIdentity.cs",
-                ImportAssetOptions.ForceUpdate | ImportAssetOptions.ForceSynchronousImport);
+            BuildTarget target = ParseTarget(Argument("-dheTarget"));
+            DheProjectBuildSupport.RestoreBuildIdentityTemplate(CreateIdentityOptions(target,
+                Path.GetFullPath(Argument("-dheBaselineRoot")),
+                Path.GetFullPath(Argument("-dheOutputRoot"))));
+        }
+
+        private static DheProjectIdentityOptions CreateIdentityOptions(BuildTarget target,
+            string baselineRoot, string outputRoot)
+        {
+            return new DheProjectIdentityOptions
+            {
+                ProjectRoot = ProjectRoot(),
+                OutputRoot = outputRoot,
+                BaselineRoot = baselineRoot,
+                ProjectPlanPath = Path.GetFullPath(Argument("-dheProjectPlan")),
+                Target = target.ToString(),
+                Workflow = "unity2021-dhe-demo",
+                BuildIdentityAssetPath = "Assets/Runtime/HybridCLRDheBuildIdentity.cs",
+                RuntimePlanPath = Path.Combine(ProjectRoot(), "Assets", "StreamingAssets",
+                    "HybridCLRLab", "DheDemo", "DheRuntimePlan.json"),
+                BaseMetaVersionAssetRoot = Path.Combine(ProjectRoot(), "Assets", "StreamingAssets",
+                    "HybridCLRLab", "DheDemo", "BaseMetaVersion"),
+                IdentityNamespace = "HybridCLR.Lab",
+                IdentityClassName = "HybridCLRDheBuildIdentity",
+            };
         }
 
         private static string Sha256NamedByteSet(IEnumerable<KeyValuePair<string, byte[]>> records)
@@ -587,6 +555,12 @@ namespace HybridCLR.Lab.Editor
             public int transformedMethodCount;
             public int nativeEntryCount;
             public int unsupportedMethodCount;
+            public string guardMode;
+            public int guardedMethodCount;
+            public int supportedGuardedMethodCount;
+            public int unsupportedGuardedMethodCount;
+            public int interpreterOnlyMethodCount;
+            public int unsupportedChangedMethodCount;
         }
 
         [Serializable]
@@ -640,10 +614,7 @@ namespace HybridCLR.Lab.Editor
             public string target;
             public int identityVersion;
             public string pathSemantics;
-            public string baselineAssemblySha256;
             public string aotSnapshotSha256;
-            public string mainBaselineAssemblySha256;
-            public string mainSnapshotSha256;
             public string aotSnapshotKind;
             public string nativeGuardSourceSha256;
             public string nativeManifestSha256;

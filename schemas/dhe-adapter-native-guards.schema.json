@@ -4,7 +4,7 @@
   "title": "HybridCLR DHE Adapter Native Guard Report",
   "type": "object",
   "additionalProperties": true,
-  "required": ["schemaVersion", "format", "generatedAtUtc", "passed", "target", "generatedCppRoot", "manifestPath", "requestedMethodCount", "transformedMethodCount", "nativeEntryCount", "unsupportedMethodCount"],
+  "required": ["schemaVersion", "format", "generatedAtUtc", "passed", "target", "generatedCppRoot", "manifestPath", "requestedMethodCount", "transformedMethodCount", "nativeEntryCount", "unsupportedMethodCount", "guardMode", "guardedMethodCount", "supportedGuardedMethodCount", "unsupportedGuardedMethodCount", "interpreterOnlyMethodCount", "unsupportedChangedMethodCount"],
   "properties": {
     "schemaVersion": { "const": 1 },
     "format": { "const": "hybridclr.dhe-adapter-native-guards.json" },
@@ -16,6 +16,12 @@
     "requestedMethodCount": { "type": "integer", "minimum": 0 },
     "transformedMethodCount": { "type": "integer", "minimum": 0 },
     "nativeEntryCount": { "type": "integer", "minimum": 0 },
-    "unsupportedMethodCount": { "const": 0 }
+    "unsupportedMethodCount": { "const": 0 },
+    "guardMode": { "enum": ["changed-only", "universal"] },
+    "guardedMethodCount": { "type": "integer", "minimum": 0 },
+    "supportedGuardedMethodCount": { "type": "integer", "minimum": 0 },
+    "unsupportedGuardedMethodCount": { "type": "integer", "minimum": 0 },
+    "interpreterOnlyMethodCount": { "type": "integer", "minimum": 0 },
+    "unsupportedChangedMethodCount": { "type": "integer", "minimum": 0 }
   }
 }

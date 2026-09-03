@@ -75,6 +75,7 @@ namespace
     {
         if (hybridclr::dhe::ShouldDispatchToInterpreter(method))
         {
+            method = hybridclr::dhe::ResolveInterpreterMethod(method);
             DheProbeMethod interpreterMethod = reinterpret_cast<DheProbeMethod>(
                 method->methodPointerCallByInterp);
             return interpreterMethod(value, method);
@@ -463,6 +464,7 @@ namespace
             instanceI4i4 != nullptr && instanceI8i8 != nullptr && instanceVoidi4 != nullptr &&
             valueTypeInstanceVoidNoArgs != nullptr && invokeArgs != nullptr);
 
+        const std::string assemblyName = "Test.Assembly";
         std::vector<uint8_t> mvBytes;
         const auto appendU32 = [&mvBytes](uint32_t value)
         {
@@ -471,38 +473,62 @@ namespace
             mvBytes.push_back(static_cast<uint8_t>((value >> 16) & 0xff));
             mvBytes.push_back(static_cast<uint8_t>((value >> 24) & 0xff));
         };
-        const char magic[] = "DHEMVLT1";
-        mvBytes.insert(mvBytes.end(), magic, magic + 8);
-        const std::string assemblyName = "Test.Assembly";
-        appendU32(1);
-        appendU32(static_cast<uint32_t>(assemblyName.size()));
-        appendU32(2);
-        appendU32(hybridclr::dhe::kMetaVersionStrictCompatibilityFlag);
-        for (uint32_t i = 0; i < 64; ++i)
+        const auto appendDigest = [&mvBytes](uint8_t seed)
         {
-            mvBytes.push_back(static_cast<uint8_t>(i + 1));
-        }
+            for (uint32_t index = 0; index < hybridclr::dhe::kSha256DigestSize; ++index)
+            {
+                mvBytes.push_back(static_cast<uint8_t>(seed + index));
+            }
+        };
+        const char magic[] = "DHEMETA1";
+        mvBytes.insert(mvBytes.end(), magic, magic + 8);
+        appendU32(hybridclr::dhe::kMetaVersionSchema);
+        appendU32(hybridclr::dhe::kMetaVersionStrictCompatibilityFlag);
+        appendU32(static_cast<uint32_t>(assemblyName.size()));
+        appendU32(1);
+        appendU32(1);
+        appendDigest(1);
         mvBytes.insert(mvBytes.end(), assemblyName.begin(), assemblyName.end());
+        appendDigest(33);
+        appendDigest(65);
+        appendU32(0x02000002);
+        appendU32(0);
+        appendDigest(97);
+        appendDigest(129);
+        appendDigest(33);
         appendU32(0x06000002);
-        appendU32(0x06000003);
+        appendU32(8);
 
         hybridclr::dhe::MetaVersionData parsedMv;
-        CHECK(hybridclr::dhe::ParseMetaVersion(mvBytes.data(), static_cast<uint32_t>(mvBytes.size()), parsedMv));
+        CHECK(hybridclr::dhe::ParseMetaVersion(mvBytes.data(),
+            static_cast<uint32_t>(mvBytes.size()), parsedMv));
         CHECK(parsedMv.assemblyName == assemblyName);
-        CHECK(parsedMv.flags == hybridclr::dhe::kMetaVersionStrictCompatibilityFlag);
-        CHECK(parsedMv.baselineAssemblyHash[0] == 1);
-        CHECK(parsedMv.baselineAssemblyHash[31] == 32);
-        CHECK(parsedMv.currentAssemblyHash[0] == 33);
-        CHECK(parsedMv.currentAssemblyHash[31] == 64);
-        CHECK(parsedMv.changedMethodTokens.size() == 2);
-        CHECK(parsedMv.changedMethodTokens[0] == 0x06000002);
+        CHECK(parsedMv.types.size() == 1);
+        CHECK(parsedMv.methods.size() == 1);
+        CHECK(parsedMv.types[0].token == 0x02000002);
+        CHECK(parsedMv.methods[0].token == 0x06000002);
+        CHECK(parsedMv.methods[0].declaringTypeStableId == parsedMv.types[0].stableId);
+        std::vector<uint8_t> badMv = mvBytes;
+        badMv[8] = 2;
+        hybridclr::dhe::MetaVersionData rejectedMv;
+        CHECK(!hybridclr::dhe::ParseMetaVersion(badMv.data(),
+            static_cast<uint32_t>(badMv.size()), rejectedMv));
+
+        const size_t methodStart = 60 + assemblyName.size() + 72;
+        std::vector<uint8_t> duplicateTokenMv = mvBytes;
+        duplicateTokenMv[24] = 2;
+        duplicateTokenMv.insert(duplicateTokenMv.end(), mvBytes.begin() + methodStart,
+            mvBytes.end());
+        duplicateTokenMv[mvBytes.size()] ^= 0x55;
+        CHECK(!hybridclr::dhe::ParseMetaVersion(duplicateTokenMv.data(),
+            static_cast<uint32_t>(duplicateTokenMv.size()), rejectedMv));
 
         // Unknown MV feature bits must fail closed. A future producer cannot
         // silently opt an older runtime into an incompatible wire format.
-        mvBytes[20] = 0x02;
+        mvBytes[12] = 0x02;
         hybridclr::dhe::MetaVersionData unknownFlagsMv;
         CHECK(!hybridclr::dhe::ParseMetaVersion(mvBytes.data(), static_cast<uint32_t>(mvBytes.size()), unknownFlagsMv));
-        mvBytes[20] = static_cast<uint8_t>(hybridclr::dhe::kMetaVersionStrictCompatibilityFlag);
+        mvBytes[12] = static_cast<uint8_t>(hybridclr::dhe::kMetaVersionStrictCompatibilityFlag);
 
         hybridclr::dhe::Sha256Digest abcHash{};
         const char abc[] = "abc";
@@ -547,20 +573,34 @@ namespace
 
 		// Exercise the production transaction entry point. It must resolve and
 		// prepare all changed methods before publishing the assembly state.
-		CHECK(hybridclr::dhe::PrepareAndRegisterChangedMethods(&assembly, { changed.token }));
+		klass->token = 0x02000002;
+		hybridclr::dhe::MetaVersionData baseMetaVersion;
+		hybridclr::dhe::MetaVersionData currentMetaVersion;
+		baseMetaVersion.assemblyName = assembly.aname.name;
+		currentMetaVersion.assemblyName = assembly.aname.name;
+		hybridclr::dhe::MetaVersionType baseType;
+		baseType.stableId.fill(1);
+		baseType.version.fill(2);
+		baseType.token = klass->token;
+		baseMetaVersion.types.push_back(baseType);
+		currentMetaVersion.types.push_back(baseType);
+		hybridclr::dhe::MetaVersionMethod baseMethod;
+		baseMethod.stableId.fill(3);
+		baseMethod.version.fill(4);
+		baseMethod.declaringTypeStableId = baseType.stableId;
+		baseMethod.token = changed.token;
+		baseMethod.flags = 8;
+		hybridclr::dhe::MetaVersionMethod currentMethod = baseMethod;
+		currentMethod.version.fill(5);
+		baseMetaVersion.methods.push_back(baseMethod);
+		currentMetaVersion.methods.push_back(currentMethod);
+		CHECK(hybridclr::dhe::PrepareAndRegisterMetaVersion(&assembly,
+			baseMetaVersion, currentMetaVersion));
 		CHECK(changed.isInterpterImpl);
 		CHECK(hybridclr::dhe::IsDheAssembly(&assembly));
 		CHECK(hybridclr::dhe::IsChangedMethod(&changed));
-		CHECK(!hybridclr::dhe::PrepareAndRegisterChangedMethods(&assembly, { unchanged.token }));
-
-        const std::vector<uint32_t> changedTokens = { changed.token };
-		// The explicit registration API remains covered for callers that already
-		// resolved MethodInfo records outside the runtime loader.
-		hybridclr::dhe::ResetForTests();
-		changed.isInterpterImpl = false;
-		CHECK(hybridclr::dhe::RegisterChangedMethods(&assembly, changedTokens, { &changed }));
-		CHECK(hybridclr::dhe::IsDheAssembly(&assembly));
-		CHECK(hybridclr::dhe::IsChangedMethod(&changed));
+		CHECK(!hybridclr::dhe::PrepareAndRegisterMetaVersion(&assembly,
+			baseMetaVersion, currentMetaVersion));
         CHECK(!hybridclr::dhe::IsChangedMethod(&unchanged));
         CHECK(hybridclr::dhe::ShouldDispatchToInterpreter(&changed));
         CHECK(!hybridclr::dhe::ShouldDispatchToInterpreter(&unchanged));
@@ -596,21 +636,128 @@ namespace
         CHECK(!hybridclr::metadata::MetadataModule::IsImplementedByInterpreter(&unchanged));
         hybridclr::native_test::SetAOTMetadataAvailable(false);
 
-        Il2CppAssembly invalidAssembly{};
-        CHECK(!hybridclr::dhe::RegisterChangedMethods(&invalidAssembly, changedTokens, { nullptr }));
-        CHECK(!hybridclr::dhe::RegisterChangedMethods(
-            &invalidAssembly, { changed.token, changed.token }, { &changed, &changed }));
-        CHECK(!hybridclr::dhe::RegisterChangedMethods(&assembly, changedTokens, { &changed }));
-
 		// A later unresolved token must roll back preparation of an earlier token
 		// and leave the assembly unpublished.
 		hybridclr::dhe::ResetForTests();
 		changed.isInterpterImpl = false;
 		const auto previousChangedPointer = changed.methodPointerCallByInterp;
-		CHECK(!hybridclr::dhe::PrepareAndRegisterChangedMethods(&assembly, { changed.token, 0x06000099 }));
+		hybridclr::dhe::MetaVersionMethod invalidBaseMethod = baseMethod;
+		invalidBaseMethod.stableId.fill(6);
+		invalidBaseMethod.token = 0x06000099;
+		hybridclr::dhe::MetaVersionMethod invalidCurrentMethod = invalidBaseMethod;
+		invalidCurrentMethod.version.fill(7);
+		baseMetaVersion.methods.push_back(invalidBaseMethod);
+		currentMetaVersion.methods.push_back(invalidCurrentMethod);
+		CHECK(!hybridclr::dhe::PrepareAndRegisterMetaVersion(&assembly,
+			baseMetaVersion, currentMetaVersion));
 		CHECK(!hybridclr::dhe::IsDheAssembly(&assembly));
 		CHECK(!changed.isInterpterImpl);
 		CHECK(changed.methodPointerCallByInterp == previousChangedPointer);
+
+		// A complete hotfix set is one dispatch transaction. An invalid method
+		// in the second assembly must leave the first assembly unpublished; a
+		// retry with both valid registrations publishes both together.
+		baseMetaVersion.methods.resize(1);
+		currentMetaVersion.methods.resize(1);
+		Il2CppAssembly secondAssembly{};
+		Il2CppImage secondImage{};
+		Il2CppClass* secondKlass =
+			static_cast<Il2CppClass*>(std::calloc(1, sizeof(Il2CppClass)));
+		CHECK(secondKlass != nullptr);
+		if (!secondKlass)
+		{
+			hybridclr::native_test::ClearDheResolver();
+			std::free(klass);
+			return;
+		}
+		secondAssembly.aname.name = "DheNativeResolver.Second";
+		secondAssembly.image = &secondImage;
+		secondImage.assembly = &secondAssembly;
+		secondKlass->image = &secondImage;
+		secondKlass->name = "DheNativeTypeSecond";
+		secondKlass->namespaze = "";
+		secondKlass->token = 0x02000002;
+		MethodInfo secondChanged{};
+		secondChanged.klass = secondKlass;
+		secondChanged.token = 0x06000002;
+		secondChanged.methodPointerCallByInterp =
+			reinterpret_cast<Il2CppMethodPointer>(InterpreterProbeMethod);
+		const MethodInfo* secondMethods[] = { &secondChanged };
+		secondKlass->methods = secondMethods;
+		secondKlass->method_count = 1;
+		hybridclr::native_test::ConfigureDheResolver(
+			&secondAssembly, &secondImage, secondKlass);
+
+		hybridclr::dhe::MetaVersionData secondBaseMetaVersion;
+		hybridclr::dhe::MetaVersionData secondCurrentMetaVersion;
+		secondBaseMetaVersion.assemblyName = secondAssembly.aname.name;
+		secondCurrentMetaVersion.assemblyName = secondAssembly.aname.name;
+		hybridclr::dhe::MetaVersionType secondType = baseType;
+		secondBaseMetaVersion.types.push_back(secondType);
+		secondCurrentMetaVersion.types.push_back(secondType);
+		hybridclr::dhe::MetaVersionMethod secondBaseMethod = baseMethod;
+		hybridclr::dhe::MetaVersionMethod secondCurrentMethod = secondBaseMethod;
+		secondCurrentMethod.version.fill(8);
+		secondBaseMetaVersion.methods.push_back(secondBaseMethod);
+		secondCurrentMetaVersion.methods.push_back(secondCurrentMethod);
+		hybridclr::dhe::MetaVersionData invalidSecondBase = secondBaseMetaVersion;
+		hybridclr::dhe::MetaVersionData invalidSecondCurrent = secondCurrentMetaVersion;
+		invalidSecondBase.methods[0].token = 0x06000099;
+		invalidSecondCurrent.methods[0].token = 0x06000099;
+		CHECK(!hybridclr::dhe::PrepareAndRegisterMetaVersions({
+			{ &assembly, &baseMetaVersion, &currentMetaVersion },
+			{ &secondAssembly, &invalidSecondBase, &invalidSecondCurrent }
+		}));
+		CHECK(!hybridclr::dhe::IsDheAssembly(&assembly));
+		CHECK(!hybridclr::dhe::IsDheAssembly(&secondAssembly));
+		CHECK(!changed.isInterpterImpl);
+		CHECK(!secondChanged.isInterpterImpl);
+
+		CHECK(hybridclr::dhe::PrepareAndRegisterMetaVersions({
+			{ &assembly, &baseMetaVersion, &currentMetaVersion },
+			{ &secondAssembly, &secondBaseMetaVersion, &secondCurrentMetaVersion }
+		}));
+		CHECK(hybridclr::dhe::IsDheAssembly(&assembly));
+		CHECK(hybridclr::dhe::IsDheAssembly(&secondAssembly));
+		CHECK(hybridclr::dhe::IsChangedMethod(&changed));
+		CHECK(hybridclr::dhe::IsChangedMethod(&secondChanged));
+		hybridclr::dhe::ResetForTests();
+		changed.isInterpterImpl = false;
+		secondChanged.isInterpterImpl = false;
+		std::free(secondKlass);
+
+		// Tombstones publish removed Base types and methods without requiring
+		// an interpreter body. Old native method entries remain resolvable only so
+		// their universal guards can raise MissingMethodException.
+		hybridclr::dhe::ResetForTests();
+		klass->token = 0x02000002;
+		baseMetaVersion = hybridclr::dhe::MetaVersionData{};
+		currentMetaVersion = hybridclr::dhe::MetaVersionData{};
+		baseMetaVersion.assemblyName = assembly.aname.name;
+		currentMetaVersion.assemblyName = assembly.aname.name;
+		hybridclr::dhe::MetaVersionType removedType;
+		removedType.stableId.fill(1);
+		removedType.version.fill(2);
+		removedType.token = klass->token;
+		baseMetaVersion.types.push_back(removedType);
+		hybridclr::dhe::MetaVersionMethod removedMethod;
+		removedMethod.stableId.fill(3);
+		removedMethod.version.fill(4);
+		removedMethod.declaringTypeStableId = removedType.stableId;
+		removedMethod.token = changed.token;
+		removedMethod.flags = 8;
+		baseMetaVersion.methods.push_back(removedMethod);
+		CHECK(hybridclr::dhe::PrepareAndRegisterMetaVersion(&assembly,
+			baseMetaVersion, currentMetaVersion));
+		CHECK(hybridclr::dhe::IsRemovedType(klass));
+		CHECK(hybridclr::dhe::IsChangedMethod(&changed));
+		CHECK(hybridclr::dhe::IsRemovedMethod(&changed));
+		MethodInfo currentTokenCollision = changed;
+		currentTokenCollision.isInterpterImpl = true;
+		CHECK(!hybridclr::dhe::IsChangedMethod(&currentTokenCollision));
+		CHECK(!hybridclr::dhe::IsRemovedMethod(&currentTokenCollision));
+		CHECK(hybridclr::dhe::ResolveInterpreterMethod(&currentTokenCollision) ==
+			&currentTokenCollision);
 		hybridclr::native_test::ClearDheResolver();
         hybridclr::dhe::ResetForTests();
         CHECK(!hybridclr::dhe::IsDheAssembly(&assembly));

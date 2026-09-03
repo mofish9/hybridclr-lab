@@ -1,0 +1,54 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://github.com/mofish9/hybridclr-lab/schemas/dhe-resource-stage.schema.json",
+  "title": "HybridCLR DHE Resource Stage",
+  "type": "object",
+  "additionalProperties": true,
+  "required": ["schemaVersion", "format", "generatedAtUtc", "passed", "updateRoot", "assetRoot", "payloadModel", "currentAssemblySetSha256", "stagedPlanPath", "stagedPlanSha256", "stagedManifestPath", "stagedValidationPath", "embeddedBaseRoot", "selectedBaseId", "baseBuildIdentityPath", "baseBuildIdentitySha256", "baseMetaVersionSetSha256", "baseMetaVersionTreeSha256Before", "baseMetaVersionTreeSha256After", "baseMetaVersionUnchanged", "stagedFiles", "immutableFiles"],
+  "properties": {
+    "schemaVersion": { "const": 1 },
+    "format": { "const": "hybridclr.dhe-resource-stage.json" },
+    "generatedAtUtc": { "type": "string", "format": "date-time" },
+    "passed": { "const": true },
+    "updateRoot": { "type": "string", "minLength": 1 },
+    "assetRoot": { "type": "string", "minLength": 1 },
+    "payloadModel": { "const": "single-current-payload" },
+    "currentAssemblySetSha256": { "type": "string", "pattern": "^[0-9a-fA-F]{64}$" },
+    "stagedPlanPath": { "type": "string", "minLength": 1 },
+    "stagedPlanSha256": { "type": "string", "pattern": "^[0-9a-fA-F]{64}$" },
+    "stagedManifestPath": { "type": "string", "minLength": 1 },
+    "stagedValidationPath": { "type": "string", "minLength": 1 },
+    "embeddedBaseRoot": { "type": "string", "minLength": 1 },
+    "selectedBaseId": { "type": "string", "pattern": "^[0-9a-fA-F]{64}$" },
+    "baseBuildIdentityPath": { "type": "string", "minLength": 1 },
+    "baseBuildIdentitySha256": { "type": "string", "pattern": "^[0-9a-fA-F]{64}$" },
+    "baseMetaVersionSetSha256": { "type": "string", "pattern": "^[0-9a-fA-F]{64}$" },
+    "baseMetaVersionTreeSha256Before": { "type": "string", "pattern": "^[0-9a-fA-F]{64}$" },
+    "baseMetaVersionTreeSha256After": { "type": "string", "pattern": "^[0-9a-fA-F]{64}$" },
+    "baseMetaVersionUnchanged": { "const": true },
+    "stagedFiles": {
+      "type": "array",
+      "minItems": 2,
+      "items": {
+        "type": "object",
+        "required": ["path", "sha256"],
+        "properties": {
+          "path": { "type": "string", "pattern": "^payload/" },
+          "sha256": { "type": "string", "pattern": "^[0-9a-fA-F]{64}$" }
+        }
+      }
+    },
+    "immutableFiles": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["path", "sha256Before", "sha256After"],
+        "properties": {
+          "path": { "type": "string", "minLength": 1 },
+          "sha256Before": { "type": "string", "pattern": "^[0-9a-fA-F]{64}$" },
+          "sha256After": { "type": "string", "pattern": "^[0-9a-fA-F]{64}$" }
+        }
+      }
+    }
+  }
+}

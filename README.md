@@ -7,7 +7,7 @@ HybridCLR community runtime on Tuanjie 1.10.0.
 
 - Tuanjie: `1.10.0` (`2022.3.62t12`)
 - HybridCLR package: `v8.13.0` (`optimize/v8.13.0`, DHE opt4 commit)
-- HybridCLR runtime: `v8.13.0-opt4`
+- HybridCLR runtime replay base: `v8.13.0-opt4` (immutable historical base plus the current DHE overlay candidate)
 - il2cpp_plus: `v2022-tuanjie-8.13.0-opt3`
 
 The runtime source repositories live beside this repository under `../repos`.
@@ -22,20 +22,25 @@ Its formal entry points, generated-output boundary, and complete four-assembly
 Player evidence are documented in
 `docs/HybridCLR-DHE-Toolchain.md`,
 `docs/HybridCLR-DHE-Workflow-Review.md` and
-`docs/HybridCLR-DHE-Formal-Project-Validation.md`. Toolchain `0.1.14` is the
+`docs/HybridCLR-DHE-Formal-Project-Validation.md`. Toolchain `0.1.16` is the
 project-trial line; projects must install an authenticated package whose
 manifest has `releaseReady=true` and pin its exact package ID.
-The workflow also emits versioned MV/native/workflow schemas and an independent
+The workflow also emits MetaVersion/native/workflow schemas and an independent
 artifact validator; it verifies the exact supported+unsupported changed-token set,
 and the versioned `il2cpp-generated-cpp-signature-v2` ABI adapter contract.
-The current Player result covers all 27 changed managed tokens through 34 real
-native entries. `releaseReady=true` additionally requires `Mode Release`, clean
+The current MetaVersion Player result covers method bodies, field/type/method evolution,
+logical property/event metadata, custom attributes, reflection, and
+cross-assembly calls. Two independently built Base Players consumed the same
+four-assembly current payload while computing their own local changed-method
+sets (71 and 72 changed methods).
+`releaseReady=true` additionally requires `Mode Release`, clean
 and tracked project and tool source identities (each bound to its Git commit,
 HEAD tree, and source-boundary hash), clean locked runtime sources, and matching
 non-surrogate engine headers.
 The embedded package is locked by `manifests/dhe-package-lock.json`; the workflow
-checks its full tree hash and, in opt4 integrated mode, verifies the package
-commit without applying the historical patch files.
+checks its full tree hash. The current DHE candidate replays authenticated
+package, common-runtime, and engine-specific overlays on temporary staging;
+formal release will replace those overlays with new integrated commits/tags.
 Runtime assembly is an external, target-specific prerequisite. The C# DHE host
 requires its staged runtime/baseline manifests as explicit inputs and never
 silently substitutes a native-only runtime.
@@ -89,12 +94,13 @@ arguments are configuration inputs.
 sources have been committed. During tool development, substitute
 `-Mode Exploratory`; it records `releaseReady=false`. `-RunPlayer` invokes the
 project adapter's C# methods for runtime-plan staging, resource evidence,
-scripts-only, and final Player builds. The historical Demo evidence was
-`4/4 compatible`, `changed=27`, `supported=27`, `unsupported=0`, and
-`nativeEntryCount=34`; it covers direct/reflection generic calls, a null generic
-reference, generic virtual dispatch, value-type state-machine paths, secondary
-assemblies, and the invalid-MV same-process retry. A new release must reproduce
-this evidence after migration. The no-op lane executes and validates baseline
+scripts-only, and final Player builds. Release decisions must use current
+MetaVersion reports bound to the exact Base identity and current payload. The
+current MetaVersion
+Player suite covers direct/reflection generic calls, a null generic reference,
+generic virtual dispatch, value-type state-machine paths, secondary assemblies,
+new top-level types and methods, and invalid-MV same-process retry. A new release
+must reproduce this evidence after migration. The no-op lane executes and validates baseline
 behavior across all four AOT assemblies; a zero changed-method count alone is not
 accepted as proof. The Player also checks the snapshot hash compiled
 into `HybridCLRDheBuildIdentity`, so a mutable

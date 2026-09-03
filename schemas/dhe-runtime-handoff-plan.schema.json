@@ -4,10 +4,12 @@
   "title": "HybridCLR DHE Runtime Handoff Plan",
   "type": "object",
   "additionalProperties": true,
-  "required": ["schemaVersion", "format", "assemblies"],
+  "required": ["schemaVersion", "format", "baseAssemblySetSha256", "selection", "aotMetadata", "assemblies"],
   "properties": {
     "schemaVersion": { "const": 1 },
     "format": { "const": "hybridclr.dhe-runtime-handoff-plan.json" },
+    "baseAssemblySetSha256": { "type": "string", "pattern": "^[0-9a-fA-F]{64}$" },
+    "selection": { "const": "embedded-base-metaversion" },
     "aotMetadataManifestSha256": { "type": "string", "pattern": "^$|^[0-9a-fA-F]{64}$" },
     "aotMetadata": {
       "type": "array",
@@ -28,17 +30,19 @@
       "minItems": 1,
       "items": {
         "type": "object",
-        "required": ["assemblyName", "current", "baseline", "mv", "snapshot", "baselineSha256", "currentSha256", "mvSha256", "snapshotSha256"],
+        "required": ["assemblyName", "current", "baseline", "snapshot", "baselineSha256", "currentSha256", "snapshotSha256", "baseMetaVersion", "currentMetaVersion", "baseMetaVersionSha256", "currentMetaVersionSha256"],
         "properties": {
           "assemblyName": { "type": "string", "minLength": 1 },
           "current": { "type": "string", "minLength": 1 },
           "baseline": { "type": "string", "minLength": 1 },
-          "mv": { "type": "string", "minLength": 1 },
           "snapshot": { "type": "string", "minLength": 1 },
+          "baseMetaVersion": { "type": "string", "minLength": 1 },
+          "currentMetaVersion": { "type": "string", "minLength": 1 },
           "baselineSha256": { "type": "string", "pattern": "^[0-9a-fA-F]{64}$" },
           "currentSha256": { "type": "string", "pattern": "^[0-9a-fA-F]{64}$" },
-          "mvSha256": { "type": "string", "pattern": "^[0-9a-fA-F]{64}$" },
-          "snapshotSha256": { "type": "string", "pattern": "^[0-9a-fA-F]{64}$" }
+          "snapshotSha256": { "type": "string", "pattern": "^[0-9a-fA-F]{64}$" },
+          "baseMetaVersionSha256": { "type": "string", "pattern": "^[0-9a-fA-F]{64}$" },
+          "currentMetaVersionSha256": { "type": "string", "pattern": "^[0-9a-fA-F]{64}$" }
         }
       }
     }

@@ -1,0 +1,473 @@
+diff --git a/libil2cpp/icalls/mscorlib/System.Reflection/FieldInfo.cpp b/libil2cpp/icalls/mscorlib/System.Reflection/FieldInfo.cpp
+index 9128b92..8005c38 100644
+--- a/libil2cpp/icalls/mscorlib/System.Reflection/FieldInfo.cpp
++++ b/libil2cpp/icalls/mscorlib/System.Reflection/FieldInfo.cpp
+@@ -8,6 +8,7 @@
+ #include "il2cpp-object-internals.h"
+ #include "vm/Class.h"
+ #include "vm/Exception.h"
++#include "vm/Field.h"
+ #include "vm/Reflection.h"
+ 
+ namespace il2cpp
+@@ -25,14 +26,15 @@ namespace Reflection
+         ::FieldInfo* fieldInfo = (::FieldInfo*)field_handle;
+         Il2CppType* il2cppType = (Il2CppType*)type_handle;
+ 
++        Il2CppClass* logicalParent = vm::Field::GetParent(fieldInfo);
+         if (il2cppType == NULL)
+-            return vm::Reflection::GetFieldObject(fieldInfo->parent, fieldInfo);
++            return vm::Reflection::GetFieldObject(logicalParent, fieldInfo);
+ 
+         Il2CppClass* originalClass = vm::Class::FromIl2CppType(il2cppType);
+ 
+         for (Il2CppClass* k = originalClass; k; k = k->parent)
+         {
+-            if (k == fieldInfo->parent)
++            if (k == logicalParent)
+                 return vm::Reflection::GetFieldObject(originalClass, fieldInfo);
+         }
+ 
+diff --git a/libil2cpp/icalls/mscorlib/System.Reflection/RuntimeFieldInfo.cpp b/libil2cpp/icalls/mscorlib/System.Reflection/RuntimeFieldInfo.cpp
+index cbbe9a5..bcde0a2 100644
+--- a/libil2cpp/icalls/mscorlib/System.Reflection/RuntimeFieldInfo.cpp
++++ b/libil2cpp/icalls/mscorlib/System.Reflection/RuntimeFieldInfo.cpp
+@@ -10,6 +10,8 @@
+ #include "vm/Runtime.h"
+ #include "vm-utils/BlobReader.h"
+ 
++#include "hybridclr/metadata/MetadataModule.h"
++
+ namespace il2cpp
+ {
+ namespace icalls
+@@ -90,7 +92,7 @@ namespace Reflection
+     {
+         Il2CppClass *parent;
+ 
+-        parent = declaring ? field->field->parent : field->klass;
++        parent = declaring ? vm::Field::GetParent(field->field) : field->klass;
+ 
+         return il2cpp::vm::Reflection::GetTypeObject(&parent->byval_arg);
+     }
+@@ -115,6 +117,9 @@ namespace Reflection
+         ::FieldInfo* fieldInfo = field->field;
+         Il2CppClass* fieldType = vm::Class::FromIl2CppType(fieldInfo->type);
+         vm::Class::Init(fieldType);
++		if (hybridclr::metadata::MetadataModule::TrySetDheSupplementalInstanceFieldValueObject(
++			obj, fieldInfo, value))
++			return;
+ 
+         uint8_t* fieldAddress;
+ 
+diff --git a/libil2cpp/vm/Class.cpp b/libil2cpp/vm/Class.cpp
+index 11f3077..edde1e6 100644
+--- a/libil2cpp/vm/Class.cpp
++++ b/libil2cpp/vm/Class.cpp
+@@ -282,6 +282,16 @@ namespace vm
+         if (!iter)
+             return NULL;
+ 
++		if (hybridclr::metadata::MetadataModule::HasDheLogicalEventView(klass))
++		{
++			if (!*iter)
++				return hybridclr::metadata::MetadataModule::GetFirstDheLogicalEvent(
++					klass, iter);
++			const EventInfo* eventInfo = NULL;
++			return hybridclr::metadata::MetadataModule::TryGetNextDheLogicalEvent(
++				klass, iter, &eventInfo) ? eventInfo : NULL;
++		}
++
+         if (!*iter)
+         {
+             Class::SetupEvents(klass);
+@@ -308,25 +318,38 @@ namespace vm
+         if (!iter)
+             return NULL;
+ 
++        if (*iter)
++        {
++            FieldInfo* supplemental = NULL;
++            if (hybridclr::metadata::MetadataModule::TryGetNextDheSupplementalField(
++                    klass, iter, &supplemental))
++                return supplemental;
++        }
++
+         if (!*iter)
+         {
+             Class::SetupFields(klass);
+             if (klass->field_count == 0)
+-                return NULL;
++                return hybridclr::metadata::MetadataModule::GetFirstDheSupplementalField(
++                    klass, iter);
+ 
+             *iter = klass->fields;
+-            return klass->fields;
++			if (!hybridclr::metadata::MetadataModule::IsDheRemovedField(klass->fields))
++				return klass->fields;
+         }
+ 
+         FieldInfo* fieldAddress = (FieldInfo*)*iter;
+         fieldAddress++;
+-        if (fieldAddress < klass->fields + klass->field_count)
++		while (fieldAddress < klass->fields + klass->field_count)
+         {
+             *iter = fieldAddress;
+-            return fieldAddress;
++			if (!hybridclr::metadata::MetadataModule::IsDheRemovedField(fieldAddress))
++				return fieldAddress;
++			fieldAddress++;
+         }
+ 
+-        return NULL;
++        return hybridclr::metadata::MetadataModule::GetFirstDheSupplementalField(
++            klass, iter);
+     }
+ 
+     FieldInfo* Class::GetFieldFromName(Il2CppClass *klass, const char* name)
+@@ -405,25 +428,38 @@ namespace vm
+         if (!iter)
+             return NULL;
+ 
++        if (*iter)
++        {
++            const MethodInfo* supplemental = NULL;
++            if (hybridclr::metadata::MetadataModule::TryGetNextDheSupplementalMethod(
++                    klass, iter, &supplemental))
++                return supplemental;
++        }
++
+         if (!*iter)
+         {
+             Class::SetupMethods(klass);
+             if (klass->method_count == 0)
+-                return NULL;
++                return hybridclr::metadata::MetadataModule::GetFirstDheSupplementalMethod(
++                    klass, iter);
+ 
+             *iter = &klass->methods[0];
+-            return klass->methods[0];
++			if (!hybridclr::metadata::MetadataModule::IsDheRemovedMethod(klass->methods[0]))
++				return klass->methods[0];
+         }
+ 
+         const MethodInfo** methodAddress = (const MethodInfo**)*iter;
+         methodAddress++;
+-        if (methodAddress < &klass->methods[klass->method_count])
++		while (methodAddress < &klass->methods[klass->method_count])
+         {
+             *iter = methodAddress;
+-            return *methodAddress;
++			if (!hybridclr::metadata::MetadataModule::IsDheRemovedMethod(*methodAddress))
++				return *methodAddress;
++			methodAddress++;
+         }
+ 
+-        return NULL;
++        return hybridclr::metadata::MetadataModule::GetFirstDheSupplementalMethod(
++            klass, iter);
+     }
+ 
+     const MethodInfo* Class::GetMethodFromName(Il2CppClass *klass, const char* name, int argsCount)
+@@ -526,40 +562,67 @@ namespace vm
+             return NULL;
+         }
+ 
++        if (*iter)
++        {
++            Il2CppClass* supplemental = NULL;
++            if (hybridclr::metadata::MetadataModule::TryGetNextDheSupplementalNestedType(
++                    klass, iter, &supplemental))
++                return supplemental;
++        }
++
+         if (!*iter)
+         {
+             Class::SetupNestedTypes(klass);
+             if (klass->nested_type_count == 0)
+-                return NULL;
++                return hybridclr::metadata::MetadataModule::GetFirstDheSupplementalNestedType(
++                    klass, iter);
+ 
+             *iter = &klass->nestedTypes[0];
+-            return klass->nestedTypes[0];
++			if (!hybridclr::metadata::MetadataModule::IsDheRemovedType(klass->nestedTypes[0]))
++				return klass->nestedTypes[0];
+         }
+ 
+         Il2CppClass** nestedTypeAddress = (Il2CppClass**)*iter;
+         nestedTypeAddress++;
+-        if (nestedTypeAddress < &klass->nestedTypes[klass->nested_type_count])
++		while (nestedTypeAddress < &klass->nestedTypes[klass->nested_type_count])
+         {
+             *iter = nestedTypeAddress;
+-            return *nestedTypeAddress;
++			if (!hybridclr::metadata::MetadataModule::IsDheRemovedType(*nestedTypeAddress))
++				return *nestedTypeAddress;
++			nestedTypeAddress++;
+         }
+ 
+-        return NULL;
++        return hybridclr::metadata::MetadataModule::GetFirstDheSupplementalNestedType(
++            klass, iter);
+     }
+ 
+     size_t Class::GetNumMethods(const Il2CppClass* klass)
+     {
+-        return klass->method_count;
++		return klass->method_count -
++			hybridclr::metadata::MetadataModule::GetDheRemovedMethodCount(
++				const_cast<Il2CppClass*>(klass)) +
++			hybridclr::metadata::MetadataModule::GetDheSupplementalMethodCount(
++				const_cast<Il2CppClass*>(klass));
+     }
+ 
+     size_t Class::GetNumProperties(const Il2CppClass* klass)
+     {
++		if (hybridclr::metadata::MetadataModule::HasDheLogicalPropertyView(
++			const_cast<Il2CppClass*>(klass)))
++		{
++			return hybridclr::metadata::MetadataModule::GetDheLogicalPropertyCount(
++				const_cast<Il2CppClass*>(klass));
++		}
+         return klass->property_count;
+     }
+ 
+     size_t Class::GetNumFields(const Il2CppClass* klass)
+     {
+-        return klass->field_count;
++        return klass->field_count +
++            hybridclr::metadata::MetadataModule::GetDheSupplementalFieldCount(
++				const_cast<Il2CppClass*>(klass)) -
++			hybridclr::metadata::MetadataModule::GetDheRemovedFieldCount(
++				const_cast<Il2CppClass*>(klass));
+     }
+ 
+     Il2CppClass* Class::GetParent(Il2CppClass *klass)
+@@ -572,6 +635,16 @@ namespace vm
+         if (!iter)
+             return NULL;
+ 
++		if (hybridclr::metadata::MetadataModule::HasDheLogicalPropertyView(klass))
++		{
++			if (!*iter)
++				return hybridclr::metadata::MetadataModule::GetFirstDheLogicalProperty(
++					klass, iter);
++			const PropertyInfo* property = NULL;
++			return hybridclr::metadata::MetadataModule::TryGetNextDheLogicalProperty(
++				klass, iter, &property) ? property : NULL;
++		}
++
+         if (!*iter)
+         {
+             Class::SetupProperties(klass);
+diff --git a/libil2cpp/vm/Field.cpp b/libil2cpp/vm/Field.cpp
+index 5132306..0025e1a 100644
+--- a/libil2cpp/vm/Field.cpp
++++ b/libil2cpp/vm/Field.cpp
+@@ -18,6 +18,7 @@
+ #include "vm-utils/BlobReader.h"
+ #include "Thread.h"
+ 
++#include "hybridclr/metadata/MetadataModule.h"
+ namespace il2cpp
+ {
+ namespace vm
+@@ -29,7 +30,7 @@ namespace vm
+ 
+     Il2CppClass* Field::GetParent(FieldInfo *field)
+     {
+-        return field->parent;
++        return hybridclr::metadata::MetadataModule::GetDheLogicalFieldParent(field);
+     }
+ 
+     int Field::GetFlags(FieldInfo *field)
+@@ -49,6 +50,9 @@ namespace vm
+         IL2CPP_ASSERT(obj);
+ 
+         IL2CPP_ASSERT(!(field->type->attrs & FIELD_ATTRIBUTE_STATIC));
++		if (hybridclr::metadata::MetadataModule::TryGetDheSupplementalInstanceFieldValue(
++			obj, field, value))
++			return;
+ 
+         src = (char*)obj + field->offset;
+         SetValueRaw(field->type, value, src, true);
+@@ -79,6 +83,11 @@ namespace vm
+             }
+         }
+ 
++		Il2CppObject* dheValue = NULL;
++		if (hybridclr::metadata::MetadataModule::TryGetDheSupplementalInstanceFieldValueObject(
++			obj, field, &dheValue))
++			return dheValue;
++
+         void* fieldAddress;
+         if (field->type->attrs & FIELD_ATTRIBUTE_STATIC)
+         {
+@@ -124,6 +133,9 @@ namespace vm
+         void *dest;
+ 
+         IL2CPP_ASSERT(!(field->type->attrs & FIELD_ATTRIBUTE_STATIC));
++		if (hybridclr::metadata::MetadataModule::TrySetDheSupplementalInstanceFieldValue(
++			obj, field, value))
++			return;
+ 
+         dest = (char*)obj + field->offset;
+         SetValueRaw(field->type, dest, value, false);
+@@ -208,6 +220,9 @@ namespace vm
+     {
+         IL2CPP_ASSERT(!(field->type->attrs & FIELD_ATTRIBUTE_LITERAL));
+         IL2CPP_ASSERT(!field->type->valuetype);
++		if (hybridclr::metadata::MetadataModule::TrySetDheSupplementalInstanceFieldValueObject(
++			objectInstance, field, value))
++			return;
+         gc::WriteBarrier::GenericStore((Il2CppObject**)(reinterpret_cast<uint8_t*>(objectInstance) + field->offset), value);
+     }
+ 
+diff --git a/libil2cpp/vm/GlobalMetadata.cpp b/libil2cpp/vm/GlobalMetadata.cpp
+index 8811ed3..3baf273 100644
+--- a/libil2cpp/vm/GlobalMetadata.cpp
++++ b/libil2cpp/vm/GlobalMetadata.cpp
+@@ -1088,6 +1088,14 @@ static CustomAttributeIndex GetCustomAttributeIndex(const Il2CppImage* image, ui
+ 
+ Il2CppMetadataCustomAttributeHandle il2cpp::vm::GlobalMetadata::GetCustomAttributeTypeToken(const Il2CppImage* image, uint32_t token)
+ {
++    const Il2CppImage* dheSourceImage = NULL;
++    uint32_t dheSourceToken = 0;
++    if (hybridclr::metadata::MetadataModule::TryGetDheCustomAttributeSource(
++        image, token, dheSourceImage, dheSourceToken))
++    {
++        image = dheSourceImage;
++        token = dheSourceToken;
++    }
+     if (hybridclr::metadata::IsInterpreterImage(image))
+     {
+         return hybridclr::metadata::MetadataModule::GetImage(image)->GetCustomAttributeTypeToken(token);
+@@ -1121,6 +1129,14 @@ static il2cpp::metadata::CustomAttributeDataReader CreateCustomAttributeDataRead
+ 
+ il2cpp::metadata::CustomAttributeDataReader il2cpp::vm::GlobalMetadata::GetCustomAttributeDataReader(const Il2CppImage* image, uint32_t token)
+ {
++    const Il2CppImage* dheSourceImage = NULL;
++    uint32_t dheSourceToken = 0;
++    if (hybridclr::metadata::MetadataModule::TryGetDheCustomAttributeSource(
++        image, token, dheSourceImage, dheSourceToken))
++    {
++        image = dheSourceImage;
++        token = dheSourceToken;
++    }
+     return CreateCustomAttributeDataReader(GetCustomAttributeTypeToken(image, token), image);
+ }
+ 
+diff --git a/libil2cpp/vm/Image.cpp b/libil2cpp/vm/Image.cpp
+index 2018e43..97dbcfd 100644
+--- a/libil2cpp/vm/Image.cpp
++++ b/libil2cpp/vm/Image.cpp
+@@ -22,6 +22,7 @@
+ 
+ #include "os/Atomic.h"
+ #include "hybridclr/metadata/Image.h"
++#include "hybridclr/metadata/MetadataModule.h"
+ 
+ struct NamespaceAndNamePairHash
+ {
+@@ -247,9 +248,14 @@ namespace vm
+ 
+         Il2CppNameToTypeHandleHashTable::const_iterator iter = image->nameToClassHashTable->find(std::make_pair(namespaze, name));
+         if (iter != image->nameToClassHashTable->end())
+-            return MetadataCache::GetTypeInfoFromHandle(iter->second);
++		{
++			Il2CppClass* klass = MetadataCache::GetTypeInfoFromHandle(iter->second);
++			if (!hybridclr::metadata::MetadataModule::IsDheRemovedType(klass))
++				return klass;
++		}
+ 
+-        return NULL;
++        return hybridclr::metadata::MetadataModule::FindDheSupplementalType(
++            image, namespaze, name);
+     }
+ 
+ 
+@@ -262,7 +268,17 @@ namespace vm
+ 
+         Il2CppNameToTypeHandleHashTable::const_iterator iter = image->nameToClassHashTable->find(std::make_pair(namespaze, name));
+         if (iter != image->nameToClassHashTable->end())
+-            return iter->second;
++		{
++			Il2CppClass* klass = MetadataCache::GetTypeInfoFromHandle(iter->second);
++			if (!hybridclr::metadata::MetadataModule::IsDheRemovedType(klass))
++				return iter->second;
++		}
++
++        Il2CppClass* supplemental =
++            hybridclr::metadata::MetadataModule::FindDheSupplementalType(
++                image, namespaze, name);
++        if (supplemental)
++            return supplemental->typeMetadataHandle;
+ 
+         return NULL;
+     }
+@@ -295,6 +311,10 @@ namespace vm
+             {
+                 continue;
+             }
++			if (hybridclr::metadata::MetadataModule::IsDheRemovedType(type))
++			{
++				continue;
++			}
+             if (exportedOnly && !IsExported(type))
+             {
+                 continue;
+@@ -302,6 +322,16 @@ namespace vm
+ 
+             target->push_back(type);
+         }
++
++        TypeVector supplementalTypes;
++        hybridclr::metadata::MetadataModule::GetDheSupplementalTypes(image,
++            supplementalTypes);
++        for (TypeVector::const_iterator type = supplementalTypes.begin();
++            type != supplementalTypes.end(); ++type)
++        {
++            if (!exportedOnly || IsExported(*type))
++                target->push_back(*type);
++        }
+     }
+ 
+     Il2CppArray* Image::GetTypes(const Il2CppImage* image, bool exportedOnly)
+@@ -359,7 +389,22 @@ namespace vm
+         {
+             Il2CppMetadataTypeHandle typeHandle = MetadataCache::GetAssemblyTypeHandle(image, i);
+             if (ClassMatches(typeHandle, namespaze, ignoreCase, name))
+-                return MetadataCache::GetTypeInfoFromHandle(typeHandle);
++			{
++				Il2CppClass* klass = MetadataCache::GetTypeInfoFromHandle(typeHandle);
++				if (!hybridclr::metadata::MetadataModule::IsDheRemovedType(klass))
++					return klass;
++			}
++        }
++
++        TypeVector supplementalTypes;
++        hybridclr::metadata::MetadataModule::GetDheSupplementalTypes(image,
++            supplementalTypes);
++        for (TypeVector::const_iterator type = supplementalTypes.begin();
++            type != supplementalTypes.end(); ++type)
++        {
++            if (!(*type)->declaringType && StringsMatch(name, (*type)->name, ignoreCase) &&
++                StringsMatch(namespaze, (*type)->namespaze, ignoreCase))
++                return const_cast<Il2CppClass*>(*type);
+         }
+ 
+         return NULL;
+@@ -371,7 +416,11 @@ namespace vm
+         {
+             Il2CppMetadataTypeHandle typeHandle = MetadataCache::GetAssemblyExportedTypeHandle(image, i);
+             if (ClassMatches(typeHandle, namespaze, ignoreCase, name))
+-                return MetadataCache::GetTypeInfoFromHandle(typeHandle);
++			{
++				Il2CppClass* klass = MetadataCache::GetTypeInfoFromHandle(typeHandle);
++				if (!hybridclr::metadata::MetadataModule::IsDheRemovedType(klass))
++					return klass;
++			}
+         }
+ 
+         return NULL;

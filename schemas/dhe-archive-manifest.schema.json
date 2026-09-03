@@ -63,14 +63,16 @@
       "minItems": 1,
       "items": {
         "type": "object",
-        "required": ["assemblyName", "status", "baseline", "current", "changedMethodCount"],
+        "required": ["assemblyName", "status", "baseline", "current", "baseMetaVersionJson", "baseMetaVersionBytes", "currentMetaVersionJson", "currentMetaVersionBytes", "changedMethodCount"],
         "properties": {
           "assemblyName": { "type": "string", "minLength": 1 },
           "status": { "enum": ["compatible", "incompatible", "missing", "error"] },
           "baseline": { "type": "string", "minLength": 1 },
           "current": { "type": "string", "minLength": 1 },
-          "mvJson": { "type": ["string", "null"] },
-          "mvBytes": { "type": ["string", "null"] },
+          "baseMetaVersionJson": { "type": ["string", "null"] },
+          "baseMetaVersionBytes": { "type": ["string", "null"] },
+          "currentMetaVersionJson": { "type": ["string", "null"] },
+          "currentMetaVersionBytes": { "type": ["string", "null"] },
           "changedMethodCount": { "type": "integer", "minimum": 0 }
         }
       }

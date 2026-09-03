@@ -4,37 +4,48 @@
   "title": "HybridCLR DHE Native Guard Manifest",
   "type": "object",
   "additionalProperties": true,
-  "required": ["schemaVersion", "resolverVersion", "abiContract", "guardHashContract", "generatedCppRoot", "changedMethodCount", "supportedChangedMethodCount", "unsupportedChangedMethodCount", "nativeEntryCount", "unsupportedChangedMethods", "methods"],
+  "required": ["schemaVersion", "resolverVersion", "abiContract", "guardHashContract", "runtimeProtocol", "runtimeContract", "runtimeCapabilities", "generatedCppRoot", "changedMethodCount", "supportedChangedMethodCount", "unsupportedChangedMethodCount", "guardMode", "guardedMethodCount", "supportedGuardedMethodCount", "unsupportedGuardedMethodCount", "interpreterOnlyMethodCount", "interpreterOnlyMethods", "nativeEntryCount", "unsupportedChangedMethods", "methods"],
   "properties": {
     "schemaVersion": { "const": 1 },
     "resolverVersion": { "const": 3 },
     "abiContract": { "const": "il2cpp-generated-cpp-signature-v2" },
     "guardHashContract": { "const": "guard-block-set-v1" },
+    "runtimeProtocol": { "const": "dhe-runtime-protocol-v1" },
+    "runtimeContract": { "const": "dhe-runtime-v1" },
+    "runtimeCapabilities": {
+      "type": "array",
+      "minItems": 2,
+      "uniqueItems": true,
+      "items": {
+        "type": "string",
+        "minLength": 1,
+        "maxLength": 128,
+        "pattern": "^[A-Za-z0-9._-]+$"
+      }
+    },
     "generatedCppRoot": { "type": "string", "minLength": 1 },
     "changedMethodCount": { "type": "integer", "minimum": 0 },
     "supportedChangedMethodCount": { "type": "integer", "minimum": 0 },
     "unsupportedChangedMethodCount": { "type": "integer", "minimum": 0 },
+    "guardMode": { "const": "universal" },
+    "guardedMethodCount": { "type": "integer", "minimum": 0 },
+    "supportedGuardedMethodCount": { "type": "integer", "minimum": 0 },
+    "unsupportedGuardedMethodCount": { "type": "integer", "minimum": 0 },
+    "interpreterOnlyMethodCount": { "type": "integer", "minimum": 0 },
     "nativeEntryCount": { "type": "integer", "minimum": 0 },
+    "interpreterOnlyMethods": {
+      "type": "array",
+      "items": { "$ref": "#/$defs/methodIssue" }
+    },
     "unsupportedChangedMethods": {
       "type": "array",
-      "items": {
-        "type": "object",
-        "required": ["id", "name", "assemblyName", "declaringType", "methodToken", "reasons"],
-        "properties": {
-          "id": { "type": "string", "minLength": 1 },
-          "name": { "type": "string", "minLength": 1 },
-          "assemblyName": { "type": "string", "minLength": 1 },
-          "declaringType": { "type": "string" },
-          "methodToken": { "type": "integer", "minimum": 1 },
-          "reasons": { "type": "array", "items": { "type": "string", "minLength": 1 } }
-        }
-      }
+      "items": { "$ref": "#/$defs/methodIssue" }
     },
     "methods": {
       "type": "array",
       "items": {
         "type": "object",
-        "required": ["functionName", "returnType", "parameters", "sourceFile", "assemblyName", "declaringType", "methodName", "methodToken", "managedReturnType", "managedParameterTypes", "managedHasThis", "declaringTypeIsValueType", "genericParameterCount", "declaringTypeGenericParameterCount", "bridgeKind", "usesHiddenReturnBuffer", "isStatic", "hasThis", "managedParameterCount"],
+        "required": ["functionName", "returnType", "parameters", "sourceFile", "assemblyName", "declaringType", "methodName", "methodToken", "managedId", "stableMethodIdSha256", "managedReturnType", "managedParameterTypes", "managedHasThis", "declaringTypeIsValueType", "genericParameterCount", "declaringTypeGenericParameterCount", "bridgeKind", "usesHiddenReturnBuffer", "isStatic", "hasThis", "managedParameterCount"],
         "properties": {
           "functionName": { "type": "string", "minLength": 1 },
           "returnType": { "type": "string", "minLength": 1 },
@@ -55,6 +66,7 @@
           "methodName": { "type": "string", "minLength": 1 },
           "methodToken": { "type": "integer", "minimum": 1 },
           "managedId": { "type": "string", "minLength": 1 },
+          "stableMethodIdSha256": { "type": "string", "pattern": "^[0-9a-fA-F]{64}$" },
           "managedReturnType": { "type": "string", "minLength": 1 },
           "managedParameterTypes": { "type": "array", "items": { "type": "string" } },
           "managedHasThis": { "type": "boolean" },
@@ -68,6 +80,22 @@
           "hasThis": { "type": "boolean" },
           "managedParameterCount": { "type": "integer", "minimum": 0 }
         }
+      }
+    }
+  },
+  "$defs": {
+    "methodIssue": {
+      "type": "object",
+      "required": ["id", "name", "assemblyName", "declaringType", "methodToken", "managedId", "stableMethodIdSha256", "reasons"],
+      "properties": {
+        "id": { "type": "string", "minLength": 1 },
+        "name": { "type": "string", "minLength": 1 },
+        "assemblyName": { "type": "string", "minLength": 1 },
+        "declaringType": { "type": "string" },
+        "methodToken": { "type": "integer", "minimum": 1 },
+        "managedId": { "type": "string", "minLength": 1 },
+        "stableMethodIdSha256": { "type": "string", "pattern": "^[0-9a-fA-F]{64}$" },
+        "reasons": { "type": "array", "minItems": 1, "items": { "type": "string", "minLength": 1 } }
       }
     }
   }

@@ -7,14 +7,22 @@
 
 ## 适用边界
 
-DHE 将全部已配置 hot-update 程序集同时编入 Player AOT。更新时只允许 method-body-only
-差分：发生变化的方法注册到解释器，未变化方法继续执行 Player 中的 AOT 代码。以下变化会
-在生成 Player 前被拒绝：
+本工作流有两个明确模式：`bootstrap` 生成一次带 universal guards 和内置 Base MetaVersion 的
+Base Player；`resource-update` 只生成一份 current DLL/MetaVersion 资源。普通 changed-only
+finalize 仍是诊断路径，不能被误认为线上资源更新能力。
 
-- 程序集、模块、类型、字段、属性、事件或资源布局变化；
-- 方法、参数、泛型约束、override、P/Invoke 或安全元数据变化；
-- token 集、异常处理边界、locals、switch target 或自定义属性契约漂移；
-- native resolver 无法覆盖的 changed token 或 ABI 形状。
+DHE 将全部已配置 hot-update 程序集同时编入 Player AOT。资源更新不是为每个 Base 计算并
+下发 changed-token 文件；MetaVersion 描述完整 current 元数据，客户端拿自身内置 Base MetaVersion 本地
+求差。发生变化或新增的受支持元数据注册到解释器，未变化方法继续执行 Player 中的 AOT
+代码。当前 proven-safe subset 除方法体变化外，还覆盖新增顶层/nested 类型、既有普通
+类型的非虚方法、受约束的实例/静态字段演进、删除类型/方法、方法签名替换、逻辑
+property/event 和既有成员 custom attribute。以下变化仍会在发布资源前被拒绝：
+
+- 既有值类型的实例布局变化，以及继承、接口集合、class layout 或 vtable 变化；
+- 既有方法的泛型约束、override、P/Invoke 或非 custom-attribute 声明元数据原地变化；
+- 给既有接口新增方法，给既有类型新增 virtual/abstract/PInvoke 方法；
+- 既有泛型类型实例字段、ThreadStatic/RVA/pointer/byref 字段和已取地址字段演进；
+- native resolver 无法覆盖的 changed AOT 入口或 ABI 形状。
 
 被拒绝的更新必须重新发布基础包，不能降级为未验证的普通热更。项目可通过关闭
 `dheAotAssemblies` 回到原 HybridCLR 路径；已发布的 baseline、MV 和 runtime payload 不得
@@ -22,33 +30,45 @@ DHE 将全部已配置 hot-update 程序集同时编入 Player AOT。更新时�
 
 ## 锁定身份
 
-当前组合由以下不可变输入组成：
+当前 MetaVersion 候选由以下可重放输入组成：
 
-- HybridCLR runtime `v8.13.0-opt4`；
-- HybridCLR Unity package 分支 `optimize/v8.13.0`，精确 commit 记录在
-  `manifests/repo-lock.json`；
+- HybridCLR runtime 基线 `v8.13.0-opt4` 加 hash 锁定的 DHE overlay；该旧 tag 不得移动，
+  正式发布需要新的 runtime commit/tag；
+- HybridCLR Unity package 基线 commit `623073b` 加 package overlay；正式发布后回到
+  `optimize/v8.13.0` 的新 commit，package 本身不打 tag；
 - 团结引擎 `1.10.0` / Unity compatibility `2022.3.62t12`；
 - `manifests/dhe-runtime-lock.json`、`dhe-package-lock.json` 和工具包 manifest 中的
   commit、tree、文件集合及 SHA-256。
 
 Release preflight 会实时重算上述身份。dirty、mixed SVN revision、surrogate headers、错误
-Editor 版本、未登记 package 文件或 runtime tree 漂移都会失败。
+Editor 版本、overlay base/hash/目标引擎不匹配、未登记 package 文件或 runtime tree 漂移都会失败。
 
 ## 标准工作流
 
-1. `Prepare` 在 current-generation phase 生成当前 stripped AOT，并从上一版本复制完整
-   baseline 集合。
-2. host 对全部 `dheAotAssemblies` 生成 MV JSON/binary，要求其集合严格等于
-   `hotUpdateAssemblies`。
-3. `StageRuntimePlan` 向运行时资源写入 current、MV、snapshot 和逐文件 SHA-256，同时绑定
-   AOT metadata manifest；完整 baseline 只保留在 workflow handoff 中供独立审计，不进入资源包。
-4. scripts-only Player 生成干净 C++；package 解析所有 changed token、注入 native guard，
-   并生成完整 build identity。
-5. final Player 编译该 identity；第二次 native finalize 必须证明 guard 和 immutable native
+1. Base bootstrap 的 `Prepare` 生成当前 stripped AOT，并将其冻结为 Base 集合；host 对全部
+   `dheAotAssemblies` 生成 Base MetaVersion，要求其集合严格等于 `hotUpdateAssemblies`。
+2. scripts-only Player 生成干净 C++；package 解析全部可支持的既有方法、注入 universal
+   native guard，并生成完整 build identity。
+3. final Player 编译该 identity；第二次 native finalize 必须证明 guard 和 immutable native
    manifest 没有漂移。`guard-block-set-v1` 只认证 manifest 声明的完整 begin/end guard 块，
    不把同一 C++ 文件中由 build identity 引起的无关变化计入 guard 身份；缺失、重复或内容不符
    的块必须失败。项目 adapter 在 Player 和 smoke 完成后必须在 `finally` 中恢复临时 build
    identity 源码模板，成功和异常路径都不得污染工作区。
+4. 后续资源发布只编译一套 current hotfix DLL。`resource-update` 为每个程序集生成一次
+   current MetaVersion，并使用所有仍受支持 Base 的 DLL、BuildIdentity 和 native manifest 做离线
+   兼容审计；identity 1 的复合 `baseId` 唯一绑定完整 Player 身份，按每个 Base 的真实差异
+   推导 `requiredRuntimeCapabilities`。Base 专属二进制不进入 payload，任一 Base 不兼容时不
+   生成可发布 manifest。
+5. `stage-resource-update` 只替换 current DLL/MetaVersion、可选补充 AOT metadata、manifest、
+   validation 和 runtime plan；manifest 使用 `runtimePlanSha256` 绑定 plan，并逐文件校验所有
+   payload hash 后才复制，
+   强制接收当前 Player 归档的 `build-identity.json`，校验 identity schema、复合 `baseId` 和
+   文件 SHA 后精确命中一个 `supportedBases` 记录，再证明 Player、GameAssembly 及 Player
+   内置 Base MetaVersion 的 hash 未变化。MetaVersion 集合相同但 runtime/native 身份不同的
+   Player 不会再被误判为歧义。
+   `resource-update-plan-integrity-v1` 和可选的
+   `resource-update-aot-metadata-path-v1` 必须参与 capability/baseId；旧 Player 缺少任一必要
+   能力时整个 Base 记录不兼容。
 6. Player smoke 验证程序集集合、payload hash、changed/interpreter 路径、unchanged/AOT
    路径以及失败事务回滚重试。no-op 更新必须证明解释器和 native changed 计数均为零，并
    实际校验四程序集基线结果、direct/reflection 能力和无解释器调度，不能只检查计数。
@@ -86,8 +106,10 @@ DHE format、未支持的 schema 断言关键字、额外属性、错误类型�
 ## 项目试用
 
 首次接入先运行 `Exploratory + StopAfterPreflight`，验证 adapter、全程序集 scope、package
-lock 和 MV 兼容性。随后在目标平台运行完整 Player；只有 Player、resource、release、archive
-和 schema gate 全部通过，才能把本轮 baseline 作为下一次更新输入。
+lock 和 MV 兼容性。随后用 `Bootstrap + RunPlayer` 在目标平台构建并归档 Base。每次后续
+更新把所有仍在线 Base 同时交给 `resource-update`，但只发布一份 current payload；不再执行
+scripts-only/final Player。只有 Player、resource、release、archive 和 schema gate 全部通过，
+才能把对应 Base 标记为该资源版本支持。
 
 Android 和桌面证据不能替代 iOS。iOS 使用同一套 C# host/package/adapter，但仍必须在 macOS
 安装对应 Editor module，并完成 Xcode、签名和设备 smoke。缺少该环境时只能声明源码与

@@ -4,6 +4,7 @@
 #include <cstdlib>
 #include <cstring>
 #include <mutex>
+#include <vector>
 
 #include "Baselib.h"
 #include "C/Baselib_SystemSemaphore.h"
@@ -16,6 +17,7 @@
 #include "vm/Exception.h"
 #include "vm/Image.h"
 #include "vm/MetadataCache.h"
+#include "metadata/GenericMetadata.h"
 #include "il2cpp-runtime-stats.h"
 #include "hybridclr/interpreter/Interpreter.h"
 #include "hybridclr/interpreter/InterpreterModule.h"
@@ -155,9 +157,13 @@ namespace
 	bool s_aotMetadataQueryPaused = false;
 	bool s_resumeAotMetadataQuery = false;
 	volatile int32_t s_interpreterStubCallCount = 0;
-	Il2CppAssembly* s_dheResolverAssembly = nullptr;
-	Il2CppImage* s_dheResolverImage = nullptr;
-	Il2CppClass* s_dheResolverClass = nullptr;
+	struct DheResolverRecord
+	{
+		Il2CppAssembly* assembly;
+		Il2CppImage* image;
+		Il2CppClass* klass;
+	};
+	std::vector<DheResolverRecord> s_dheResolvers;
 
     void InterpreterMethodPointerStub()
     {
@@ -242,12 +248,22 @@ namespace vm
         return nullptr;
     }
 
+    Il2CppException* Exception::GetMissingMethodException(const char*)
+    {
+        return nullptr;
+    }
+
     // The native test executable does not boot the VM. These definitions keep
     // the resolver and direct interpreter bridge linkable while their real
     // implementations remain covered by the Unity Player gate.
     Il2CppImage* Assembly::GetImage(const Il2CppAssembly* assembly)
     {
-        return assembly == s_dheResolverAssembly ? s_dheResolverImage : nullptr;
+		for (const DheResolverRecord& resolver : s_dheResolvers)
+		{
+			if (resolver.assembly == assembly)
+				return resolver.image;
+		}
+		return nullptr;
     }
 
     const Il2CppAssembly* Assembly::GetLoadedAssembly(const char*)
@@ -257,9 +273,13 @@ namespace vm
 
     const Il2CppAssembly* MetadataCache::GetAssemblyByName(const char* name)
     {
-        return s_dheResolverAssembly && name && s_dheResolverAssembly->aname.name &&
-            std::strcmp(name, s_dheResolverAssembly->aname.name) == 0
-            ? s_dheResolverAssembly : nullptr;
+		for (const DheResolverRecord& resolver : s_dheResolvers)
+		{
+			if (resolver.assembly && name && resolver.assembly->aname.name &&
+				std::strcmp(name, resolver.assembly->aname.name) == 0)
+				return resolver.assembly;
+		}
+		return nullptr;
     }
 
     void Image::GetTypes(const Il2CppImage* image, bool, TypeVector* target)
@@ -267,9 +287,13 @@ namespace vm
         if (target)
         {
             target->clear();
-			if (image == s_dheResolverImage && s_dheResolverClass)
+			for (const DheResolverRecord& resolver : s_dheResolvers)
 			{
-				target->push_back(s_dheResolverClass);
+				if (image == resolver.image && resolver.klass)
+				{
+					target->push_back(resolver.klass);
+					break;
+				}
 			}
         }
     }
@@ -286,6 +310,18 @@ namespace vm
     const MethodInfo* Class::GetMethodFromName(Il2CppClass*, const char*, int)
     {
         return nullptr;
+    }
+}
+}
+
+namespace il2cpp
+{
+namespace metadata
+{
+    const MethodInfo* GenericMetadata::Inflate(const MethodInfo* methodDefinition,
+        const Il2CppGenericContext*)
+    {
+        return methodDefinition;
     }
 }
 }
@@ -377,16 +413,20 @@ namespace native_test
 
 	void ConfigureDheResolver(Il2CppAssembly* assembly, Il2CppImage* image, Il2CppClass* klass)
 	{
-		s_dheResolverAssembly = assembly;
-		s_dheResolverImage = image;
-		s_dheResolverClass = klass;
+		for (DheResolverRecord& resolver : s_dheResolvers)
+		{
+			if (resolver.assembly == assembly)
+			{
+				resolver = { assembly, image, klass };
+				return;
+			}
+		}
+		s_dheResolvers.push_back({ assembly, image, klass });
 	}
 
 	void ClearDheResolver()
 	{
-		s_dheResolverAssembly = nullptr;
-		s_dheResolverImage = nullptr;
-		s_dheResolverClass = nullptr;
+		s_dheResolvers.clear();
 	}
 }
 

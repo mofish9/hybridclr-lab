@@ -125,11 +125,20 @@ namespace HybridCLR.Lab.ManagedCasesAot
 
         public static int GenericContainerValue(int value)
         {
+#if DHE_STRUCTURE_CURRENT
+            var added = new DheAddedReferenceType(300);
+            var generic = new DheAddedGenericType<int>(added.Apply(value));
+            var calculator = new DheDemoCalculator();
+            var nested = new DheAddedNestedType(600);
+            return generic.Value + AddedStaticMethod(value) +
+                calculator.AddedInstanceMethod(value) + nested.Apply(value);
+#else
             var values = new List<int> { value, value + 1 };
 #if DHE_CURRENT
             return values[0] + values[1] + 100;
 #else
             return values[0] + values[1] + 1;
+#endif
 #endif
         }
 
@@ -196,6 +205,29 @@ namespace HybridCLR.Lab.ManagedCasesAot
                 FinallyMarker = marker + 1;
             }
         }
+
+#if DHE_STRUCTURE_CURRENT
+        public sealed class DheAddedNestedType
+        {
+            private readonly int offset;
+
+            public DheAddedNestedType(int offset)
+            {
+                this.offset = offset;
+            }
+
+            public int Apply(int value)
+            {
+                return value + offset;
+            }
+        }
+
+        public static int AddedStaticMethod(int value)
+        {
+            return value + 400;
+        }
+
+#endif
 
         public static int FinallyMarker;
     }

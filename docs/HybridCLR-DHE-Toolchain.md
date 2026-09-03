@@ -44,11 +44,12 @@ dotnet run --project tool/HybridCLR.DheTool.csproj -- workflow \
   -Config C:/project/ProjectSettings/DHE/dhe-workflow-config.json
 ```
 
-The generated adapter is a compilable StreamingAssets implementation, not a
-stub. It calls every package-owned DHE phase and writes the required structured
-evidence. A YooAsset/Addressables project replaces its asset root/resolver and
-resource evidence; a production project also supplies signing and runtime smoke
-logic. Paths in the config are resolved relative to the config file; explicit
+The generated adapter is a compilable, fail-closed scaffold. It calls every
+package-owned DHE phase, but `BuildDheYooAsset` deliberately throws until the
+project implements its resource/catalog build and writes verified structured
+evidence. A YooAsset/Addressables project also replaces its asset root/resolver;
+a production project supplies signing and runtime smoke logic. Paths in the
+config are resolved relative to the config file; explicit
 command line values override config values. `unityArguments` is a scalar map for
 project-owned Unity adapter options (for example `dhePreview`,
 `dheStandalone`, or a target-specific fallback metadata root). The host still
@@ -82,6 +83,49 @@ dotnet run --project tool/HybridCLR.DheTool.csproj -- batch \
 
 All paths are explicit. Output paths are checked against the input roots and
 are never allowed to overwrite an assembly or settings file.
+
+## Fixed Base and resource-only updates
+
+Build a Base Player once with the project workflow's `-Bootstrap -RunPlayer`
+mode. The Player embeds one Base MetaVersion per configured hot-update assembly and a
+build identity; the scripts-only stage emits universal native guards before
+the final Player is compiled. Archive the Base DLL root,
+`build-identity.json`, and `dhe-native-manifest.json` for every Player version
+that remains online.
+
+For later releases, compile one current hot-update DLL set and validate it
+against all supported Base Players in one command:
+
+```text
+dotnet HybridCLR.DheTool.dll resource-update \
+  -CurrentRoot C:/build/current-hotfix \
+  -BaseRoots C:/release/base-100/dlls,C:/release/base-110/dlls \
+  -BaseNativeManifests C:/release/base-100/dhe-native-manifest.json,C:/release/base-110/dhe-native-manifest.json \
+  -BaseBuildIdentities C:/release/base-100/build-identity.json,C:/release/base-110/build-identity.json \
+  -AotMetadataRoot C:/build/stripped-aot \
+  -SettingsFile C:/project/ProjectSettings/HybridCLRSettings.asset \
+  -OutputRoot C:/build/resource-update
+```
+
+The output contains one copy of each current DLL and current MetaVersion. Base inputs
+are compatibility evidence only and are never copied into `payload/`. At
+runtime each Player compares the remote current MetaVersion with its own embedded Base
+MetaVersion, so different Base versions may produce different changed-method sets from
+the same payload. If any declared Base is incompatible, the command removes
+the publish manifests and fails instead of producing a partial release.
+When supplemental AOT metadata is required, `-AotMetadataRoot` adds the complete
+`patchAOTAssemblies` set to the same payload. Projects that have separately proved a
+no-supplemental-metadata workflow may omit it.
+
+Use `stage-resource-update` from the resource/catalog build to copy this one
+payload. Supply the exact archived Base identity with `-BaseBuildIdentity`; the
+command uses its composite `baseId` to select one supported Base and proves that
+the identity file, embedded Base MetaVersion, and optional Player binaries were
+not changed. Two Players may therefore share an identical Base MetaVersion set
+while retaining different runtime/native identities. It verifies the manifest-bound
+runtime plan and every current DLL, MetaVersion, and supplemental AOT metadata hash
+before copying. The complete lifecycle and current compatibility subset are in
+`docs/HybridCLR-DHE-Resource-Only-Design.md`.
 
 ## JSON contract gates
 
@@ -236,9 +280,14 @@ tool directory should be outside an SVN working copy or explicitly ignored.
 
 Project Release readiness is derived only from passing source, clean checkout,
 project preflight, Player, independent artifact, release, and archive gates.
-It requires equal hot-update/DHE assembly sets, strict method-body-only diffs,
-complete native guard coverage, a target-bound previous baseline, clean
-source/package/runtime provenance, and a real Player smoke result. A no-op
+It requires equal hot-update/DHE assembly sets, the MetaVersion proven-safe
+compatibility subset, complete native guard coverage, target-bound Base
+identities, clean source/package/runtime provenance, and a real Player smoke
+result. The accepted subset includes method-body changes, supported additions
+and removals of types, methods and fields, method signature replacement,
+logical property/event evolution, custom attributes, and constrained reference
+type sidecar fields. Existing value-type layout, inheritance/interface/vtable,
+unsupported field shapes, and unsupported declaration changes fail closed. A no-op
 release is valid when all changed/interpreter/native counts are zero and the
 transaction status is `notApplicable`. The Player must also set
 `noOpAotBehaviorValidated=true` after checking baseline results, the complete

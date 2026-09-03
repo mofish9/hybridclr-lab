@@ -4,10 +4,14 @@
   "title": "HybridCLR DHE Runtime Asset Plan",
   "type": "object",
   "additionalProperties": true,
-  "required": ["schemaVersion", "format", "assemblies"],
+  "required": ["schemaVersion", "format", "selection", "currentAssemblySetSha256", "runtimeAssetRoot", "baseMetaVersionAssetRoot", "aotMetadata", "assemblies"],
   "properties": {
     "schemaVersion": { "const": 1 },
     "format": { "const": "hybridclr.dhe-runtime-asset-plan.json" },
+    "selection": { "const": "embedded-base-metaversion" },
+    "currentAssemblySetSha256": { "type": "string", "pattern": "^[0-9a-fA-F]{64}$" },
+    "runtimeAssetRoot": { "type": "string", "minLength": 1 },
+    "baseMetaVersionAssetRoot": { "type": "string", "minLength": 1 },
     "aotMetadataManifestSha256": { "type": "string", "pattern": "^$|^[0-9a-fA-F]{64}$" },
     "aotMetadata": {
       "type": "array",
@@ -16,7 +20,7 @@
         "required": ["assemblyName", "sourceKind", "sha256", "manifestSha256", "path"],
         "properties": {
           "assemblyName": { "type": "string", "minLength": 1 },
-          "sourceKind": { "enum": ["current-stripped", "fallback-root"] },
+          "sourceKind": { "enum": ["current-stripped", "fallback-root", "resource-update"] },
           "sha256": { "type": "string", "pattern": "^[0-9a-fA-F]{64}$" },
           "manifestSha256": { "type": "string", "pattern": "^$|^[0-9a-fA-F]{64}$" },
           "path": { "type": "string", "minLength": 1 }
@@ -28,17 +32,15 @@
       "minItems": 1,
       "items": {
         "type": "object",
-        "required": ["assemblyName", "current", "mv", "snapshot", "currentSha256", "baselineSha256", "mvSha256", "snapshotSha256"],
         "properties": {
           "assemblyName": { "type": "string", "minLength": 1 },
           "current": { "type": "string", "minLength": 1 },
-          "mv": { "type": "string", "minLength": 1 },
-          "snapshot": { "type": "string", "minLength": 1 },
           "currentSha256": { "type": "string", "pattern": "^[0-9a-fA-F]{64}$" },
-          "baselineSha256": { "type": "string", "pattern": "^[0-9a-fA-F]{64}$" },
-          "mvSha256": { "type": "string", "pattern": "^[0-9a-fA-F]{64}$" },
-          "snapshotSha256": { "type": "string", "pattern": "^[0-9a-fA-F]{64}$" }
-        }
+          "currentMetaVersion": { "type": "string" },
+          "baseMetaVersion": { "type": "string" },
+          "currentMetaVersionSha256": { "type": "string" }
+        },
+        "required": ["assemblyName", "current", "currentMetaVersion", "baseMetaVersion", "currentSha256", "currentMetaVersionSha256"]
       }
     }
   }
