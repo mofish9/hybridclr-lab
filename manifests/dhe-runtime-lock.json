@@ -1,13 +1,15 @@
 {
   "schemaVersion": 1,
   "format": "hybridclr.dhe-runtime-lock.json",
-  "sourceMode": "overlay",
+  "sourceMode": "integrated",
   "patches": [
     {
       "id": "hybridclr-native-dhe-metaversion",
       "repository": "hybridclr",
-      "sourceMode": "overlay",
+      "sourceMode": "integrated",
       "baseCommit": "9e4fc7219724a3c63ff845e0b2acaa7d10c2430b",
+      "integratedCommit": "f777ed77eafd3eaa7262115c0c135f7418f83b74",
+      "expectedTreeSha256": "C18BF733D8F7963F65E5E5A2330F8C59E3A92F2311CF930FCFE40330DE0D972B",
       "path": "patches/dhe-lite/hybridclr.patch",
       "sha256": "CEF5B9FDE280A319357C721F74759A1C8F0DA1A0D8F77ABD4715295F681AF5E6",
       "applyRoot": "libil2cpp",
@@ -16,8 +18,10 @@
     {
       "id": "il2cpp-plus-dhe-metaversion-unity2021",
       "repository": "il2cpp_plus",
-      "sourceMode": "overlay",
+      "sourceMode": "integrated",
       "baseCommit": "511df62f4aa7cba2bdb505deead48a8d080d582c",
+      "integratedCommit": "b3fdf1ef70b63758dc6598c674ffb38f3534c4e6",
+      "expectedTreeSha256": "42D3A8581C38FBFEE6CE59B9D07A3EEBEA567E30175F49CF003E07D71F34B124",
       "engineWorkflows": ["Unity2021Standard"],
       "path": "patches/dhe-lite/il2cpp_plus_unity2021.patch",
       "sha256": "F2F819F867635F79CA6701A13C4A0ED6B392AFA80D220D18422B0620454598FD",
@@ -27,8 +31,10 @@
     {
       "id": "il2cpp-plus-dhe-metaversion-unity2022",
       "repository": "il2cpp_plus",
-      "sourceMode": "overlay",
+      "sourceMode": "integrated",
       "baseCommit": "bf15337e189ae7da5876aa51c9b896a36c52a155",
+      "integratedCommit": "60322744721410e79203155fc455be4232c3df4b",
+      "expectedTreeSha256": "D5254308FAE642400A109A9CE85C3E5C1BA53201913A77832BB3CA795E2D2E50",
       "engineWorkflows": ["Unity2022Fgs"],
       "path": "patches/dhe-lite/il2cpp_plus_unity2022.patch",
       "sha256": "E1BF606D1F39947D5A238C84931E3D222AB13CB9705F5DF906BC67AC648ECDF3",
@@ -38,8 +44,10 @@
     {
       "id": "il2cpp-plus-dhe-metaversion-tuanjie2022",
       "repository": "il2cpp_plus",
-      "sourceMode": "overlay",
+      "sourceMode": "integrated",
       "baseCommit": "82162cb681f1564807d2ab5e7f3a9312271d0a73",
+      "integratedCommit": "52968ad6c88416f212d09d919b9a1b6afdc8a53b",
+      "expectedTreeSha256": "E9CA1486ADC1AA446BF7565B0D014340964E16722221983CB2699AE4D9A0E4B2",
       "engineWorkflows": ["Tuanjie2022Fgs"],
       "path": "patches/dhe-lite/il2cpp_plus_tuanjie2022.patch",
       "sha256": "02B06E4649D2F50F6DBB24020EB54B510FD139B9AE2DB546CF027106E15D68C9",
@@ -49,10 +57,12 @@
     {
       "id": "hybridclr-unity-dhe-metaversion",
       "repository": "hybridclr_unity",
-      "sourceMode": "overlay",
+      "sourceMode": "integrated",
       "baseCommit": "623073baafd5a1d12ea46df8145de9fddc899fac",
+      "integratedCommit": "c19e2357848c5d87c04706333dee3947c3d4cf5c",
+      "expectedTreeSha256": "CE25BE8434CEFD6283A08A02B5CD3D465017616402922089F36405DD32D535D6",
       "path": "patches/dhe-lite/hybridclr_unity.patch",
-      "sha256": "106439A42E1BB08A44ABBB0A36474053CB8421AD6D1DCAF325F1C68E3B4B2ED0",
+      "sha256": "E7D835308482B7249F861EFA25518A3D420883D5FE4BC29228C382B1A6114468",
       "applyRoot": "package",
       "stripComponents": 1
     }

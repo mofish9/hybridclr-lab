@@ -26,6 +26,9 @@ internal static partial class Program
         "runtime-capability-missing-rejected", "composite-base-id-runtime-bound",
         "resource-stage-plan-capability-bound",
         "resource-stage-aot-metadata-capability-bound",
+        "resource-player-evidence-binding",
+        "integrated-source-lock-valid", "integrated-source-lock-commit-tamper",
+        "integrated-source-lock-tree-tamper", "integrated-source-lock-patch-tamper",
         "layout-release-role-schemas",
         "schema-valid-document", "schema-maximum-rejected", "schema-additional-type-rejected",
         "schema-unsupported-keyword-rejected", "schema-gate-contract",
@@ -50,6 +53,7 @@ internal static partial class Program
                 "batch" => Batch(cli),
                 "resource-update" => ResourceUpdate(cli),
                 "stage-resource-update" => StageResourceUpdate(cli),
+                "resource-player-evidence" => ResourcePlayerEvidence(cli),
                 "baseline-manifest" => BaselineManifest(cli),
                 "aot-metadata-manifest" => AotMetadataManifest(cli),
                 "preflight" => Preflight(cli),
@@ -1259,15 +1263,20 @@ internal static partial class Program
                     if (!workflowRoles.Add(workflowRole) || !Sha256File(workflowPath).Equals(
                             GetString(workflow, "sha256"), StringComparison.OrdinalIgnoreCase))
                         throw new DheException("Regression workflow output identity is invalid: " + workflowRole);
-                    RequireEvidenceFormat(ReadJson<JsonElement>(workflowPath),
-                        "hybridclr.dhe-project-player-workflow.json", workflowRole);
+                    var workflowReport = ReadJson<JsonElement>(workflowPath);
+                    var expectedFormat = workflowRole == "demo-changed"
+                        ? "hybridclr.dhe-resource-player-workflow.json"
+                        : "hybridclr.dhe-project-player-workflow.json";
+                    RequireEvidenceFormat(workflowReport, expectedFormat, workflowRole);
                 }
                 if (!workflowRoles.SetEquals(new[] { "demo-changed", "demo-noop" }))
                     throw new DheException("Regression workflow output roles are incomplete.");
                 break;
             case "demo-changed":
             case "demo-noop":
-                RequireEvidenceFormat(report, "hybridclr.dhe-project-player-workflow.json", role);
+                RequireEvidenceFormat(report, role == "demo-changed"
+                    ? "hybridclr.dhe-resource-player-workflow.json"
+                    : "hybridclr.dhe-project-player-workflow.json", role);
                 if (!GetBool(report, "validationPassed") || !GetBool(report, "coverageGatePassed"))
                     throw new DheException(role + " evidence did not pass validation and coverage.");
                 ValidateEvidenceToolIdentity(report, reportPath, sourceHead, sourceTree);
@@ -1275,10 +1284,14 @@ internal static partial class Program
                 var player = report.GetProperty("player");
                 if (role == "demo-changed")
                 {
+                    bool resourceOnly = GetString(report, "format") ==
+                        "hybridclr.dhe-resource-player-workflow.json";
+                    if (resourceOnly) ValidateResourcePlayerEvidenceBindings(report, reportPath);
                     if (changed <= 0 || GetInt(player, "changedMethodCount") != changed ||
                         GetInt(player, "interpreterEntryCount") <= 0 || GetInt(player, "aotEntryCount") <= 0 ||
                         !GetBool(player, "dispatchProbeValidated") || !GetBool(player, "changedProbeChanged") ||
-                        GetBool(player, "unchangedProbeChanged") || !GetBool(player, "retryValidated") ||
+                        (!resourceOnly && GetBool(player, "unchangedProbeChanged")) ||
+                        !GetBool(player, "retryValidated") ||
                         GetString(player, "transactionStatus") != "validated")
                         throw new DheException("Changed Demo evidence does not prove interpreter/AOT dispatch and rollback.");
                 }
@@ -1309,6 +1322,63 @@ internal static partial class Program
             default:
                 throw new DheException("Unknown release evidence role: " + role);
         }
+    }
+
+    private static void ValidateResourcePlayerEvidenceBindings(JsonElement report, string reportPath)
+    {
+        string root = Path.GetDirectoryName(reportPath)!;
+        string Bound(string pathProperty, string hashProperty, string description)
+        {
+            string path = ResolveEvidencePath(GetString(report, pathProperty), root, description);
+            if (!Sha256File(path).Equals(GetString(report, hashProperty),
+                    StringComparison.OrdinalIgnoreCase))
+                throw new DheException(description + " hash does not match resource Player evidence.");
+            return path;
+        }
+
+        string manifestPath = Bound("resourceUpdateManifest", "resourceUpdateManifestSha256",
+            "Resource update manifest");
+        string validationPath = Bound("resourceUpdateValidation", "resourceUpdateValidationSha256",
+            "Resource update validation");
+        string stagePath = Bound("resourceStage", "resourceStageSha256", "Resource stage");
+        string playerPath = Bound("playerResult", "playerResultSha256", "Resource Player result");
+        string baseWorkflowPath = Bound("baseWorkflowReport", "baseWorkflowReportSha256",
+            "Base workflow report");
+        _ = Bound("buildIdentity", "buildIdentitySha256", "Base build identity");
+        _ = Bound("runtimePlan", "runtimePlanSha256", "Resource runtime plan");
+        string nativePath = ResolveEvidencePath(GetString(report, "nativeManifest"), root,
+            "Base native manifest");
+        if (!Sha256File(nativePath).Equals(GetString(report, "nativeManifestSha256"),
+                StringComparison.OrdinalIgnoreCase))
+            throw new DheException("Base native manifest hash does not match resource Player evidence.");
+
+        JsonElement manifest = ReadJson<JsonElement>(manifestPath);
+        JsonElement validation = ReadJson<JsonElement>(validationPath);
+        JsonElement stage = ReadJson<JsonElement>(stagePath);
+        JsonElement player = ReadJson<JsonElement>(playerPath);
+        JsonElement baseWorkflow = ReadJson<JsonElement>(baseWorkflowPath);
+        RequireEvidenceFormat(manifest, "hybridclr.dhe-resource-update.json", "Resource update manifest");
+        RequireEvidenceFormat(validation, "hybridclr.dhe-resource-update-validation.json",
+            "Resource update validation");
+        RequireEvidenceFormat(stage, "hybridclr.dhe-resource-stage.json", "Resource stage");
+        RequireEvidenceFormat(player, "hybridclr.dhe-player-result.json", "Resource Player result");
+        RequireEvidenceFormat(baseWorkflow, "hybridclr.dhe-project-player-workflow.json",
+            "Base workflow report");
+        if (!GetBool(validation, "passed") || !GetBool(stage, "passed") ||
+            !GetBool(player, "passed") || !GetBool(baseWorkflow, "passed") ||
+            !string.Equals(JsonSerializer.Serialize(player),
+                JsonSerializer.Serialize(report.GetProperty("player")), StringComparison.Ordinal) ||
+            !string.Equals(GetString(stage, "selectedBaseId"), GetString(report, "selectedBaseId"),
+                StringComparison.OrdinalIgnoreCase) ||
+            !string.Equals(GetString(player, "selectedBaseId"), GetString(report, "selectedBaseId"),
+                StringComparison.OrdinalIgnoreCase) ||
+            !string.Equals(GetString(manifest, "currentAssemblySetSha256"),
+                GetString(report, "currentAssemblySetSha256"), StringComparison.OrdinalIgnoreCase) ||
+            !string.Equals(GetString(stage, "currentAssemblySetSha256"),
+                GetString(report, "currentAssemblySetSha256"), StringComparison.OrdinalIgnoreCase) ||
+            !string.Equals(GetString(baseWorkflow, "cleanCheckoutGate"),
+                GetString(report, "cleanCheckoutGate"), StringComparison.OrdinalIgnoreCase))
+            throw new DheException("Resource Player evidence live bindings do not agree.");
     }
 
     private static void ValidateNativeReleaseEvidence(JsonElement report, string reportPath, string sourceRoot,
@@ -2125,7 +2195,7 @@ internal static partial class Program
         }
     }
 
-    private static void PrintHelp() => Console.WriteLine("HybridCLR DHE C# tool\nCommands: version, mv, batch, resource-update, stage-resource-update, baseline-manifest, aot-metadata-manifest, preflight, workflow, release-gate, regression, schema-validate, schema-gate, validate, archive, doctor, verify-package, release-evidence, publish, install, new-adapter, new-config, assemble-runtime, native-tests, build-managed-cases, generate-test-manifest, generate-metadata-stress-source, reference, compare-results, check-environment, clear-unity-project-locks, wait-editor, prepare-engine-test-project, bootstrap-repos, tree-hash, file-hash\nExample: dotnet run --project tool/HybridCLR.DheTool.csproj -- workflow -Config <project/dhe-workflow-config.json>");
+    private static void PrintHelp() => Console.WriteLine("HybridCLR DHE C# tool\nCommands: version, mv, batch, resource-update, stage-resource-update, resource-player-evidence, baseline-manifest, aot-metadata-manifest, preflight, workflow, release-gate, regression, schema-validate, schema-gate, validate, archive, doctor, verify-package, release-evidence, publish, install, new-adapter, new-config, assemble-runtime, native-tests, build-managed-cases, generate-test-manifest, generate-metadata-stress-source, reference, compare-results, check-environment, clear-unity-project-locks, wait-editor, prepare-engine-test-project, bootstrap-repos, tree-hash, file-hash\nExample: dotnet run --project tool/HybridCLR.DheTool.csproj -- workflow -Config <project/dhe-workflow-config.json>");
 
     private static string ResolveUnity(Cli cli, string project) => RequireFile(cli.Optional("unity") ?? Environment.GetEnvironmentVariable("DHE_UNITY_EXE") ?? throw new DheException("Set -Unity or DHE_UNITY_EXE."), "Unity editor");
     private static void RunUnity(string executable, string workingDirectory, IEnumerable<string> arguments, IDictionary<string, string> environment, string logPath, int timeoutSeconds)

@@ -156,6 +156,245 @@ internal static partial class Program
         return 0;
     }
 
+    /// <summary>
+    /// Binds a resource-only update and its real Player smoke back to the
+    /// immutable Base workflow. This replaces the obsolete changed-Player
+    /// rebuild as the changed lane consumed by toolchain release evidence.
+    /// </summary>
+    private static int ResourcePlayerEvidence(Cli cli)
+    {
+        string updateRoot = RequireDirectory(cli.Require("resourceupdateroot"),
+            "DHE resource update root");
+        string manifestPath = RequireFile(Path.Combine(updateRoot, "dhe-resource-update.json"),
+            "DHE resource update manifest");
+        JsonElement manifest = ReadJson<JsonElement>(manifestPath);
+        RequireEvidenceFormat(manifest, "hybridclr.dhe-resource-update.json",
+            "Resource update manifest");
+        string validationPath = ValidateResourceUpdateCompatibility(updateRoot, manifest);
+        JsonElement validation = ReadJson<JsonElement>(validationPath);
+        string runtimePlanPath = RequireFile(ResolveContainedPath(updateRoot,
+            GetString(manifest, "runtimePlan") ?? string.Empty, "DHE resource runtime plan"),
+            "DHE resource runtime plan");
+
+        string stagePath = RequireFile(cli.Require("stagereport"), "DHE resource stage report");
+        JsonElement stage = ReadJson<JsonElement>(stagePath);
+        RequireEvidenceFormat(stage, "hybridclr.dhe-resource-stage.json", "Resource stage");
+        string playerPath = RequireFile(cli.Require("playerresult"), "DHE resource Player result");
+        JsonElement player = ReadJson<JsonElement>(playerPath);
+        RequireEvidenceFormat(player, "hybridclr.dhe-player-result.json", "Resource Player");
+        string baseWorkflowPath = RequireFile(cli.Require("baseworkflowreport"),
+            "DHE Base workflow report");
+        JsonElement baseWorkflow = ReadJson<JsonElement>(baseWorkflowPath);
+        RequireEvidenceFormat(baseWorkflow, "hybridclr.dhe-project-player-workflow.json",
+            "Base workflow");
+
+        var errors = new List<string>();
+        if (!GetBool(validation, "passed") || !GetBool(stage, "passed") ||
+            !GetBool(baseWorkflow, "passed") || !GetBool(player, "passed"))
+            errors.Add("Resource update, stage, Base workflow, and Player must all pass.");
+        try { ValidateNoOpPlayerEvidence(baseWorkflow.GetProperty("player")); }
+        catch (Exception ex) { errors.Add("Base workflow is not a complete no-op proof: " + ex.Message); }
+
+        string selectedBaseId = GetString(stage, "selectedBaseId") ?? string.Empty;
+        JsonElement selectedBase = manifest.GetProperty("supportedBases").EnumerateArray()
+            .SingleOrDefault(item => string.Equals(GetString(item, "baseId"), selectedBaseId,
+                StringComparison.OrdinalIgnoreCase));
+        if (selectedBase.ValueKind == JsonValueKind.Undefined || !GetBool(selectedBase, "compatible"))
+            errors.Add("Resource stage did not select one compatible Base record.");
+
+        string currentSet = GetString(manifest, "currentAssemblySetSha256") ?? string.Empty;
+        string target = GetString(player, "target") ?? string.Empty;
+        if (!string.Equals(Path.GetFullPath(GetString(stage, "updateRoot") ?? string.Empty),
+                Path.GetFullPath(updateRoot), StringComparison.OrdinalIgnoreCase) ||
+            !string.Equals(GetString(stage, "currentAssemblySetSha256"), currentSet,
+                StringComparison.OrdinalIgnoreCase) ||
+            !string.Equals(GetString(validation, "currentAssemblySetSha256"), currentSet,
+                StringComparison.OrdinalIgnoreCase) ||
+            !string.Equals(GetString(selectedBase, "target"), target, StringComparison.OrdinalIgnoreCase) ||
+            !string.Equals(GetString(player, "selectedBaseId"), selectedBaseId,
+                StringComparison.OrdinalIgnoreCase))
+            errors.Add("Resource, stage, Base, and Player selection identities do not agree.");
+
+        string stagedManifest = RequireFile(GetString(stage, "stagedManifestPath") ?? string.Empty,
+            "Staged resource manifest");
+        string stagedValidation = RequireFile(GetString(stage, "stagedValidationPath") ?? string.Empty,
+            "Staged resource validation");
+        string stagedPlan = RequireFile(GetString(stage, "stagedPlanPath") ?? string.Empty,
+            "Staged runtime plan");
+        if (!Sha256File(stagedManifest).Equals(Sha256File(manifestPath),
+                StringComparison.OrdinalIgnoreCase) ||
+            !Sha256File(stagedValidation).Equals(Sha256File(validationPath),
+                StringComparison.OrdinalIgnoreCase) ||
+            !Sha256File(stagedPlan).Equals(Sha256File(runtimePlanPath),
+                StringComparison.OrdinalIgnoreCase) ||
+            !Sha256File(stagedPlan).Equals(GetString(stage, "stagedPlanSha256"),
+                StringComparison.OrdinalIgnoreCase) ||
+            !Sha256File(runtimePlanPath).Equals(GetString(manifest, "runtimePlanSha256"),
+                StringComparison.OrdinalIgnoreCase))
+            errors.Add("Staged resource manifest, validation, or runtime plan bytes drifted.");
+
+        string buildIdentityPath = RequireFile(GetString(stage, "baseBuildIdentityPath") ?? string.Empty,
+            "Staged Base build identity");
+        string workflowIdentityPath = ResolveEvidencePath(GetString(baseWorkflow, "buildIdentity"),
+            Path.GetDirectoryName(baseWorkflowPath)!, "Base workflow build identity");
+        string nativeManifestPath = ResolveEvidencePath(GetString(baseWorkflow, "nativeManifest"),
+            Path.GetDirectoryName(baseWorkflowPath)!, "Base workflow native manifest");
+        JsonElement nativeManifest = ReadJson<JsonElement>(nativeManifestPath);
+        if (!Sha256File(buildIdentityPath).Equals(GetString(stage, "baseBuildIdentitySha256"),
+                StringComparison.OrdinalIgnoreCase) ||
+            !Sha256File(buildIdentityPath).Equals(Sha256File(workflowIdentityPath),
+                StringComparison.OrdinalIgnoreCase) ||
+            !Sha256File(buildIdentityPath).Equals(GetString(selectedBase, "buildIdentitySha256"),
+                StringComparison.OrdinalIgnoreCase) ||
+            !Sha256File(nativeManifestPath).Equals(GetString(selectedBase, "nativeManifestSha256"),
+                StringComparison.OrdinalIgnoreCase) ||
+            !Sha256File(nativeManifestPath).Equals(GetString(player, "nativeManifestSha256"),
+                StringComparison.OrdinalIgnoreCase))
+            errors.Add("Base build identity or native manifest is not bound to the selected resource record.");
+
+        string[] assemblyNames = manifest.GetProperty("assemblies").EnumerateArray()
+            .Select(item => GetString(item, "assemblyName") ?? string.Empty)
+            .Where(name => name.Length > 0).OrderBy(name => name, StringComparer.OrdinalIgnoreCase)
+            .ToArray();
+        string[] plannedNames = player.GetProperty("plannedDheAssemblies").EnumerateArray()
+            .Select(item => item.GetString() ?? string.Empty)
+            .OrderBy(name => name, StringComparer.OrdinalIgnoreCase).ToArray();
+        string[] loadedNames = player.GetProperty("loadedDheAssemblies").EnumerateArray()
+            .Select(item => item.GetString() ?? string.Empty)
+            .OrderBy(name => name, StringComparer.OrdinalIgnoreCase).ToArray();
+        if (!assemblyNames.SequenceEqual(plannedNames, StringComparer.OrdinalIgnoreCase) ||
+            !assemblyNames.SequenceEqual(loadedNames, StringComparer.OrdinalIgnoreCase))
+            errors.Add("Resource manifest and Player assembly scopes do not agree.");
+        ValidatePlayerAssemblies(player, assemblyNames, errors);
+
+        int expectedChanged = selectedBase.ValueKind == JsonValueKind.Undefined ? 0 :
+            selectedBase.GetProperty("assemblies").EnumerateArray().Sum(item =>
+                GetInt(item, "guardRequiredMethodCount") + GetInt(item, "addedMethodCount"));
+        if (expectedChanged <= 0 || GetInt(player, "changedMethodCount") != expectedChanged ||
+            GetInt(player, "expectedChangedMethodCount") != expectedChanged ||
+            GetInt(player, "interpreterEntryCount") <= 0 || GetInt(player, "aotEntryCount") <= 0 ||
+            !GetBool(player, "resourceUpdateManifestPresent") ||
+            !GetBool(player, "resourceUpdateValidated") || !GetBool(player, "dispatchProbeValidated") ||
+            !GetBool(player, "changedProbeChanged") ||
+            !GetBool(player, "multiAssemblyValidated") || !GetBool(player, "capabilityPassed") ||
+            !GetBool(player, "secondaryAssemblyChangedValidated") ||
+            !GetBool(player, "structuralPassed") || !GetBool(player, "retryValidated") ||
+            GetString(player, "transactionStatus") != "validated" ||
+            GetString(player, "retryFailure") != "DHE_MV_REGISTRATION_FAILED")
+            errors.Add("Resource Player did not prove changed interpreter/AOT dispatch, structure, and rollback.");
+
+        if (!GetBool(stage, "baseMetaVersionUnchanged") ||
+            stage.GetProperty("immutableFiles").EnumerateArray().Any(item =>
+                !string.Equals(GetString(item, "sha256Before"), GetString(item, "sha256After"),
+                    StringComparison.OrdinalIgnoreCase)))
+            errors.Add("Resource stage did not preserve immutable Base files.");
+        if (errors.Count > 0) throw new DheException(string.Join(" ", errors));
+
+        int methodCount = selectedBase.GetProperty("assemblies").EnumerateArray().Sum(item =>
+            GetInt(item, "unchangedMethodCount") + GetInt(item, "changedMethodCount") +
+            GetInt(item, "addedMethodCount"));
+        int typeChangeCount = selectedBase.GetProperty("assemblies").EnumerateArray().Sum(item =>
+            GetInt(item, "changedExistingTypeCount") + GetInt(item, "addedTypeCount") +
+            GetInt(item, "removedTypeCount"));
+        int guardedMethodCount = selectedBase.GetProperty("assemblies").EnumerateArray()
+            .Sum(item => GetInt(item, "guardCoveredMethodCount"));
+        var output = SafeReportPath(cli.Require("output"), new[]
+        {
+            manifestPath, validationPath, runtimePlanPath, stagePath, playerPath, baseWorkflowPath,
+            buildIdentityPath, nativeManifestPath,
+        });
+        WriteJson(output, new
+        {
+            schemaVersion = 1,
+            format = "hybridclr.dhe-resource-player-workflow.json",
+            generatedAtUtc = DateTimeOffset.UtcNow,
+            passed = true,
+            validationPassed = true,
+            target,
+            mode = GetString(baseWorkflow, "mode"),
+            coverageRequired = true,
+            coverageGatePassed = true,
+            releaseReady = false,
+            artifactValidationPassed = true,
+            buildIdentityReady = true,
+            identityVersion = 1,
+            aotSnapshotKind = GetString(player, "aotSnapshotKind"),
+            nativeGuardSourceSha256 = GetString(player, "nativeGuardSourceSha256"),
+            nativeManifestSha256 = GetString(player, "nativeManifestSha256"),
+            pathSemantics = "workspace-absolute-v1",
+            projectPlan = manifestPath,
+            projectPlanValidation = validationPath,
+            batchReport = validationPath,
+            runtimePlan = runtimePlanPath,
+            runtimePlanProjectPath = stagedPlan,
+            sourcePreflight = GetString(baseWorkflow, "sourcePreflight"),
+            cleanCheckoutGate = GetString(baseWorkflow, "cleanCheckoutGate"),
+            toolchainGate = GetString(baseWorkflow, "toolchainGate"),
+            expectedToolchainPackageId = GetString(baseWorkflow, "expectedToolchainPackageId"),
+            transaction = new
+            {
+                status = GetString(player, "transactionStatus"),
+                retryValidated = GetBool(player, "retryValidated"),
+                retryAssemblyName = GetString(player, "retryAssemblyName"),
+                retryFailure = GetString(player, "retryFailure"),
+            },
+            assemblyScope = new
+            {
+                strategy = "single-current-multibase-resource",
+                aotAssemblies = assemblyNames,
+                loadedDheAssemblies = loadedNames,
+                stagedDependencies = Array.Empty<string>(),
+                stagedDependenciesLoadedAsDhe = false,
+                secondaryAssemblyChangedValidated = GetBool(player,
+                    "secondaryAssemblyChangedValidated"),
+                secondaryAssemblyDirectValidated = GetBool(player,
+                    "secondaryAssemblyDirectValidated"),
+            },
+            capability = new
+            {
+                methodCount,
+                changedMethodCount = expectedChanged,
+                typeChangeCount,
+                compatibility = "compatible",
+            },
+            nativeGuardCoverage = new
+            {
+                manifestAvailable = true,
+                changedMethodCount = expectedChanged,
+                supportedChangedMethodCount = expectedChanged,
+                unsupportedChangedMethodCount = 0,
+                nativeEntryCount = GetInt(nativeManifest, "nativeEntryCount"),
+                guardedMethodCount,
+                complete = true,
+            },
+            player,
+            playerResult = playerPath,
+            nativeManifest = nativeManifestPath,
+            buildIdentity = buildIdentityPath,
+            resourceEvidence = stagePath,
+            resourceBuildPolicy = "required",
+            resourceUpdateManifest = manifestPath,
+            resourceUpdateManifestSha256 = Sha256File(manifestPath),
+            resourceUpdateValidation = validationPath,
+            resourceUpdateValidationSha256 = Sha256File(validationPath),
+            resourceStage = stagePath,
+            resourceStageSha256 = Sha256File(stagePath),
+            baseWorkflowReport = baseWorkflowPath,
+            baseWorkflowReportSha256 = Sha256File(baseWorkflowPath),
+            playerResultSha256 = Sha256File(playerPath),
+            buildIdentitySha256 = Sha256File(buildIdentityPath),
+            runtimePlanSha256 = Sha256File(runtimePlanPath),
+            selectedBaseId,
+            currentAssemblySetSha256 = currentSet,
+            artifactValidation = validationPath,
+            archiveManifest = (string?)null,
+            archiveGate = (string?)null,
+            runtimeSource = GetString(baseWorkflow, "runtimeSource"),
+        });
+        Console.WriteLine("DHE resource Player workflow evidence: " + output);
+        return 0;
+    }
+
     private static JsonElement ValidateStagingBuildIdentity(string identityPath,
         JsonElement identity, JsonElement manifest)
     {

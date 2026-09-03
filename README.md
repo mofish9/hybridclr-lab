@@ -6,23 +6,23 @@ HybridCLR community runtime on Tuanjie 1.10.0.
 ## Fixed baseline
 
 - Tuanjie: `1.10.0` (`2022.3.62t12`)
-- HybridCLR package: `v8.13.0` (`optimize/v8.13.0`, DHE opt4 commit)
-- HybridCLR runtime replay base: `v8.13.0-opt4` (immutable historical base plus the current DHE overlay candidate)
-- il2cpp_plus: `v2022-tuanjie-8.13.0-opt3`
+- HybridCLR package: `v8.13.0` (`optimize/v8.13.0@c19e235`, no package opt tag)
+- HybridCLR runtime: `v8.13.0-opt4.1` (`f777ed7`)
+- il2cpp_plus: `v2022-tuanjie-8.13.0-opt4.1` (`52968ad`)
 
 The runtime source repositories live beside this repository under `../repos`.
 Their immutable inputs are recorded in `manifests/repo-lock.json`.
 
 ## Current phase
 
-The DHE-lite workflow is maintained as a separate, explicit validation lane;
-the integrated opt4 source line is documented in
+The DHE workflow is maintained as a separate, explicit validation lane. Its
+integrated opt4.1 source line is documented in
 `docs/HybridCLR-DHE-Opt4-Integrated-Design.md`.
 Its formal entry points, generated-output boundary, and complete four-assembly
 Player evidence are documented in
 `docs/HybridCLR-DHE-Toolchain.md`,
 `docs/HybridCLR-DHE-Workflow-Review.md` and
-`docs/HybridCLR-DHE-Formal-Project-Validation.md`. Toolchain `0.1.16` is the
+`docs/HybridCLR-DHE-Formal-Project-Validation.md`. Toolchain `0.1.17` is the
 project-trial line; projects must install an authenticated package whose
 manifest has `releaseReady=true` and pin its exact package ID.
 The workflow also emits MetaVersion/native/workflow schemas and an independent
@@ -38,9 +38,10 @@ and tracked project and tool source identities (each bound to its Git commit,
 HEAD tree, and source-boundary hash), clean locked runtime sources, and matching
 non-surrogate engine headers.
 The embedded package is locked by `manifests/dhe-package-lock.json`; the workflow
-checks its full tree hash. The current DHE candidate replays authenticated
-package, common-runtime, and engine-specific overlays on temporary staging;
-formal release will replace those overlays with new integrated commits/tags.
+checks its full tree hash. Runtime assembly uses the published integrated
+package, common-runtime, and engine-specific commits. It verifies every exact
+commit and content-tree SHA-256 and retains the old patches only as authenticated
+migration/audit records; integrated assembly never applies them.
 Runtime assembly is an external, target-specific prerequisite. The C# DHE host
 requires its staged runtime/baseline manifests as explicit inputs and never
 silently substitutes a native-only runtime.
@@ -69,7 +70,7 @@ through this gate before returning success. The gate rejects unknown DHE formats
 and unsupported schema assertions, and validates its own report before returning
 success.
 
-The formal DHE-lite lane is reproducible from clean runtime inputs. Assemble the
+The formal DHE lane is reproducible from clean integrated runtime inputs. Assemble the
 locked runtime (the `-ReposRoot` path may point at a new checkout), then run the
 Demo through the reusable project orchestrator:
 

@@ -97,6 +97,24 @@ and staging verifies every current DLL, MetaVersion, and optional AOT metadata p
 before copying. YooAsset/Addressables catalog building,
 signing, upload, rollback pointer, and device smoke remain project callbacks.
 
+After the staged Player/device smoke writes its result, bind the resource-only
+changed lane for review and toolchain release evidence:
+
+```text
+dotnet HybridCLR.DheTool.dll resource-player-evidence \
+  -ResourceUpdateRoot C:/build/resource-205 \
+  -StageReport C:/build/resource-205/stage-base-100.json \
+  -PlayerResult C:/build/resource-205/player-base-100.json \
+  -BaseWorkflowReport C:/release/base-100/player-workflow-report.json \
+  -Output C:/build/resource-205/evidence/resource-player-workflow-report.json
+```
+
+This command revalidates the selected Base, live staged manifest/validation/plan
+bytes, build identity, native manifest, immutable Player files, assembly scope,
+changed dispatch, remaining AOT entries, structural/reflection probes, and
+transaction rollback. It replaces rebuilding a changed Player merely to obtain
+the `demo-changed` release role; Base Players must retain universal guards.
+
 ## Runtime proof
 
 Every Player downloads the same current payload and compares current MetaVersion

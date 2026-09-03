@@ -443,16 +443,19 @@ internal static class LabCommands
         ValidateRepoIdentity("hybridclr_unity", hybridclrUnity,
             StringProperty(lockDoc.GetProperty("repositories").GetProperty("hybridclr_unity"), "commit"),
             cli.Has("allowdirty"));
+        if (StringProperty(runtimeLock, "sourceMode") == "integrated")
+            ApplyLockedOverlays(lab, runtimeLock, "hybridclr_unity", hybridclrUnity, workflowId,
+                Git(hybridclrUnity, "rev-parse", "HEAD"), hybridclrUnity);
         var output = ResolvePath(lab, cli.Optional("outputroot") ?? "staging/runtime"); var stage = Path.Combine(output, profile); SafeDelete(stage, output); Directory.CreateDirectory(stage);
         var stagedRuntime = Path.Combine(stage, "libil2cpp"); var stagedExternal = Path.Combine(stage, "external");
         CopyDirectory(Path.Combine(il2cpp, "libil2cpp"), stagedRuntime);
+        ApplyLockedOverlays(lab, runtimeLock, "il2cpp_plus", stagedRuntime, workflowId,
+            Git(il2cpp, "rev-parse", "HEAD"), stagedRuntime);
         var stagedHybridclr = Path.Combine(stagedRuntime, "hybridclr");
         if (Directory.Exists(stagedHybridclr)) Directory.Delete(stagedHybridclr, true);
         CopyDirectory(Path.Combine(hybridclr, "hybridclr"), stagedHybridclr);
-        ApplyLockedOverlays(lab, runtimeLock, "il2cpp_plus", stagedRuntime, workflowId,
-            Git(il2cpp, "rev-parse", "HEAD"));
         ApplyLockedOverlays(lab, runtimeLock, "hybridclr", stagedRuntime, workflowId,
-            Git(hybridclr, "rev-parse", "HEAD"));
+            Git(hybridclr, "rev-parse", "HEAD"), stagedHybridclr);
         var editor = cli.Optional("editorexecutable") ?? StringProperty(engine, "executablePath"); var editorAvailable = File.Exists(editor); var external = ResolveExternalHeaders(editor, cli.Optional("externalheadersroot"), engine);
         if (!Directory.Exists(external)) throw new DirectoryNotFoundException("IL2CPP external headers: " + external);
         if (!editorAvailable && !cli.Has("allowsurrogateexternalheaders")) throw new InvalidOperationException("Engine editor is unavailable; pass -AllowSurrogateExternalHeaders only for exploratory native validation.");
@@ -466,14 +469,42 @@ internal static class LabCommands
         WriteJson(Path.Combine(stage, "runtime-manifest.json"), manifest); Console.WriteLine("Assembled " + profile + " runtime: " + stagedRuntime); return 0;
     }
 
-    private static void ApplyLockedOverlays(string lab, JsonElement runtimeLock,
-        string repository, string destination, string engineWorkflow, string sourceCommit)
+    internal static void ApplyLockedOverlays(string lab, JsonElement runtimeLock,
+        string repository, string destination, string engineWorkflow, string sourceCommit,
+        string? integratedTreeRoot = null)
     {
-        if (!string.Equals(StringProperty(runtimeLock, "sourceMode"), "overlay",
-                StringComparison.Ordinal)) return;
+        string sourceMode = StringProperty(runtimeLock, "sourceMode");
         JsonElement[] patches = SelectLockedOverlays(runtimeLock, repository, engineWorkflow);
         if (patches.Length == 0)
-            throw new InvalidOperationException("DHE overlay lock has no patch for " + repository + ".");
+            throw new InvalidOperationException("DHE runtime lock has no patch for " + repository + ".");
+
+        if (string.Equals(sourceMode, "integrated", StringComparison.Ordinal))
+        {
+            string treeRoot = RequireDirectory(integratedTreeRoot ?? destination);
+            string actualTree = TreeHash(treeRoot, repository == "hybridclr_unity");
+            foreach (JsonElement patch in patches)
+            {
+                ValidateLockedPatchReference(lab, patch, repository);
+                if (!string.Equals(StringProperty(patch, "sourceMode"), "integrated",
+                        StringComparison.Ordinal))
+                    throw new InvalidOperationException("DHE integrated patch sourceMode is invalid for " +
+                        repository + ".");
+                if (!string.Equals(StringProperty(patch, "integratedCommit"), sourceCommit,
+                        StringComparison.OrdinalIgnoreCase))
+                    throw new InvalidOperationException("DHE integrated commit does not match " +
+                        repository + ": " + StringProperty(patch, "integratedCommit") + " != " +
+                        sourceCommit + ".");
+                if (!string.Equals(StringProperty(patch, "expectedTreeSha256"), actualTree,
+                        StringComparison.OrdinalIgnoreCase))
+                    throw new InvalidOperationException("DHE integrated tree hash does not match " +
+                        repository + ": " + actualTree + ".");
+            }
+            Console.WriteLine("Verified integrated DHE source " + repository + " at " + sourceCommit + ".");
+            return;
+        }
+        if (!string.Equals(sourceMode, "overlay", StringComparison.Ordinal))
+            throw new InvalidOperationException("Unsupported DHE runtime lock sourceMode: " + sourceMode + ".");
+
         foreach (JsonElement patch in patches)
         {
             if (!string.Equals(StringProperty(patch, "baseCommit"), sourceCommit,
@@ -485,14 +516,7 @@ internal static class LabCommands
                     StringComparison.Ordinal))
                 throw new InvalidOperationException("DHE overlay patch sourceMode is invalid for " +
                     repository + ".");
-            string patchPath = ResolvePath(lab, StringProperty(patch, "path"));
-            if (!File.Exists(patchPath) || !string.Equals(Sha256File(patchPath),
-                    StringProperty(patch, "sha256"), StringComparison.OrdinalIgnoreCase))
-                throw new InvalidOperationException("DHE overlay patch hash mismatch: " + patchPath);
-            string applyRoot = StringProperty(patch, "applyRoot");
-            string expectedRoot = repository == "hybridclr_unity" ? "package" : "libil2cpp";
-            if (!string.Equals(applyRoot, expectedRoot, StringComparison.Ordinal))
-                throw new InvalidOperationException("DHE overlay applyRoot is invalid for " + repository + ".");
+            string patchPath = ValidateLockedPatchReference(lab, patch, repository);
             int stripComponents = patch.GetProperty("stripComponents").GetInt32();
             string strip = "-p" + stripComponents.ToString(System.Globalization.CultureInfo.InvariantCulture);
             string directory = "--directory=" + Path.GetFullPath(destination)
@@ -504,6 +528,20 @@ internal static class LabCommands
             Console.WriteLine("Applied DHE overlay " + StringProperty(patch, "id") + " to " +
                 destination);
         }
+    }
+
+    private static string ValidateLockedPatchReference(string lab, JsonElement patch,
+        string repository)
+    {
+        string patchPath = ResolvePath(lab, StringProperty(patch, "path"));
+        if (!File.Exists(patchPath) || !string.Equals(Sha256File(patchPath),
+                StringProperty(patch, "sha256"), StringComparison.OrdinalIgnoreCase))
+            throw new InvalidOperationException("DHE patch audit hash mismatch: " + patchPath);
+        string applyRoot = StringProperty(patch, "applyRoot");
+        string expectedRoot = repository == "hybridclr_unity" ? "package" : "libil2cpp";
+        if (!string.Equals(applyRoot, expectedRoot, StringComparison.Ordinal))
+            throw new InvalidOperationException("DHE patch applyRoot is invalid for " + repository + ".");
+        return patchPath;
     }
 
     private static JsonElement[] SelectLockedOverlays(JsonElement runtimeLock, string repository,

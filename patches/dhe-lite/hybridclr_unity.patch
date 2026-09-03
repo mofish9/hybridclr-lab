@@ -1,3 +1,32 @@
+diff --git a/Data~/hybridclr_version.json b/Data~/hybridclr_version.json
+index b68c3b3..043ee04 100644
+--- a/Data~/hybridclr_version.json
++++ b/Data~/hybridclr_version.json
+@@ -12,18 +12,18 @@
+     },
+     {
+         "unity_version":"2021",
+-        "hybridclr" : { "branch":"v8.13.0-opt4"},
+-        "il2cpp_plus": { "branch":"v2021-8.1.0-opt3"}
++        "hybridclr" : { "branch":"v8.13.0-opt4.1"},
++        "il2cpp_plus": { "branch":"v2021-8.1.0-opt4.1"}
+     },
+     {
+         "unity_version":"2022",
+-        "hybridclr" : { "branch":"v8.13.0-opt4"},
+-        "il2cpp_plus": { "branch":"v2022-8.11.0-opt3"}
++        "hybridclr" : { "branch":"v8.13.0-opt4.1"},
++        "il2cpp_plus": { "branch":"v2022-8.11.0-opt4.1"}
+     },
+     {
+         "unity_version":"2022-tuanjie",
+-        "hybridclr" : { "branch":"v8.13.0-opt4"},
+-        "il2cpp_plus": { "branch":"v2022-tuanjie-8.13.0-opt3"}
++        "hybridclr" : { "branch":"v8.13.0-opt4.1"},
++        "il2cpp_plus": { "branch":"v2022-tuanjie-8.13.0-opt4.1"}
+     },
+     {
+         "unity_version":"2023",
 diff --git a/Documentation~/dhe-project-integration.md b/Documentation~/dhe-project-integration.md
 index 148b890..e78b677 100644
 --- a/Documentation~/dhe-project-integration.md

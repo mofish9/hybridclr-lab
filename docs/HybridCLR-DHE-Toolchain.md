@@ -127,6 +127,13 @@ runtime plan and every current DLL, MetaVersion, and supplemental AOT metadata h
 before copying. The complete lifecycle and current compatibility subset are in
 `docs/HybridCLR-DHE-Resource-Only-Design.md`.
 
+Run `resource-player-evidence` after the real Player/device smoke. It binds the
+resource manifest, stage report, Player result, and immutable Base workflow into
+`resource-player-workflow-report.json`. This is the only supported
+`demo-changed` input for toolchain release evidence; a non-bootstrap changed
+Player build is intentionally rejected because online Base Players require
+universal guards.
+
 ## JSON contract gates
 
 Validate one document or every registered DHE report below an output root with
@@ -303,7 +310,7 @@ dotnet HybridCLR.DheTool.dll release-evidence \
   -LabRoot C:/src/hybridclr-lab \
   -OutputRoot C:/build/dhe-release-evidence \
   -Regression C:/build/regression.json \
-  -DemoChanged C:/build/demo-changed/player-workflow-report.json \
+  -DemoChanged C:/build/demo-changed/resource-player-workflow-report.json \
   -DemoNoop C:/build/demo-noop/player-workflow-report.json \
   -NativeTuanjie2022 C:/build/native-tuanjie/native-gate.json \
   -NativeUnity2022 C:/build/native-unity2022/native-gate.json \

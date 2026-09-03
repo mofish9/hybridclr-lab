@@ -30,18 +30,20 @@ property/event 和既有成员 custom attribute。以下变化仍会在发布资
 
 ## 锁定身份
 
-当前 MetaVersion 候选由以下可重放输入组成：
+当前正式 MetaVersion 工作流由以下 integrated 输入组成：
 
-- HybridCLR runtime 基线 `v8.13.0-opt4` 加 hash 锁定的 DHE overlay；该旧 tag 不得移动，
-  正式发布需要新的 runtime commit/tag；
-- HybridCLR Unity package 基线 commit `623073b` 加 package overlay；正式发布后回到
-  `optimize/v8.13.0` 的新 commit，package 本身不打 tag；
+- HybridCLR runtime commit `f777ed7` / annotated tag `v8.13.0-opt4.1`；
+- Unity 2021、Unity 2022、团结 2022 的 il2cpp_plus commit 分别为 `b3fdf1e`、
+  `6032274`、`52968ad`，tag 分别为 `v2021-8.1.0-opt4.1`、
+  `v2022-8.11.0-opt4.1`、`v2022-tuanjie-8.13.0-opt4.1`；
+- HybridCLR Unity package commit `c19e235`，位于 `optimize/v8.13.0`，package 本身不打 tag；
 - 团结引擎 `1.10.0` / Unity compatibility `2022.3.62t12`；
 - `manifests/dhe-runtime-lock.json`、`dhe-package-lock.json` 和工具包 manifest 中的
   commit、tree、文件集合及 SHA-256。
 
 Release preflight 会实时重算上述身份。dirty、mixed SVN revision、surrogate headers、错误
-Editor 版本、overlay base/hash/目标引擎不匹配、未登记 package 文件或 runtime tree 漂移都会失败。
+Editor 版本、integrated commit/tree、审计 patch hash、目标引擎不匹配、未登记 package 文件或
+runtime tree 漂移都会失败。integrated 模式只校验源码，不再应用 overlay。
 
 ## 标准工作流
 
@@ -69,9 +71,12 @@ Editor 版本、overlay base/hash/目标引擎不匹配、未登记 package 文�
    `resource-update-plan-integrity-v1` 和可选的
    `resource-update-aot-metadata-path-v1` 必须参与 capability/baseId；旧 Player 缺少任一必要
    能力时整个 Base 记录不兼容。
-6. Player smoke 验证程序集集合、payload hash、changed/interpreter 路径、unchanged/AOT
+6. Player smoke 验证程序集集合、payload hash、changed/interpreter 路径、仍保留的 AOT
    路径以及失败事务回滚重试。no-op 更新必须证明解释器和 native changed 计数均为零，并
    实际校验四程序集基线结果、direct/reflection 能力和无解释器调度，不能只检查计数。
+   changed smoke 完成后必须运行 `resource-player-evidence`，将资源 manifest、stage、Base
+   identity/native manifest 和 Player result 绑定为发布证据；不得为了生成证据重新构建一个
+   非 universal-guard 的 changed Player。
 7. release gate 从原始 DLL、MV、runtime plan、native manifest、Player 和资源报告实时重算
    结果，不能只信任报告中的 `passed`。
 8. archive gate 生成无绝对路径的可移植证据，保留 immutable native manifest 原始字节并在
@@ -90,7 +95,8 @@ DHE format、未支持的 schema 断言关键字、额外属性、错误类型�
 的 release evidence，并且以下六个角色各出现一次、文件 hash 正确且报告格式匹配：
 
 - `regression`：全部生产负例和 package/schema 认证通过；
-- `demo-changed`：真实 changed-method Player 路径通过；
+- `demo-changed`：真实资源更新 Player 路径通过，并由
+  `hybridclr.dhe-resource-player-workflow.json` 绑定回 immutable Base；
 - `demo-noop`：零变化 Player 路径通过；
 - `native-tuanjie2022`：团结 2022 锁定 runtime、真实外部 headers、CMake/CTest 通过；
 - `native-unity2022`：Unity 2022 锁定 runtime、真实外部 headers、CMake/CTest 通过；

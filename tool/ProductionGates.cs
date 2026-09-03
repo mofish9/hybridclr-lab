@@ -85,6 +85,9 @@ internal static partial class Program
             {
                 var packageLock = ReadJson<JsonElement>(packageLockPath);
                 RequireFormat(packageLock, "hybridclr.dhe-package-lock.json", "Package lock", errors);
+                if (release && (GetString(packageLock, "sourceMode") != "integrated" ||
+                    !IsHex(GetString(packageLock, "integratedCommit"), 40, 40)))
+                    errors.Add("Release requires an integrated package lock with an exact commit.");
                 var packagePath = GetString(packageLock, "packagePath");
                 if (string.IsNullOrWhiteSpace(packagePath) || Path.IsPathRooted(packagePath) || packagePath.Contains("..", StringComparison.Ordinal))
                     errors.Add("Package lock packagePath is unsafe.");
@@ -255,6 +258,11 @@ internal static partial class Program
             !Sha256File(packagedRuntimeLock).Equals(GetString(runtime, "dheRuntimeLockSha256"), StringComparison.OrdinalIgnoreCase)))
         {
             errors.Add("Runtime lock is missing or does not match the installed toolchain.");
+            valid = false;
+        }
+        if (release && GetString(runtime, "dheRuntimeSourceMode") != "integrated")
+        {
+            errors.Add("Release runtime must be assembled from integrated sources.");
             valid = false;
         }
 
@@ -946,6 +954,7 @@ internal static partial class Program
         AddRegressionCheck(checks, errors, "runtime-package-source-binding",
             runtimeSource.Contains("ValidateRepoIdentity(\"hybridclr_unity\"", StringComparison.Ordinal),
             "runtime assembly must fail closed on the locked package source identity");
+        RunIntegratedSourceLockRegressions(regressionRoot, checks, errors);
 
         var weakNoOpRejected = false;
         try
@@ -1063,6 +1072,7 @@ internal static partial class Program
             "distributed package documents and schema gate evidence must validate");
         var workflowSchemaPassed = false;
         var realWorkflowOutputsValidated = false;
+        var resourcePlayerEvidenceBindingPassed = false;
         var workflowOutputs = new List<object>();
         var changedWorkflowRoot = cli.Optional("workflowchangedroot");
         var noOpWorkflowRoot = cli.Optional("workflownooproot");
@@ -1087,8 +1097,20 @@ internal static partial class Program
             {
                 foreach (var item in workflowRoots)
                 {
-                    var reportPath = RequireFile(Path.Combine(item.Root, "player-workflow-report.json"),
+                    var reportName = item.Name == "changed"
+                        ? "resource-player-workflow-report.json"
+                        : "player-workflow-report.json";
+                    var reportPath = RequireFile(Path.Combine(item.Root, reportName),
                         item.Name + " workflow report");
+                    if (item.Name == "changed")
+                    {
+                        JsonElement resourceWorkflow = ReadJson<JsonElement>(reportPath);
+                        RequireEvidenceFormat(resourceWorkflow,
+                            "hybridclr.dhe-resource-player-workflow.json",
+                            "changed resource workflow");
+                        ValidateResourcePlayerEvidenceBindings(resourceWorkflow, reportPath);
+                        resourcePlayerEvidenceBindingPassed = true;
+                    }
                     workflowOutputs.Add(new
                     {
                         role = item.Name == "changed" ? "demo-changed" : "demo-noop",
@@ -1110,11 +1132,19 @@ internal static partial class Program
             };
             workflowSchemaPassed = requiredOutputSchemas.All(name => File.Exists(Path.Combine(packageRoot,
                 "schemas", name)));
+            resourcePlayerEvidenceBindingPassed = File.ReadAllText(Path.Combine(packageRoot,
+                "tool", "ResourceUpdateStaging.cs")).Contains(
+                    "resource-player-workflow-report.json", StringComparison.Ordinal);
         }
         AddRegressionCheck(checks, errors, "schema-workflow-output-contract", workflowSchemaPassed,
             realWorkflowOutputsValidated
                 ? "real changed and no-op workflow output trees passed the distributed schema gate"
                 : "the distributed package must contain every workflow output schema");
+        AddRegressionCheck(checks, errors, "resource-player-evidence-binding",
+            resourcePlayerEvidenceBindingPassed,
+            realWorkflowOutputsValidated
+                ? "resource-only changed evidence was revalidated against all live bindings"
+                : "the distributed package contains the resource Player evidence implementation");
         var sourceHead = GitValue(cli.Root, "rev-parse", "HEAD");
         var sourceTree = GitValue(cli.Root, "rev-parse", "HEAD^{tree}");
         var sourceClean = !string.IsNullOrWhiteSpace(sourceHead) && string.IsNullOrWhiteSpace(GitValue(cli.Root, "status", "--porcelain"));
@@ -1129,6 +1159,105 @@ internal static partial class Program
     {
         checks.Add(new { name, passed, details });
         if (!passed) errors.Add(name + ": " + details);
+    }
+
+    private static void RunIntegratedSourceLockRegressions(string regressionRoot,
+        List<object> checks, List<string> errors)
+    {
+        string root = Path.Combine(regressionRoot, "integrated-source-lock");
+        Directory.CreateDirectory(root);
+        string source = Path.Combine(root, "source");
+        Directory.CreateDirectory(source);
+        string sentinel = Path.Combine(source, "sentinel.txt");
+        File.WriteAllText(sentinel, "integrated\n", new UTF8Encoding(false));
+        string auditPatch = Path.Combine(root, "audit.patch");
+        File.WriteAllText(auditPatch, "audit-only\n", new UTF8Encoding(false));
+        string commit = new string('a', 40);
+        string tree = TreeHashForRelease(source, Array.Empty<string>());
+        string auditHash = Sha256File(auditPatch);
+
+        JsonElement Lock(string expectedTree, string? expectedCommit = null,
+            string? expectedAuditHash = null)
+        {
+            return JsonDocument.Parse(JsonSerializer.Serialize(new
+            {
+                schemaVersion = 1,
+                format = "hybridclr.dhe-runtime-lock.json",
+                sourceMode = "integrated",
+                patches = new[]
+                {
+                    new
+                    {
+                        id = "regression-integrated-package",
+                        repository = "hybridclr_unity",
+                        sourceMode = "integrated",
+                        baseCommit = new string('b', 40),
+                        integratedCommit = expectedCommit ?? commit,
+                        expectedTreeSha256 = expectedTree,
+                        path = "audit.patch",
+                        sha256 = expectedAuditHash ?? auditHash,
+                        applyRoot = "package",
+                        stripComponents = 1,
+                    }
+                }
+            })).RootElement.Clone();
+        }
+
+        bool validAccepted;
+        try
+        {
+            LabCommands.ApplyLockedOverlays(root, Lock(tree), "hybridclr_unity", source,
+                "Unity2021Standard", commit, source);
+            validAccepted = File.ReadAllText(sentinel) == "integrated\n";
+        }
+        catch
+        {
+            validAccepted = false;
+        }
+        AddRegressionCheck(checks, errors, "integrated-source-lock-valid",
+            validAccepted, "an exact integrated commit/tree must pass without applying the audit patch");
+
+        bool commitTamperRejected;
+        try
+        {
+            LabCommands.ApplyLockedOverlays(root, Lock(tree, new string('d', 40)),
+                "hybridclr_unity", source, "Unity2021Standard", commit, source);
+            commitTamperRejected = false;
+        }
+        catch
+        {
+            commitTamperRejected = File.ReadAllText(sentinel) == "integrated\n";
+        }
+        AddRegressionCheck(checks, errors, "integrated-source-lock-commit-tamper",
+            commitTamperRejected, "an integrated commit mismatch must fail before source mutation");
+
+        bool treeTamperRejected;
+        try
+        {
+            LabCommands.ApplyLockedOverlays(root, Lock(new string('c', 64)),
+                "hybridclr_unity", source, "Unity2021Standard", commit, source);
+            treeTamperRejected = false;
+        }
+        catch
+        {
+            treeTamperRejected = File.ReadAllText(sentinel) == "integrated\n";
+        }
+        AddRegressionCheck(checks, errors, "integrated-source-lock-tree-tamper",
+            treeTamperRejected, "an integrated tree mismatch must fail before source mutation");
+
+        bool patchTamperRejected;
+        try
+        {
+            LabCommands.ApplyLockedOverlays(root, Lock(tree, expectedAuditHash: new string('e', 64)),
+                "hybridclr_unity", source, "Unity2021Standard", commit, source);
+            patchTamperRejected = false;
+        }
+        catch
+        {
+            patchTamperRejected = File.ReadAllText(sentinel) == "integrated\n";
+        }
+        AddRegressionCheck(checks, errors, "integrated-source-lock-patch-tamper",
+            patchTamperRejected, "an integrated audit-patch hash mismatch must fail before source mutation");
     }
 
     private static void RunResourceStagingRegressions(string updateRoot, string assetRoot,

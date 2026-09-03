@@ -106,6 +106,11 @@ MetaVersion 集合相同，只要 native/runtime 身份不同，也会各自选�
 staging 同时校验 `runtimePlanSha256`、current DLL/MetaVersion 和每个补充 AOT metadata 的
 SHA-256；任一文件缺失或篡改都拒绝整包，不留下可接受的部分 staging 报告。
 
+真实 Player/device smoke 完成后，运行 `resource-player-evidence`，把该 Player result、上述
+stage report、资源发布目录和归档的 Base `player-workflow-report.json` 绑定为
+`resource-player-workflow-report.json`。工具链发布时的 `demo-changed` 角色只接受这份资源更新
+证据，不再要求、也不允许通过重建非 universal-guard 的 changed Player 来伪造线上流程。
+
 ## 客户端选择与本地求差
 
 客户端不下载 Base MetaVersion，也不按版本号选择远端差分文件：
@@ -179,5 +184,7 @@ capability 均会 fail closed。新能力 Player 的 Base ID 为
 平台层缺陷仍必须通过新 Base Player 修复。
 
 这证明“Base 只构建一次、后续一份资源包服务多个 Base”的架构链路成立，但不等于官方旗舰版
-DHE 的全部元数据能力。Android Player、iOS/Xcode/device 和现有结构限制仍是正式发布前的
-独立门禁；缺少目标环境时只能声明源码候选和已完成平台的证据。
+DHE 的全部元数据能力。正式源码身份已收口到 `v8.13.0-opt4.1`、三条 il2cpp_plus
+`opt4.1` runtime tag 和 package commit `c19e235`。Android Player、iOS/Xcode/device、性能、
+内存和现有结构限制仍是正式发布前的独立门禁；当前结论只能是 Windows Player 与三引擎
+native 有条件通过，不能声明全平台生产发布完成。
