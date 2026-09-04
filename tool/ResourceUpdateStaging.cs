@@ -229,6 +229,8 @@ internal static partial class Program
         string currentSet = GetString(selectedManifestVariant, "currentAssemblySetSha256") ??
             GetString(manifest, "currentAssemblySetSha256") ?? string.Empty;
         string target = GetString(player, "target") ?? string.Empty;
+        string? payloadSelectionError = PlayerPayloadSelectionError(player, manifest,
+            validation, selectedVariantId, currentSet);
         if (!string.Equals(Path.GetFullPath(GetString(stage, "updateRoot") ?? string.Empty),
                 Path.GetFullPath(updateRoot), StringComparison.OrdinalIgnoreCase) ||
             !string.Equals(GetString(stage, "currentAssemblySetSha256"), currentSet,
@@ -245,11 +247,9 @@ internal static partial class Program
                 StringComparison.OrdinalIgnoreCase) ||
             !string.Equals(GetString(player, "selectedBaseId"), selectedBaseId,
                 StringComparison.OrdinalIgnoreCase) ||
-            !string.Equals(GetString(player, "selectedPayloadVariantId") ?? "default",
-                selectedVariantId, StringComparison.OrdinalIgnoreCase) ||
-            !string.Equals(GetString(player, "selectedPayloadCurrentAssemblySetSha256"),
-                currentSet, StringComparison.OrdinalIgnoreCase))
-            errors.Add("Resource, stage, Base, and Player selection identities do not agree.");
+            payloadSelectionError is not null)
+            errors.Add(payloadSelectionError ??
+                "Resource, stage, Base, and Player selection identities do not agree.");
 
         string stagedManifest = RequireFile(GetString(stage, "stagedManifestPath") ?? string.Empty,
             "Staged resource manifest");
@@ -797,6 +797,56 @@ internal static partial class Program
         if (!string.Equals(variantId, "default", StringComparison.OrdinalIgnoreCase))
             throw new DheException(description + " has no payload variant: " + variantId);
         return document;
+    }
+
+    private static bool IsImplicitSingleDefaultPayload(JsonElement document)
+    {
+        if (document.ValueKind != JsonValueKind.Object ||
+            !document.TryGetProperty("payloadVariants", out JsonElement variants))
+            return true;
+        if (variants.ValueKind != JsonValueKind.Array || variants.GetArrayLength() != 1)
+            return false;
+        JsonElement only = variants.EnumerateArray().Single();
+        return string.Equals(GetString(only, "variantId"), "default",
+            StringComparison.OrdinalIgnoreCase);
+    }
+
+    /// <summary>
+    /// A pre-variant Player result may omit payload selection fields. That is
+    /// unambiguous only when both authenticated documents expose one implicit
+    /// default payload. Explicit variant releases must carry both fields.
+    /// </summary>
+    private static string? PlayerPayloadSelectionError(JsonElement player,
+        JsonElement manifest, JsonElement validation, string expectedVariantId,
+        string expectedCurrentSet)
+    {
+        bool requiresExplicitSelection =
+            !string.Equals(GetString(manifest, "payloadModel"),
+                "single-current-payload", StringComparison.Ordinal) ||
+            !IsImplicitSingleDefaultPayload(manifest) ||
+            !IsImplicitSingleDefaultPayload(validation);
+        string? actualVariantId = GetString(player, "selectedPayloadVariantId");
+        string? actualCurrentSet = GetString(player,
+            "selectedPayloadCurrentAssemblySetSha256");
+        if (actualVariantId is null && requiresExplicitSelection)
+            return "Resource Player result must record selectedPayloadVariantId for a variant payload.";
+        if (actualCurrentSet is null && requiresExplicitSelection)
+            return "Resource Player result must record selectedPayloadCurrentAssemblySetSha256 for a variant payload.";
+        if (!requiresExplicitSelection && (actualVariantId is null) !=
+            (actualCurrentSet is null))
+            return "Resource Player result must record both payload selection fields or omit both for a legacy single payload.";
+        if (actualVariantId is not null &&
+            !string.Equals(actualVariantId, expectedVariantId,
+                StringComparison.OrdinalIgnoreCase))
+            return "Resource Player result selected payload variant does not match the staged variant.";
+        if (actualCurrentSet is not null &&
+            !string.Equals(actualCurrentSet, expectedCurrentSet,
+                StringComparison.OrdinalIgnoreCase))
+            return "Resource Player result selected payload hash does not match the staged payload.";
+        if (actualVariantId is null &&
+            !string.Equals(expectedVariantId, "default", StringComparison.OrdinalIgnoreCase))
+            return "Legacy Resource Player result can only infer the default payload variant.";
+        return null;
     }
 
     private static string ValidateResourceUpdateCompatibility(string updateRoot, JsonElement manifest)

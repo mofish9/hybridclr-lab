@@ -171,6 +171,14 @@ changed Player 来伪造线上流程。
 default payload，也不能仅凭顶层 assembly set hash 通过多 Base 审计。旧的 single-current
 payload 沿用 `default` variant 语义。
 
+证据兼容有一个明确的窄例外：早于 payload variant 字段的旧 Player runner 可能完全没有
+`selectedPayloadVariantId` 和 `selectedPayloadCurrentAssemblySetSha256`。当且仅当资源 manifest
+的 `payloadModel` 是 `single-current-payload`，manifest/validation 中最多只有一个 `default`
+variant 时，`resource-player-evidence` 才按 `default` 和已认证的 current assembly set 进行
+推断。只提供其中一个字段、声明了非 default variant、或 manifest 是
+`variant-current-payload` 时都会 fail-closed。这个兼容只恢复历史 evidence 审计能力，不允许
+runtime 在多 variant 资源中猜测 payload；新 runner 仍应始终写出两个字段。
+
 ## 客户端选择与本地求差
 
 客户端不下载 Base MetaVersion，也不按版本号选择远端差分文件：

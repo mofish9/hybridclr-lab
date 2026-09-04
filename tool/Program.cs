@@ -34,6 +34,7 @@ internal static partial class Program
         "resource-stage-direct-base-valid",
         "resource-base-registry",
         "resource-player-evidence-binding",
+        "resource-player-legacy-single-payload-compatibility",
         "resource-player-release-readiness",
         "evidence-managed-release-binding", "evidence-multibase-current-binding",
         "evidence-extensible-player-engine-matrix",
@@ -2053,8 +2054,8 @@ internal static partial class Program
                 selectedVariantId, StringComparison.OrdinalIgnoreCase) ||
              !string.Equals(GetString(stage, "currentAssemblySetSha256"), selectedCurrentSet,
                 StringComparison.OrdinalIgnoreCase) ||
-             !string.Equals(GetString(player, "selectedPayloadCurrentAssemblySetSha256"),
-                selectedCurrentSet, StringComparison.OrdinalIgnoreCase) ||
+             PlayerPayloadSelectionError(player, manifest, validation, selectedVariantId,
+                 selectedCurrentSet) is not null ||
              !string.Equals(GetString(selectedValidationVariant, "currentAssemblySetSha256"),
                 selectedCurrentSet, StringComparison.OrdinalIgnoreCase) ||
              !string.Equals(GetString(report, "currentAssemblySetSha256"), selectedCurrentSet,

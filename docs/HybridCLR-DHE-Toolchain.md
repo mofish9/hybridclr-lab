@@ -203,6 +203,13 @@ resource manifest, stage report, Player result, and immutable Base workflow into
 Player build is intentionally rejected because online Base Players require
 universal guards.
 
+The distributed tool also ships `dhe-resource-player-workflow.schema.json` and
+validates this report as part of the schema gate. A legacy Player result may omit
+both payload-selection fields only for a `single-current-payload` release whose
+authenticated manifest and validation contain one implicit `default` payload. A
+partial pair or any variant release remains fail-closed; generated evidence
+always records the inferred or selected variant and current assembly-set hash.
+
 ## JSON contract gates
 
 Validate one document or every registered DHE report below an output root with

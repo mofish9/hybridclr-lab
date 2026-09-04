@@ -1111,6 +1111,11 @@ internal static partial class Program
         AddRegressionCheck(checks, errors, "evidence-extensible-player-engine-matrix",
             extensiblePlayerMatrixPassed,
             "release evidence must accept additional Base Players while requiring all three engine workflows");
+        bool legacyPayloadSelectionPassed = RunLegacySinglePayloadSelectionRegression();
+        AddRegressionCheck(checks, errors,
+            "resource-player-legacy-single-payload-compatibility",
+            legacyPayloadSelectionPassed,
+            "legacy Player results may omit both payload selection fields only for a single implicit default payload");
         var runtimeSource = File.ReadAllText(Path.Combine(cli.Root, "tool", "LabCommands.cs"));
         AddRegressionCheck(checks, errors, "runtime-package-source-binding",
             runtimeSource.Contains("ValidateRepoIdentity(\"hybridclr_unity\"", StringComparison.Ordinal),
@@ -1470,7 +1475,7 @@ internal static partial class Program
                 "dhe-adapter-player-build.schema.json", "dhe-adapter-stage.schema.json",
                 "dhe-metaversion.schema.json", "dhe-native-manifest.schema.json",
                 "dhe-player-result.schema.json", "dhe-project-preflight.schema.json",
-                "dhe-workflow-report.schema.json"
+                "dhe-resource-player-workflow.schema.json", "dhe-workflow-report.schema.json"
             };
             workflowSchemaPassed = requiredOutputSchemas.All(name => File.Exists(Path.Combine(packageRoot,
                 "schemas", name)));
@@ -1586,6 +1591,34 @@ internal static partial class Program
         {
             return variantMismatchRejected;
         }
+    }
+
+    private static bool RunLegacySinglePayloadSelectionRegression()
+    {
+        const string currentSet = "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa";
+        using var singleManifest = JsonDocument.Parse("{\"payloadModel\":\"single-current-payload\",\"currentAssemblySetSha256\":\"" +
+            currentSet + "\"}");
+        using var singleValidation = JsonDocument.Parse("{\"currentAssemblySetSha256\":\"" + currentSet + "\"}");
+        using var legacyPlayer = JsonDocument.Parse("{\"passed\":true}");
+        using var partialPlayer = JsonDocument.Parse("{\"selectedPayloadVariantId\":\"default\"}");
+        using var variantManifest = JsonDocument.Parse("{\"payloadModel\":\"variant-current-payload\",\"payloadVariants\":[{" +
+            "\"variantId\":\"default\",\"currentAssemblySetSha256\":\"" + currentSet + "\"}]}");
+        using var modernPlayer = JsonDocument.Parse("{\"selectedPayloadVariantId\":\"default\",\"selectedPayloadCurrentAssemblySetSha256\":\"" +
+            currentSet + "\"}");
+        using var wrongPlayer = JsonDocument.Parse("{\"selectedPayloadVariantId\":\"android\",\"selectedPayloadCurrentAssemblySetSha256\":\"" +
+            currentSet + "\"}");
+
+        bool legacyAccepted = PlayerPayloadSelectionError(legacyPlayer.RootElement,
+            singleManifest.RootElement, singleValidation.RootElement, "default", currentSet) is null;
+        bool partialRejected = PlayerPayloadSelectionError(partialPlayer.RootElement,
+            singleManifest.RootElement, singleValidation.RootElement, "default", currentSet) is not null;
+        bool variantLegacyRejected = PlayerPayloadSelectionError(legacyPlayer.RootElement,
+            variantManifest.RootElement, variantManifest.RootElement, "default", currentSet) is not null;
+        bool modernAccepted = PlayerPayloadSelectionError(modernPlayer.RootElement,
+            variantManifest.RootElement, variantManifest.RootElement, "default", currentSet) is null;
+        bool wrongRejected = PlayerPayloadSelectionError(wrongPlayer.RootElement,
+            variantManifest.RootElement, variantManifest.RootElement, "default", currentSet) is not null;
+        return legacyAccepted && partialRejected && variantLegacyRejected && modernAccepted && wrongRejected;
     }
 
     private static void RunIntegratedSourceLockRegressions(string regressionRoot,
