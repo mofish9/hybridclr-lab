@@ -335,6 +335,25 @@ internal static class LabCommands
         var source = Path.Combine(lab, "unity-test-project"); Directory.CreateDirectory(Path.Combine(destination, "Assets"));
         var workflows = ReadJson(Path.Combine(lab, "manifests/runtime-workflows.json"));
         var workflow = workflows.GetProperty("workflows").EnumerateArray().Single(x => StringProperty(x, "id") == workflowId);
+        var managedCasesRoot = ResolvePath(lab, Path.Combine("artifacts", "managed-cases", target));
+        var managedCasesAotRoot = ResolvePath(lab, Path.Combine("artifacts", "managed-cases-aot", target));
+        var managedCaseFiles = new[]
+        {
+            "HybridCLR.BoundaryContracts.dll",
+            "HybridCLR.ManagedCases.dll",
+            "HybridCLR.MetadataStress.dll",
+            "HybridCLR.CrossAssemblyDerived.dll",
+        };
+        if (managedCaseFiles.Any(name => !File.Exists(Path.Combine(managedCasesRoot, name))) ||
+            !File.Exists(Path.Combine(managedCasesAotRoot, "HybridCLR.ManagedCasesAot.dll")))
+        {
+            BuildManagedCases(new Cli("build-managed-cases", new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase)
+            {
+                ["labroot"] = lab,
+                ["target"] = target,
+                ["configuration"] = "Release",
+            }));
+        }
         foreach (var folder in new[] { "Packages", "ProjectSettings" }) CopyDirectory(Path.Combine(source, folder), Path.Combine(destination, folder));
         foreach (var asset in new[] { "Editor", "Editor.meta", "Runtime", "Runtime.meta", "Scenes", "Scenes.meta" }) CopyDirectoryOrFile(Path.Combine(source, "Assets", asset), Path.Combine(destination, "Assets", asset));
         foreach (var meta in Directory.GetFiles(Path.Combine(destination, "Assets"), "*.meta", SearchOption.AllDirectories)) File.Delete(meta);
@@ -348,10 +367,17 @@ internal static class LabCommands
         // compile-time contract used by the resolver project. Keep this
         // assembly outside the DHE hot-update plan and install it as a normal
         // Unity plugin for the prepared test project.
-        var boundaryContracts = ResolvePath(lab, cli.Optional("boundarycontractspath") ??
-            Path.Combine("artifacts", "managed-cases-aot", target, "HybridCLR.BoundaryContracts.dll"));
-        CopyRequired(boundaryContracts,
-            Path.Combine(destination, "Assets", "Plugins", "HybridCLRLab", "HybridCLR.BoundaryContracts.dll"));
+        var plugin = Path.Combine(destination, "Assets", "Plugins", "HybridCLRLab");
+        foreach (var name in managedCaseFiles)
+        {
+            var input = name.Equals("HybridCLR.BoundaryContracts.dll", StringComparison.OrdinalIgnoreCase) &&
+                        cli.Optional("boundarycontractspath") is { Length: > 0 } overridePath
+                ? Path.GetFullPath(overridePath)
+                : Path.Combine(managedCasesRoot, name);
+            CopyRequired(input, Path.Combine(plugin, name));
+        }
+        CopyRequired(Path.Combine(managedCasesAotRoot, "HybridCLR.ManagedCasesAot.dll"),
+            Path.Combine(plugin, "HybridCLR.ManagedCasesAot.dll"));
         var repoLock = ReadJson(Path.Combine(lab, "manifests/repo-lock.json"));
         var reposRoot = ResolveReposRoot(lab, repoLock, cli.Optional("reposroot"));
         var repoRoot = ResolvePath(lab, cli.Optional("hybridclrUnitySource") ??
