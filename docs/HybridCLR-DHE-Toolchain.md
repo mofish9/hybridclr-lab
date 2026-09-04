@@ -140,9 +140,12 @@ dotnet HybridCLR.DheTool.dll resource-update \
 The host rejects duplicate Base IDs, unsupported engine workflows, mixed registry
 and parallel Base arguments, missing registry files, and an identity whose
 `baseId` differs from the registry entry. The resulting resource manifest records
-the registry SHA-256 and entry count, so the audit can prove which online Base set
-was validated. Add a newly shipped Base by adding its archived entry before the
-next resource build; the current DLL/MV payload remains a single shared payload.
+the registry SHA-256 and entry count and copies the exact registry bytes to
+`audit/dhe-base-registry.json`; staging verifies that copy before touching the
+project asset root. The audit can therefore prove which online Base set was
+validated even after the build host is gone. Add a newly shipped Base by adding
+its archived entry before the next resource build; the current DLL/MV payload
+remains a single shared payload.
 
 The output contains one copy of each current DLL and current MetaVersion. Base inputs
 are compatibility evidence only and are never copied into `payload/`. At

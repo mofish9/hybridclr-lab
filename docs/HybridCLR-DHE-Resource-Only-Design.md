@@ -96,7 +96,9 @@ registry 使用 `hybridclr.dhe-base-registry.json` schema v1。每个条目绑�
 `registry-relative-v1`，便于把 registry 与 Base 归档一起迁移。`resource-update`
 会按 registry 条目顺序读取并重新计算所有身份，拒绝重复 Base、错误引擎、路径缺失、
 identity/baseId 不一致或 registry 与旧式并行参数混用，并将 registry SHA-256 和 entry
-count 写入资源 manifest。新增线上 Base 只需先归档并加入 registry，下一次资源构建会将它
+count、原始 registry 的精确副本 `audit/dhe-base-registry.json` 及其 SHA-256
+写入资源输出。消费侧会在 staging 前校验该副本的 hash、格式、Base 数量和唯一身份；
+缺失或篡改会整体拒绝。新增线上 Base 只需先归档并加入 registry，下一次资源构建会将它
 与所有旧 Base 一起审计。
 
 每个 Base 对应的资源/catalog 构建必须显式携带该 Player 归档的完整身份，而不是仅凭内置

@@ -723,6 +723,7 @@ internal static partial class Program
 
     private static string ValidateResourceUpdateCompatibility(string updateRoot, JsonElement manifest)
     {
+        ValidateBaseRegistryAudit(updateRoot, manifest);
         var validationRelative = GetString(manifest, "validation") ?? string.Empty;
         var expectedValidationHash = GetString(manifest, "validationSha256");
         var validationPath = RequireFile(ResolveContainedPath(updateRoot, validationRelative,
@@ -790,6 +791,59 @@ internal static partial class Program
                 throw new DheException("DHE resource update contains an unvalidated Base: " + baseId);
         }
         return validationPath;
+    }
+
+    private static void ValidateBaseRegistryAudit(string updateRoot, JsonElement manifest)
+    {
+        string? registrySha256 = GetString(manifest, "baseRegistrySha256");
+        string? auditPathValue = GetString(manifest, "baseRegistryAuditPath");
+        string? auditSha256 = GetString(manifest, "baseRegistryAuditSha256");
+        if (string.IsNullOrWhiteSpace(registrySha256))
+        {
+            if (!string.IsNullOrWhiteSpace(auditPathValue) ||
+                !string.IsNullOrWhiteSpace(auditSha256))
+                throw new DheException("DHE resource update has Base registry audit fields without a registry.");
+            return;
+        }
+
+        if (!IsHex(registrySha256, 64, 64) ||
+            !string.Equals(auditPathValue, "audit/dhe-base-registry.json",
+                StringComparison.Ordinal) ||
+            !IsHex(auditSha256, 64, 64))
+            throw new DheException("DHE Base registry audit binding is invalid.");
+        string auditPath = RequireFile(ResolveContainedPath(updateRoot, auditPathValue!,
+            "DHE Base registry audit copy"), "DHE Base registry audit copy");
+        if (!string.Equals(Sha256File(auditPath), registrySha256,
+                StringComparison.OrdinalIgnoreCase) ||
+            !string.Equals(Sha256File(auditPath), auditSha256,
+                StringComparison.OrdinalIgnoreCase))
+            throw new DheException("DHE Base registry audit copy hash does not match the manifest.");
+
+        // Do not resolve paths from the archived document: those paths are
+        // relative to the original registry location. Validate its identity
+        // and entry set here, while ReadBaseRegistry validates paths at build
+        // time before the copy is made.
+        JsonElement archived = ReadJson<JsonElement>(auditPath);
+        if (GetInt(archived, "schemaVersion") != 1 ||
+            !string.Equals(GetString(archived, "format"),
+                "hybridclr.dhe-base-registry.json", StringComparison.Ordinal) ||
+            (GetString(archived, "pathSemantics") is not ("registry-relative-v1" or
+                "workspace-absolute-v1")) ||
+            !archived.TryGetProperty("bases", out JsonElement bases) ||
+            bases.ValueKind != JsonValueKind.Array || bases.GetArrayLength() == 0 ||
+            GetInt(manifest, "baseRegistryEntryCount") != bases.GetArrayLength())
+            throw new DheException("DHE archived Base registry identity or entry count is invalid.");
+
+        var ids = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+        foreach (JsonElement entry in bases.EnumerateArray())
+        {
+            string baseId = GetString(entry, "baseId") ?? string.Empty;
+            string workflow = GetString(entry, "engineWorkflow") ?? string.Empty;
+            if (!IsHex(baseId, 64, 64) || !ids.Add(baseId) ||
+                !RequiredPlayerEngineWorkflows.Contains(workflow,
+                    StringComparer.Ordinal))
+                throw new DheException("DHE archived Base registry contains an invalid entry.");
+        }
     }
 
     private static string[] ReadRuntimeCapabilities(JsonElement value, string property)

@@ -28,6 +28,8 @@ internal static partial class Program
         "runtime-capability-missing-rejected", "composite-base-id-runtime-bound",
         "resource-stage-plan-capability-bound",
         "resource-stage-aot-metadata-capability-bound",
+        "resource-stage-base-registry-audit-bound",
+        "resource-stage-base-registry-audit-tamper-rejected",
         "resource-base-registry",
         "resource-player-evidence-binding",
         "resource-player-release-readiness",
@@ -411,6 +413,23 @@ internal static partial class Program
         Directory.CreateDirectory(payloadRoot);
         Directory.CreateDirectory(auditRoot);
 
+        string? baseRegistryAuditPath = null;
+        string? baseRegistryAuditSha256 = null;
+        if (baseRegistry != null)
+        {
+            // Keep the exact authenticated registry bytes beside the release
+            // evidence. The registry's external paths remain build-host input;
+            // the archived copy is intentionally used for audit/hash checks only.
+            baseRegistryAuditPath = "audit/dhe-base-registry.json";
+            string auditPath = ResolveContainedPath(outputRoot, baseRegistryAuditPath,
+                "DHE Base registry audit copy");
+            File.Copy(baseRegistry.SourcePath, auditPath, true);
+            baseRegistryAuditSha256 = Sha256File(auditPath);
+            if (!string.Equals(baseRegistryAuditSha256, baseRegistry.Sha256,
+                    StringComparison.OrdinalIgnoreCase))
+                throw new DheException("DHE Base registry audit copy hash mismatch.");
+        }
+
         var currentSnapshots = new Dictionary<string, MetaVersionSnapshot>(StringComparer.OrdinalIgnoreCase);
         var payloadFiles = new List<object>();
         var runtimeAssemblies = new List<object>();
@@ -665,6 +684,8 @@ internal static partial class Program
             currentAssemblySetSha256 = currentSetHash,
             baseRegistrySha256 = baseRegistry?.Sha256,
             baseRegistryEntryCount = baseRegistry?.Entries.Length,
+            baseRegistryAuditPath,
+            baseRegistryAuditSha256,
             candidateBaseCount = candidateBases.Count,
             compatibleBaseCount = candidateBases.Count - releaseErrors.Count,
             bases = candidateBases.ToArray(),
@@ -703,6 +724,8 @@ internal static partial class Program
             currentAssemblySetSha256 = currentSetHash,
             baseRegistrySha256 = baseRegistry?.Sha256,
             baseRegistryEntryCount = baseRegistry?.Entries.Length,
+            baseRegistryAuditPath,
+            baseRegistryAuditSha256,
             playerUpdateRequired = false,
             guardCoverageValidated = true,
             runtimeComparison = "embedded-base-mv-vs-current-mv",

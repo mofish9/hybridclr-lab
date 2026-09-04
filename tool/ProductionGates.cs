@@ -947,10 +947,21 @@ internal static partial class Program
                     JsonElement updateManifest = ReadJson<JsonElement>(RequireFile(
                         Path.Combine(resourceUpdateRoot, "dhe-resource-update.json"),
                         "Registry regression resource update manifest"));
+                    string auditPath = GetString(updateManifest, "baseRegistryAuditPath") ?? string.Empty;
+                    string auditHash = GetString(updateManifest, "baseRegistryAuditSha256") ?? string.Empty;
+                    string auditSource = string.IsNullOrWhiteSpace(auditPath)
+                        ? string.Empty
+                        : ResolveContainedPath(resourceUpdateRoot, auditPath,
+                            "Registry regression Base registry audit copy");
                     manifestBound = string.Equals(GetString(updateManifest,
                             "baseRegistrySha256"), registry.Sha256,
                             StringComparison.OrdinalIgnoreCase) &&
-                        GetInt(updateManifest, "baseRegistryEntryCount") == registry.Entries.Length;
+                        GetInt(updateManifest, "baseRegistryEntryCount") == registry.Entries.Length &&
+                        !string.IsNullOrWhiteSpace(auditSource) && File.Exists(auditSource) &&
+                        string.Equals(Sha256File(auditSource), registry.Sha256,
+                            StringComparison.OrdinalIgnoreCase) &&
+                        string.Equals(auditHash, registry.Sha256,
+                            StringComparison.OrdinalIgnoreCase);
                 }
                 baseRegistryPassed = workflowMatrix && manifestBound;
                 baseRegistryDetails = baseRegistryPassed
@@ -1707,6 +1718,36 @@ internal static partial class Program
 
         var positiveManifest = ReadJson<JsonElement>(Path.Combine(positive.Update,
             "dhe-resource-update.json"));
+        string positiveRegistryHash = GetString(positiveManifest, "baseRegistrySha256") ?? string.Empty;
+        string positiveRegistryAuditPath = GetString(positiveManifest,
+            "baseRegistryAuditPath") ?? string.Empty;
+        string positiveRegistryAudit = string.IsNullOrWhiteSpace(positiveRegistryAuditPath)
+            ? string.Empty
+            : ResolveContainedPath(positive.Update, positiveRegistryAuditPath,
+                "Regression Base registry audit copy");
+        bool registryAuditBound = !string.IsNullOrWhiteSpace(positiveRegistryHash) &&
+            string.Equals(positiveRegistryHash,
+                GetString(positiveManifest, "baseRegistryAuditSha256"),
+                StringComparison.OrdinalIgnoreCase) &&
+            File.Exists(positiveRegistryAudit) &&
+            string.Equals(Sha256File(positiveRegistryAudit), positiveRegistryHash,
+                StringComparison.OrdinalIgnoreCase);
+        AddRegressionCheck(checks, errors, "resource-stage-base-registry-audit-bound",
+            registryAuditBound,
+            "a registry-backed resource update must archive and hash the exact registry bytes.");
+
+        if (registryAuditBound)
+        {
+            var registryAuditTamper = CopyFixture("base-registry-audit-tamper");
+            File.AppendAllText(Path.Combine(registryAuditTamper.Update,
+                positiveRegistryAuditPath), Environment.NewLine,
+                new UTF8Encoding(false));
+            AddRegressionCheck(checks, errors, "resource-stage-base-registry-audit-tamper-rejected",
+                !Stage("base-registry-audit-tamper-stage", registryAuditTamper.Update,
+                    registryAuditTamper.Assets, registryAuditTamper.Identity),
+                "a tampered archived Base registry must be rejected before staging.");
+        }
+
         string positiveRuntimeAssetRoot = RequirePortableAssetRoot(
             GetString(positiveManifest, "runtimeAssetRoot"), "runtimeAssetRoot");
         JsonElement[] positiveAotMetadata = positiveManifest.GetProperty("aotMetadataSets")
