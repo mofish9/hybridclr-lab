@@ -47,7 +47,8 @@ Editor 版本、integrated commit/tree、审计 patch hash、目标引擎不匹�
 runtime tree 漂移都会失败。integrated 模式只校验源码，不再应用 overlay。
 
 当前 `0.1.20` 候选的锁已经更新为：HybridCLR `fe3b1edb222511a1d3227f7e76e8b83b618c4d27`、
-HybridCLR Unity package `6b2444c018e870e966159fe098dbdcf9e2d8c5f9`，以及同一三引擎
+HybridCLR Unity package `70c163ed4860c5ea02e4558e7b32c36c3967a517`（tree
+`4F330F52DE18256017A2767282639E59C42B27E9ACB0D178771E5803CBDC2AE7`），以及同一三引擎
 `il2cpp_plus` opt4.1 维护线。候选尚未创建新的 runtime tag、尚未推送，也不能作为
 Release package 使用；以 `manifests/dhe-runtime-lock.json`、`dhe-package-lock.json` 和
 `repo-lock.json` 中的完整 commit/tree/hash 为准。

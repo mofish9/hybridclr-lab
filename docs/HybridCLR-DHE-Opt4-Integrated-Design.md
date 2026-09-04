@@ -25,9 +25,10 @@ runtime.
 
 The active 0.1.20 candidate extends that integrated line with the locked
 HybridCLR commit `fe3b1edb222511a1d3227f7e76e8b83b618c4d27` and package commit
-`6b2444c018e870e966159fe098dbdcf9e2d8c5f9`. These candidate commits are the
-identities used by the current runtime manifests and exploratory toolchain
-package; no new runtime tag has been created yet.
+`70c163ed4860c5ea02e4558e7b32c36c3967a517` (tree
+`4F330F52DE18256017A2767282639E59C42B27E9ACB0D178771E5803CBDC2AE7`). These
+candidate commits are the identities used by the current runtime manifests and
+exploratory toolchain package; no new runtime tag has been created yet.
 
 The native runtime keeps every hot-update assembly's baseline image in the
 player. At runtime, the strict MV loader validates the current DLL hash, the
