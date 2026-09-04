@@ -1968,8 +1968,11 @@ internal static partial class Program
             throw new DheException("The shared current payload does not declare every proven Base identity.");
         JsonElement manifestVariant = SelectPayloadVariant(manifest, selectedVariantId,
             "Multi-Base resource update manifest");
-        if (!string.Equals(GetString(manifestVariant, "currentAssemblySetSha256"),
-                selectedVariantCurrentSet, StringComparison.OrdinalIgnoreCase))
+        string manifestVariantCurrentSet = GetString(manifestVariant,
+            "currentAssemblySetSha256") ?? string.Empty;
+        if (!string.IsNullOrWhiteSpace(manifestVariantCurrentSet) &&
+            !string.Equals(manifestVariantCurrentSet, selectedVariantCurrentSet,
+                StringComparison.OrdinalIgnoreCase))
             throw new DheException("Multi-Base changed evidence does not match its selected payload variant.");
     }
 

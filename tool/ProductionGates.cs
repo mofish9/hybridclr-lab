@@ -1873,9 +1873,19 @@ internal static partial class Program
             "every resource update Base must require manifest-bound runtime plan validation.");
         bool aotMetadataCapabilityBound = positiveAotMetadata.Length == 0 ||
             positiveBases.EnumerateArray().All(supportedBase =>
-                supportedBase.GetProperty("requiredRuntimeCapabilities").EnumerateArray().Any(value =>
-                    string.Equals(value.GetString(), "resource-update-aot-metadata-path-v1",
-                        StringComparison.Ordinal)));
+            {
+                string setId = GetString(supportedBase, "aotMetadataSetId") ?? string.Empty;
+                JsonElement[] sets = positiveManifest.GetProperty("aotMetadataSets")
+                    .EnumerateArray().Where(set => string.Equals(GetString(set,
+                        "aotMetadataSetId"), setId, StringComparison.OrdinalIgnoreCase)).ToArray();
+                bool hasMetadata = sets.Length == 1 && sets[0].TryGetProperty("assemblies",
+                    out JsonElement records) && records.ValueKind == JsonValueKind.Array &&
+                    records.GetArrayLength() != 0;
+                bool hasPathCapability = supportedBase.GetProperty("requiredRuntimeCapabilities")
+                    .EnumerateArray().Any(value => string.Equals(value.GetString(),
+                        "resource-update-aot-metadata-path-v1", StringComparison.Ordinal));
+                return !hasMetadata || hasPathCapability;
+            });
         AddRegressionCheck(checks, errors, "resource-stage-aot-metadata-capability-bound",
             aotMetadataCapabilityBound,
             "a resource update with AOT metadata must require plan-directed metadata loading.");
@@ -2018,8 +2028,12 @@ internal static partial class Program
         var tampered = CopyFixture("payload-tamper");
         var tamperedManifest = ReadJson<JsonElement>(Path.Combine(tampered.Update,
             "dhe-resource-update.json"));
+        string tamperedVariantId = GetString(tamperedManifest.GetProperty("supportedBases")
+            .EnumerateArray().First(), "payloadVariantId") ?? "default";
+        JsonElement tamperedVariant = SelectPayloadVariant(tamperedManifest, tamperedVariantId,
+            "Regression payload variant");
         string tamperedPayload = ResolveContainedPath(tampered.Update,
-            GetString(tamperedManifest.GetProperty("assemblies")[0], "dll") ?? string.Empty,
+            GetString(tamperedVariant.GetProperty("assemblies")[0], "dll") ?? string.Empty,
             "Regression payload");
         byte[] tamperedBytes = File.ReadAllBytes(tamperedPayload);
         tamperedBytes[^1] ^= 0x5a;
@@ -2032,8 +2046,12 @@ internal static partial class Program
         var missing = CopyFixture("payload-missing");
         var missingManifest = ReadJson<JsonElement>(Path.Combine(missing.Update,
             "dhe-resource-update.json"));
+        string missingVariantId = GetString(missingManifest.GetProperty("supportedBases")
+            .EnumerateArray().First(), "payloadVariantId") ?? "default";
+        JsonElement missingVariant = SelectPayloadVariant(missingManifest, missingVariantId,
+            "Regression payload variant");
         string missingPayload = ResolveContainedPath(missing.Update,
-            GetString(missingManifest.GetProperty("assemblies")[0],
+            GetString(missingVariant.GetProperty("assemblies")[0],
                 "currentMetaVersion") ?? string.Empty, "Regression payload");
         File.Delete(missingPayload);
         AddRegressionCheck(checks, errors, "resource-stage-missing-payload-rejected",
