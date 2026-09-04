@@ -930,6 +930,47 @@ internal static partial class Program
             }
         }
 
+        string? resourceBaseRegistry = cli.Optional("baseregistry");
+        bool baseRegistryPassed = false;
+        string baseRegistryDetails = "the distributed package contains the Base registry schema";
+        if (!string.IsNullOrWhiteSpace(resourceBaseRegistry))
+        {
+            try
+            {
+                BaseRegistryDocument registry = ReadBaseRegistry(resourceBaseRegistry);
+                var workflows = registry.Entries.Select(entry => entry.EngineWorkflow)
+                    .ToHashSet(StringComparer.Ordinal);
+                bool workflowMatrix = RequiredPlayerEngineWorkflows.All(workflows.Contains);
+                bool manifestBound = true;
+                if (!string.IsNullOrWhiteSpace(resourceUpdateRoot))
+                {
+                    JsonElement updateManifest = ReadJson<JsonElement>(RequireFile(
+                        Path.Combine(resourceUpdateRoot, "dhe-resource-update.json"),
+                        "Registry regression resource update manifest"));
+                    manifestBound = string.Equals(GetString(updateManifest,
+                            "baseRegistrySha256"), registry.Sha256,
+                            StringComparison.OrdinalIgnoreCase) &&
+                        GetInt(updateManifest, "baseRegistryEntryCount") == registry.Entries.Length;
+                }
+                baseRegistryPassed = workflowMatrix && manifestBound;
+                baseRegistryDetails = baseRegistryPassed
+                    ? "registry-relative multi-Base input covers all three engine workflows and is bound to the single current manifest"
+                    : "Base registry engine matrix or resource manifest binding is invalid";
+            }
+            catch (Exception exception)
+            {
+                baseRegistryDetails = exception.Message;
+            }
+        }
+        else if (!string.IsNullOrWhiteSpace(cli.Optional("packageroot")))
+        {
+            baseRegistryPassed = File.Exists(Path.Combine(RequireDirectory(cli.Optional("packageroot")!,
+                "Regression package"), "schemas",
+                "dhe-base-registry.schema.json"));
+        }
+        AddRegressionCheck(checks, errors, "resource-base-registry", baseRegistryPassed,
+            baseRegistryDetails);
+
         var packageRoot = cli.Optional("packageroot");
         if (!string.IsNullOrWhiteSpace(packageRoot))
         {

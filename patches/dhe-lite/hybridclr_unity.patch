@@ -1,5 +1,5 @@
 diff --git a/Data~/hybridclr_version.json b/Data~/hybridclr_version.json
-index b68c3b3..043ee04 100644
+index b68c3b37171d9dfa435793d9b542127d967f4758..043ee04c5e7a8ef4b4d4f6a378b154ae4bf9147e 100644
 --- a/Data~/hybridclr_version.json
 +++ b/Data~/hybridclr_version.json
 @@ -12,18 +12,18 @@
@@ -28,10 +28,10 @@ index b68c3b3..043ee04 100644
      {
          "unity_version":"2023",
 diff --git a/Documentation~/dhe-project-integration.md b/Documentation~/dhe-project-integration.md
-index 148b890..87f8cd7 100644
+index 148b890f266395de26231aedb2b24fac74530650..604902a2dffbf8d8b20c4088f63799a4038dbbfd 100644
 --- a/Documentation~/dhe-project-integration.md
 +++ b/Documentation~/dhe-project-integration.md
-@@ -1,80 +1,147 @@
+@@ -1,80 +1,155 @@
  # DHE project integration
  
 -The customized package owns DHE assembly generation, runtime-plan staging,
@@ -190,6 +190,14 @@ index 148b890..87f8cd7 100644
 +when its declared capability set contains every capability required by its own
 +Base-to-current diff. Keep every still-supported production Base in the command
 +input. Omitting an old Base is equivalent to ending support for it.
++For repeatable releases, store that set in a
++`hybridclr.dhe-base-registry.json` file and pass `-BaseRegistry` to the host.
++Use `registry-relative-v1` paths when the registry travels with the archived
++Base records. The host rejects duplicate Base IDs, unsupported engine workflows,
++mixed registry/parallel arguments, and identity/baseId mismatches, then records
++the registry SHA-256 and entry count in the resource manifest. Adding a new
++online Base is an audited registry change; it does not create a second current
++DLL/MV payload.
 +Every resource update requires `resource-update-plan-integrity-v1` and
 +`resource-update-aot-metadata-set-selection-v1`; updates carrying non-empty
 +supplemental metadata also require `resource-update-aot-metadata-path-v1`. The
@@ -236,7 +244,7 @@ index 148b890..87f8cd7 100644
 +remote delta or reimplement MV parsing, Base identity matching, transaction
 +retry, changed-method dispatch, or native identity checks.
 diff --git a/Editor/Commands/CompileDllCommand.cs b/Editor/Commands/CompileDllCommand.cs
-index 583368e..52b9504 100644
+index 583368e10eca9d9b2a9c89c64cd27cd7ea13de5d..52b9504f5216e66050b0ce5089e97d5b7b8dbacd 100644
 --- a/Editor/Commands/CompileDllCommand.cs
 +++ b/Editor/Commands/CompileDllCommand.cs
 @@ -20,6 +20,12 @@ namespace HybridCLR.Editor.Commands
@@ -253,7 +261,7 @@ index 583368e..52b9504 100644
              ScriptCompilationResult scriptCompilationResult = PlayerBuildInterface.CompilePlayerScripts(scriptCompilationSettings, buildDir);
  #if UNITY_2022
 diff --git a/Editor/Commands/DheBuildPipeline.cs b/Editor/Commands/DheBuildPipeline.cs
-index aa81ffd..35651f3 100644
+index aa81ffd609dfc43593ccbb898655c106fcf084c3..35651f3aea418a1f3c18f3f2a30bfae496d435a7 100644
 --- a/Editor/Commands/DheBuildPipeline.cs
 +++ b/Editor/Commands/DheBuildPipeline.cs
 @@ -24,11 +24,41 @@ namespace HybridCLR.Editor.Commands
@@ -2092,7 +2100,7 @@ index aa81ffd..35651f3 100644
      {
          public string OutputPath;
 diff --git a/Editor/Commands/DheProjectBuildSupport.cs b/Editor/Commands/DheProjectBuildSupport.cs
-index 8003bb4..09ca286 100644
+index 8003bb459d996d9ff8ac4581b2bc8c21571540d4..09ca286bb21c585e034176ce0295ad2cb47e7ecf 100644
 --- a/Editor/Commands/DheProjectBuildSupport.cs
 +++ b/Editor/Commands/DheProjectBuildSupport.cs
 @@ -34,6 +34,7 @@ namespace HybridCLR.Editor.Commands
@@ -2734,7 +2742,7 @@ index 8003bb4..09ca286 100644
          public string IdentityClassName = "DheBuildIdentity";
      }
 diff --git a/Editor/Commands/DheProjectResourceSupport.cs b/Editor/Commands/DheProjectResourceSupport.cs
-index 2b1525d..3644882 100644
+index 2b1525d838b1a73206a56242f22db7ef120a97e2..3644882eede03c3bc283abed9da50cbc31eb7b76 100644
 --- a/Editor/Commands/DheProjectResourceSupport.cs
 +++ b/Editor/Commands/DheProjectResourceSupport.cs
 @@ -143,6 +143,7 @@ namespace HybridCLR.Editor.Commands
@@ -2894,7 +2902,7 @@ index 2b1525d..3644882 100644
          private sealed class RequiredAssetSpec
          {
 diff --git a/Editor/Commands/DheProjectWorkflowRunner.cs b/Editor/Commands/DheProjectWorkflowRunner.cs
-index f24c481..d3f6774 100644
+index f24c4814d42953d715d188ba58b66994602a02bf..d3f6774fa57b7ac5ba82f4c560729640c46c8302 100644
 --- a/Editor/Commands/DheProjectWorkflowRunner.cs
 +++ b/Editor/Commands/DheProjectWorkflowRunner.cs
 @@ -30,6 +30,7 @@ namespace HybridCLR.Editor.Commands
@@ -2951,7 +2959,7 @@ index f24c481..d3f6774 100644
                  string.IsNullOrWhiteSpace(adapter.IdentityNamespace) ||
                  string.IsNullOrWhiteSpace(adapter.IdentityClassName))
 diff --git a/Editor/Commands/StripAOTDllCommand.cs b/Editor/Commands/StripAOTDllCommand.cs
-index 6eaf1b0..f37c4c4 100644
+index 6eaf1b06816ee67e06f949029b2b7025c1b31e4d..f37c4c40299f37027e59ae8b528383f9285c648f 100644
 --- a/Editor/Commands/StripAOTDllCommand.cs
 +++ b/Editor/Commands/StripAOTDllCommand.cs
 @@ -135,6 +135,11 @@ namespace HybridCLR.Editor.Commands
@@ -2967,7 +2975,7 @@ index 6eaf1b0..f37c4c4 100644
                      subtarget = (int)StandaloneBuildSubtarget.Server,
  #endif
 diff --git a/Runtime/DheRuntime.cs b/Runtime/DheRuntime.cs
-index 0e5fda3..414d357 100644
+index 0e5fda333a02679185da6196ad587930e12519b8..414d357151691b52b53c5bc44a10c3cd7f8086c4 100644
 --- a/Runtime/DheRuntime.cs
 +++ b/Runtime/DheRuntime.cs
 @@ -1,6 +1,7 @@
@@ -4128,7 +4136,7 @@ index 0e5fda3..414d357 100644
          {
              string normalized = string.IsNullOrWhiteSpace(value) ? DefaultAssetRoot :
 diff --git a/Runtime/RuntimeApi.cs b/Runtime/RuntimeApi.cs
-index b79bf17..3471579 100644
+index b79bf17922b27bee757b0b66f6949c6d6c7e7bef..3471579037f5f523c1cdb69646e2c78a6185ca41 100644
 --- a/Runtime/RuntimeApi.cs
 +++ b/Runtime/RuntimeApi.cs
 @@ -44,28 +44,36 @@ namespace HybridCLR

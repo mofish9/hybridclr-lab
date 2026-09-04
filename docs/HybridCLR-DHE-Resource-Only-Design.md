@@ -90,6 +90,15 @@ dotnet HybridCLR.DheTool.dll resource-update \
 收窄本次代码变化、停止向该 Base 发布并要求玩家升级主包、或者发布带新 runtime 的 Base；
 不存在未经验证仍强行下发的第四条路径。
 
+registry 使用 `hybridclr.dhe-base-registry.json` schema v1。每个条目绑定一个
+`baseId`、`engineWorkflow`、baseline DLL 根目录、universal native manifest、完整
+`build-identity.json`，以及可选的 `patchAOTAssemblies` 根目录；路径可以采用
+`registry-relative-v1`，便于把 registry 与 Base 归档一起迁移。`resource-update`
+会按 registry 条目顺序读取并重新计算所有身份，拒绝重复 Base、错误引擎、路径缺失、
+identity/baseId 不一致或 registry 与旧式并行参数混用，并将 registry SHA-256 和 entry
+count 写入资源 manifest。新增线上 Base 只需先归档并加入 registry，下一次资源构建会将它
+与所有旧 Base 一起审计。
+
 每个 Base 对应的资源/catalog 构建必须显式携带该 Player 归档的完整身份，而不是仅凭内置
 MetaVersion 集合猜测 Base：
 
@@ -198,7 +207,7 @@ metadata set、错误 Base、废弃 sidecar 残留和缺 capability 等负例均
 
 这证明“Base 只构建一次、后续一份资源包服务多个 Base”的架构链路成立，但不等于官方旗舰版
 DHE 的全部元数据能力。当前候选源码使用 HybridCLR commit `71cf142`、package commit
-`169041c8` 和三条已锁定的 il2cpp_plus `opt4.1` 维护线；本轮尚未创建新的 runtime tag，也未
+`3a4e3fe5` 和三条已锁定的 il2cpp_plus `opt4.1` 维护线；本轮尚未创建新的 runtime tag，也未
 合入正式 package 维护分支。Android Player、iOS/Xcode/device、性能、内存和现有结构限制仍是
 正式发布前的独立门禁；当前结论只能是 Windows Player 与三引擎 native 有条件通过，不能声明
 全平台生产发布完成。

@@ -16,6 +16,8 @@
     "validation": { "const": "dhe-resource-update-validation.json" },
     "validationSha256": { "type": "string", "pattern": "^[0-9a-fA-F]{64}$" },
     "currentAssemblySetSha256": { "type": "string", "pattern": "^[0-9a-fA-F]{64}$" },
+    "baseRegistrySha256": { "type": ["string", "null"], "pattern": "^[0-9a-fA-F]{64}$" },
+    "baseRegistryEntryCount": { "type": ["integer", "null"], "minimum": 1 },
     "playerUpdateRequired": { "const": false },
     "guardCoverageValidated": { "const": true },
     "runtimeComparison": { "const": "embedded-base-mv-vs-current-mv" },

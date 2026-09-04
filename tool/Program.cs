@@ -28,6 +28,7 @@ internal static partial class Program
         "runtime-capability-missing-rejected", "composite-base-id-runtime-bound",
         "resource-stage-plan-capability-bound",
         "resource-stage-aot-metadata-capability-bound",
+        "resource-base-registry",
         "resource-player-evidence-binding",
         "resource-player-release-readiness",
         "evidence-managed-release-binding", "evidence-multibase-current-binding",
@@ -274,32 +275,75 @@ internal static partial class Program
         var currentRoot = RequireDirectory(cli.Require("currentroot"), "Current root");
         var settingsPath = RequireFile(cli.Require("settingsfile"), "HybridCLR settings");
         var outputRoot = SafeOutputRoot(cli.Require("outputroot"), new[] { currentRoot, settingsPath });
-        var baselineRoots = (cli.Optional("baseroots") ?? cli.Require("baselineroot"))
-            .Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries)
-            .Select(path => RequireDirectory(path, "DHE base snapshot root")).ToArray();
+        string? baseRegistryPath = cli.Optional("baseregistry");
+        BaseRegistryDocument? baseRegistry = null;
+        string[] baselineRoots;
+        string[] nativeManifestPaths;
+        string[] buildIdentityPaths;
+        string[] registryAotMetadataRoots = Array.Empty<string>();
+        if (!string.IsNullOrWhiteSpace(baseRegistryPath))
+        {
+            string[] legacyInputs =
+            {
+                "baseroots", "baselineroot", "basenativemanifests", "basenativemanifest",
+                "basebuildidentities", "basebuildidentity", "aotmetadataroots", "aotmetadataroot"
+            };
+            if (legacyInputs.Any(name => !string.IsNullOrWhiteSpace(cli.Optional(name))))
+                throw new DheException("BaseRegistry cannot be combined with parallel BaseRoots, " +
+                    "BaseNativeManifests, BaseBuildIdentities, or AotMetadataRoots arguments.");
+            baseRegistry = ReadBaseRegistry(baseRegistryPath);
+            baselineRoots = baseRegistry.Entries.Select(entry => entry.BaselineRoot).ToArray();
+            nativeManifestPaths = baseRegistry.Entries.Select(entry => entry.NativeManifest).ToArray();
+            buildIdentityPaths = baseRegistry.Entries.Select(entry => entry.BuildIdentity).ToArray();
+            if (baseRegistry.Entries.Any(entry => entry.AotMetadataRoot != null))
+            {
+                if (baseRegistry.Entries.Any(entry => entry.AotMetadataRoot == null))
+                    throw new DheException("Every Base registry entry must provide AotMetadataRoot " +
+                        "when any entry provides one.");
+                registryAotMetadataRoots = baseRegistry.Entries.Select(entry =>
+                    entry.AotMetadataRoot!).ToArray();
+            }
+        }
+        else
+        {
+            baselineRoots = (cli.Optional("baseroots") ?? cli.Require("baselineroot"))
+                .Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries)
+                .Select(path => RequireDirectory(path, "DHE base snapshot root")).ToArray();
+            var nativeManifestValue = cli.Optional("basenativemanifests") ?? cli.Optional("basenativemanifest") ??
+                throw new DheException("Missing -BaseNativeManifests (one universal native manifest per BaseRoot).");
+            nativeManifestPaths = nativeManifestValue
+                .Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries)
+                .Select(path => RequireFile(path, "Base native guard manifest"))
+                .ToArray();
+            var buildIdentityValue = cli.Optional("basebuildidentities") ?? cli.Optional("basebuildidentity") ??
+                throw new DheException("Missing -BaseBuildIdentities (one immutable build identity per BaseRoot).");
+            buildIdentityPaths = buildIdentityValue
+                .Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries)
+                .Select(path => RequireFile(path, "Base Player build identity"))
+                .ToArray();
+        }
         if (baselineRoots.Length == 0) throw new DheException("At least one base snapshot root is required.");
         if (baselineRoots.Distinct(StringComparer.OrdinalIgnoreCase).Count() != baselineRoots.Length)
             throw new DheException("BaseRoots must not contain duplicate Base snapshot roots.");
-        var nativeManifestValue = cli.Optional("basenativemanifests") ?? cli.Optional("basenativemanifest") ??
-            throw new DheException("Missing -BaseNativeManifests (one universal native manifest per BaseRoot).");
-        var nativeManifestPaths = nativeManifestValue
-            .Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries)
-            .Select(path => RequireFile(path, "Base native guard manifest"))
-            .ToArray();
         if (nativeManifestPaths.Length != baselineRoots.Length)
             throw new DheException("BaseRoots and BaseNativeManifests must have the same number of entries.");
-        var buildIdentityValue = cli.Optional("basebuildidentities") ?? cli.Optional("basebuildidentity") ??
-            throw new DheException("Missing -BaseBuildIdentities (one immutable build identity per BaseRoot).");
-        var buildIdentityPaths = buildIdentityValue
-            .Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries)
-            .Select(path => RequireFile(path, "Base Player build identity"))
-            .ToArray();
         if (buildIdentityPaths.Length != baselineRoots.Length)
             throw new DheException("BaseRoots and BaseBuildIdentities must have the same number of entries.");
         var baseIdentities = buildIdentityPaths.Select(path => ReadJson<JsonElement>(path)).ToArray();
         if (baseIdentities.Any(identity => GetInt(identity, "identityVersion") != 1))
             throw new DheException(
                 "Every supported Base must use the current DHE build identity.");
+        if (baseRegistry != null)
+        {
+            for (int index = 0; index < baseRegistry.Entries.Length; index++)
+            {
+                string identityBaseId = GetString(baseIdentities[index], "baseId") ?? string.Empty;
+                if (!string.Equals(identityBaseId, baseRegistry.Entries[index].BaseId,
+                        StringComparison.OrdinalIgnoreCase))
+                    throw new DheException("DHE Base registry baseId does not match its build identity: " +
+                        baseRegistry.Entries[index].BuildIdentity);
+            }
+        }
         string runtimeAssetRoot = RequireCommonBaseAssetRoot(baseIdentities,
             "runtimeAssetRoot");
         string baseMetaVersionAssetRoot = RequireCommonBaseAssetRoot(baseIdentities,
@@ -321,12 +365,25 @@ internal static partial class Program
             path = RequireFile(Path.Combine(currentRoot, name + ".dll"), name + " current assembly"),
         }).ToArray();
         var currentSetHash = NamedAssemblySetHash(currentRecords.Select(record => (record.name, record.path)));
-        var aotMetadataRoots = cli.GetList("aotmetadataroots")
+        string[] aotMetadataRoots;
+        var explicitAotMetadataRoots = cli.GetList("aotmetadataroots")
             .Select(path => RequireDirectory(path, "AOT metadata root")).ToArray();
         var sharedAotMetadataRoot = cli.Optional("aotmetadataroot");
+        if (baseRegistry != null && (explicitAotMetadataRoots.Length != 0 ||
+                !string.IsNullOrWhiteSpace(sharedAotMetadataRoot)))
+            throw new DheException("BaseRegistry entries own their AotMetadataRoot; do not pass " +
+                "AotMetadataRoots separately.");
+        if (baseRegistry != null)
+        {
+            aotMetadataRoots = registryAotMetadataRoots;
+        }
+        else
+        {
+            aotMetadataRoots = explicitAotMetadataRoots;
+        }
         if (aotMetadataRoots.Length != 0 && !string.IsNullOrWhiteSpace(sharedAotMetadataRoot))
             throw new DheException("Use either -AotMetadataRoots or -AotMetadataRoot, not both.");
-        if (aotMetadataRoots.Length == 0 && !string.IsNullOrWhiteSpace(sharedAotMetadataRoot))
+        if (baseRegistry == null && aotMetadataRoots.Length == 0 && !string.IsNullOrWhiteSpace(sharedAotMetadataRoot))
         {
             string root = RequireDirectory(sharedAotMetadataRoot, "AOT metadata root");
             aotMetadataRoots = Enumerable.Repeat(root, baselineRoots.Length).ToArray();
@@ -606,6 +663,8 @@ internal static partial class Program
             compatibilityPolicy = ResourceUpdateCompatibility.Policy,
             runtimeProtocol = ResourceUpdateCompatibility.RuntimeProtocol,
             currentAssemblySetSha256 = currentSetHash,
+            baseRegistrySha256 = baseRegistry?.Sha256,
+            baseRegistryEntryCount = baseRegistry?.Entries.Length,
             candidateBaseCount = candidateBases.Count,
             compatibleBaseCount = candidateBases.Count - releaseErrors.Count,
             bases = candidateBases.ToArray(),
@@ -642,6 +701,8 @@ internal static partial class Program
             validation = "dhe-resource-update-validation.json",
             validationSha256 = Sha256File(validationPath),
             currentAssemblySetSha256 = currentSetHash,
+            baseRegistrySha256 = baseRegistry?.Sha256,
+            baseRegistryEntryCount = baseRegistry?.Entries.Length,
             playerUpdateRequired = false,
             guardCoverageValidated = true,
             runtimeComparison = "embedded-base-mv-vs-current-mv",
@@ -2650,7 +2711,7 @@ internal static partial class Program
         }
     }
 
-    private static void PrintHelp() => Console.WriteLine("HybridCLR DHE C# tool\nCommands: version, mv, batch, resource-update, stage-resource-update, resource-player-evidence, baseline-manifest, aot-metadata-manifest, preflight, workflow, release-gate, regression, schema-validate, schema-gate, validate, archive, doctor, verify-package, release-evidence, publish, install, new-adapter, new-config, assemble-runtime, native-tests, build-managed-cases, generate-test-manifest, generate-metadata-stress-source, reference, compare-results, check-environment, clear-unity-project-locks, wait-editor, prepare-engine-test-project, bootstrap-repos, tree-hash, file-hash\nExample: dotnet run --project tool/HybridCLR.DheTool.csproj -- workflow -Config <project/dhe-workflow-config.json>");
+    private static void PrintHelp() => Console.WriteLine("HybridCLR DHE C# tool\nCommands: version, mv, batch, resource-update, stage-resource-update, resource-player-evidence, baseline-manifest, aot-metadata-manifest, preflight, workflow, release-gate, regression, schema-validate, schema-gate, validate, archive, doctor, verify-package, release-evidence, publish, install, new-adapter, new-config, assemble-runtime, native-tests, build-managed-cases, generate-test-manifest, generate-metadata-stress-source, reference, compare-results, check-environment, clear-unity-project-locks, wait-editor, prepare-engine-test-project, bootstrap-repos, tree-hash, file-hash\nResource update accepts -BaseRegistry <registry.json> for an authenticated multi-Base input.\nExample: dotnet run --project tool/HybridCLR.DheTool.csproj -- workflow -Config <project/dhe-workflow-config.json>");
 
     private static string ResolveUnity(Cli cli, string project) => RequireFile(cli.Optional("unity") ?? Environment.GetEnvironmentVariable("DHE_UNITY_EXE") ?? throw new DheException("Set -Unity or DHE_UNITY_EXE."), "Unity editor");
     private static void RunUnity(string executable, string workingDirectory, IEnumerable<string> arguments, IDictionary<string, string> environment, string logPath, int timeoutSeconds)

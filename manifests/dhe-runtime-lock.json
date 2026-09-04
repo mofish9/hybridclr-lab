@@ -59,13 +59,13 @@
       "repository": "hybridclr_unity",
       "sourceMode": "integrated",
       "baseCommit": "623073baafd5a1d12ea46df8145de9fddc899fac",
-      "integratedCommit": "169041c8fa2992b5b8750e897ea7f5ae39d9da3e",
-      "expectedTreeSha256": "EFA9A908FA364F9A60200B7B3DE9A2FD1731C72AC5FEEA40CD7F444E56E8DC08",
+      "integratedCommit": "3a4e3fe0ec78ea689ba35f938bbda6b8da1699e4",
+      "expectedTreeSha256": "68B892B908B4F0EC9AA412475DBB23ED2C69EBB3A84B3CE825E813479E6A4F9F",
       "treeHashIgnoredPaths": [
         "Editor/BuildProcessors/AddLil2cppSourceCodeToXcodeproj2023OrNewer.cs.meta"
       ],
       "path": "patches/dhe-lite/hybridclr_unity.patch",
-      "sha256": "BF519376672145DD006E25FD48C435F4EC1F658D6C97972203476D9534EFF2FE",
+      "sha256": "99552F43A4BC949357A4ADE961D12D3A5EA8024C88D001D58D16876506307D5B",
       "applyRoot": "package",
       "stripComponents": 1
     }

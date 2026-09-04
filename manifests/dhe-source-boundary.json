@@ -46,6 +46,7 @@
     "tool/Program.cs",
     "tool/ResourceUpdateCompatibility.cs",
     "tool/ResourceUpdateStaging.cs",
+    "tool/BaseRegistry.cs",
     "tool/SchemaValidation.cs",
     "tool/ProductionGates.cs",
     "tool/dnlib.dll"

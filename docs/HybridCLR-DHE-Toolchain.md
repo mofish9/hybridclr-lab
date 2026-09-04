@@ -123,6 +123,27 @@ dotnet HybridCLR.DheTool.dll resource-update \
   -OutputRoot C:/build/resource-update
 ```
 
+For an online game, keep the supported Base set in one authenticated
+`hybridclr.dhe-base-registry.json` file instead of maintaining parallel command
+line lists. Registry paths can be relative to the registry file, and each entry
+declares one Base ID, engine workflow, baseline snapshot, native manifest,
+BuildIdentity, and (when needed) its supplemental AOT metadata root:
+
+```text
+dotnet HybridCLR.DheTool.dll resource-update \
+  -CurrentRoot C:/build/current-hotfix \
+  -BaseRegistry C:/release/base-registry/supported-bases.json \
+  -SettingsFile C:/project/ProjectSettings/HybridCLRSettings.asset \
+  -OutputRoot C:/build/resource-update
+```
+
+The host rejects duplicate Base IDs, unsupported engine workflows, mixed registry
+and parallel Base arguments, missing registry files, and an identity whose
+`baseId` differs from the registry entry. The resulting resource manifest records
+the registry SHA-256 and entry count, so the audit can prove which online Base set
+was validated. Add a newly shipped Base by adding its archived entry before the
+next resource build; the current DLL/MV payload remains a single shared payload.
+
 The output contains one copy of each current DLL and current MetaVersion. Base inputs
 are compatibility evidence only and are never copied into `payload/`. At
 runtime each Player compares the remote current MetaVersion with its own embedded Base
