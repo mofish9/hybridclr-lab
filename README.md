@@ -6,8 +6,8 @@ HybridCLR community runtime on Tuanjie 1.10.0.
 ## Fixed baseline
 
 - Tuanjie: `1.10.0` (`2022.3.62t12`)
-- HybridCLR package: `v8.13.0` (`optimize/dhe-generated-cpp-resolver-v8.13.0@3a4e3fe`, no package opt tag)
-- HybridCLR runtime: DHE candidate based on `v8.13.0-opt4.1` (`71cf142d`, no new runtime tag)
+- HybridCLR package: `v8.13.0` (`optimize/dhe-generated-cpp-resolver-v8.13.0@6b2444c`, no package opt tag)
+- HybridCLR runtime: DHE candidate based on `v8.13.0-opt4.1` (`fe3b1ed`, no new runtime tag)
 - il2cpp_plus: `v2022-tuanjie-8.13.0-opt4.1` (`52968ad`)
 
 The runtime source repositories live beside this repository under `../repos`.
@@ -28,7 +28,7 @@ and remaining platform gates are recorded in
 `docs/HybridCLR-DHE-Opt4-Release-0.1.18.md`. Projects must install an
 authenticated package whose manifest has `releaseReady=true` and pin its exact
 package ID.
-Toolchain `0.1.19` is the active candidate. It replaces generated-function
+Toolchain `0.1.20` is the active candidate. It replaces generated-function
 name guessing with IL2CPP MethodDef/MethodSpec table resolution and requires a
 source-bound resolver regression report from each of the three locked Editors
 before it can be published as Release.
@@ -40,7 +40,7 @@ logical property/event metadata, custom attributes, reflection, and
 cross-assembly calls. Three independently built Unity 2021, Unity 2022, and Tuanjie 2022
 Base Players consumed the same four-assembly structural current payload while computing
 71 changed methods each.
-The 0.1.19 release contract extends this proof to an arbitrary changed-Player
+The 0.1.20 release contract extends this proof to an arbitrary changed-Player
 evidence list and requires Unity 2021, Unity 2022, and Tuanjie 2022 coverage
 over one shared current payload.
 `releaseReady=true` additionally requires `Mode Release`, clean

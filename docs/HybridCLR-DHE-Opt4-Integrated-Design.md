@@ -23,9 +23,9 @@ The old base commits and patches remain in the locks as replay and migration
 evidence. They are not the source identities used to build the integrated
 runtime.
 
-The active 0.1.19 candidate extends that integrated line with the locked
-HybridCLR commit `71cf142da1c00fc2a690e0063da14866f678d57c` and package commit
-`3a4e3fe0ec78ea689ba35f938bbda6b8da1699e4`. These candidate commits are the
+The active 0.1.20 candidate extends that integrated line with the locked
+HybridCLR commit `fe3b1edb222511a1d3227f7e76e8b83b618c4d27` and package commit
+`6b2444c018e870e966159fe098dbdcf9e2d8c5f9`. These candidate commits are the
 identities used by the current runtime manifests and exploratory toolchain
 package; no new runtime tag has been created yet.
 
@@ -123,9 +123,12 @@ rebuild is not a substitute and is rejected when it would lose universal guard
 coverage.
 
 The current release conclusion is conditional: Windows dual-Base Player
-correctness and all three real-header native lanes are the completed evidence
-surfaces. Android/iOS Player, device smoke, performance, memory, temperature,
-and weak-core gates are not complete and must not be inferred from them.
+correctness and all three real-header native lanes are completed evidence
+surfaces. A Unity 2021 Android ARM64 APK has also passed exploratory offline
+IL2CPP/NDK compilation and packaged-asset identity checks, but it has no device
+result and is not bound to the current clean lab commit. Android device smoke,
+PSS/RSS, temperature and weak-core gates, plus all iOS/Xcode/device gates, are
+not complete and must not be inferred from the offline build.
 
 ## Rollback
 

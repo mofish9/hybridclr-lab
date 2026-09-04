@@ -46,8 +46,8 @@ Release preflight 会实时重算上述身份。dirty、mixed SVN revision、sur
 Editor 版本、integrated commit/tree、审计 patch hash、目标引擎不匹配、未登记 package 文件或
 runtime tree 漂移都会失败。integrated 模式只校验源码，不再应用 overlay。
 
-当前 `0.1.19` 候选的锁已经更新为：HybridCLR `71cf142da1c00fc2a690e0063da14866f678d57c`、
-HybridCLR Unity package `3a4e3fe0ec78ea689ba35f938bbda6b8da1699e4`，以及同一三引擎
+当前 `0.1.20` 候选的锁已经更新为：HybridCLR `fe3b1edb222511a1d3227f7e76e8b83b618c4d27`、
+HybridCLR Unity package `6b2444c018e870e966159fe098dbdcf9e2d8c5f9`，以及同一三引擎
 `il2cpp_plus` opt4.1 维护线。候选尚未创建新的 runtime tag、尚未推送，也不能作为
 Release package 使用；以 `manifests/dhe-runtime-lock.json`、`dhe-package-lock.json` 和
 `repo-lock.json` 中的完整 commit/tree/hash 为准。
@@ -133,6 +133,20 @@ scripts-only/final Player。只有 Player、resource、release、archive 和 sch
 Android 和桌面证据不能替代 iOS。iOS 使用同一套 C# host/package/adapter，但仍必须在 macOS
 安装对应 Editor module，并完成 Xcode、签名和设备 smoke。缺少该环境时只能声明源码与
 Windows/Android lane 已通过，不能声明 iOS 已验证。
+
+当前 `0.1.20` 候选已有一轮 Unity `2021.3.45f2` Android ARM64 探索性离线证据：Base
+preflight 的 4/4 程序集兼容、26,287 个 universal native guards、IL2CPP/NDK 编译和 APK
+构建均通过；APK SHA-256 为
+`49c76a9425554ad575475af1a2b702d12e1f6f91b006599ac9a14b1d4531e849`，包内 24 个
+`HybridCLRLab` StreamingAssets 与 staging 逐字节一致。后续 current 也已由 Unity
+`Prepare` 编译链生成，并以单份 DLL/MV/AOT metadata payload 完成 resource update 和
+staging，Base MetaVersion tree 与 APK hash 均未变化。该证据位于
+`artifacts/dhe-u21-android-base-20260904-v4`、
+`artifacts/dhe-u21-android-current-preflight-20260904-v1`、
+`artifacts/resource-update-u21-android-20260904-v3` 和
+`artifacts/resource-stage-u21-android-20260904-v2.json`，属于本地 exploratory 产物，未绑定
+当前 clean lab commit。由于没有连接 Android 设备，也没有生成 `dhe-player-result.json`，
+Android 真机 correctness、PSS/RSS、温度和弱核门禁仍未完成；iOS/Xcode/device 也仍未验证。
 
 ## 回滚
 

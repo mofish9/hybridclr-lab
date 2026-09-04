@@ -137,7 +137,7 @@ SHA-256；任一文件缺失或篡改都拒绝整包，不留下可接受的部�
 
 真实 Player/device smoke 完成后，运行 `resource-player-evidence`，把该 Player result、上述
 stage report、资源发布目录和归档的 Base `player-workflow-report.json` 绑定为
-`resource-player-workflow-report.json`。0.1.19 起以可扩展的 `player-changed` 列表记录所有
+`resource-player-workflow-report.json`。0.1.20 起以可扩展的 `player-changed` 列表记录所有
 代表性 Base，至少覆盖 Unity 2021、Unity 2022、团结 2022 三个不同 Base；所有记录必须绑定
 同一个 current manifest、validation 和 assembly set。不再要求、也不允许通过重建非
 universal-guard 的
@@ -226,8 +226,8 @@ metadata set、错误 Base、废弃 sidecar 残留和缺 capability 等负例均
 平台层缺陷仍必须通过新 Base Player 修复。
 
 这证明“Base 只构建一次、后续一份资源包服务多个 Base”的架构链路成立，但不等于官方旗舰版
-DHE 的全部元数据能力。当前候选源码使用 HybridCLR commit `71cf142`、package commit
-`3a4e3fe5` 和三条已锁定的 il2cpp_plus `opt4.1` 维护线；本轮尚未创建新的 runtime tag，也未
+DHE 的全部元数据能力。当前候选源码使用 HybridCLR commit `fe3b1ed`、package commit
+`6b2444c` 和三条已锁定的 il2cpp_plus `opt4.1` 维护线；本轮尚未创建新的 runtime tag，也未
 合入正式 package 维护分支。Android Player、iOS/Xcode/device、性能、内存和现有结构限制仍是
 正式发布前的独立门禁；当前结论只能是 Windows Player 与三引擎 native 有条件通过，不能声明
 全平台生产发布完成。

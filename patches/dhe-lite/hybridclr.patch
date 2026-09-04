@@ -1,8 +1,8 @@
 diff --git a/hybridclr/DheRuntime.cpp b/hybridclr/DheRuntime.cpp
-index 7103ed2..74d76a8 100644
+index 7103ed2..86a98f1 100644
 --- a/hybridclr/DheRuntime.cpp
 +++ b/hybridclr/DheRuntime.cpp
-@@ -18,6 +18,7 @@
+@@ -18,21 +18,32 @@
  #include "interpreter/Interpreter.h"
  #include "interpreter/InterpreterModule.h"
  #include "interpreter/InterpreterDefs.h"
@@ -10,7 +10,10 @@ index 7103ed2..74d76a8 100644
  #include "vm/Exception.h"
  #include "Il2CppCompatibleDef.h"
  
-@@ -25,14 +26,22 @@ namespace hybridclr::dhe
+-namespace hybridclr::dhe
++namespace hybridclr
++{
++namespace dhe
  {
  namespace
  {
@@ -35,7 +38,7 @@ index 7103ed2..74d76a8 100644
      };
  
      struct PublishedState
-@@ -46,6 +55,11 @@ namespace
+@@ -46,6 +57,11 @@ namespace
      std::recursive_mutex s_registrationMutex;
      const PublishedState* s_emptyState = new PublishedState();
      std::atomic<const PublishedState*> s_publishedState{ s_emptyState };
@@ -47,7 +50,7 @@ index 7103ed2..74d76a8 100644
      std::atomic<int32_t> s_interpreterEntryCount{ 0 };
      std::atomic<int32_t> s_aotBridgeCallCount{ 0 };
      std::atomic<int32_t> s_aotEntryCount{ 0 };
-@@ -154,6 +168,22 @@ namespace
+@@ -154,6 +170,22 @@ namespace
          offset += sizeof(value);
          return true;
      }
@@ -70,7 +73,7 @@ index 7103ed2..74d76a8 100644
  }
  
  bool ComputeSha256(const void* data, uint32_t size, Sha256Digest& result)
-@@ -206,37 +236,28 @@ bool ParseMetaVersion(const void* data, uint32_t size, MetaVersionData& result)
+@@ -206,37 +238,28 @@ bool ParseMetaVersion(const void* data, uint32_t size, MetaVersionData& result)
      size_t offset = kMetaVersionMagicSize;
      uint32_t schemaVersion = 0;
      uint32_t assemblyNameSize = 0;
@@ -94,19 +97,19 @@ index 7103ed2..74d76a8 100644
 -
 -    // The first format stores 32 bytes each for baseline/current SHA-256.
 -    if (size - offset < 64 || size - offset - 64 < assemblyNameSize)
-+        (result.flags & ~kMetaVersionKnownFlags) != 0 ||
-+        typeCount > (size - offset) / kMetaVersionTypeSize)
-     {
-         return false;
-     }
+-    {
+-        return false;
+-    }
 -    std::memcpy(result.baselineAssemblyHash.data(), bytes + offset, kSha256DigestSize);
 -    std::memcpy(result.currentAssemblyHash.data(), bytes + offset + kSha256DigestSize, kSha256DigestSize);
 -    offset += 64;
 -
 -    if (size - offset < assemblyNameSize)
--    {
--        return false;
--    }
++        (result.flags & ~kMetaVersionKnownFlags) != 0 ||
++        typeCount > (size - offset) / kMetaVersionTypeSize)
+     {
+         return false;
+     }
 -
 -    const size_t tokenBytes = size - offset - assemblyNameSize;
 -    if (methodCount > tokenBytes / sizeof(uint32_t) ||
@@ -119,7 +122,7 @@ index 7103ed2..74d76a8 100644
      {
          return false;
      }
-@@ -249,17 +270,48 @@ bool ParseMetaVersion(const void* data, uint32_t size, MetaVersionData& result)
+@@ -249,17 +272,48 @@ bool ParseMetaVersion(const void* data, uint32_t size, MetaVersionData& result)
      }
      offset += assemblyNameSize;
  
@@ -130,9 +133,7 @@ index 7103ed2..74d76a8 100644
 +    std::unordered_set<uint32_t> typeTokens;
 +    result.types.reserve(typeCount);
 +    for (uint32_t index = 0; index < typeCount; ++index)
-     {
--        uint32_t token = 0;
--        if (!ReadU32(bytes, size, offset, token) || token == 0 || !uniqueTokens.insert(token).second)
++    {
 +        MetaVersionType type;
 +        if (!ReadDigest(bytes, size, offset, type.stableId) ||
 +            !ReadDigest(bytes, size, offset, type.version) ||
@@ -142,11 +143,10 @@ index 7103ed2..74d76a8 100644
 +            (type.flags & ~kMetaVersionKnownTypeFlags) != 0 ||
 +            !typeIds.insert(DigestKey(type.stableId)).second ||
 +            !typeTokens.insert(type.token).second)
-         {
-             result = MetaVersionData{};
-             return false;
-         }
--        result.changedMethodTokens.push_back(token);
++        {
++            result = MetaVersionData{};
++            return false;
++        }
 +        result.types.push_back(type);
 +    }
 +
@@ -154,7 +154,9 @@ index 7103ed2..74d76a8 100644
 +    std::unordered_set<uint32_t> methodTokens;
 +    result.methods.reserve(methodCount);
 +    for (uint32_t index = 0; index < methodCount; ++index)
-+    {
+     {
+-        uint32_t token = 0;
+-        if (!ReadU32(bytes, size, offset, token) || token == 0 || !uniqueTokens.insert(token).second)
 +        MetaVersionMethod method;
 +        if (!ReadDigest(bytes, size, offset, method.stableId) ||
 +            !ReadDigest(bytes, size, offset, method.version) ||
@@ -166,15 +168,16 @@ index 7103ed2..74d76a8 100644
 +            typeIds.find(DigestKey(method.declaringTypeStableId)) == typeIds.end() ||
 +            !methodIds.insert(DigestKey(method.stableId)).second ||
 +            !methodTokens.insert(method.token).second)
-+        {
-+            result = MetaVersionData{};
-+            return false;
-+        }
+         {
+             result = MetaVersionData{};
+             return false;
+         }
+-        result.changedMethodTokens.push_back(token);
 +        result.methods.push_back(method);
      }
      return offset == size;
  }
-@@ -369,58 +421,34 @@ bool ParseMetaVersion(const void* data, uint32_t size, MetaVersionData& result)
+@@ -369,58 +423,34 @@ bool ParseMetaVersion(const void* data, uint32_t size, MetaVersionData& result)
          }
      }
  
@@ -246,7 +249,7 @@ index 7103ed2..74d76a8 100644
  bool IsChangedMethod(const MethodInfo* method)
  {
      if (!method || !method->klass || !method->klass->image || !method->klass->image->assembly)
-@@ -433,8 +461,64 @@ bool IsChangedMethod(const MethodInfo* method)
+@@ -433,8 +463,64 @@ bool IsChangedMethod(const MethodInfo* method)
      {
          return false;
      }
@@ -313,7 +316,7 @@ index 7103ed2..74d76a8 100644
  }
  
  bool ShouldDispatchToInterpreter(const MethodInfo* method)
-@@ -444,28 +528,12 @@ bool ShouldDispatchToInterpreter(const MethodInfo* method)
+@@ -444,28 +530,12 @@ bool ShouldDispatchToInterpreter(const MethodInfo* method)
      return IsChangedMethod(method);
  }
  
@@ -344,7 +347,7 @@ index 7103ed2..74d76a8 100644
      const Il2CppImage* image = il2cpp::vm::Assembly::GetImage(assembly);
      if (!image)
      {
-@@ -494,6 +562,78 @@ const MethodInfo* ResolveMethodByToken(const char* assemblyName, uint32_t token)
+@@ -494,6 +564,78 @@ const MethodInfo* ResolveMethodByToken(const char* assemblyName, uint32_t token)
      return nullptr;
  }
  
@@ -423,7 +426,7 @@ index 7103ed2..74d76a8 100644
  const MethodInfo* ResolveMethodByNameAndToken(const char* assemblyName,
      const char* declaringType, const char* methodName, uint32_t parameterCount, uint32_t token)
  {
-@@ -524,43 +664,36 @@ const MethodInfo* ResolveMethodByNameAndToken(const char* assemblyName,
+@@ -524,43 +666,36 @@ const MethodInfo* ResolveMethodByNameAndToken(const char* assemblyName,
      return method && method->token == token ? method : nullptr;
  }
  
@@ -487,7 +490,7 @@ index 7103ed2..74d76a8 100644
              return false;
          }
  
-@@ -581,8 +714,6 @@ bool PrepareChangedMethods(const Il2CppAssembly* assembly,
+@@ -581,8 +716,6 @@ bool PrepareChangedMethods(const Il2CppAssembly* assembly,
              hybridclr::InitAndGetInterpreterDirectlyCallMethodPointer(method);
          if (!interpreterPointer)
          {
@@ -496,7 +499,7 @@ index 7103ed2..74d76a8 100644
              return false;
          }
          // The direct-call pointer can have been initialized by an earlier
-@@ -590,31 +721,228 @@ bool PrepareChangedMethods(const Il2CppAssembly* assembly,
+@@ -590,31 +723,228 @@ bool PrepareChangedMethods(const Il2CppAssembly* assembly,
          // token, so make the interpreter implementation bit explicit.
          const_cast<MethodInfo*>(method)->isInterpterImpl = true;
      }
@@ -737,7 +740,7 @@ index 7103ed2..74d76a8 100644
  }
  
  int32_t ExecuteInterpreterI4I4(const MethodInfo* method, int32_t value)
-@@ -867,6 +1195,7 @@ void ResetForTests()
+@@ -867,6 +1197,8 @@ void ResetForTests()
  {
      std::lock_guard<std::recursive_mutex> lock(s_registrationMutex);
      s_publishedState.store(new PublishedState(), std::memory_order_release);
@@ -745,22 +748,26 @@ index 7103ed2..74d76a8 100644
      ResetDispatchCounters();
  }
  }
++}
 diff --git a/hybridclr/DheRuntime.h b/hybridclr/DheRuntime.h
-index e143176..23a52e9 100644
+index e143176..54f5f11 100644
 --- a/hybridclr/DheRuntime.h
 +++ b/hybridclr/DheRuntime.h
-@@ -6,43 +6,79 @@
+@@ -6,43 +6,91 @@
  #include <vector>
  
  struct Il2CppAssembly;
 +struct Il2CppClass;
  struct MethodInfo;
  
- namespace hybridclr::dhe
+-namespace hybridclr::dhe
++namespace hybridclr
  {
 -    // The DHE-lite binary MV format is intentionally small and immutable. It
 -    // carries the current method tokens; IL and metadata remain in the
 -    // homologous DLL loaded by the existing runtime path.
++namespace dhe
++{
 +    // The Base Player embeds one immutable MetaVersion per DHE assembly. At
 +    // runtime it is compared with the current MetaVersion shipped beside the
 +    // current managed assembly.
@@ -804,6 +811,16 @@ index e143176..23a52e9 100644
 +
 +    struct MetaVersionRegistration
 +    {
++        MetaVersionRegistration() = default;
++        MetaVersionRegistration(const Il2CppAssembly* baseAssemblyValue,
++            const MetaVersionData* baseMetaVersionValue,
++            const MetaVersionData* currentMetaVersionValue)
++            : baseAssembly(baseAssemblyValue),
++              baseMetaVersion(baseMetaVersionValue),
++              currentMetaVersion(currentMetaVersionValue)
++        {
++        }
++
 +        const Il2CppAssembly* baseAssembly = nullptr;
 +        const MetaVersionData* baseMetaVersion = nullptr;
 +        const MetaVersionData* currentMetaVersion = nullptr;
@@ -840,7 +857,7 @@ index e143176..23a52e9 100644
  
      // Called by generated AOT entry guards to select changed methods without
      // replacing the AOT method pointer used by unchanged methods.
-@@ -54,6 +90,7 @@ namespace hybridclr::dhe
+@@ -54,6 +102,7 @@ namespace hybridclr::dhe
      const MethodInfo* ResolveMethodByToken(const char* assemblyName, uint32_t token);
      const MethodInfo* ResolveMethodByNameAndToken(const char* assemblyName,
          const char* declaringType, const char* methodName, uint32_t parameterCount, uint32_t token);
@@ -848,6 +865,11 @@ index e143176..23a52e9 100644
      // Direct bridge for supported generated native ABI shapes. It executes
      // current IL through Interpreter::Execute instead of calling
      // methodPointerCallByInterp, whose generated entry may be the AOT guard.
+@@ -89,3 +138,4 @@ namespace hybridclr::dhe
+     // DHE assembly because the corresponding homologous image is one-shot.
+     void ResetForTests();
+ }
++}
 diff --git a/hybridclr/RuntimeApi.cpp b/hybridclr/RuntimeApi.cpp
 index e4f38ae..9095781 100644
 --- a/hybridclr/RuntimeApi.cpp

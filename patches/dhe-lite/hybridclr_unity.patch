@@ -1,5 +1,5 @@
 diff --git a/Data~/hybridclr_version.json b/Data~/hybridclr_version.json
-index b68c3b37171d9dfa435793d9b542127d967f4758..043ee04c5e7a8ef4b4d4f6a378b154ae4bf9147e 100644
+index b68c3b3..043ee04 100644
 --- a/Data~/hybridclr_version.json
 +++ b/Data~/hybridclr_version.json
 @@ -12,18 +12,18 @@
@@ -28,10 +28,10 @@ index b68c3b37171d9dfa435793d9b542127d967f4758..043ee04c5e7a8ef4b4d4f6a378b154ae
      {
          "unity_version":"2023",
 diff --git a/Documentation~/dhe-project-integration.md b/Documentation~/dhe-project-integration.md
-index 148b890f266395de26231aedb2b24fac74530650..604902a2dffbf8d8b20c4088f63799a4038dbbfd 100644
+index 148b890..70bdc87 100644
 --- a/Documentation~/dhe-project-integration.md
 +++ b/Documentation~/dhe-project-integration.md
-@@ -1,80 +1,155 @@
+@@ -1,80 +1,165 @@
  # DHE project integration
  
 -The customized package owns DHE assembly generation, runtime-plan staging,
@@ -153,7 +153,7 @@ index 148b890f266395de26231aedb2b24fac74530650..604902a2dffbf8d8b20c4088f63799a4
 +```text
 +payload/<assembly>.dll.bytes
 +payload/<assembly>.mv.bytes
-+  payload/aot-metadata/<sha256>.bytes   # deduplicated supplemental metadata blobs
++  payload/aot-metadata/<sha256-prefix-128>.bytes # deduplicated blobs; full SHA-256 stays in the plan
 +dhe-runtime-plan.json
 +dhe-resource-update.json
 +dhe-resource-update-validation.json
@@ -209,6 +209,12 @@ index 148b890f266395de26231aedb2b24fac74530650..604902a2dffbf8d8b20c4088f63799a4
 +maps every `baseId` through `baseSelections`; a Player loads only the set selected
 +for its own identity. A Player built with an older managed runtime or without this
 +identity/capability is rejected instead of being treated as an equivalent Base.
++
++For consecutive resource releases, keep the archived Base registry and each
++Player's embedded Base MetaVersion unchanged. Run `resource-update` again for
++the new current DLL set and stage its single payload over the previous resource
++root; do not promote the previous current DLL/MV into a new baseline unless a
++new Base Player is intentionally shipped and added to the registry.
  
  ## Runtime adapter
  
@@ -239,12 +245,16 @@ index 148b890f266395de26231aedb2b24fac74530650..604902a2dffbf8d8b20c4088f63799a4
 +   `DheRuntime.LoadAssemblyImages` once before any ordinary `Assembly.Load`
 +   or game logic. The batch call publishes the complete DHE set atomically.
 +
++The demo's `DheStreamingAssetReader` covers filesystem platforms and Android
++APK ZIP entries; a production provider must keep the same relative-path and
++integrity semantics when its catalog resolves remote bundles on Android/iOS.
++
 +Every Player reads Base MetaVersion from its immutable built-in asset root and compares
 +it with the one remote current MetaVersion. Project code must not select a per-Base
 +remote delta or reimplement MV parsing, Base identity matching, transaction
 +retry, changed-method dispatch, or native identity checks.
 diff --git a/Editor/Commands/CompileDllCommand.cs b/Editor/Commands/CompileDllCommand.cs
-index 583368e10eca9d9b2a9c89c64cd27cd7ea13de5d..52b9504f5216e66050b0ce5089e97d5b7b8dbacd 100644
+index 583368e..52b9504 100644
 --- a/Editor/Commands/CompileDllCommand.cs
 +++ b/Editor/Commands/CompileDllCommand.cs
 @@ -20,6 +20,12 @@ namespace HybridCLR.Editor.Commands
@@ -261,7 +271,7 @@ index 583368e10eca9d9b2a9c89c64cd27cd7ea13de5d..52b9504f5216e66050b0ce5089e97d5b
              ScriptCompilationResult scriptCompilationResult = PlayerBuildInterface.CompilePlayerScripts(scriptCompilationSettings, buildDir);
  #if UNITY_2022
 diff --git a/Editor/Commands/DheBuildPipeline.cs b/Editor/Commands/DheBuildPipeline.cs
-index aa81ffd609dfc43593ccbb898655c106fcf084c3..35651f3aea418a1f3c18f3f2a30bfae496d435a7 100644
+index aa81ffd..35651f3 100644
 --- a/Editor/Commands/DheBuildPipeline.cs
 +++ b/Editor/Commands/DheBuildPipeline.cs
 @@ -24,11 +24,41 @@ namespace HybridCLR.Editor.Commands
@@ -2100,7 +2110,7 @@ index aa81ffd609dfc43593ccbb898655c106fcf084c3..35651f3aea418a1f3c18f3f2a30bfae4
      {
          public string OutputPath;
 diff --git a/Editor/Commands/DheProjectBuildSupport.cs b/Editor/Commands/DheProjectBuildSupport.cs
-index 8003bb459d996d9ff8ac4581b2bc8c21571540d4..09ca286bb21c585e034176ce0295ad2cb47e7ecf 100644
+index 8003bb4..09ca286 100644
 --- a/Editor/Commands/DheProjectBuildSupport.cs
 +++ b/Editor/Commands/DheProjectBuildSupport.cs
 @@ -34,6 +34,7 @@ namespace HybridCLR.Editor.Commands
@@ -2742,7 +2752,7 @@ index 8003bb459d996d9ff8ac4581b2bc8c21571540d4..09ca286bb21c585e034176ce0295ad2c
          public string IdentityClassName = "DheBuildIdentity";
      }
 diff --git a/Editor/Commands/DheProjectResourceSupport.cs b/Editor/Commands/DheProjectResourceSupport.cs
-index 2b1525d838b1a73206a56242f22db7ef120a97e2..3644882eede03c3bc283abed9da50cbc31eb7b76 100644
+index 2b1525d..3644882 100644
 --- a/Editor/Commands/DheProjectResourceSupport.cs
 +++ b/Editor/Commands/DheProjectResourceSupport.cs
 @@ -143,6 +143,7 @@ namespace HybridCLR.Editor.Commands
@@ -2902,7 +2912,7 @@ index 2b1525d838b1a73206a56242f22db7ef120a97e2..3644882eede03c3bc283abed9da50cbc
          private sealed class RequiredAssetSpec
          {
 diff --git a/Editor/Commands/DheProjectWorkflowRunner.cs b/Editor/Commands/DheProjectWorkflowRunner.cs
-index f24c4814d42953d715d188ba58b66994602a02bf..d3f6774fa57b7ac5ba82f4c560729640c46c8302 100644
+index f24c481..d3f6774 100644
 --- a/Editor/Commands/DheProjectWorkflowRunner.cs
 +++ b/Editor/Commands/DheProjectWorkflowRunner.cs
 @@ -30,6 +30,7 @@ namespace HybridCLR.Editor.Commands
@@ -2959,7 +2969,7 @@ index f24c4814d42953d715d188ba58b66994602a02bf..d3f6774fa57b7ac5ba82f4c560729640
                  string.IsNullOrWhiteSpace(adapter.IdentityNamespace) ||
                  string.IsNullOrWhiteSpace(adapter.IdentityClassName))
 diff --git a/Editor/Commands/StripAOTDllCommand.cs b/Editor/Commands/StripAOTDllCommand.cs
-index 6eaf1b06816ee67e06f949029b2b7025c1b31e4d..f37c4c40299f37027e59ae8b528383f9285c648f 100644
+index 6eaf1b0..f37c4c4 100644
 --- a/Editor/Commands/StripAOTDllCommand.cs
 +++ b/Editor/Commands/StripAOTDllCommand.cs
 @@ -135,6 +135,11 @@ namespace HybridCLR.Editor.Commands
@@ -2975,7 +2985,7 @@ index 6eaf1b06816ee67e06f949029b2b7025c1b31e4d..f37c4c40299f37027e59ae8b528383f9
                      subtarget = (int)StandaloneBuildSubtarget.Server,
  #endif
 diff --git a/Runtime/DheRuntime.cs b/Runtime/DheRuntime.cs
-index 0e5fda333a02679185da6196ad587930e12519b8..414d357151691b52b53c5bc44a10c3cd7f8086c4 100644
+index 0e5fda3..414d357 100644
 --- a/Runtime/DheRuntime.cs
 +++ b/Runtime/DheRuntime.cs
 @@ -1,6 +1,7 @@
@@ -4136,7 +4146,7 @@ index 0e5fda333a02679185da6196ad587930e12519b8..414d357151691b52b53c5bc44a10c3cd
          {
              string normalized = string.IsNullOrWhiteSpace(value) ? DefaultAssetRoot :
 diff --git a/Runtime/RuntimeApi.cs b/Runtime/RuntimeApi.cs
-index b79bf17922b27bee757b0b66f6949c6d6c7e7bef..3471579037f5f523c1cdb69646e2c78a6185ca41 100644
+index b79bf17..3471579 100644
 --- a/Runtime/RuntimeApi.cs
 +++ b/Runtime/RuntimeApi.cs
 @@ -44,28 +44,36 @@ namespace HybridCLR
