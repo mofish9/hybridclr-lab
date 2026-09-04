@@ -104,13 +104,15 @@ internal static class LabCommands
         builder.AppendLine("    public interface IStressContract<T> { T Transform(T value); }");
         builder.AppendLine("    public static class MetadataStressEntry");
         builder.AppendLine("    {");
+        builder.AppendLine("        [System.Runtime.CompilerServices.MethodImpl(System.Runtime.CompilerServices.MethodImplOptions.NoInlining)]");
+        builder.AppendLine("        private static long Accumulate(long left, long right) { return left + right; }");
         builder.AppendLine("        public static long Touch()");
         builder.AppendLine("        {");
         builder.AppendLine("            long checksum = 0;");
         for (var i = 0; i < typeCount; i += 16)
         {
-            builder.AppendLine($"            checksum += new StressType{i:D4}().Method00({i + 1});");
-            builder.AppendLine($"            checksum += new StressType{i:D4}.Nested<int>({i}).Value;");
+            builder.AppendLine($"            checksum = Accumulate(checksum, new StressType{i:D4}().Method00({i + 1}));");
+            builder.AppendLine($"            checksum = Accumulate(checksum, new StressType{i:D4}.Nested<int>({i}).Value);");
         }
         builder.AppendLine("            return checksum;");
         builder.AppendLine("        }");
@@ -173,14 +175,16 @@ internal static class LabCommands
         SafeDelete(output, lab); SafeDelete(aotOutput, lab);
         Directory.CreateDirectory(output); Directory.CreateDirectory(aotOutput);
         var targetDefine = target.Equals("StandaloneWindows64", StringComparison.OrdinalIgnoreCase) ? "HYBRIDCLR_TARGET_WINDOWS" : target.Equals("Android", StringComparison.OrdinalIgnoreCase) ? "HYBRIDCLR_TARGET_ANDROID" : "";
-        // Keep the fixture variants comparable to the historical DHE gate:
-        // the baseline dependency build uses the project defaults and the
-        // current dependency build adds only DHE_CURRENT. Target-specific
-        // symbols would change compiler-generated metadata/token ordering and
-        // turn a body-only diff into a false layout/token incompatibility.
-        var dependencyDefine = isCurrent
-            ? isStructural ? "DHE_CURRENT;DHE_STRUCTURE_CURRENT" : "DHE_CURRENT"
-            : targetDefine;
+        // Target symbols select platform interop declarations and must remain
+        // stable between a Base and its current assembly set. Variant symbols
+        // are additive so an Android current build cannot accidentally regain
+        // Windows-only P/Invoke methods.
+        var dependencyDefine = string.Join(";", new[]
+        {
+            targetDefine,
+            isCurrent ? "DHE_CURRENT" : string.Empty,
+            isStructural ? "DHE_STRUCTURE_CURRENT" : string.Empty,
+        }.Where(value => !string.IsNullOrWhiteSpace(value)));
         var projects = new[]
         {
             "managed-cases/HybridCLR.ManagedCases/HybridCLR.ManagedCases.csproj",

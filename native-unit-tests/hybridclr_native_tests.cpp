@@ -9,6 +9,7 @@
 #include <limits>
 #include <string>
 #include <thread>
+#include <type_traits>
 #include <vector>
 
 #include "hybridclr/Il2CppCompatibleDef.h"
@@ -17,6 +18,13 @@
 #define HYBRIDCLR_LAB_DHE_ENABLED 1
 #else
 #define HYBRIDCLR_LAB_DHE_ENABLED 0
+#endif
+
+#if HYBRIDCLR_LAB_DHE_ENABLED
+static_assert(std::is_constructible<hybridclr::dhe::MetaVersionRegistration,
+    const Il2CppAssembly*, const hybridclr::dhe::MetaVersionData*,
+    const hybridclr::dhe::MetaVersionData*>::value,
+    "DHE registration must support C++11 construction on mobile toolchains");
 #endif
 #include "hybridclr/metadata/BlobReader.h"
 #include "hybridclr/metadata/MetadataUtil.h"

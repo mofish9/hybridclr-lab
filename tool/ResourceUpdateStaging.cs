@@ -812,7 +812,8 @@ internal static partial class Program
         string? auditSha256 = GetString(manifest, "baseRegistryAuditSha256");
         if (string.IsNullOrWhiteSpace(registrySha256))
         {
-            if (GetInt(manifest, "baseRegistryEntryCount") != 0 ||
+            if (!manifest.TryGetProperty("baseRegistryEntryCount", out JsonElement entryCount) ||
+                entryCount.ValueKind != JsonValueKind.Null ||
                 !string.IsNullOrWhiteSpace(auditPathValue) ||
                 !string.IsNullOrWhiteSpace(auditSha256))
                 throw new DheException("DHE resource update has Base registry audit fields without a registry.");

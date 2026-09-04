@@ -1727,6 +1727,35 @@ internal static partial class Program
 
         var positiveManifest = ReadJson<JsonElement>(Path.Combine(positive.Update,
             "dhe-resource-update.json"));
+
+        var directBase = CopyFixture("direct-base");
+        string directManifestPath = Path.Combine(directBase.Update,
+            "dhe-resource-update.json");
+        string directValidationPath = Path.Combine(directBase.Update,
+            "dhe-resource-update-validation.json");
+        var directManifest = System.Text.Json.Nodes.JsonNode.Parse(
+            File.ReadAllText(directManifestPath))!.AsObject();
+        var directValidation = System.Text.Json.Nodes.JsonNode.Parse(
+            File.ReadAllText(directValidationPath))!.AsObject();
+        foreach (string property in new[]
+        {
+            "baseRegistrySha256", "baseRegistryEntryCount", "baseRegistryAuditPath",
+            "baseRegistryAuditSha256"
+        })
+        {
+            directManifest[property] = null;
+            directValidation[property] = null;
+        }
+        File.WriteAllText(directValidationPath, directValidation.ToJsonString(Json),
+            new UTF8Encoding(false));
+        directManifest["validationSha256"] = Sha256File(directValidationPath);
+        File.WriteAllText(directManifestPath, directManifest.ToJsonString(Json),
+            new UTF8Encoding(false));
+        AddRegressionCheck(checks, errors, "resource-stage-direct-base-valid",
+            Stage("direct-base-stage", directBase.Update, directBase.Assets,
+                directBase.Identity),
+            "a direct-Base resource update with null registry fields must stage successfully.");
+
         string positiveRegistryHash = GetString(positiveManifest, "baseRegistrySha256") ?? string.Empty;
         string positiveRegistryAuditPath = GetString(positiveManifest,
             "baseRegistryAuditPath") ?? string.Empty;
