@@ -31,6 +31,7 @@ internal static partial class Program
         "resource-stage-base-registry-audit-bound",
         "resource-stage-base-registry-audit-tamper-rejected",
         "resource-stage-base-registry-binding-removal-rejected",
+        "resource-stage-direct-base-valid",
         "resource-base-registry",
         "resource-player-evidence-binding",
         "resource-player-release-readiness",
