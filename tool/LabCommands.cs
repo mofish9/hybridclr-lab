@@ -328,6 +328,7 @@ internal static class LabCommands
     private static int PrepareEngineTestProject(Cli cli)
     {
         var lab = LabRoot(cli); var workflowId = cli.Require("engineworkflow");
+        var target = cli.Optional("target") ?? "StandaloneWindows64";
         var destinationRoot = ResolvePath(lab, cli.Optional("outputroot") ?? "artifacts/engine-projects");
         var destination = Path.Combine(destinationRoot, workflowId);
         SafeDelete(destination, destinationRoot);
@@ -337,6 +338,14 @@ internal static class LabCommands
         foreach (var folder in new[] { "Packages", "ProjectSettings" }) CopyDirectory(Path.Combine(source, folder), Path.Combine(destination, folder));
         foreach (var asset in new[] { "Editor", "Editor.meta", "Runtime", "Runtime.meta", "Scenes", "Scenes.meta" }) CopyDirectoryOrFile(Path.Combine(source, "Assets", asset), Path.Combine(destination, "Assets", asset));
         foreach (var meta in Directory.GetFiles(Path.Combine(destination, "Assets"), "*.meta", SearchOption.AllDirectories)) File.Delete(meta);
+        // The runtime marker references BoundaryContracts only to anchor the
+        // compile-time contract used by the resolver project. Keep this
+        // assembly outside the DHE hot-update plan and install it as a normal
+        // Unity plugin for the prepared test project.
+        var boundaryContracts = ResolvePath(lab, cli.Optional("boundarycontractspath") ??
+            Path.Combine("artifacts", "managed-cases-aot", target, "HybridCLR.BoundaryContracts.dll"));
+        CopyRequired(boundaryContracts,
+            Path.Combine(destination, "Assets", "Plugins", "HybridCLRLab", "HybridCLR.BoundaryContracts.dll"));
         var repoLock = ReadJson(Path.Combine(lab, "manifests/repo-lock.json"));
         var reposRoot = ResolveReposRoot(lab, repoLock, cli.Optional("reposroot"));
         var repoRoot = ResolvePath(lab, cli.Optional("hybridclrUnitySource") ??

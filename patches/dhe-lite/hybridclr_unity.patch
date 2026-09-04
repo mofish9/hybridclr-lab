@@ -4420,10 +4420,19 @@ index 0e5fda3..5caf860 100644
          {
              string normalized = string.IsNullOrWhiteSpace(value) ? DefaultAssetRoot :
 diff --git a/Runtime/DheRuntimeSmoke.cs b/Runtime/DheRuntimeSmoke.cs
-index fe8dde2..df72615 100644
+index fe8dde2..eb9c7bc 100644
 --- a/Runtime/DheRuntimeSmoke.cs
 +++ b/Runtime/DheRuntimeSmoke.cs
-@@ -198,6 +198,9 @@ namespace HybridCLR
+@@ -72,6 +72,8 @@ namespace HybridCLR
+         public string nativeGuardSourceSha256;
+         public string nativeManifestSha256;
+         public string target;
++        public string selectedPayloadVariantId;
++        public string selectedPayloadCurrentAssemblySetSha256;
+         public bool dheEnabled;
+         public int changedMethodCount;
+         public int expectedChangedMethodCount;
+@@ -198,6 +200,9 @@ namespace HybridCLR
                  nativeGuardSourceSha256 = options.ExpectedNativeGuardSourceSha256,
                  nativeManifestSha256 = options.ExpectedNativeManifestSha256,
                  target = options.ExpectedTarget,
