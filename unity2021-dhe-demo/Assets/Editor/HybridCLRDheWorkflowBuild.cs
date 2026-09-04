@@ -220,8 +220,11 @@ namespace HybridCLR.Lab.Editor
                 BeeLogPath = Path.Combine(outputRoot, "native", "bee-rebuild.log"),
                 RequireCompleteCoverage = true,
                 RebuildPlayer = rebuildPlayer,
-                GuardAllMethods = string.Equals(OptionalArgument("-dheBootstrap"), "true", StringComparison.OrdinalIgnoreCase) ||
-                    string.Equals(OptionalArgument("-dheBootstrap"), "1", StringComparison.OrdinalIgnoreCase),
+                // Every DHE Base must remain consumable by later
+                // resource-only updates, so native finalization always
+                // emits universal guards. Bootstrap only controls whether
+                // the baseline is created from the generated current set.
+                GuardAllMethods = true,
                 BeeMaxAttempts = 3,
                 BeeTimeoutSeconds = 600,
             };

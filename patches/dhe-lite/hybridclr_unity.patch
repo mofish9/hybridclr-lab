@@ -2092,7 +2092,7 @@ index aa81ffd..35651f3 100644
      {
          public string OutputPath;
 diff --git a/Editor/Commands/DheProjectBuildSupport.cs b/Editor/Commands/DheProjectBuildSupport.cs
-index 8003bb4..ce14e7f 100644
+index 8003bb4..09ca286 100644
 --- a/Editor/Commands/DheProjectBuildSupport.cs
 +++ b/Editor/Commands/DheProjectBuildSupport.cs
 @@ -34,6 +34,7 @@ namespace HybridCLR.Editor.Commands
@@ -2431,7 +2431,7 @@ index 8003bb4..ce14e7f 100644
                  "            };\n" +
                  "        }\n";
          }
-@@ -302,12 +480,118 @@ namespace HybridCLR.Editor.Commands
+@@ -302,12 +480,130 @@ namespace HybridCLR.Editor.Commands
              return resolved;
          }
  
@@ -2483,6 +2483,18 @@ index 8003bb4..ce14e7f 100644
 +            if (!full.StartsWith(root, StringComparison.OrdinalIgnoreCase))
 +                throw new BuildFailedException("DHE identity project path escapes the project: " + relative);
 +            return full;
++        }
++
++        private static string RequireProjectChild(string projectRoot, string path,
++            string description)
++        {
++            string resolvedRoot = Path.GetFullPath(projectRoot).TrimEnd(Path.DirectorySeparatorChar,
++                Path.AltDirectorySeparatorChar) + Path.DirectorySeparatorChar;
++            string resolvedPath = Path.GetFullPath(path ?? string.Empty);
++            if (!resolvedPath.StartsWith(resolvedRoot, StringComparison.OrdinalIgnoreCase))
++                throw new BuildFailedException(description + " must be inside the project root: " +
++                    resolvedPath);
++            return resolvedPath;
 +        }
 +
 +        private static bool IsSha256(string value)
@@ -2551,7 +2563,7 @@ index 8003bb4..ce14e7f 100644
                  {
                      byte[] name = Encoding.UTF8.GetBytes(record.Key + "\n");
                      sha.TransformBlock(name, 0, name.Length, name, 0);
-@@ -332,6 +616,50 @@ namespace HybridCLR.Editor.Commands
+@@ -332,6 +628,50 @@ namespace HybridCLR.Editor.Commands
                  .ToLowerInvariant();
          }
  
@@ -2602,7 +2614,7 @@ index 8003bb4..ce14e7f 100644
          private static string Quote(string value)
          {
              return "\"" + (value ?? string.Empty).Replace("\\", "\\\\").Replace("\"", "\\\"")
-@@ -376,6 +704,12 @@ namespace HybridCLR.Editor.Commands
+@@ -376,6 +716,12 @@ namespace HybridCLR.Editor.Commands
              public int transformedMethodCount;
              public int nativeEntryCount;
              public int unsupportedMethodCount;
@@ -2615,7 +2627,7 @@ index 8003bb4..ce14e7f 100644
          }
  
          [Serializable]
-@@ -405,12 +739,23 @@ namespace HybridCLR.Editor.Commands
+@@ -405,12 +751,23 @@ namespace HybridCLR.Editor.Commands
              public string workflow;
              public string target;
              public int identityVersion;
@@ -2640,7 +2652,7 @@ index 8003bb4..ce14e7f 100644
              public string generatedCppRoot;
              public string[] generatedCppPaths;
              public string nativeManifestPath;
-@@ -424,6 +769,59 @@ namespace HybridCLR.Editor.Commands
+@@ -424,6 +781,59 @@ namespace HybridCLR.Editor.Commands
              public string baselinePath;
              public string baselineSha256;
              public string snapshotSha256;
@@ -2700,7 +2712,7 @@ index 8003bb4..ce14e7f 100644
          }
      }
  
-@@ -435,6 +833,7 @@ namespace HybridCLR.Editor.Commands
+@@ -435,6 +845,7 @@ namespace HybridCLR.Editor.Commands
          public string Target;
          public int BeeMaxAttempts = 3;
          public int BeeTimeoutSeconds = 600;
@@ -2708,7 +2720,7 @@ index 8003bb4..ce14e7f 100644
      }
  
      public sealed class DheProjectIdentityOptions
-@@ -442,9 +841,12 @@ namespace HybridCLR.Editor.Commands
+@@ -442,9 +853,12 @@ namespace HybridCLR.Editor.Commands
          public string ProjectRoot;
          public string OutputRoot;
          public string BaselineRoot;
@@ -2882,7 +2894,7 @@ index 2b1525d..3644882 100644
          private sealed class RequiredAssetSpec
          {
 diff --git a/Editor/Commands/DheProjectWorkflowRunner.cs b/Editor/Commands/DheProjectWorkflowRunner.cs
-index f24c481..ab3a634 100644
+index f24c481..d3f6774 100644
 --- a/Editor/Commands/DheProjectWorkflowRunner.cs
 +++ b/Editor/Commands/DheProjectWorkflowRunner.cs
 @@ -30,6 +30,7 @@ namespace HybridCLR.Editor.Commands
@@ -2902,15 +2914,20 @@ index f24c481..ab3a634 100644
              try
              {
                  DheNativeFinalizeResult result = BuildPlayer(adapter, context, BuildOptions.None);
-@@ -200,6 +203,7 @@ namespace HybridCLR.Editor.Commands
+@@ -200,6 +203,12 @@ namespace HybridCLR.Editor.Commands
                  ProjectPlanPath = context.ProjectPlanPath,
                  OutputRoot = context.OutputRoot,
                  Target = context.TargetName,
-+                GuardAllMethods = context.GetBooleanArgument("-dheBootstrap"),
++                // Every DHE Base must remain consumable by later
++                // resource-only updates.  The native finalizer therefore
++                // requires universal guards for both bootstrap and
++                // subsequent Base rebuilds; bootstrap only controls the
++                // baseline creation policy.
++                GuardAllMethods = true,
              };
          }
  
-@@ -211,9 +215,14 @@ namespace HybridCLR.Editor.Commands
+@@ -211,9 +220,14 @@ namespace HybridCLR.Editor.Commands
                  ProjectRoot = adapter.ProjectRoot,
                  OutputRoot = context.OutputRoot,
                  BaselineRoot = context.BaselineRoot,
@@ -2925,7 +2942,7 @@ index f24c481..ab3a634 100644
                  IdentityNamespace = adapter.IdentityNamespace,
                  IdentityClassName = adapter.IdentityClassName,
              };
-@@ -224,6 +233,7 @@ namespace HybridCLR.Editor.Commands
+@@ -224,6 +238,7 @@ namespace HybridCLR.Editor.Commands
              if (adapter == null) throw new ArgumentNullException(nameof(adapter));
              if (string.IsNullOrWhiteSpace(adapter.ProjectRoot) || adapter.GetScenes == null ||
                  adapter.BuildPlayer == null || adapter.ResolvePlayerOutput == null ||
