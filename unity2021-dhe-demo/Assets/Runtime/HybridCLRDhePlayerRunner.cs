@@ -96,8 +96,9 @@ namespace HybridCLR.Lab
             {
                 throw new InvalidDataException("DHE runtime plan is empty or invalid.");
             }
-            DheAssemblyPlanData[] selectedPlanAssemblies = SelectRuntimeAssemblies(runtimePlan,
-                runtimeIdentity.BaseId);
+            DheRuntimePayloadVariantData selectedPayloadVariant = SelectRuntimePayloadVariant(
+                runtimePlan, runtimeIdentity.BaseId);
+            DheAssemblyPlanData[] selectedPlanAssemblies = selectedPayloadVariant.assemblies;
             if (!DheRuntime.LoadAotMetadataImages(provider, HomologousImageMode.SuperSet,
                     out LoadImageErrorCode metadataError, out string metadataMessage))
             {
@@ -559,6 +560,9 @@ namespace HybridCLR.Lab
                 selectedBaseId = runtimeIdentity.BaseId,
                 selectedAotMetadataSetId = runtimeIdentity.AotMetadataSetId,
                 selectedBaseMetaVersionSetSha256 = runtimeIdentity.BaseMetaVersionSetSha256,
+                selectedPayloadVariantId = selectedPayloadVariant.variantId,
+                selectedPayloadCurrentAssemblySetSha256 =
+                    selectedPayloadVariant.currentAssemblySetSha256,
                 changedMethodCount = changedMethodCount,
                 expectedChangedMethodCount = changedMethodCount,
                 dispatchProbeValidated = dispatchProbeValidated,
@@ -1347,8 +1351,24 @@ namespace HybridCLR.Lab
         private static DheAssemblyPlanData[] SelectRuntimeAssemblies(DheRuntimePlanData plan,
             string baseId)
         {
+            return SelectRuntimePayloadVariant(plan, baseId).assemblies;
+        }
+
+        private static DheRuntimePayloadVariantData SelectRuntimePayloadVariant(
+            DheRuntimePlanData plan, string baseId)
+        {
             if (plan.payloadVariants == null || plan.payloadVariants.Length == 0)
-                return plan.assemblies ?? Array.Empty<DheAssemblyPlanData>();
+            {
+                if (plan.assemblies == null || plan.assemblies.Length == 0 ||
+                    string.IsNullOrWhiteSpace(plan.currentAssemblySetSha256))
+                    throw new InvalidDataException("DHE runtime plan has no default payload variant.");
+                return new DheRuntimePayloadVariantData
+                {
+                    variantId = "default",
+                    currentAssemblySetSha256 = plan.currentAssemblySetSha256,
+                    assemblies = plan.assemblies,
+                };
+            }
             DheRuntimeBaseSelectionData[] selections = plan.baseSelections ??
                 Array.Empty<DheRuntimeBaseSelectionData>();
             DheRuntimeBaseSelectionData[] matches = selections.Where(item => item != null &&
@@ -1364,7 +1384,7 @@ namespace HybridCLR.Lab
                 !string.Equals(matches[0].currentAssemblySetSha256,
                     variants[0].currentAssemblySetSha256, StringComparison.OrdinalIgnoreCase))
                 throw new InvalidDataException("DHE runtime plan payload variant is not bound to this Base.");
-            return variants[0].assemblies;
+            return variants[0];
         }
 
         private static string[] GetAssemblyNames(Dictionary<string, LoadedDheAssembly> assemblies)
@@ -1821,6 +1841,8 @@ namespace HybridCLR.Lab
             public string selectedBaseId;
             public string selectedAotMetadataSetId;
             public string selectedBaseMetaVersionSetSha256;
+            public string selectedPayloadVariantId;
+            public string selectedPayloadCurrentAssemblySetSha256;
             public bool passed;
             public string error;
             public string loadError;

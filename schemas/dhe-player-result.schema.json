@@ -39,6 +39,8 @@
     "target": { "type": ["string", "null"], "pattern": "^[A-Za-z0-9._-]+$" },
     "selectedBaseId": { "type": ["string", "null"], "pattern": "^[0-9a-fA-F]{64}$" },
     "selectedAotMetadataSetId": { "type": ["string", "null"], "pattern": "^[0-9a-fA-F]{64}$" },
+    "selectedPayloadVariantId": { "type": ["string", "null"], "pattern": "^[A-Za-z0-9._-]{1,64}$" },
+    "selectedPayloadCurrentAssemblySetSha256": { "type": ["string", "null"], "pattern": "^[0-9a-fA-F]{64}$" },
     "expectedChangedMethodCount": { "type": "integer", "minimum": 0 },
     "dispatchProbeValidated": { "type": "boolean" },
     "noOpAotBehaviorValidated": { "type": "boolean" },
@@ -109,7 +111,7 @@
     {
       "if": { "properties": { "passed": { "const": true } }, "required": ["passed"] },
       "then": {
-        "required": ["loadError", "target", "plannedDheAssemblies", "loadedDheAssemblies", "changedMethodCount", "retryValidated", "retryAssemblyName", "retryFailure", "transactionStatus", "assemblyValidations", "multiAssemblyValidated", "buildIdentityValidated", "identityVersion", "aotSnapshotKind", "nativeGuardSourceSha256", "nativeManifestSha256", "selectedBaseId", "selectedAotMetadataSetId", "expectedChangedMethodCount", "dispatchProbeValidated", "noOpAotBehaviorValidated", "changedProbeChanged", "unchangedProbeChanged", "interpreterEntryCount", "aotEntryCount"],
+        "required": ["loadError", "target", "plannedDheAssemblies", "loadedDheAssemblies", "changedMethodCount", "retryValidated", "retryAssemblyName", "retryFailure", "transactionStatus", "assemblyValidations", "multiAssemblyValidated", "buildIdentityValidated", "identityVersion", "aotSnapshotKind", "nativeGuardSourceSha256", "nativeManifestSha256", "selectedBaseId", "selectedAotMetadataSetId", "selectedPayloadVariantId", "selectedPayloadCurrentAssemblySetSha256", "expectedChangedMethodCount", "dispatchProbeValidated", "noOpAotBehaviorValidated", "changedProbeChanged", "unchangedProbeChanged", "interpreterEntryCount", "aotEntryCount"],
         "properties": {
           "loadError": { "const": "OK" },
           "plannedDheAssemblies": { "type": "array", "minItems": 1, "uniqueItems": true },
@@ -122,6 +124,8 @@
           "aotSnapshotKind": { "const": "managed-assembly-plus-generated-cpp-v1" },
           "nativeGuardSourceSha256": { "type": "string", "pattern": "^[0-9a-fA-F]{64}$" },
           "nativeManifestSha256": { "type": "string", "pattern": "^[0-9a-fA-F]{64}$" },
+          "selectedPayloadVariantId": { "type": "string", "pattern": "^[A-Za-z0-9._-]{1,64}$" },
+          "selectedPayloadCurrentAssemblySetSha256": { "type": "string", "pattern": "^[0-9a-fA-F]{64}$" },
           "dispatchProbeValidated": { "const": true },
           "changedProbeChanged": { "type": "boolean" },
           "unchangedProbeChanged": { "type": "boolean" }

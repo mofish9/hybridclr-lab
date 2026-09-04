@@ -1935,6 +1935,18 @@ internal static partial class Program
         }
 
         var first = identities[0].Item;
+        string selectedVariantId = GetString(first.Report, "selectedPayloadVariantId") ?? "default";
+        string selectedVariantCurrentSet = GetString(first.Report,
+            "selectedPayloadCurrentAssemblySetSha256") ??
+            GetString(first.Report, "currentAssemblySetSha256") ?? string.Empty;
+        if (identities.Skip(1).Any(item =>
+                !string.Equals(GetString(item.Item.Report, "selectedPayloadVariantId") ?? "default",
+                    selectedVariantId, StringComparison.OrdinalIgnoreCase) ||
+                !string.Equals(GetString(item.Item.Report,
+                    "selectedPayloadCurrentAssemblySetSha256") ??
+                    GetString(item.Item.Report, "currentAssemblySetSha256") ?? string.Empty,
+                    selectedVariantCurrentSet, StringComparison.OrdinalIgnoreCase)))
+            throw new DheException("Multi-Base changed evidence selects different payload variants.");
         foreach (string property in new[] { "currentAssemblySetSha256", "resourceUpdateManifestSha256",
                      "resourceUpdateValidationSha256" })
             if (identities.Skip(1).Any(item => !string.Equals(GetString(first.Report, property),
@@ -1954,6 +1966,11 @@ internal static partial class Program
         if (supported.Count < identities.Length ||
             identities.Any(item => !supported.Contains(item.Identity.BaseId)))
             throw new DheException("The shared current payload does not declare every proven Base identity.");
+        JsonElement manifestVariant = SelectPayloadVariant(manifest, selectedVariantId,
+            "Multi-Base resource update manifest");
+        if (!string.Equals(GetString(manifestVariant, "currentAssemblySetSha256"),
+                selectedVariantCurrentSet, StringComparison.OrdinalIgnoreCase))
+            throw new DheException("Multi-Base changed evidence does not match its selected payload variant.");
     }
 
     private static void ValidateResourcePlayerEvidenceBindings(JsonElement report, string reportPath)
@@ -1999,10 +2016,22 @@ internal static partial class Program
         JsonElement[] selectedManifestBases = manifest.GetProperty("supportedBases")
             .EnumerateArray().Where(item => string.Equals(GetString(item, "baseId"),
                 GetString(report, "selectedBaseId"), StringComparison.OrdinalIgnoreCase)).ToArray();
+        string selectedVariantId = GetString(report, "selectedPayloadVariantId") ?? "default";
+        JsonElement selectedManifestVariant = SelectPayloadVariant(manifest, selectedVariantId,
+            "Resource update manifest");
+        string selectedCurrentSet = GetString(selectedManifestVariant,
+            "currentAssemblySetSha256") ?? GetString(manifest, "currentAssemblySetSha256") ?? string.Empty;
         if (selectedManifestBases.Length != 1 ||
             !string.Equals(GetString(selectedManifestBases[0], "aotMetadataSetId"),
-                GetString(report, "selectedAotMetadataSetId"), StringComparison.OrdinalIgnoreCase))
+                GetString(report, "selectedAotMetadataSetId"), StringComparison.OrdinalIgnoreCase) ||
+            !string.Equals(GetString(selectedManifestBases[0], "payloadVariantId") ?? "default",
+                selectedVariantId, StringComparison.OrdinalIgnoreCase) ||
+            !string.Equals(GetString(selectedManifestBases[0], "currentAssemblySetSha256"),
+                selectedCurrentSet, StringComparison.OrdinalIgnoreCase))
             throw new DheException("Resource Player evidence selects a Base with the wrong AOT metadata set.");
+        JsonElement selectedValidationVariant = SelectPayloadVariant(validation, selectedVariantId,
+            "Resource update validation");
+        string payloadVariantSetHash = GetString(manifest, "payloadVariantSetSha256") ?? string.Empty;
         if (!GetBool(validation, "passed") || !GetBool(stage, "passed") ||
             !GetBool(player, "passed") || !GetBool(baseWorkflow, "passed") ||
             !string.Equals(JsonSerializer.Serialize(player),
@@ -2015,11 +2044,26 @@ internal static partial class Program
                  GetString(report, "selectedAotMetadataSetId"), StringComparison.OrdinalIgnoreCase) ||
              !string.Equals(GetString(player, "selectedAotMetadataSetId"),
                  GetString(report, "selectedAotMetadataSetId"), StringComparison.OrdinalIgnoreCase) ||
-             !string.Equals(GetString(manifest, "currentAssemblySetSha256"),
-                GetString(report, "currentAssemblySetSha256"), StringComparison.OrdinalIgnoreCase) ||
-            !string.Equals(GetString(stage, "currentAssemblySetSha256"),
-                GetString(report, "currentAssemblySetSha256"), StringComparison.OrdinalIgnoreCase) ||
-            !string.Equals(GetString(baseWorkflow, "cleanCheckoutGate"),
+             !string.Equals(GetString(stage, "payloadVariantId") ?? "default",
+                selectedVariantId, StringComparison.OrdinalIgnoreCase) ||
+             !string.Equals(GetString(player, "selectedPayloadVariantId") ?? "default",
+                selectedVariantId, StringComparison.OrdinalIgnoreCase) ||
+             !string.Equals(GetString(stage, "currentAssemblySetSha256"), selectedCurrentSet,
+                StringComparison.OrdinalIgnoreCase) ||
+             !string.Equals(GetString(player, "selectedPayloadCurrentAssemblySetSha256"),
+                selectedCurrentSet, StringComparison.OrdinalIgnoreCase) ||
+             !string.Equals(GetString(selectedValidationVariant, "currentAssemblySetSha256"),
+                selectedCurrentSet, StringComparison.OrdinalIgnoreCase) ||
+             !string.Equals(GetString(report, "currentAssemblySetSha256"), selectedCurrentSet,
+                StringComparison.OrdinalIgnoreCase) ||
+             !string.Equals(GetString(report, "selectedPayloadVariantId") ?? "default",
+                selectedVariantId, StringComparison.OrdinalIgnoreCase) ||
+             !string.Equals(GetString(report, "selectedPayloadCurrentAssemblySetSha256"),
+                selectedCurrentSet, StringComparison.OrdinalIgnoreCase) ||
+             (!string.IsNullOrWhiteSpace(payloadVariantSetHash) &&
+              !string.Equals(GetString(report, "payloadVariantSetSha256"), payloadVariantSetHash,
+                  StringComparison.OrdinalIgnoreCase)) ||
+             !string.Equals(GetString(baseWorkflow, "cleanCheckoutGate"),
                 GetString(report, "cleanCheckoutGate"), StringComparison.OrdinalIgnoreCase))
             throw new DheException("Resource Player evidence live bindings do not agree.");
     }

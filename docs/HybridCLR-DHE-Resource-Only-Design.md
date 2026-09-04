@@ -164,6 +164,13 @@ stage report、资源发布目录和归档的 Base `player-workflow-report.json`
 universal-guard 的
 changed Player 来伪造线上流程。
 
+当资源包包含多个 current payload variant 时，Player result 还必须记录
+`selectedPayloadVariantId` 和 `selectedPayloadCurrentAssemblySetSha256`；workflow evidence
+会把这两个值与 Base registry、manifest/validation、stage 和 runtime plan 的同一 variant
+逐层比对，并记录整个 `payloadVariantSetSha256`。因此不同平台或不同编译目标不能误用
+default payload，也不能仅凭顶层 assembly set hash 通过多 Base 审计。旧的 single-current
+payload 沿用 `default` variant 语义。
+
 ## 客户端选择与本地求差
 
 客户端不下载 Base MetaVersion，也不按版本号选择远端差分文件：

@@ -224,6 +224,8 @@ internal static partial class Program
 
         JsonElement selectedManifestVariant = SelectPayloadVariant(manifest, selectedVariantId,
             "Resource update manifest");
+        JsonElement selectedValidationVariant = SelectPayloadVariant(validation, selectedVariantId,
+            "Resource update validation");
         string currentSet = GetString(selectedManifestVariant, "currentAssemblySetSha256") ??
             GetString(manifest, "currentAssemblySetSha256") ?? string.Empty;
         string target = GetString(player, "target") ?? string.Empty;
@@ -231,7 +233,8 @@ internal static partial class Program
                 Path.GetFullPath(updateRoot), StringComparison.OrdinalIgnoreCase) ||
             !string.Equals(GetString(stage, "currentAssemblySetSha256"), currentSet,
                 StringComparison.OrdinalIgnoreCase) ||
-            !string.Equals(GetString(validation, "currentAssemblySetSha256"), currentSet,
+            !string.Equals(GetString(selectedValidationVariant, "currentAssemblySetSha256") ??
+                GetString(validation, "currentAssemblySetSha256"), currentSet,
                 StringComparison.OrdinalIgnoreCase) ||
             !string.Equals(GetString(selectedBase, "target"), target, StringComparison.OrdinalIgnoreCase) ||
             !string.Equals(GetString(selectedBase, "aotMetadataSetId"),
@@ -241,7 +244,11 @@ internal static partial class Program
             !string.Equals(GetString(selectedBase, "currentAssemblySetSha256"), currentSet,
                 StringComparison.OrdinalIgnoreCase) ||
             !string.Equals(GetString(player, "selectedBaseId"), selectedBaseId,
-                StringComparison.OrdinalIgnoreCase))
+                StringComparison.OrdinalIgnoreCase) ||
+            !string.Equals(GetString(player, "selectedPayloadVariantId") ?? "default",
+                selectedVariantId, StringComparison.OrdinalIgnoreCase) ||
+            !string.Equals(GetString(player, "selectedPayloadCurrentAssemblySetSha256"),
+                currentSet, StringComparison.OrdinalIgnoreCase))
             errors.Add("Resource, stage, Base, and Player selection identities do not agree.");
 
         string stagedManifest = RequireFile(GetString(stage, "stagedManifestPath") ?? string.Empty,
@@ -415,6 +422,9 @@ internal static partial class Program
             runtimePlanSha256 = Sha256File(runtimePlanPath),
             selectedBaseId,
             selectedAotMetadataSetId,
+            selectedPayloadVariantId = selectedVariantId,
+            selectedPayloadCurrentAssemblySetSha256 = currentSet,
+            payloadVariantSetSha256 = GetString(manifest, "payloadVariantSetSha256"),
             currentAssemblySetSha256 = currentSet,
             artifactValidation = validationPath,
             archiveManifest = (string?)null,
