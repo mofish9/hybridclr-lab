@@ -155,7 +155,9 @@ the same payload. If any declared Base is incompatible, the command removes
 the publish manifests and fails instead of producing a partial release.
 When supplemental AOT metadata is required, `-AotMetadataRoots` supplies one complete
 `patchAOTAssemblies` root per BaseRoot, in the same order. The command content-addresses
-and deduplicates equal blobs across sets. A root is mandatory whenever
+and deduplicates equal blobs across sets. On disk, each blob uses a 128-bit SHA-256 prefix
+as a short lookup name so long Windows project/worktree paths remain readable by Unity;
+the full SHA-256 is still recorded and verified. A root is mandatory whenever
 `patchAOTAssemblies` is non-empty; a no-metadata workflow therefore requires an empty
 patch set and an independently validated project configuration. `-AotMetadataRoot` remains
 available as a shorthand only when every Base intentionally shares one root.

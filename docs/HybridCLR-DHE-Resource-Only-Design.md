@@ -149,7 +149,9 @@ changed Player 来伪造线上流程。
 
 所有资源更新都要求 `resource-update-plan-integrity-v1`、`stable-method-identity-v1` 和
 `resource-update-aot-metadata-set-selection-v1`；携带非空补充 AOT metadata 时还要求
-`resource-update-aot-metadata-path-v1`。AOT metadata 以内容 SHA-256 寻址并跨 Base set 去重，
+`resource-update-aot-metadata-path-v1`。AOT metadata 按内容 SHA-256 去重；文件名使用 SHA-256
+前 128 位作为短查找键，以避免长工作树路径触发 Windows MAX_PATH，完整 SHA-256 仍写入并校验，
+跨 Base set 复用相同 blob，
 runtime plan 用 `baseSelections` 将每个 `baseId` 映射到唯一 set。metadata set 身份参与
 BuildIdentity/baseId 计算，因此升级 managed runtime 后旧 Player 不会被误认为可安全消费新
 plan。缺少能力的 Base 必须停止领取该资源版本或升级主包。

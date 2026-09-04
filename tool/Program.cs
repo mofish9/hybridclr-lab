@@ -484,13 +484,19 @@ internal static partial class Program
                         metadataName + " AOT metadata");
                     byte[] bytes = File.ReadAllBytes(source);
                     string hash = Sha256Bytes(bytes);
-                    string relativePath = "payload/aot-metadata/" + hash + ".bytes";
+                    // Keep the on-disk name below Windows' legacy MAX_PATH
+                    // limit even when a project/worktree path is long. The
+                    // complete SHA-256 remains the authenticated identity in
+                    // the runtime plan and is still checked before staging
+                    // and loading; the 128-bit prefix is only a file-name
+                    // lookup key.
+                    string relativePath = "payload/aot-metadata/" + hash.Substring(0, 32) + ".bytes";
                     string target = ResolveContainedPath(outputRoot, relativePath,
                         "AOT metadata blob");
                     Directory.CreateDirectory(Path.GetDirectoryName(target)!);
                     if (File.Exists(target) && !string.Equals(Sha256File(target), hash,
                             StringComparison.OrdinalIgnoreCase))
-                        throw new DheException("AOT metadata content-address collision: " + hash);
+                        throw new DheException("AOT metadata short-name collision: " + hash);
                     if (!File.Exists(target)) File.WriteAllBytes(target, bytes);
                     setBytes.Add((metadataName, bytes));
                     setAssemblies.Add(new ResourceAotMetadataPayload(metadataName,

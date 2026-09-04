@@ -79,7 +79,7 @@ identities and emits one payload:
 ```text
 payload/<assembly>.dll.bytes
 payload/<assembly>.mv.bytes
-  payload/aot-metadata/<sha256>.bytes   # deduplicated supplemental metadata blobs
+  payload/aot-metadata/<sha256-prefix-128>.bytes # deduplicated blobs; full SHA-256 stays in the plan
 dhe-runtime-plan.json
 dhe-resource-update.json
 dhe-resource-update-validation.json
