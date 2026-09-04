@@ -160,8 +160,11 @@ matrix is maintained in `HybridCLR-DHE-Resource-Only-Design.md`.
 The C# host and package APIs are shared by Windows, Android, and iOS. Android
 still requires the Unity Android module, SDK/NDK, signing, and device runner.
 iOS still requires macOS, the Unity iOS module, Xcode, signing, and a device
-runner. Windows evidence cannot be reported as Android/iOS evidence, and native
-compilation against one engine's headers cannot stand in for another engine.
+runner. The demo DHE reader handles Android APK StreamingAssets through its ZIP
+container; a production YooAsset/Addressables provider must provide the same
+logical asset-path behavior on Android and iOS. Windows evidence cannot be
+reported as Android/iOS evidence, and native compilation against one engine's
+headers cannot stand in for another engine.
 
 ## Release boundary
 

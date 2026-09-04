@@ -1148,6 +1148,15 @@ internal static partial class Program
                 StringComparison.Ordinal);
         AddRegressionCheck(checks, errors, "native-universal-body-filter", bodyFilterPresent,
             "universal guards must exclude delegate/runtime methods without a managed IL body");
+        string dheReaderPath = Path.Combine(cli.Root, "unity2021-dhe-demo", "Assets", "Runtime",
+            "DheStreamingAssetReader.cs");
+        string dheReaderSource = File.Exists(dheReaderPath) ? File.ReadAllText(dheReaderPath) : string.Empty;
+        bool crossPlatformDheReader = dheReaderSource.Contains("UNITY_ANDROID", StringComparison.Ordinal) &&
+            dheReaderSource.Contains("ZipArchive", StringComparison.Ordinal) &&
+            dheReaderSource.Contains("Application.dataPath", StringComparison.Ordinal);
+        AddRegressionCheck(checks, errors, "dhe-cross-platform-streaming-reader",
+            crossPlatformDheReader,
+            "the demo DHE asset reader must handle Android APK StreamingAssets as well as filesystem platforms");
         RunIntegratedSourceLockRegressions(regressionRoot, checks, errors);
 
         var weakNoOpRejected = false;

@@ -155,6 +155,10 @@ existing hot-update load flow:
    `DheRuntime.LoadAssemblyImages` once before any ordinary `Assembly.Load`
    or game logic. The batch call publishes the complete DHE set atomically.
 
+The demo's `DheStreamingAssetReader` covers filesystem platforms and Android
+APK ZIP entries; a production provider must keep the same relative-path and
+integrity semantics when its catalog resolves remote bundles on Android/iOS.
+
 Every Player reads Base MetaVersion from its immutable built-in asset root and compares
 it with the one remote current MetaVersion. Project code must not select a per-Base
 remote delta or reimplement MV parsing, Base identity matching, transaction

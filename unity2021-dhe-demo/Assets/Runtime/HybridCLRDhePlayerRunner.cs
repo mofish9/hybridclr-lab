@@ -121,9 +121,9 @@ namespace HybridCLR.Lab
                 {
                     throw new InvalidDataException("DHE runtime plan contains duplicate assembly: " + assemblyPlan.assemblyName);
                 }
-                byte[] assemblyCurrent = ReadStreamingAssetBytes(assemblyPlan.current);
-                byte[] assemblyCurrentMv = ReadStreamingAssetBytes(assemblyPlan.currentMetaVersion);
-                byte[] assemblyBaseMv = ReadStreamingAssetBytes(assemblyPlan.baseMetaVersion);
+                byte[] assemblyCurrent = DheStreamingAssetReader.Read(assemblyPlan.current);
+                byte[] assemblyCurrentMv = DheStreamingAssetReader.Read(assemblyPlan.currentMetaVersion);
+                byte[] assemblyBaseMv = DheStreamingAssetReader.Read(assemblyPlan.baseMetaVersion);
                 MetaVersionInfo currentMv = ParseMetaVersion(assemblyCurrentMv,
                     assemblyPlan.assemblyName);
                 MetaVersionInfo baseMv = ParseMetaVersion(assemblyBaseMv,
@@ -187,11 +187,11 @@ namespace HybridCLR.Lab
             }
 
             LoadedDheAssembly mainLoaded = loadedAssemblies[MainAssemblyName];
-            byte[] current = ReadStreamingAssetBytes(mainLoaded.plan.current);
-            byte[] mv = ReadStreamingAssetBytes(mainLoaded.plan.currentMetaVersion);
+            byte[] current = DheStreamingAssetReader.Read(mainLoaded.plan.current);
+            byte[] mv = DheStreamingAssetReader.Read(mainLoaded.plan.currentMetaVersion);
             byte[] snapshot = mainLoaded.baselineHash;
             DheBuildIdentityData buildIdentity = JsonUtility.FromJson<DheBuildIdentityData>(
-                System.Text.Encoding.UTF8.GetString(ReadStreamingAssetBytes(BuildIdentityFile)));
+                System.Text.Encoding.UTF8.GetString(DheStreamingAssetReader.Read(BuildIdentityFile)));
             byte[] currentHash = Sha256(current);
             byte[] baselineHash = mainLoaded.baselineHash;
             byte[] expectedCurrentHash = mainLoaded.mvCurrentHash;
@@ -1345,40 +1345,13 @@ namespace HybridCLR.Lab
             return assemblies.Keys.OrderBy(name => name, StringComparer.Ordinal).ToArray();
         }
 
-        private static byte[] ReadStreamingAssetBytes(string relativePath)
-        {
-            if (string.IsNullOrWhiteSpace(relativePath) || Path.IsPathRooted(relativePath))
-            {
-                throw new InvalidDataException("DHE runtime plan contains a non-relative StreamingAssets path: " + relativePath);
-            }
-            string normalized = relativePath.Replace('\\', '/');
-            if (normalized.StartsWith("/", StringComparison.Ordinal) ||
-                System.Text.RegularExpressions.Regex.IsMatch(normalized, "(^|/)\\.\\.(/|$)"))
-            {
-                throw new InvalidDataException("DHE runtime plan path escapes StreamingAssets: " + relativePath);
-            }
-            string streamingRoot = Path.GetFullPath(Application.streamingAssetsPath).TrimEnd('\\', '/');
-            string path = Path.GetFullPath(Path.Combine(
-                streamingRoot, normalized.Replace('/', Path.DirectorySeparatorChar)));
-            string rootPrefix = streamingRoot + Path.DirectorySeparatorChar;
-            if (!path.StartsWith(rootPrefix, StringComparison.OrdinalIgnoreCase))
-            {
-                throw new InvalidDataException("DHE runtime plan path escapes StreamingAssets: " + relativePath);
-            }
-            if (!File.Exists(path))
-            {
-                throw new FileNotFoundException("Streaming asset was not found", path);
-            }
-            return File.ReadAllBytes(path);
-        }
-
         private sealed class StreamingAssetsProvider : IDheRuntimeAssetProvider
         {
             public bool Exists(string assetPath)
             {
                 try
                 {
-                    return File.Exists(ResolveStreamingAssetPath(assetPath));
+                    return DheStreamingAssetReader.Exists(assetPath);
                 }
                 catch
                 {
@@ -1394,26 +1367,8 @@ namespace HybridCLR.Lab
 
             public byte[] LoadBytes(string assetPath)
             {
-                return File.ReadAllBytes(ResolveStreamingAssetPath(assetPath));
+                return DheStreamingAssetReader.Read(assetPath);
             }
-        }
-
-        private static string ResolveStreamingAssetPath(string relativePath)
-        {
-            if (string.IsNullOrWhiteSpace(relativePath) || Path.IsPathRooted(relativePath))
-                throw new InvalidDataException("DHE StreamingAssets path must be relative.");
-            string normalized = relativePath.Replace('\\', '/');
-            if (normalized.Split('/').Any(segment => segment.Length == 0 || segment == "." ||
-                segment == ".."))
-                throw new InvalidDataException("DHE StreamingAssets path is unsafe: " + relativePath);
-            string root = Path.GetFullPath(Application.streamingAssetsPath);
-            string path = Path.GetFullPath(Path.Combine(root,
-                normalized.Replace('/', Path.DirectorySeparatorChar)));
-            string prefix = root.TrimEnd(Path.DirectorySeparatorChar,
-                Path.AltDirectorySeparatorChar) + Path.DirectorySeparatorChar;
-            if (!path.StartsWith(prefix, StringComparison.OrdinalIgnoreCase))
-                throw new InvalidDataException("DHE StreamingAssets path escapes its root.");
-            return path;
         }
 
         private static byte[] Sha256(byte[] bytes)
