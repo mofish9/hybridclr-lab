@@ -1110,7 +1110,7 @@ internal static partial class Program
         }
         AddRegressionCheck(checks, errors, "evidence-extensible-player-engine-matrix",
             extensiblePlayerMatrixPassed,
-            "release evidence must accept additional Base Players while requiring all three engine workflows");
+            "release evidence must accept additional Base Players and per-Base payload variants while requiring all three engine workflows");
         bool legacyPayloadSelectionPassed = RunLegacySinglePayloadSelectionRegression();
         AddRegressionCheck(checks, errors,
             "resource-player-legacy-single-payload-compatibility",
@@ -1582,6 +1582,88 @@ internal static partial class Program
         {
             variantMismatchRejected = true;
         }
+
+        // A single release may carry target/engine-specific managed payloads.
+        // Verify that the three-engine matrix accepts distinct variants when
+        // each Base is explicitly bound to its own current assembly set.
+        string variantManifestPath = Path.Combine(root, "variant-resource-update.json");
+        string[] variantIds = { "default", "unity2022", "tuanjie" };
+        string[] variantCurrentSets = { new string('1', 64), new string('2', 64), new string('3', 64) };
+        WriteJson(variantManifestPath, new
+        {
+            schemaVersion = 1,
+            format = "hybridclr.dhe-resource-update.json",
+            payloadVariants = variantIds.Select((variantId, index) => new
+            {
+                variantId,
+                currentAssemblySetSha256 = variantCurrentSets[index],
+            }).ToArray(),
+            supportedBases = baseIds.Take(3).Select((baseId, index) => new
+            {
+                baseId,
+                target = "StandaloneWindows64",
+                payloadVariantId = variantIds[index],
+                currentAssemblySetSha256 = variantCurrentSets[index],
+            }).ToArray(),
+        });
+        string variantManifestSha256 = Sha256File(variantManifestPath);
+        var variantReports = new List<(JsonElement Report, string Path)>();
+        for (int index = 0; index < 3; index++)
+        {
+            string runtimePath = Path.Combine(root, "variant-runtime-" + index + ".json");
+            WriteJson(runtimePath, new
+            {
+                schemaVersion = 1,
+                format = "hybridclr.dhe-runtime-manifest.json",
+                engineWorkflow = workflows[index],
+            });
+            string reportPath = Path.Combine(root, "variant-player-" + index + ".json");
+            WriteJson(reportPath, new
+            {
+                schemaVersion = 1,
+                format = "hybridclr.dhe-resource-player-workflow.json",
+                selectedBaseId = baseIds[index],
+                selectedAotMetadataSetId = new string((char)('1' + index), 64),
+                runtimeSource = runtimePath,
+                target = "StandaloneWindows64",
+                currentAssemblySetSha256 = variantCurrentSets[index],
+                selectedPayloadVariantId = variantIds[index],
+                selectedPayloadCurrentAssemblySetSha256 = variantCurrentSets[index],
+                resourceUpdateManifestSha256 = variantManifestSha256,
+                resourceUpdateValidationSha256 = new string('4', 64),
+                resourceUpdateManifest = variantManifestPath,
+            });
+            variantReports.Add((ReadJson<JsonElement>(reportPath), reportPath));
+        }
+        bool variantMatrixAccepted = true;
+        try
+        {
+            ValidateMultiBaseChangedEvidence(variantReports, true);
+        }
+        catch (DheException)
+        {
+            variantMatrixAccepted = false;
+        }
+        bool variantSelectionRejected = false;
+        var variantSelectionTamperPath = Path.Combine(root, "variant-player-tampered.json");
+        var variantSelectionTamper = System.Text.Json.Nodes.JsonNode.Parse(
+            variantReports[1].Report.GetRawText())!.AsObject();
+        variantSelectionTamper["selectedPayloadCurrentAssemblySetSha256"] = new string('1', 64);
+        File.WriteAllText(variantSelectionTamperPath, variantSelectionTamper.ToJsonString(Json),
+            new UTF8Encoding(false));
+        try
+        {
+            ValidateMultiBaseChangedEvidence(new[]
+            {
+                variantReports[0],
+                (ReadJson<JsonElement>(variantSelectionTamperPath), variantSelectionTamperPath),
+                variantReports[2],
+            }, true);
+        }
+        catch (DheException)
+        {
+            variantSelectionRejected = true;
+        }
         try
         {
             ValidateMultiBaseChangedEvidence(new[] { reports[0], reports[1], reports[3] }, true);
@@ -1589,7 +1671,7 @@ internal static partial class Program
         }
         catch (DheException)
         {
-            return variantMismatchRejected;
+            return variantMismatchRejected && variantMatrixAccepted && variantSelectionRejected;
         }
     }
 

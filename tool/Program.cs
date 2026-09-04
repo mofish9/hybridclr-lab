@@ -1936,45 +1936,63 @@ internal static partial class Program
         }
 
         var first = identities[0].Item;
-        string selectedVariantId = GetString(first.Report, "selectedPayloadVariantId") ?? "default";
-        string selectedVariantCurrentSet = GetString(first.Report,
-            "selectedPayloadCurrentAssemblySetSha256") ??
-            GetString(first.Report, "currentAssemblySetSha256") ?? string.Empty;
-        if (identities.Skip(1).Any(item =>
-                !string.Equals(GetString(item.Item.Report, "selectedPayloadVariantId") ?? "default",
-                    selectedVariantId, StringComparison.OrdinalIgnoreCase) ||
-                !string.Equals(GetString(item.Item.Report,
-                    "selectedPayloadCurrentAssemblySetSha256") ??
-                    GetString(item.Item.Report, "currentAssemblySetSha256") ?? string.Empty,
-                    selectedVariantCurrentSet, StringComparison.OrdinalIgnoreCase)))
-            throw new DheException("Multi-Base changed evidence selects different payload variants.");
-        foreach (string property in new[] { "currentAssemblySetSha256", "resourceUpdateManifestSha256",
+        // One resource release owns one authenticated manifest and validation
+        // document, but it may contain more than one managed payload variant.
+        // Compare the document identities globally and validate the selected
+        // variant independently for every Base below.
+        foreach (string property in new[] { "resourceUpdateManifestSha256",
                      "resourceUpdateValidationSha256" })
             if (identities.Skip(1).Any(item => !string.Equals(GetString(first.Report, property),
                     GetString(item.Item.Report, property), StringComparison.OrdinalIgnoreCase)))
-                throw new DheException("Multi-Base changed evidence does not share one current payload: " +
+                throw new DheException("Multi-Base changed evidence does not share one resource release document: " +
                     property + ".");
-        if (identities.Skip(1).Any(item => !string.Equals(GetString(first.Report, "target"),
-                GetString(item.Item.Report, "target"), StringComparison.OrdinalIgnoreCase)))
-            throw new DheException("Multi-Base changed evidence targets different platforms.");
 
         string manifestPath = ResolveEvidencePath(GetString(first.Report, "resourceUpdateManifest"),
             Path.GetDirectoryName(first.Path)!, "Multi-Base resource update manifest");
         JsonElement manifest = ReadJson<JsonElement>(manifestPath);
-        var supported = manifest.GetProperty("supportedBases").EnumerateArray()
+        var supportedRecords = manifest.GetProperty("supportedBases").EnumerateArray().ToArray();
+        var supported = supportedRecords
             .Select(item => GetString(item, "baseId") ?? string.Empty)
             .ToHashSet(StringComparer.OrdinalIgnoreCase);
         if (supported.Count < identities.Length ||
             identities.Any(item => !supported.Contains(item.Identity.BaseId)))
             throw new DheException("The shared current payload does not declare every proven Base identity.");
-        JsonElement manifestVariant = SelectPayloadVariant(manifest, selectedVariantId,
-            "Multi-Base resource update manifest");
-        string manifestVariantCurrentSet = GetString(manifestVariant,
-            "currentAssemblySetSha256") ?? string.Empty;
-        if (!string.IsNullOrWhiteSpace(manifestVariantCurrentSet) &&
-            !string.Equals(manifestVariantCurrentSet, selectedVariantCurrentSet,
-                StringComparison.OrdinalIgnoreCase))
-            throw new DheException("Multi-Base changed evidence does not match its selected payload variant.");
+
+        foreach (var item in identities)
+        {
+            string variantId = GetString(item.Item.Report, "selectedPayloadVariantId") ?? "default";
+            string selectedCurrentSet = GetString(item.Item.Report,
+                "selectedPayloadCurrentAssemblySetSha256") ??
+                GetString(item.Item.Report, "currentAssemblySetSha256") ?? string.Empty;
+            JsonElement manifestVariant = SelectPayloadVariant(manifest, variantId,
+                "Multi-Base resource update manifest");
+            string manifestVariantCurrentSet = GetString(manifestVariant,
+                "currentAssemblySetSha256") ?? string.Empty;
+            if (!string.IsNullOrWhiteSpace(manifestVariantCurrentSet) &&
+                !string.Equals(manifestVariantCurrentSet, selectedCurrentSet,
+                    StringComparison.OrdinalIgnoreCase))
+                throw new DheException("Multi-Base changed evidence does not match its selected payload variant.");
+
+            JsonElement[] baseMatches = supportedRecords.Where(candidate =>
+                string.Equals(GetString(candidate, "baseId"), item.Identity.BaseId,
+                    StringComparison.OrdinalIgnoreCase)).ToArray();
+            if (baseMatches.Length != 1)
+                throw new DheException("The shared current payload does not uniquely declare Base identity: " +
+                    item.Identity.BaseId + ".");
+            JsonElement baseRecord = baseMatches[0];
+            string baseVariantId = GetString(baseRecord, "payloadVariantId") ?? "default";
+            string baseCurrentSet = GetString(baseRecord, "currentAssemblySetSha256") ?? string.Empty;
+            if (!string.Equals(baseVariantId, variantId, StringComparison.OrdinalIgnoreCase) ||
+                (!string.IsNullOrWhiteSpace(baseCurrentSet) &&
+                 !string.Equals(baseCurrentSet, selectedCurrentSet,
+                     StringComparison.OrdinalIgnoreCase)))
+                throw new DheException("Multi-Base changed evidence selects a variant not bound to its Base.");
+            string baseTarget = GetString(baseRecord, "target") ?? string.Empty;
+            string reportTarget = GetString(item.Item.Report, "target") ?? string.Empty;
+            if (!string.IsNullOrWhiteSpace(baseTarget) && !string.IsNullOrWhiteSpace(reportTarget) &&
+                !string.Equals(baseTarget, reportTarget, StringComparison.OrdinalIgnoreCase))
+                throw new DheException("Multi-Base changed evidence target does not match its Base record.");
+        }
     }
 
     private static void ValidateResourcePlayerEvidenceBindings(JsonElement report, string reportPath)
