@@ -338,6 +338,12 @@ internal static class LabCommands
         foreach (var folder in new[] { "Packages", "ProjectSettings" }) CopyDirectory(Path.Combine(source, folder), Path.Combine(destination, folder));
         foreach (var asset in new[] { "Editor", "Editor.meta", "Runtime", "Runtime.meta", "Scenes", "Scenes.meta" }) CopyDirectoryOrFile(Path.Combine(source, "Assets", asset), Path.Combine(destination, "Assets", asset));
         foreach (var meta in Directory.GetFiles(Path.Combine(destination, "Assets"), "*.meta", SearchOption.AllDirectories)) File.Delete(meta);
+        // Resolver regression is a lab-owned Editor entry point rather than a
+        // package runtime file. Copy it into every prepared engine project so
+        // the three real Editors execute the same source-bound checks.
+        CopyRequired(Path.Combine(lab, "unity2021-dhe-demo", "Assets", "Editor",
+                "HybridCLRDheCppResolverRegression.cs"),
+            Path.Combine(destination, "Assets", "Editor", "HybridCLRDheCppResolverRegression.cs"));
         // The runtime marker references BoundaryContracts only to anchor the
         // compile-time contract used by the resolver project. Keep this
         // assembly outside the DHE hot-update plan and install it as a normal
