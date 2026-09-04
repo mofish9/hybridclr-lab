@@ -745,6 +745,18 @@ internal static partial class Program
                 GetString(manifest, "currentAssemblySetSha256"), StringComparison.OrdinalIgnoreCase))
             throw new DheException("DHE resource compatibility validation did not pass.");
 
+        foreach (string property in new[]
+        {
+            "baseRegistrySha256", "baseRegistryEntryCount", "baseRegistryAuditPath",
+            "baseRegistryAuditSha256"
+        })
+        {
+            if (!OptionalJsonPropertiesEqual(validation, manifest, property))
+                throw new DheException(
+                    "DHE resource registry binding differs between manifest and validation: " +
+                    property);
+        }
+
         if (!manifest.TryGetProperty("supportedBases", out JsonElement supportedBases) ||
             supportedBases.ValueKind != JsonValueKind.Array || supportedBases.GetArrayLength() == 0 ||
             !validation.TryGetProperty("bases", out JsonElement validatedBases) ||
@@ -800,7 +812,8 @@ internal static partial class Program
         string? auditSha256 = GetString(manifest, "baseRegistryAuditSha256");
         if (string.IsNullOrWhiteSpace(registrySha256))
         {
-            if (!string.IsNullOrWhiteSpace(auditPathValue) ||
+            if (GetInt(manifest, "baseRegistryEntryCount") != 0 ||
+                !string.IsNullOrWhiteSpace(auditPathValue) ||
                 !string.IsNullOrWhiteSpace(auditSha256))
                 throw new DheException("DHE resource update has Base registry audit fields without a registry.");
             return;
@@ -858,6 +871,15 @@ internal static partial class Program
     private static bool IsValidCapabilitySet(string[] values) =>
         values.Length != 0 && !values.Any(string.IsNullOrWhiteSpace) &&
         values.Distinct(StringComparer.Ordinal).Count() == values.Length;
+
+    private static bool OptionalJsonPropertiesEqual(JsonElement left, JsonElement right,
+        string property)
+    {
+        bool leftPresent = left.TryGetProperty(property, out JsonElement leftValue);
+        bool rightPresent = right.TryGetProperty(property, out JsonElement rightValue);
+        return leftPresent == rightPresent &&
+            (!leftPresent || JsonEquivalent(leftValue, rightValue));
+    }
 
     private static string ResourceBaseIdentityKey(JsonElement value)
     {

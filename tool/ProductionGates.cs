@@ -1746,6 +1746,25 @@ internal static partial class Program
                 !Stage("base-registry-audit-tamper-stage", registryAuditTamper.Update,
                     registryAuditTamper.Assets, registryAuditTamper.Identity),
                 "a tampered archived Base registry must be rejected before staging.");
+
+            var registryBindingRemoval = CopyFixture("base-registry-binding-removal");
+            string registryBindingManifestPath = Path.Combine(registryBindingRemoval.Update,
+                "dhe-resource-update.json");
+            var registryBindingManifest = System.Text.Json.Nodes.JsonNode.Parse(
+                File.ReadAllText(registryBindingManifestPath))!.AsObject();
+            foreach (string property in new[]
+            {
+                "baseRegistrySha256", "baseRegistryEntryCount", "baseRegistryAuditPath",
+                "baseRegistryAuditSha256"
+            })
+                registryBindingManifest.Remove(property);
+            File.WriteAllText(registryBindingManifestPath,
+                registryBindingManifest.ToJsonString(Json), new UTF8Encoding(false));
+            AddRegressionCheck(checks,
+                errors, "resource-stage-base-registry-binding-removal-rejected",
+                !Stage("base-registry-binding-removal-stage", registryBindingRemoval.Update,
+                    registryBindingRemoval.Assets, registryBindingRemoval.Identity),
+                "removing registry binding fields from the manifest must be rejected by validation consistency.");
         }
 
         string positiveRuntimeAssetRoot = RequirePortableAssetRoot(
