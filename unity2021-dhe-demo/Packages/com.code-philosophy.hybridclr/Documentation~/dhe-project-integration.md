@@ -132,6 +132,12 @@ maps every `baseId` through `baseSelections`; a Player loads only the set select
 for its own identity. A Player built with an older managed runtime or without this
 identity/capability is rejected instead of being treated as an equivalent Base.
 
+For consecutive resource releases, keep the archived Base registry and each
+Player's embedded Base MetaVersion unchanged. Run `resource-update` again for
+the new current DLL set and stage its single payload over the previous resource
+root; do not promote the previous current DLL/MV into a new baseline unless a
+new Base Player is intentionally shipped and added to the registry.
+
 ## Runtime adapter
 
 Implement `IDheRuntimeAssetProvider` for the resource system. During the

@@ -86,6 +86,21 @@ dotnet HybridCLR.DheTool.dll resource-update \
 选择的多个差分变体。加入新的线上 Base 只会扩大发布前审计集合；current payload 字节仍然
 相同。
 
+### 连续资源更新
+
+Base registry 中保存的是每个主包首次发布时的 immutable Base 身份和 Base MetaVersion，
+不是上一次热更的 current。玩家领取第一份资源后，下一份资源仍然用同一个 registry
+重新从所有历史 Base 求差；不需要、也不能把上一份 current 写回 Player 的
+`BaseMetaVersion`。因此同一个 Player 可以依次 staging `resource-update-N`、
+`resource-update-N+1`，每次只替换 current DLL/MetaVersion、AOT metadata 和 manifest，
+而内置 Base MetaVersion、Player executable、`GameAssembly` 和 native identity 保持不变。
+
+每个 current payload 都必须独立通过 registry 中全部仍在线 Base 的兼容性审计。若新版本
+只改变了某个已经在上一版本中变化的方法，MetaVersion 仍按 stable method identity 对原始
+Base 求差；这保证老 Base 不会因为漏领中间资源或跨版本安装而失去可更新能力。只有重新
+构建并发布新的 Base Player 时，才新增 registry 条目并从该 Player 归档新的 Base
+MetaVersion、native manifest 和 AOT metadata set。
+
 线上必须维护“仍可领取当前资源版本”的 Base registry。每次发布都把 registry 中所有 Base
 传给 `resource-update`，不能为了让门禁通过而漏掉老 Base。某个 Base 不兼容时只有三种选择：
 收窄本次代码变化、停止向该 Base 发布并要求玩家升级主包、或者发布带新 runtime 的 Base；
