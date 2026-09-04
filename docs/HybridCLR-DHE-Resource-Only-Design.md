@@ -218,25 +218,35 @@ plan。缺少能力的 Base 必须停止领取该资源版本或升级主包。
 
 ## 已有证据与剩余门禁
 
-identity 1 的同一 structural current payload 已在 Unity 2021、Unity 2022 和团结 2022 的
-三个 `StandaloneWindows64` Base Player 上完成本地 MetaVersion 求差。current set 为
+历史 identity 1 的 structural current payload 曾在 Unity 2021、Unity 2022 和团结 2022 的
+三个 `StandaloneWindows64` Base Player 上完成本地 MetaVersion 求差。该历史 current set 为
 `4ca7b5a1c90cfccb4fb9e6d1eb0eb2fee133e4bb0e22c84ec2f36e0dc788229f`，对应 Base ID 为：
 
 - Unity 2021：`56f1b4cb3081e7af05518241635b7fc57274c7b6a472f303fa992542cde03db8`；
 - Unity 2022：`c047d8309159e3ec4474dda51d378739b6ca63848200adee76d570a3ab13519a`；
 - 团结 2022：`0e751fbfa0ebaecd8cf5d1ae05a1100ba4506a261acc18a3d9baf177e208a9b5`。
 
-三个 Windows Player 都识别 43 个 changed/new 方法，并记录 12 次解释器入口和 35 次 AOT 入口；
+这组历史 Windows Player 都识别 43 个 changed/new 方法，并记录 12 次解释器入口和 35 次 AOT 入口；
 多程序集、结构演进、dispatch probe、事务回滚和同进程重试均通过。统一资源 manifest
 `0e16b4d67d9b8906245b74dc399d4b0197f82e9c4292eb3a55de7d7e6b6abba5` 包含 3 个按 Base
 选择的 AOT metadata set，跨 set 内容寻址后去重为 10 个 blob。三个 staging 均保持 Base
 MetaVersion、Player executable、`GameAssembly` 和引擎 Player DLL 不变。plan/payload、
 metadata set、错误 Base、废弃 sidecar 残留和缺 capability 等负例均 fail closed。
 
-这些 Windows Player 和资源报告仍是 exploratory evidence，三个
+这组历史 Windows Player 和资源报告仍是 exploratory evidence，三个
 `resource-player-workflow-report.json` 的 `releaseReady` 均为 `false`，不能输入正式
 `release-evidence`。它们只证明当前 Windows Player 下的三 Base 共享 payload 链路，不能
 外推为 Android 或 iOS Player 证据。
+
+随后生成的 `artifacts/resource-update-0.1.20-four-base-fresh` 使用 current set
+`5de205c782e8bdb0b6a001a09032d78c48cb5434a27b22d579f6967c509766da`，并通过四个
+`StandaloneWindows64` Base 的兼容审计、staging 和 Player smoke：Unity 2021
+`906b387a42dec63a99831de1e78af0a9ca11920444a0909a46ecb39121451220`、Unity 2022
+`a4a71f832318708103c371c2ab1105abfee8d48801f3aea0d83fcb1f866a1fbe`、旧 Unity 2022
+`d200c23bd8f72bf926916c6e6790bb7fbff26cc9dcb7e370f99534011081a464` 和团结 2022
+`6f92ced837ad6a6901159aafdcfe3ec7d8d2a35218d6e5440a9bc328220bf330`。这些报告仍未绑定
+当前 `9b4a628` clean commit，且 `releaseReady=false`；它们只扩展了 Windows 多 Base
+证据，不改变 Android/iOS 门禁结论。
 
 这套兼容只从首个采用 identity 1/runtime protocol v1 的正式 Base 开始。已经发布的旧 runtime
 不会因下载资源而获得新的 DHE runtime 能力；runtime 自身、IL2CPP ABI、native plugin 或

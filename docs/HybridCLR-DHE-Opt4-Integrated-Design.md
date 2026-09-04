@@ -122,7 +122,7 @@ resource-only Player smoke and its immutable Base workflow. A changed Player
 rebuild is not a substitute and is rejected when it would lose universal guard
 coverage.
 
-The current release conclusion is conditional: Windows three-Base Player
+The current release conclusion is conditional: Windows four-Base Player
 correctness and all three real-header native lanes are completed evidence
 surfaces. A Unity 2021 Android ARM64 APK has also passed exploratory offline
 IL2CPP/NDK compilation and packaged-asset identity checks, but it has no device
