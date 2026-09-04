@@ -905,9 +905,11 @@ internal static partial class Program
             "same-count wrong MV token set must be rejected");
 
         string? resourceUpdateRoot = cli.Optional("resourceupdateroot");
+        string? resourceUpdateRoot2 = cli.Optional("resourceupdateroot2");
         string? resourceAssetRoot = cli.Optional("resourceassetroot");
         string? resourceBaseBuildIdentity = cli.Optional("resourcebasebuildidentity");
         if (!string.IsNullOrWhiteSpace(resourceUpdateRoot) ||
+            !string.IsNullOrWhiteSpace(resourceUpdateRoot2) ||
             !string.IsNullOrWhiteSpace(resourceAssetRoot) ||
             !string.IsNullOrWhiteSpace(resourceBaseBuildIdentity))
         {
@@ -926,7 +928,11 @@ internal static partial class Program
                     RequireDirectory(resourceAssetRoot, "Regression resource asset root"),
                     RequireFile(resourceBaseBuildIdentity,
                         "Regression Base Player build identity"),
-                    regressionRoot, checks, errors);
+                    regressionRoot, checks, errors,
+                    string.IsNullOrWhiteSpace(resourceUpdateRoot2)
+                        ? null
+                        : RequireDirectory(resourceUpdateRoot2,
+                            "Regression consecutive resource update"));
             }
         }
 
@@ -1683,7 +1689,7 @@ internal static partial class Program
 
     private static void RunResourceStagingRegressions(string updateRoot, string assetRoot,
         string baseBuildIdentityPath, string regressionRoot, List<object> checks,
-        List<string> errors)
+        List<string> errors, string? consecutiveUpdateRoot = null)
     {
         string root = Path.Combine(regressionRoot, "resource-staging");
         Directory.CreateDirectory(root);
@@ -1708,12 +1714,13 @@ internal static partial class Program
             }
         }
 
-        (string Update, string Assets, string Identity) CopyFixture(string name)
+        (string Update, string Assets, string Identity) CopyFixture(string name,
+            string? sourceUpdateRoot = null)
         {
             string update = Path.Combine(root, name + "-update");
             string assets = Path.Combine(root, name + "-assets");
             string identity = Path.Combine(root, name + "-build-identity.json");
-            CopyDirectory(updateRoot, update);
+            CopyDirectory(sourceUpdateRoot ?? updateRoot, update);
             CopyDirectory(assetRoot, assets);
             File.Copy(baseBuildIdentityPath, identity, true);
             return (update, assets, identity);
@@ -1724,6 +1731,47 @@ internal static partial class Program
             positive.Identity);
         AddRegressionCheck(checks, errors, "resource-stage-valid", positiveStaged,
             "a valid resource update must stage into its matching Base.");
+
+        if (!string.IsNullOrWhiteSpace(consecutiveUpdateRoot))
+        {
+            var consecutive = CopyFixture("consecutive");
+            bool firstStaged = Stage("consecutive-n-stage", consecutive.Update,
+                consecutive.Assets, consecutive.Identity);
+            string secondUpdate = RequireDirectory(consecutiveUpdateRoot,
+                "Regression consecutive resource update");
+            bool secondStaged = Stage("consecutive-n-plus-one-stage", secondUpdate,
+                consecutive.Assets, consecutive.Identity);
+            string firstReportPath = Path.Combine(root, "consecutive-n-stage.json");
+            string secondReportPath = Path.Combine(root, "consecutive-n-plus-one-stage.json");
+            bool consecutiveStable = false;
+            if (firstStaged && secondStaged && File.Exists(firstReportPath) &&
+                File.Exists(secondReportPath))
+            {
+                JsonElement firstReport = ReadJson<JsonElement>(firstReportPath);
+                JsonElement secondReport = ReadJson<JsonElement>(secondReportPath);
+                string firstCurrent = GetString(firstReport, "currentAssemblySetSha256") ?? string.Empty;
+                string secondCurrent = GetString(secondReport, "currentAssemblySetSha256") ?? string.Empty;
+                consecutiveStable = !string.IsNullOrWhiteSpace(firstCurrent) &&
+                    !string.Equals(firstCurrent, secondCurrent, StringComparison.OrdinalIgnoreCase) &&
+                    string.Equals(GetString(firstReport, "selectedBaseId"),
+                        GetString(secondReport, "selectedBaseId"), StringComparison.OrdinalIgnoreCase) &&
+                    string.Equals(GetString(firstReport, "selectedAotMetadataSetId"),
+                        GetString(secondReport, "selectedAotMetadataSetId"), StringComparison.OrdinalIgnoreCase) &&
+                    string.Equals(GetString(firstReport, "baseMetaVersionSetSha256"),
+                        GetString(secondReport, "baseMetaVersionSetSha256"), StringComparison.OrdinalIgnoreCase) &&
+                    string.Equals(GetString(firstReport, "baseMetaVersionTreeSha256Before"),
+                        GetString(secondReport, "baseMetaVersionTreeSha256Before"), StringComparison.OrdinalIgnoreCase) &&
+                    GetBool(firstReport, "baseMetaVersionUnchanged") &&
+                    GetBool(secondReport, "baseMetaVersionUnchanged") &&
+                    string.Equals(GetString(firstReport, "baseMetaVersionTreeSha256Before"),
+                        GetString(firstReport, "baseMetaVersionTreeSha256After"), StringComparison.OrdinalIgnoreCase) &&
+                    string.Equals(GetString(secondReport, "baseMetaVersionTreeSha256Before"),
+                        GetString(secondReport, "baseMetaVersionTreeSha256After"), StringComparison.OrdinalIgnoreCase);
+            }
+            AddRegressionCheck(checks, errors, "resource-stage-consecutive-base-stable",
+                consecutiveStable,
+                "consecutive updates must reuse the immutable Base MetaVersion and select the same Base/AOT identity.");
+        }
 
         var positiveManifest = ReadJson<JsonElement>(Path.Combine(positive.Update,
             "dhe-resource-update.json"));

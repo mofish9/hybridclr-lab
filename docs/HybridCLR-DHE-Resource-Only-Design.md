@@ -101,6 +101,12 @@ Base 求差；这保证老 Base 不会因为漏领中间资源或跨版本安装
 构建并发布新的 Base Player 时，才新增 registry 条目并从该 Player 归档新的 Base
 MetaVersion、native manifest 和 AOT metadata set。
 
+回归门禁可以在同一份 staging 根上验证连续资源更新。除了首个更新根外，传入
+`-ResourceUpdateRoot2 <resource-update-N+1>`；host 会先 staging `resource-update-N`，再
+用同一份 Base identity staging 第二份 payload，并要求两次选择的 Base/AOT identity、
+原始 Base MetaVersion 集合和 tree hash 完全一致，同时要求两份 current assembly set
+确实不同。该检查只验证资源替换，不会把第一份 current 写入 Base 归档。
+
 线上必须维护“仍可领取当前资源版本”的 Base registry。每次发布都把 registry 中所有 Base
 传给 `resource-update`，不能为了让门禁通过而漏掉老 Base。某个 Base 不兼容时只有三种选择：
 收窄本次代码变化、停止向该 Base 发布并要求玩家升级主包、或者发布带新 runtime 的 Base；
