@@ -6,8 +6,8 @@ HybridCLR community runtime on Tuanjie 1.10.0.
 ## Fixed baseline
 
 - Tuanjie: `1.10.0` (`2022.3.62t12`)
-- HybridCLR package: `v8.13.0` (`optimize/v8.13.0@749eaee`, no package opt tag)
-- HybridCLR runtime: `v8.13.0-opt4.1` (`f777ed7`)
+- HybridCLR package: `v8.13.0` (`optimize/dhe-generated-cpp-resolver-v8.13.0@169041c`, no package opt tag)
+- HybridCLR runtime: DHE candidate based on `v8.13.0-opt4.1` (`71cf142d`, no new runtime tag)
 - il2cpp_plus: `v2022-tuanjie-8.13.0-opt4.1` (`52968ad`)
 
 The runtime source repositories live beside this repository under `../repos`.
@@ -37,8 +37,9 @@ artifact validator; it verifies the exact supported+unsupported changed-token se
 and the versioned `il2cpp-generated-cpp-signature-v2` ABI adapter contract.
 The current MetaVersion Player result covers method bodies, field/type/method evolution,
 logical property/event metadata, custom attributes, reflection, and
-cross-assembly calls. Two independently built Unity 2021 Base Players consumed
-the same four-assembly current payload while computing 72 changed methods each.
+cross-assembly calls. Three independently built Unity 2021, Unity 2022, and Tuanjie 2022
+Base Players consumed the same four-assembly structural current payload while computing
+71 changed methods each.
 The 0.1.19 release contract extends this proof to an arbitrary changed-Player
 evidence list and requires Unity 2021, Unity 2022, and Tuanjie 2022 coverage
 over one shared current payload.

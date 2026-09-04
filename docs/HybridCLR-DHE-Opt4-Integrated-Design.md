@@ -23,6 +23,12 @@ The old base commits and patches remain in the locks as replay and migration
 evidence. They are not the source identities used to build the integrated
 runtime.
 
+The active 0.1.19 candidate extends that integrated line with the locked
+HybridCLR commit `71cf142da1c00fc2a690e0063da14866f678d57c` and package commit
+`169041c8fa2992b5b8750e897ea7f5ae39d9da3e`. These candidate commits are the
+identities used by the current runtime manifests and exploratory toolchain
+package; no new runtime tag has been created yet.
+
 The native runtime keeps every hot-update assembly's baseline image in the
 player. At runtime, the strict MV loader validates the current DLL hash, the
 baseline AOT snapshot hash, assembly identity, and the changed method token set.
