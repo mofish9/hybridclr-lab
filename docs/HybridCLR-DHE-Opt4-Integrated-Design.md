@@ -25,8 +25,8 @@ runtime.
 
 The active 0.1.20 candidate extends that integrated line with the locked
 HybridCLR commit `fe3b1edb222511a1d3227f7e76e8b83b618c4d27` and package commit
-`70c163ed4860c5ea02e4558e7b32c36c3967a517` (tree
-`4F330F52DE18256017A2767282639E59C42B27E9ACB0D178771E5803CBDC2AE7`). These
+`7005963222bb13f5a92797da1eaa2bdf3c8de3ec` (tree
+`8B9620DF0FA80490B057219C4302097D90794132108462643F306AB160D0007B`). These
 candidate commits are the identities used by the current runtime manifests and
 exploratory toolchain package; no new runtime tag has been created yet.
 

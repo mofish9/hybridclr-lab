@@ -28,10 +28,10 @@ index b68c3b3..043ee04 100644
      {
          "unity_version":"2023",
 diff --git a/Documentation~/dhe-project-integration.md b/Documentation~/dhe-project-integration.md
-index 148b890..70bdc87 100644
+index 148b890..66b8671 100644
 --- a/Documentation~/dhe-project-integration.md
 +++ b/Documentation~/dhe-project-integration.md
-@@ -1,80 +1,165 @@
+@@ -1,80 +1,172 @@
  # DHE project integration
  
 -The customized package owns DHE assembly generation, runtime-plan staging,
@@ -196,8 +196,14 @@ index 148b890..70bdc87 100644
 +Base records. The host rejects duplicate Base IDs, unsupported engine workflows,
 +mixed registry/parallel arguments, and identity/baseId mismatches, then records
 +the registry SHA-256 and entry count in the resource manifest. Adding a new
-+online Base is an audited registry change; it does not create a second current
-+DLL/MV payload.
++online Base is an audited registry change; it does not create a second Base-specific
++delta payload. For target-specific managed metadata shapes, one resource manifest
++may contain multiple current payload variants. Pass `-CurrentRoot` for the default
++variant and `-CurrentVariantRoots {"android":"C:/build/current-android","windows":"C:/build/current-windows"}`
++for additional roots, then set each registry entry's `payloadVariantId` to the
++variant consumed by that Base. The runtime plan keeps the variant hash and asset
++paths bound to the Base selection, and staging copies only the selected DLL/MV
++variant while preserving the same one-package release model.
 +Every resource update requires `resource-update-plan-integrity-v1` and
 +`resource-update-aot-metadata-set-selection-v1`; updates carrying non-empty
 +supplemental metadata also require `resource-update-aot-metadata-path-v1`. The
@@ -212,9 +218,10 @@ index 148b890..70bdc87 100644
 +
 +For consecutive resource releases, keep the archived Base registry and each
 +Player's embedded Base MetaVersion unchanged. Run `resource-update` again for
-+the new current DLL set and stage its single payload over the previous resource
-+root; do not promote the previous current DLL/MV into a new baseline unless a
-+new Base Player is intentionally shipped and added to the registry.
++the new current DLL roots (one root per variant) and stage the resulting manifest
++over the previous resource root; do not promote the previous current DLL/MV into
++a new baseline unless a new Base Player is intentionally shipped and added to the
++registry. The same Base can consume N and N+1 without changing its embedded files.
  
  ## Runtime adapter
  
@@ -250,9 +257,9 @@ index 148b890..70bdc87 100644
 +integrity semantics when its catalog resolves remote bundles on Android/iOS.
 +
 +Every Player reads Base MetaVersion from its immutable built-in asset root and compares
-+it with the one remote current MetaVersion. Project code must not select a per-Base
-+remote delta or reimplement MV parsing, Base identity matching, transaction
-+retry, changed-method dispatch, or native identity checks.
++it with the current MetaVersion from its selected payload variant. Project code must
++not select a per-Base remote delta or reimplement MV parsing, Base identity matching,
++transaction retry, changed-method dispatch, or native identity checks.
 diff --git a/Editor/Commands/CompileDllCommand.cs b/Editor/Commands/CompileDllCommand.cs
 index 583368e..52b9504 100644
 --- a/Editor/Commands/CompileDllCommand.cs
@@ -2752,10 +2759,22 @@ index 8003bb4..09ca286 100644
          public string IdentityClassName = "DheBuildIdentity";
      }
 diff --git a/Editor/Commands/DheProjectResourceSupport.cs b/Editor/Commands/DheProjectResourceSupport.cs
-index 2b1525d..3644882 100644
+index 2b1525d..3965d53 100644
 --- a/Editor/Commands/DheProjectResourceSupport.cs
 +++ b/Editor/Commands/DheProjectResourceSupport.cs
-@@ -143,6 +143,7 @@ namespace HybridCLR.Editor.Commands
+@@ -34,8 +34,9 @@ namespace HybridCLR.Editor.Commands
+                 File.ReadAllText(runtimePlanPath));
+             if (plan == null || plan.schemaVersion != 1 ||
+                 !string.Equals(plan.format, "hybridclr.dhe-runtime-asset-plan.json",
+-                    StringComparison.Ordinal) || plan.assemblies == null ||
+-                plan.assemblies.Length == 0)
++                StringComparison.Ordinal) ||
++                ((plan.assemblies == null || plan.assemblies.Length == 0) &&
++                 (plan.payloadVariants == null || plan.payloadVariants.Length == 0)))
+                 throw new BuildFailedException(
+                     "DHE runtime asset plan is invalid: " + runtimePlanPath);
+ 
+@@ -143,6 +144,7 @@ namespace HybridCLR.Editor.Commands
                  throw new BuildFailedException("DHE runtime asset prefix is invalid.");
              var result = new List<RequiredAssetSpec>();
              var paths = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
@@ -2763,7 +2782,20 @@ index 2b1525d..3644882 100644
              Action<string, string, string> add = (path, kind, assembly) =>
              {
                  string normalized = NormalizeAssetPath(path);
-@@ -168,29 +169,81 @@ namespace HybridCLR.Editor.Commands
+@@ -161,36 +163,93 @@ namespace HybridCLR.Editor.Commands
+             };
+             foreach (string control in options.ControlFileNames ?? Array.Empty<string>())
+                 add(prefix + control, "control", null);
+-            foreach (RuntimeAssembly assembly in plan.assemblies)
++            IEnumerable<RuntimeAssembly> plannedAssemblies = plan.payloadVariants != null &&
++                plan.payloadVariants.Length != 0
++                ? plan.payloadVariants.SelectMany(variant => variant?.assemblies ??
++                    Array.Empty<RuntimeAssembly>())
++                : plan.assemblies ?? Array.Empty<RuntimeAssembly>();
++            foreach (RuntimeAssembly assembly in plannedAssemblies)
+             {
+                 string name = NormalizeAssemblyName(assembly?.assemblyName);
+                 if (string.IsNullOrWhiteSpace(name))
                      throw new BuildFailedException(
                          "DHE runtime asset plan contains an unnamed assembly.");
                  add(assembly.current, "current", name);
@@ -2860,7 +2892,7 @@ index 2b1525d..3644882 100644
              return result;
          }
  
-@@ -232,6 +285,12 @@ namespace HybridCLR.Editor.Commands
+@@ -232,6 +291,12 @@ namespace HybridCLR.Editor.Commands
                      .ToLowerInvariant();
          }
  
@@ -2873,7 +2905,7 @@ index 2b1525d..3644882 100644
          private static string NormalizeAssetPath(string path)
          {
              return (path ?? string.Empty).Replace('\\', '/').TrimStart('/');
-@@ -271,16 +330,34 @@ namespace HybridCLR.Editor.Commands
+@@ -271,16 +336,43 @@ namespace HybridCLR.Editor.Commands
          {
              public int schemaVersion;
              public string format;
@@ -2882,6 +2914,13 @@ index 2b1525d..3644882 100644
              public RuntimeAotMetadata[] aotMetadata;
 +            public RuntimeAotMetadataSet[] aotMetadataSets;
 +            public RuntimeBaseSelection[] baseSelections;
++            public RuntimeAssembly[] assemblies;
++            public RuntimePayloadVariant[] payloadVariants;
++        }
++        [Serializable] private sealed class RuntimePayloadVariant
++        {
++            public string variantId;
++            public string currentAssemblySetSha256;
              public RuntimeAssembly[] assemblies;
          }
 -        [Serializable] private sealed class RuntimeAotMetadata { public string assemblyName; }
@@ -2900,6 +2939,8 @@ index 2b1525d..3644882 100644
 +        {
 +            public string baseId;
 +            public string aotMetadataSetId;
++            public string payloadVariantId;
++            public string currentAssemblySetSha256;
 +        }
          [Serializable] private sealed class RuntimeAssembly
          {
@@ -2985,7 +3026,7 @@ index 6eaf1b0..f37c4c4 100644
                      subtarget = (int)StandaloneBuildSubtarget.Server,
  #endif
 diff --git a/Runtime/DheRuntime.cs b/Runtime/DheRuntime.cs
-index 0e5fda3..414d357 100644
+index 0e5fda3..5caf860 100644
 --- a/Runtime/DheRuntime.cs
 +++ b/Runtime/DheRuntime.cs
 @@ -1,6 +1,7 @@
@@ -3019,7 +3060,7 @@ index 0e5fda3..414d357 100644
      }
  
      /// <summary>
-@@ -43,17 +52,43 @@ namespace HybridCLR
+@@ -43,18 +52,46 @@ namespace HybridCLR
      {
          private const string PlanAssetPath = "Assets/GameMain/HotfixDlls/DheRuntimePlan.json";
          private const string DefaultAssetRoot = "Assets/GameMain/HotfixDlls/";
@@ -3061,24 +3102,37 @@ index 0e5fda3..414d357 100644
          private static bool transactionRetryValidated;
 +        private static bool validationProbesEnabled;
          private static string transactionAssemblyName;
++        private static string selectedPayloadVariantId;
++        private static string selectedPayloadCurrentAssemblySetSha256;
          private static LoadImageErrorCode transactionFailureCode =
              LoadImageErrorCode.DHE_MV_REGISTRATION_FAILED;
-@@ -65,7 +100,14 @@ namespace HybridCLR
+         private static DheRuntimeIdentity identity;
+@@ -65,7 +102,24 @@ namespace HybridCLR
          {
              public int schemaVersion;
              public string format;
 +            public string selection;
 +            public string currentAssemblySetSha256;
++            public string payloadVariantSetSha256;
 +            public string runtimeAssetRoot;
 +            public string baseMetaVersionAssetRoot;
 +            public string aotMetadataSetId;
              public DheAotMetadataRecord[] aotMetadata;
 +            public DheAotMetadataSet[] aotMetadataSets;
 +            public DheBaseSelection[] baseSelections;
++            public DheAssemblyRecord[] assemblies;
++            public DhePayloadVariant[] payloadVariants;
++        }
++
++        [Serializable]
++        private sealed class DhePayloadVariant
++        {
++            public string variantId;
++            public string currentAssemblySetSha256;
              public DheAssemblyRecord[] assemblies;
          }
  
-@@ -73,8 +115,70 @@ namespace HybridCLR
+@@ -73,8 +127,76 @@ namespace HybridCLR
          private sealed class DheAssemblyRecord
          {
              public string assemblyName;
@@ -3109,6 +3163,8 @@ index 0e5fda3..414d357 100644
 +            public string baseMetaVersionAssetRoot;
 +            public string buildIdentitySha256;
 +            public string aotMetadataSetId;
++            public string payloadVariantId;
++            public string currentAssemblySetSha256;
 +            public string compatibilityPolicy;
 +            public bool compatible;
 +            public bool guardCoverageValidated;
@@ -3129,6 +3185,7 @@ index 0e5fda3..414d357 100644
 +            public bool playerUpdateRequired;
 +            public bool guardCoverageValidated;
 +            public string currentAssemblySetSha256;
++            public string payloadVariantSetSha256;
 +            public string runtimeAssetRoot;
 +            public string baseMetaVersionAssetRoot;
 +            public string runtimePlan;
@@ -3136,6 +3193,7 @@ index 0e5fda3..414d357 100644
 +            public string validation;
 +            public string validationSha256;
 +            public DheSupportedBase[] supportedBases;
++            public DhePayloadVariant[] payloadVariants;
 +        }
 +
 +        [Serializable]
@@ -3147,11 +3205,13 @@ index 0e5fda3..414d357 100644
 +            public string compatibilityPolicy;
 +            public string runtimeProtocol;
 +            public string currentAssemblySetSha256;
++            public string payloadVariantSetSha256;
++            public DhePayloadVariant[] payloadVariants;
 +            public DheSupportedBase[] bases;
          }
  
          [Serializable]
-@@ -82,13 +186,29 @@ namespace HybridCLR
+@@ -82,13 +204,31 @@ namespace HybridCLR
          {
              public string assemblyName;
              public string sha256;
@@ -3170,6 +3230,8 @@ index 0e5fda3..414d357 100644
 +        {
 +            public string baseId;
 +            public string aotMetadataSetId;
++            public string payloadVariantId;
++            public string currentAssemblySetSha256;
          }
  
          private sealed class DheAssemblyArtifact
@@ -3182,7 +3244,21 @@ index 0e5fda3..414d357 100644
          }
  
          public static bool Enabled => enabled;
-@@ -135,6 +255,7 @@ namespace HybridCLR
+@@ -109,6 +249,13 @@ namespace HybridCLR
+ 
+         public static LoadImageErrorCode TransactionRetryFailure => transactionFailureCode;
+ 
++        /// <summary>Variant selected by the authenticated Base-to-payload binding.</summary>
++        public static string SelectedPayloadVariantId => selectedPayloadVariantId ?? string.Empty;
++
++        /// <summary>Current assembly-set hash for <see cref="SelectedPayloadVariantId"/>.</summary>
++        public static string SelectedPayloadCurrentAssemblySetSha256 =>
++            selectedPayloadCurrentAssemblySetSha256 ?? string.Empty;
++
+         public static string[] PlannedAssemblyNames
+         {
+             get
+@@ -135,6 +282,7 @@ namespace HybridCLR
          {
              Artifacts.Clear();
              AotMetadataHashes.Clear();
@@ -3190,9 +3266,12 @@ index 0e5fda3..414d357 100644
              LoadedAssemblies.Clear();
              identity = null;
              assetRoot = DefaultAssetRoot;
-@@ -144,10 +265,12 @@ namespace HybridCLR
+@@ -143,11 +291,15 @@ namespace HybridCLR
+             transactionProbeAttempted = false;
              transactionRetryValidated = false;
              transactionAssemblyName = null;
++            selectedPayloadVariantId = null;
++            selectedPayloadCurrentAssemblySetSha256 = null;
              transactionFailureCode = LoadImageErrorCode.DHE_MV_REGISTRATION_FAILED;
 +            validationProbesEnabled = false;
          }
@@ -3204,7 +3283,7 @@ index 0e5fda3..414d357 100644
          {
              error = string.Empty;
              if (initialized)
-@@ -178,6 +301,7 @@ namespace HybridCLR
+@@ -178,15 +330,32 @@ namespace HybridCLR
                  assetRoot = NormalizeAssetRoot(runtimeAssetRoot);
                  identity = buildIdentity ?? throw new InvalidDataException(
                      "DHE Player build identity is missing.");
@@ -3212,7 +3291,10 @@ index 0e5fda3..414d357 100644
                  RuntimePlan plan = JsonUtility.FromJson<RuntimePlan>(provider.LoadText(planAssetPath));
                  if (plan == null || plan.schemaVersion != 1 ||
                      !string.Equals(plan.format, "hybridclr.dhe-runtime-asset-plan.json",
-@@ -185,6 +309,18 @@ namespace HybridCLR
+-                        StringComparison.Ordinal) || plan.assemblies == null || plan.assemblies.Length == 0)
++                        StringComparison.Ordinal) ||
++                    ((plan.assemblies == null || plan.assemblies.Length == 0) &&
++                     (plan.payloadVariants == null || plan.payloadVariants.Length == 0)))
                  {
                      throw new InvalidDataException("DHE runtime plan has an invalid schema or no assemblies.");
                  }
@@ -3228,10 +3310,15 @@ index 0e5fda3..414d357 100644
 +                        "DHE runtime plan asset roots do not match the Player identity.");
 +                }
 +                DheAotMetadataRecord[] selectedAotMetadata = SelectAotMetadata(plan, identity);
++                DheAssemblyRecord[] selectedAssemblies = SelectPayloadAssemblies(plan, identity);
++                SetSelectedPayloadIdentity(plan, identity);
  
-                 foreach (DheAssemblyRecord record in plan.assemblies)
+-                foreach (DheAssemblyRecord record in plan.assemblies)
++                foreach (DheAssemblyRecord record in selectedAssemblies)
                  {
-@@ -194,27 +330,62 @@ namespace HybridCLR
+                     string assemblyName = NormalizeAssemblyName(record?.assemblyName);
+                     if (string.IsNullOrWhiteSpace(assemblyName) || Artifacts.ContainsKey(assemblyName))
+@@ -194,27 +363,62 @@ namespace HybridCLR
                          throw new InvalidDataException(
                              "DHE runtime plan contains an empty or duplicate assembly.");
                      }
@@ -3299,15 +3386,19 @@ index 0e5fda3..414d357 100644
  
                  ValidateEmbeddedIdentity();
                  enabled = true;
-@@ -227,6 +398,7 @@ namespace HybridCLR
+@@ -227,8 +431,11 @@ namespace HybridCLR
              {
                  Artifacts.Clear();
                  AotMetadataHashes.Clear();
 +                AotMetadataPaths.Clear();
                  LoadedAssemblies.Clear();
                  identity = null;
++                selectedPayloadVariantId = null;
++                selectedPayloadCurrentAssemblySetSha256 = null;
                  enabled = false;
-@@ -236,6 +408,294 @@ namespace HybridCLR
+                 initialized = false;
+                 error = exception.Message;
+@@ -236,6 +443,378 @@ namespace HybridCLR
              }
          }
  
@@ -3334,11 +3425,21 @@ index 0e5fda3..414d357 100644
 +                }
 +                ResourceUpdateManifest manifest = JsonUtility.FromJson<ResourceUpdateManifest>(
 +                    provider.LoadText(manifestAssetPath));
++                if (manifest != null && manifest.payloadVariants != null &&
++                    manifest.payloadVariants.Length != 0 &&
++                    (!IsSha256(manifest.payloadVariantSetSha256) ||
++                     !string.Equals(manifest.payloadVariantSetSha256,
++                         ComputePayloadVariantSetHash(manifest.payloadVariants),
++                         StringComparison.OrdinalIgnoreCase)))
++                {
++                    error = "DHE resource manifest payload variant set hash is invalid.";
++                    return false;
++                }
 +                if (manifest == null || manifest.schemaVersion != 1 ||
 +                    !string.Equals(manifest.format, "hybridclr.dhe-resource-update.json",
 +                        StringComparison.Ordinal) ||
-+                    !string.Equals(manifest.payloadModel, "single-current-payload",
-+                        StringComparison.Ordinal) ||
++                    (manifest.payloadModel != "single-current-payload" &&
++                     manifest.payloadModel != "variant-current-payload") ||
 +                    manifest.metaVersionSchema != 1 || manifest.playerUpdateRequired ||
 +                    !manifest.guardCoverageValidated ||
 +                    !string.Equals(manifest.runtimeComparison,
@@ -3385,6 +3486,18 @@ index 0e5fda3..414d357 100644
 +                }
 +                ResourceUpdateValidation validation = JsonUtility.FromJson<ResourceUpdateValidation>(
 +                    System.Text.Encoding.UTF8.GetString(validationBytes));
++                if (validation != null && validation.payloadVariants != null &&
++                    validation.payloadVariants.Length != 0 &&
++                    (!IsSha256(validation.payloadVariantSetSha256) ||
++                     !string.Equals(validation.payloadVariantSetSha256,
++                         ComputePayloadVariantSetHash(validation.payloadVariants),
++                         StringComparison.OrdinalIgnoreCase) ||
++                     !string.Equals(validation.payloadVariantSetSha256,
++                         manifest.payloadVariantSetSha256, StringComparison.OrdinalIgnoreCase)))
++                {
++                    error = "DHE resource validation payload variant set hash is invalid.";
++                    return false;
++                }
 +                if (validation == null || validation.schemaVersion != 1 || !validation.passed ||
 +                    !string.Equals(validation.format,
 +                        "hybridclr.dhe-resource-update-validation.json", StringComparison.Ordinal) ||
@@ -3463,6 +3576,22 @@ index 0e5fda3..414d357 100644
 +                    error = "DHE current payload was not validated for Player base " + baseId + ".";
 +                    return false;
 +                }
++                string selectedVariantId = string.IsNullOrWhiteSpace(matches[0].payloadVariantId)
++                    ? "default" : matches[0].payloadVariantId;
++                DhePayloadVariant manifestVariant = SelectManifestPayloadVariant(manifest,
++                    selectedVariantId);
++                if (manifestVariant == null || !IsSha256(manifestVariant.currentAssemblySetSha256) ||
++                    (!string.IsNullOrWhiteSpace(matches[0].currentAssemblySetSha256) &&
++                     !string.Equals(matches[0].currentAssemblySetSha256,
++                         manifestVariant.currentAssemblySetSha256, StringComparison.OrdinalIgnoreCase)) ||
++                    !string.Equals(manifestVariant.currentAssemblySetSha256,
++                        FindPlanVariantHash(provider, manifestAssetPath, manifest.runtimePlan,
++                            selectedVariantId, manifest.runtimePlanSha256),
++                        StringComparison.OrdinalIgnoreCase))
++                {
++                    error = "DHE resource update payload variant is not bound to this Player base.";
++                    return false;
++                }
 +                return true;
 +            }
 +            catch (Exception exception)
@@ -3504,6 +3633,48 @@ index 0e5fda3..414d357 100644
 +                new HashSet<string>(candidate.runtimeCapabilities ?? Array.Empty<string>(),
 +                    StringComparer.Ordinal).SetEquals(buildIdentity.RuntimeCapabilities ??
 +                    Array.Empty<string>());
++        }
++
++        private static DhePayloadVariant SelectManifestPayloadVariant(
++            ResourceUpdateManifest manifest, string variantId)
++        {
++            DhePayloadVariant[] variants = manifest.payloadVariants ?? Array.Empty<DhePayloadVariant>();
++            if (variants.Length == 0)
++            {
++                return string.Equals(variantId, "default", StringComparison.OrdinalIgnoreCase)
++                    ? new DhePayloadVariant
++                    {
++                        variantId = "default",
++                        currentAssemblySetSha256 = manifest.currentAssemblySetSha256,
++                    }
++                    : null;
++            }
++            DhePayloadVariant[] matches = variants.Where(variant => variant != null &&
++                string.Equals(variant.variantId, variantId, StringComparison.OrdinalIgnoreCase)).ToArray();
++            return matches.Length == 1 ? matches[0] : null;
++        }
++
++        private static string FindPlanVariantHash(IDheRuntimeAssetProvider provider,
++            string manifestAssetPath, string planAssetPath, string variantId, string expectedHash)
++        {
++            string directory = Path.GetDirectoryName(manifestAssetPath.Replace('/',
++                Path.DirectorySeparatorChar))?.Replace(Path.DirectorySeparatorChar, '/') ?? string.Empty;
++            string path = planAssetPath.Replace('\\', '/');
++            if (!path.StartsWith("Assets/", StringComparison.Ordinal) && !string.IsNullOrEmpty(directory))
++                path = directory.TrimEnd('/') + "/" + path;
++            if (!provider.Exists(path)) return string.Empty;
++            byte[] bytes = provider.LoadBytes(path);
++            if (!string.Equals(Sha256Hex(bytes), expectedHash, StringComparison.OrdinalIgnoreCase))
++                return string.Empty;
++            RuntimePlan plan = JsonUtility.FromJson<RuntimePlan>(System.Text.Encoding.UTF8.GetString(bytes));
++            if (plan == null) return string.Empty;
++            DhePayloadVariant[] variants = plan.payloadVariants ?? Array.Empty<DhePayloadVariant>();
++            if (variants.Length == 0)
++                return string.Equals(variantId, "default", StringComparison.OrdinalIgnoreCase)
++                    ? plan.currentAssemblySetSha256 : string.Empty;
++            DhePayloadVariant[] matches = variants.Where(variant => variant != null &&
++                string.Equals(variant.variantId, variantId, StringComparison.OrdinalIgnoreCase)).ToArray();
++            return matches.Length == 1 ? matches[0].currentAssemblySetSha256 : string.Empty;
 +        }
 +
 +        private static bool HasRequiredRuntimeCapabilities(DheSupportedBase candidate,
@@ -3580,6 +3751,10 @@ index 0e5fda3..414d357 100644
 +                if (matchingSelections.Length != 1 ||
 +                    !string.Equals(matchingSelections[0].aotMetadataSetId,
 +                        selectedBase.aotMetadataSetId, StringComparison.OrdinalIgnoreCase) ||
++                    !string.Equals(matchingSelections[0].payloadVariantId ?? "default",
++                        selectedBase.payloadVariantId ?? "default", StringComparison.OrdinalIgnoreCase) ||
++                    !string.Equals(matchingSelections[0].currentAssemblySetSha256,
++                        selectedBase.currentAssemblySetSha256, StringComparison.OrdinalIgnoreCase) ||
 +                    !string.Equals(selectedBase.aotMetadataSetId,
 +                        buildIdentity.AotMetadataSetId, StringComparison.OrdinalIgnoreCase))
 +                {
@@ -3602,7 +3777,7 @@ index 0e5fda3..414d357 100644
          public static bool IsDheAssembly(string assemblyName)
          {
              return enabled && Artifacts.ContainsKey(NormalizeAssemblyName(assemblyName));
-@@ -302,10 +762,70 @@ namespace HybridCLR
+@@ -302,10 +881,70 @@ namespace HybridCLR
              return true;
          }
  
@@ -3673,7 +3848,7 @@ index 0e5fda3..414d357 100644
              string normalizedName = NormalizeAssemblyName(assemblyName);
              if (!Artifacts.TryGetValue(normalizedName, out DheAssemblyArtifact artifact))
              {
-@@ -316,13 +836,21 @@ namespace HybridCLR
+@@ -316,13 +955,21 @@ namespace HybridCLR
  
              try
              {
@@ -3697,7 +3872,7 @@ index 0e5fda3..414d357 100644
                  {
                      if (!TryRunTransactionProbe(normalizedName, artifact, currentDll,
                              out code, out error))
-@@ -333,7 +861,7 @@ namespace HybridCLR
+@@ -333,7 +980,7 @@ namespace HybridCLR
                  }
  
                  code = RuntimeApi.LoadDifferentialHybridAssemblyWithMetaVersion(
@@ -3706,7 +3881,7 @@ index 0e5fda3..414d357 100644
                  if (code == LoadImageErrorCode.OK)
                  {
                      artifact.Current = currentDll == null ? null : (byte[])currentDll.Clone();
-@@ -351,6 +879,98 @@ namespace HybridCLR
+@@ -351,6 +998,98 @@ namespace HybridCLR
              }
          }
  
@@ -3805,7 +3980,7 @@ index 0e5fda3..414d357 100644
          private static bool TryRunTransactionProbe(string assemblyName,
              DheAssemblyArtifact artifact, byte[] currentDll, out LoadImageErrorCode code,
              out string error)
-@@ -361,7 +981,8 @@ namespace HybridCLR
+@@ -361,7 +1100,8 @@ namespace HybridCLR
              try
              {
                  transactionFailureCode = RuntimeApi.LoadDifferentialHybridAssemblyWithMetaVersion(
@@ -3815,7 +3990,7 @@ index 0e5fda3..414d357 100644
                  if (transactionFailureCode != LoadImageErrorCode.DHE_MV_REGISTRATION_FAILED)
                  {
                      code = transactionFailureCode;
-@@ -371,7 +992,7 @@ namespace HybridCLR
+@@ -371,7 +1111,7 @@ namespace HybridCLR
                  }
  
                  code = RuntimeApi.LoadDifferentialHybridAssemblyWithMetaVersion(
@@ -3824,7 +3999,7 @@ index 0e5fda3..414d357 100644
                  if (code != LoadImageErrorCode.OK)
                  {
                      error = "DHE transaction probe retry returned " + code +
-@@ -409,7 +1030,7 @@ namespace HybridCLR
+@@ -409,7 +1149,7 @@ namespace HybridCLR
              foreach (string assemblyName in PlannedAssemblyNames)
              {
                  DheAssemblyArtifact artifact = Artifacts[assemblyName];
@@ -3833,7 +4008,7 @@ index 0e5fda3..414d357 100644
                  {
                      continue;
                  }
-@@ -452,29 +1073,92 @@ namespace HybridCLR
+@@ -452,29 +1192,191 @@ namespace HybridCLR
              return true;
          }
  
@@ -3884,6 +4059,105 @@ index 0e5fda3..414d357 100644
 +            return setsById[matches[0].aotMetadataSetId].assemblies;
 +        }
 +
++        private static DheAssemblyRecord[] SelectPayloadAssemblies(RuntimePlan plan,
++            DheRuntimeIdentity buildIdentity)
++        {
++            DhePayloadVariant[] variants = plan.payloadVariants ?? Array.Empty<DhePayloadVariant>();
++            if (variants.Length == 0)
++            {
++                if (plan.assemblies == null || plan.assemblies.Length == 0)
++                    throw new InvalidDataException("DHE runtime plan has no payload assemblies.");
++                return plan.assemblies;
++            }
++            var variantsById = new Dictionary<string, DhePayloadVariant>(
++                StringComparer.OrdinalIgnoreCase);
++            foreach (DhePayloadVariant variant in variants)
++            {
++                if (variant == null || string.IsNullOrWhiteSpace(variant.variantId) ||
++                    !IsPayloadVariantId(variant.variantId) ||
++                    !IsSha256(variant.currentAssemblySetSha256) ||
++                    variant.assemblies == null || variant.assemblies.Length == 0 ||
++                    !variantsById.TryAdd(variant.variantId, variant))
++                    throw new InvalidDataException("DHE runtime plan contains an invalid payload variant.");
++            }
++            DheBaseSelection[] selections = plan.baseSelections ?? Array.Empty<DheBaseSelection>();
++            DheBaseSelection[] matches = selections.Where(selection => selection != null &&
++                string.Equals(selection.baseId, buildIdentity.BaseId,
++                    StringComparison.OrdinalIgnoreCase)).ToArray();
++            if (matches.Length != 1)
++                throw new InvalidDataException("DHE runtime plan does not select a payload variant for this Base.");
++            string variantId = string.IsNullOrWhiteSpace(matches[0].payloadVariantId)
++                ? "default" : matches[0].payloadVariantId;
++            if (!variantsById.TryGetValue(variantId, out DhePayloadVariant selected) ||
++                !string.Equals(matches[0].currentAssemblySetSha256,
++                    selected.currentAssemblySetSha256, StringComparison.OrdinalIgnoreCase))
++                throw new InvalidDataException("DHE runtime plan selected payload variant is not bound to this Base.");
++            if (!IsSha256(plan.payloadVariantSetSha256) ||
++                !string.Equals(plan.payloadVariantSetSha256,
++                    ComputePayloadVariantSetHash(variants), StringComparison.OrdinalIgnoreCase))
++                throw new InvalidDataException("DHE runtime plan payload variant set hash is invalid.");
++            if (!string.Equals(plan.currentAssemblySetSha256,
++                    variantsById.TryGetValue("default", out DhePayloadVariant defaultVariant)
++                        ? defaultVariant.currentAssemblySetSha256 : plan.currentAssemblySetSha256,
++                    StringComparison.OrdinalIgnoreCase))
++                throw new InvalidDataException("DHE runtime plan default payload hash is invalid.");
++            return selected.assemblies;
++        }
++
++        private static void SetSelectedPayloadIdentity(RuntimePlan plan,
++            DheRuntimeIdentity buildIdentity)
++        {
++            DhePayloadVariant[] variants = plan.payloadVariants ?? Array.Empty<DhePayloadVariant>();
++            if (variants.Length == 0)
++            {
++                selectedPayloadVariantId = "default";
++                selectedPayloadCurrentAssemblySetSha256 = plan.currentAssemblySetSha256 ?? string.Empty;
++                return;
++            }
++
++            DheBaseSelection[] matches = (plan.baseSelections ?? Array.Empty<DheBaseSelection>())
++                .Where(selection => selection != null && string.Equals(selection.baseId,
++                    buildIdentity.BaseId, StringComparison.OrdinalIgnoreCase)).ToArray();
++            if (matches.Length != 1)
++                throw new InvalidDataException("DHE runtime plan does not select a payload identity for this Base.");
++            string variantId = string.IsNullOrWhiteSpace(matches[0].payloadVariantId)
++                ? "default" : matches[0].payloadVariantId;
++            DhePayloadVariant[] selected = variants.Where(variant => variant != null &&
++                string.Equals(variant.variantId, variantId, StringComparison.OrdinalIgnoreCase)).ToArray();
++            if (selected.Length != 1 || !string.Equals(selected[0].currentAssemblySetSha256,
++                    matches[0].currentAssemblySetSha256, StringComparison.OrdinalIgnoreCase))
++                throw new InvalidDataException("DHE runtime plan payload identity is not bound to this Base.");
++            selectedPayloadVariantId = variantId;
++            selectedPayloadCurrentAssemblySetSha256 = selected[0].currentAssemblySetSha256;
++        }
++
++        private static string ComputePayloadVariantSetHash(DhePayloadVariant[] variants)
++        {
++            using (SHA256 sha = SHA256.Create())
++            {
++                foreach (DhePayloadVariant variant in variants.OrderBy(item => item.variantId,
++                             StringComparer.OrdinalIgnoreCase))
++                {
++                    byte[] bytes = System.Text.Encoding.UTF8.GetBytes((variant.variantId ?? string.Empty) +
++                        "\n" + (variant.currentAssemblySetSha256 ?? string.Empty).ToLowerInvariant() + "\n");
++                    sha.TransformBlock(bytes, 0, bytes.Length, bytes, 0);
++                }
++                sha.TransformFinalBlock(Array.Empty<byte>(), 0, 0);
++                return ToHex(sha.Hash);
++            }
++        }
++
++        private static bool IsPayloadVariantId(string value)
++        {
++            if (string.IsNullOrWhiteSpace(value) || value.Length > 64) return false;
++            foreach (char character in value)
++            {
++                if (!(char.IsLetterOrDigit(character) || character == '-' ||
++                      character == '_' || character == '.')) return false;
++            }
++            return true;
++        }
++
          private static void ValidateEmbeddedIdentity()
          {
 -            if (identity.IdentityVersion != 2 || !string.Equals(identity.AotSnapshotKind,
@@ -3932,7 +4206,7 @@ index 0e5fda3..414d357 100644
              for (int index = 0; index < identity.AssemblyNames.Length; index++)
              {
                  string assemblyName = NormalizeAssemblyName(identity.AssemblyNames[index]);
-@@ -484,45 +1168,106 @@ namespace HybridCLR
+@@ -484,45 +1386,106 @@ namespace HybridCLR
                          "DHE Player build identity contains an empty or duplicate assembly.");
                  }
                  if (!Artifacts.TryGetValue(assemblyName, out DheAssemblyArtifact artifact) ||
@@ -4061,7 +4335,7 @@ index 0e5fda3..414d357 100644
          private static string ValidateAssetPath(string path, string description)
          {
              if (string.IsNullOrWhiteSpace(path))
-@@ -540,6 +1285,83 @@ namespace HybridCLR
+@@ -540,6 +1503,83 @@ namespace HybridCLR
              return normalized;
          }
  
@@ -4145,6 +4419,20 @@ index 0e5fda3..414d357 100644
          private static string NormalizeAssetRoot(string value)
          {
              string normalized = string.IsNullOrWhiteSpace(value) ? DefaultAssetRoot :
+diff --git a/Runtime/DheRuntimeSmoke.cs b/Runtime/DheRuntimeSmoke.cs
+index fe8dde2..df72615 100644
+--- a/Runtime/DheRuntimeSmoke.cs
++++ b/Runtime/DheRuntimeSmoke.cs
+@@ -198,6 +198,9 @@ namespace HybridCLR
+                 nativeGuardSourceSha256 = options.ExpectedNativeGuardSourceSha256,
+                 nativeManifestSha256 = options.ExpectedNativeManifestSha256,
+                 target = options.ExpectedTarget,
++                selectedPayloadVariantId = DheRuntime.SelectedPayloadVariantId,
++                selectedPayloadCurrentAssemblySetSha256 =
++                    DheRuntime.SelectedPayloadCurrentAssemblySetSha256,
+                 dheEnabled = DheRuntime.Enabled,
+                 changedMethodCount = options.ExpectedChangedMethodCount,
+                 expectedChangedMethodCount = options.ExpectedChangedMethodCount,
 diff --git a/Runtime/RuntimeApi.cs b/Runtime/RuntimeApi.cs
 index b79bf17..3471579 100644
 --- a/Runtime/RuntimeApi.cs

@@ -6,7 +6,7 @@ HybridCLR community runtime on Tuanjie 1.10.0.
 ## Fixed baseline
 
 - Tuanjie: `1.10.0` (`2022.3.62t12`)
-- HybridCLR package: `v8.13.0` (`optimize/dhe-generated-cpp-resolver-v8.13.0@70c163e`, tree `4F330F52DE18256017A2767282639E59C42B27E9ACB0D178771E5803CBDC2AE7`, no package opt tag)
+- HybridCLR package: `v8.13.0` (`optimize/dhe-generated-cpp-resolver-v8.13.0@7005963`, tree `8B9620DF0FA80490B057219C4302097D90794132108462643F306AB160D0007B`, no package opt tag)
 - HybridCLR runtime: DHE candidate based on `v8.13.0-opt4.1` (`fe3b1ed`, no new runtime tag)
 - il2cpp_plus: `v2022-tuanjie-8.13.0-opt4.1` (`52968ad`)
 
