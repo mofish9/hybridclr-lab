@@ -10,6 +10,7 @@
     "format": { "const": "hybridclr.dhe-runtime-asset-plan.json" },
     "selection": { "enum": ["embedded-base-metaversion", "embedded-base-metaversion-and-aot-metadata-set"] },
     "currentAssemblySetSha256": { "type": "string", "pattern": "^[0-9a-fA-F]{64}$" },
+    "payloadVariantSetSha256": { "type": "string", "pattern": "^[0-9a-fA-F]{64}$" },
     "runtimeAssetRoot": { "type": "string", "minLength": 1 },
     "baseMetaVersionAssetRoot": { "type": "string", "minLength": 1 },
     "aotMetadataSetId": { "type": "string", "pattern": "^$|^[0-9a-fA-F]{64}$" },
@@ -47,7 +48,21 @@
         "required": ["baseId", "aotMetadataSetId"],
         "properties": {
           "baseId": { "type": "string", "pattern": "^[0-9a-fA-F]{64}$" },
-          "aotMetadataSetId": { "type": "string", "pattern": "^[0-9a-fA-F]{64}$" }
+          "aotMetadataSetId": { "type": "string", "pattern": "^[0-9a-fA-F]{64}$" },
+          "payloadVariantId": { "type": "string", "pattern": "^[A-Za-z0-9._-]{1,64}$" },
+          "currentAssemblySetSha256": { "type": "string", "pattern": "^[0-9a-fA-F]{64}$" }
+        }
+      }
+    },
+    "payloadVariants": {
+      "type": "array", "minItems": 1,
+      "items": {
+        "type": "object",
+        "required": ["variantId", "currentAssemblySetSha256", "assemblies"],
+        "properties": {
+          "variantId": { "type": "string", "pattern": "^[A-Za-z0-9._-]{1,64}$" },
+          "currentAssemblySetSha256": { "type": "string", "pattern": "^[0-9a-fA-F]{64}$" },
+          "assemblies": { "type": "array", "minItems": 1 }
         }
       }
     },

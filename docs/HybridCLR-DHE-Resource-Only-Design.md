@@ -85,16 +85,21 @@ Player。命令先
 7. 全部通过后才写 validation、runtime plan 和最终 manifest，manifest 通过
    `runtimePlanSha256` 绑定 plan 原始字节。
 
-因此 CDN/资源系统发布的是一个目录（或由该目录制作的一个 bundle 集），不是按客户端版本
-选择的多个差分变体。加入新的线上 Base 只会扩大发布前审计集合；current payload 字节仍然
-相同。
+因此 CDN/资源系统发布的是一个目录（或由该目录制作的一个 bundle 集），不是按 Base 版本
+拆开的多个差分包。单 target 时目录只有 default payload；mixed-target 时目录包含多个
+variant 子目录，客户端按 Base 身份选择。加入新的线上 Base 只会扩大发布前审计集合，
+不会回写或改造 Base Player。
 
-跨 target 或跨引擎共用 payload 还要求 current DLL 的 managed metadata 形状同时兼容所有
+跨 target 或跨引擎共用同一个 current DLL 仍要求 managed metadata 形状同时兼容所有
 Base。工具不会把平台条件编译产生的方法、P/Invoke 或类型布局差异翻译成另一套程序集；
-这类变化会在对应 Base 上 fail-closed。因而 Android、Windows、iOS 的程序集若包含不同
-的条件成员，应分别维护资源发布 lane；只有从首个 Base 起就保持相同程序集形状、并通过
-每个 target 的 guard/Player 门禁时，才可加入同一 registry。不同 Base 仍可以各自使用
-`null` 或非空的 AOT metadata set，但这不会消除 managed metadata 的跨 target 约束。
+这类变化会在对应 Base 上 fail-closed。若 Android、Windows、iOS 的程序集形状不同，可以
+在一次资源发布中使用多个 payload variant：`-CurrentRoot` 作为 `default` variant，
+`-CurrentVariantRoots {"android":"...","windows":"..."}` 追加其他 variant，
+而 registry 每个条目用 `payloadVariantId` 绑定自身 variant。manifest/runtime plan 会为
+每个 variant 写入独立的 DLL/MV 路径和 `currentAssemblySetSha256`，客户端按自身
+`BaseId -> payloadVariantId` 只读取对应目录；这仍是一次资源包发布，不要求不同 target
+的 DLL 字节相同。不同 Base 仍可以各自使用 `null` 或非空的 AOT metadata set，但每个
+variant 内部仍必须通过对应 target 的 guard/Player 门禁。
 
 ### 连续资源更新
 

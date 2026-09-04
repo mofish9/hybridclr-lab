@@ -1,4 +1,5 @@
 using System.Text.Json;
+using System.Linq;
 
 namespace HybridCLR.DheTool;
 
@@ -7,6 +8,7 @@ internal static partial class Program
     private sealed record BaseRegistryEntry(
         string BaseId,
         string EngineWorkflow,
+        string PayloadVariantId,
         string BaselineRoot,
         string NativeManifest,
         string BuildIdentity,
@@ -52,6 +54,9 @@ internal static partial class Program
                     StringComparer.Ordinal))
                 throw new DheException("DHE Base registry contains an unsupported engineWorkflow: " +
                     engineWorkflow);
+            string payloadVariantId = GetString(item, "payloadVariantId") ?? "default";
+            if (!IsPayloadVariantId(payloadVariantId))
+                throw new DheException("DHE Base registry contains an invalid payloadVariantId.");
 
             string baselineRoot = ResolveBaseRegistryPath(item, "baselineRoot", registryDirectory,
                 pathSemantics, requireDirectory: true);
@@ -73,12 +78,20 @@ internal static partial class Program
                     registryDirectory, pathSemantics, requireDirectory: true);
             }
 
-            entries.Add(new BaseRegistryEntry(baseId, engineWorkflow, baselineRoot,
+            entries.Add(new BaseRegistryEntry(baseId, engineWorkflow, payloadVariantId, baselineRoot,
                 nativeManifest, buildIdentity, aotMetadataRoot));
         }
 
         return new BaseRegistryDocument(sourcePath, pathSemantics, Sha256File(sourcePath),
             entries.ToArray());
+    }
+
+    private static bool IsPayloadVariantId(string value)
+    {
+        if (string.IsNullOrWhiteSpace(value) || value.Length > 64)
+            return false;
+        return value.All(character => char.IsLetterOrDigit(character) ||
+            character is '-' or '_' or '.');
     }
 
     private static string ResolveBaseRegistryPath(JsonElement entry, string property,

@@ -21,8 +21,9 @@ of the contract.
   Release mode.
 
 There are two separate production flows. Bootstrap creates a new immutable
-Base Player. Resource update compiles and publishes one current payload without
-building a Player.
+Base Player. Resource update compiles and publishes one resource package without
+building a Player; the package may contain multiple target-specific current
+payload variants when managed metadata shapes differ.
 
 ## Base bootstrap
 
@@ -89,11 +90,13 @@ must already be present in that Player's BuildIdentity. Use the singular
 `-AotMetadataRoot` only when every Base intentionally shares one root. Omit both in the
 legacy parallel-argument form only for a separately validated no-metadata workflow.
 
-The current DLL bytes are shared across the entire registry. Platform-specific conditional
+The default current DLL bytes are shared across the registry. Platform-specific conditional
 members, P/Invoke declarations, or other managed metadata differences are not translated;
-the affected Base fails the compatibility audit. Android/iOS and desktop may share a
-payload only after their Base assembly shapes and target-specific Player gates have both
-been independently validated.
+the affected Base must bind a separate `payloadVariantId` and variant root. Use
+`-CurrentVariantRoots {"android":"C:/build/current-android","windows":"C:/build/current-windows"}`
+with a registry whose entries select `android` or `windows`. The manifest/runtime plan
+contains all variants, while each Player stages and loads only its selected variant.
+Android/iOS and desktop still require independent target-specific Player gates.
 
 `stage-resource-update` copies this one payload into the project's resource
 catalog staging root. Pass the exact archived `build-identity.json` for the
@@ -125,7 +128,8 @@ transaction rollback. It replaces rebuilding a changed Player merely to obtain
 the `player-changed` release role; Base Players must retain universal guards.
 Formal toolchain release evidence runs this smoke against at least three distinct
 Base identities, requires Unity 2021, Unity 2022, and Tuanjie 2022 coverage, and
-requires every report to reference exactly one shared current payload. The input
+requires every report to reference one manifest/validation and its selected current
+payload variant. The input
 is extensible, so additional representative Base reports can be bound as the
 matrix grows. Every online Base remains a mandatory input to `resource-update`.
 
@@ -139,8 +143,8 @@ archived as a new registry entry.
 
 ## Runtime proof
 
-Every Player downloads the same current payload and compares current MetaVersion
-with its own embedded Base MetaVersion. The Player result must prove:
+Every Player downloads the selected current payload variant and compares current
+MetaVersion with its own embedded Base MetaVersion. The Player result must prove:
 
 1. Its complete Player identity uniquely matches a validated `supportedBases`
    record.

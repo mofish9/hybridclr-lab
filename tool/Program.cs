@@ -266,6 +266,44 @@ internal static partial class Program
         return configErrors.Count == 0 && summary.counts.incompatible == 0 && summary.counts.missing == 0 && summary.counts.error == 0 ? 0 : 2;
     }
 
+    private static Dictionary<string, string> ReadCurrentVariantRoots(Cli cli,
+        string defaultCurrentRoot)
+    {
+        var roots = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase)
+        {
+            ["default"] = defaultCurrentRoot,
+        };
+        string? raw = cli.Optional("currentvariantroots");
+        if (string.IsNullOrWhiteSpace(raw))
+            return roots;
+        JsonElement value;
+        try
+        {
+            using var document = JsonDocument.Parse(raw);
+            value = document.RootElement.Clone();
+        }
+        catch (JsonException exception)
+        {
+            throw new DheException("CurrentVariantRoots must be a JSON object mapping variant IDs to roots: " +
+                exception.Message);
+        }
+        if (value.ValueKind != JsonValueKind.Object)
+            throw new DheException("CurrentVariantRoots must be a JSON object mapping variant IDs to roots.");
+        foreach (JsonProperty property in value.EnumerateObject())
+        {
+            if (!IsPayloadVariantId(property.Name) || property.Value.ValueKind != JsonValueKind.String)
+                throw new DheException("CurrentVariantRoots contains an invalid variant ID or root: " +
+                    property.Name);
+            string root = RequireDirectory(property.Value.GetString() ?? string.Empty,
+                "Current " + property.Name + " variant root");
+            if (roots.TryGetValue(property.Name, out string? prior) &&
+                !string.Equals(prior, root, StringComparison.OrdinalIgnoreCase))
+                throw new DheException("CurrentVariantRoots cannot redefine the default root.");
+            roots[property.Name] = root;
+        }
+        return roots;
+    }
+
     /// <summary>
     /// Builds a resource-only DHE release. The command deliberately never
     /// invokes Unity or touches generated native output: a fixed Base Player
@@ -278,7 +316,9 @@ internal static partial class Program
     {
         var currentRoot = RequireDirectory(cli.Require("currentroot"), "Current root");
         var settingsPath = RequireFile(cli.Require("settingsfile"), "HybridCLR settings");
-        var outputRoot = SafeOutputRoot(cli.Require("outputroot"), new[] { currentRoot, settingsPath });
+        var currentVariantRoots = ReadCurrentVariantRoots(cli, currentRoot);
+        var outputInputs = currentVariantRoots.Values.Append(settingsPath).ToArray();
+        var outputRoot = SafeOutputRoot(cli.Require("outputroot"), outputInputs);
         string? baseRegistryPath = cli.Optional("baseregistry");
         BaseRegistryDocument? baseRegistry = null;
         string[] baselineRoots;
@@ -302,9 +342,18 @@ internal static partial class Program
             if (baseRegistry.Entries.Any(entry => entry.AotMetadataRoot != null))
                 registryAotMetadataRoots = baseRegistry.Entries.Select(entry =>
                     entry.AotMetadataRoot).ToArray();
+            foreach (string variantId in baseRegistry.Entries.Select(entry => entry.PayloadVariantId)
+                         .Distinct(StringComparer.OrdinalIgnoreCase))
+            {
+                if (!currentVariantRoots.ContainsKey(variantId))
+                    throw new DheException("No current root was supplied for Base payloadVariantId: " +
+                        variantId);
+            }
         }
         else
         {
+            if (currentVariantRoots.Count != 1)
+                throw new DheException("CurrentVariantRoots requires a BaseRegistry with payloadVariantId entries.");
             baselineRoots = (cli.Optional("baseroots") ?? cli.Require("baselineroot"))
                 .Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries)
                 .Select(path => RequireDirectory(path, "DHE base snapshot root")).ToArray();
@@ -358,12 +407,96 @@ internal static partial class Program
         var settings = Settings.Read(settingsPath);
         var names = settings.Dhe;
         if (names.Length == 0) throw new DheException("No DHE assemblies are configured.");
-        var currentRecords = names.Select(name => new
+        var payloadRoot = Path.Combine(outputRoot, "payload");
+        var auditRoot = Path.Combine(outputRoot, "audit");
+        var manifestPath = Path.Combine(outputRoot, "dhe-resource-update.json");
+        var runtimePlanPath = Path.Combine(outputRoot, "dhe-runtime-plan.json");
+        var validationPath = Path.Combine(outputRoot, "dhe-resource-update-validation.json");
+        Directory.CreateDirectory(outputRoot);
+        File.Delete(manifestPath);
+        File.Delete(runtimePlanPath);
+        File.Delete(validationPath);
+        if (Directory.Exists(payloadRoot)) Directory.Delete(payloadRoot, true);
+        if (Directory.Exists(auditRoot)) Directory.Delete(auditRoot, true);
+        Directory.CreateDirectory(payloadRoot);
+        Directory.CreateDirectory(auditRoot);
+        var currentVariants = new Dictionary<string, CurrentVariantData>(
+            StringComparer.OrdinalIgnoreCase);
+        foreach (var variantRoot in currentVariantRoots.OrderBy(pair => pair.Key,
+                     StringComparer.OrdinalIgnoreCase))
         {
-            name,
-            path = RequireFile(Path.Combine(currentRoot, name + ".dll"), name + " current assembly"),
-        }).ToArray();
-        var currentSetHash = NamedAssemblySetHash(currentRecords.Select(record => (record.name, record.path)));
+            var currentRecords = names.Select(name => new
+            {
+                name,
+                path = RequireFile(Path.Combine(variantRoot.Value, name + ".dll"),
+                    name + " current assembly (" + variantRoot.Key + ")"),
+            }).ToArray();
+            var variant = new CurrentVariantData
+            {
+                VariantId = variantRoot.Key,
+                Root = variantRoot.Value,
+                CurrentSetHash = NamedAssemblySetHash(currentRecords.Select(record =>
+                    (record.name, record.path))),
+                Snapshots = new Dictionary<string, MetaVersionSnapshot>(StringComparer.OrdinalIgnoreCase),
+                PayloadFiles = new List<object>(),
+                RuntimeAssemblies = new List<object>(),
+            };
+            string variantPayloadPrefix = string.Equals(variantRoot.Key, "default",
+                StringComparison.OrdinalIgnoreCase)
+                ? "payload/"
+                : "payload/variants/" + variantRoot.Key + "/";
+            string variantAuditPrefix = string.Equals(variantRoot.Key, "default",
+                StringComparison.OrdinalIgnoreCase)
+                ? string.Empty
+                : variantRoot.Key + "/";
+            foreach (var record in currentRecords)
+            {
+                var snapshot = MetaVersionSnapshot.Create(record.path);
+                variant.Snapshots.Add(record.name, snapshot);
+                variant.AddressTakenFields = (variant.AddressTakenFields ?? Array.Empty<string>())
+                    .Concat(snapshot.AddressTakenFieldIdentities)
+                    .Distinct(StringComparer.Ordinal).ToArray();
+                var dllTarget = Path.Combine(payloadRoot, variantPayloadPrefix["payload/".Length..],
+                    record.name + ".dll.bytes");
+                var mvTarget = Path.Combine(payloadRoot, variantPayloadPrefix["payload/".Length..],
+                    record.name + ".mv.bytes");
+                var mvJsonTarget = string.IsNullOrEmpty(variantAuditPrefix)
+                    ? Path.Combine(auditRoot, record.name + ".mv.json")
+                    : Path.Combine(auditRoot, variantAuditPrefix, record.name + ".mv.json");
+                Directory.CreateDirectory(Path.GetDirectoryName(dllTarget)!);
+                Directory.CreateDirectory(Path.GetDirectoryName(mvJsonTarget)!);
+                File.Copy(record.path, dllTarget, true);
+                File.WriteAllBytes(mvTarget, snapshot.ToBinary());
+                WriteJson(mvJsonTarget, snapshot.ToJson(record.path));
+                var dllAsset = variantPayloadPrefix + record.name + ".dll.bytes";
+                var mvAsset = variantPayloadPrefix + record.name + ".mv.bytes";
+                variant.PayloadFiles.Add(new
+                {
+                    assemblyName = record.name,
+                    dll = dllAsset,
+                    currentMetaVersion = mvAsset,
+                    dllSha256 = Sha256File(dllTarget),
+                    currentMetaVersionSha256 = Sha256File(mvTarget),
+                });
+                variant.RuntimeAssemblies.Add(new
+                {
+                    assemblyName = record.name,
+                    current = runtimeAssetRoot + dllAsset,
+                    currentMetaVersion = runtimeAssetRoot + mvAsset,
+                    baseMetaVersion = baseMetaVersionAssetRoot + record.name + ".mv.bytes",
+                    currentSha256 = Sha256File(dllTarget),
+                    currentMetaVersionSha256 = Sha256File(mvTarget),
+                });
+            }
+            currentVariants.Add(variant.VariantId, variant);
+        }
+        var defaultVariant = currentVariants["default"];
+        var currentSetHash = defaultVariant.CurrentSetHash;
+        string payloadVariantSetHash = NamedVariantSetHash(currentVariants.Values.Select(variant =>
+            (variant.VariantId, variant.CurrentSetHash)));
+        string payloadModel = currentVariants.Count == 1
+            ? "single-current-payload"
+            : "variant-current-payload";
         string?[] aotMetadataRoots;
         var explicitAotMetadataRoots = cli.GetList("aotmetadataroots")
             .Select(path => RequireDirectory(path, "AOT metadata root")).ToArray();
@@ -394,22 +527,6 @@ internal static partial class Program
                 "AotMetadataRoots is required when patchAOTAssemblies is non-empty; " +
                 "pass one metadata root per BaseRoot.");
 
-        var payloadRoot = Path.Combine(outputRoot, "payload");
-        var auditRoot = Path.Combine(outputRoot, "audit");
-        var manifestPath = Path.Combine(outputRoot, "dhe-resource-update.json");
-        var runtimePlanPath = Path.Combine(outputRoot, "dhe-runtime-plan.json");
-        var validationPath = Path.Combine(outputRoot, "dhe-resource-update-validation.json");
-        Directory.CreateDirectory(outputRoot);
-        // Invalidate publish markers before touching payload files. A failed
-        // validation must never leave a previous manifest beside new bytes.
-        File.Delete(manifestPath);
-        File.Delete(runtimePlanPath);
-        File.Delete(validationPath);
-        if (Directory.Exists(payloadRoot)) Directory.Delete(payloadRoot, true);
-        if (Directory.Exists(auditRoot)) Directory.Delete(auditRoot, true);
-        Directory.CreateDirectory(payloadRoot);
-        Directory.CreateDirectory(auditRoot);
-
         string? baseRegistryAuditPath = null;
         string? baseRegistryAuditSha256 = null;
         if (baseRegistry != null)
@@ -427,42 +544,8 @@ internal static partial class Program
                 throw new DheException("DHE Base registry audit copy hash mismatch.");
         }
 
-        var currentSnapshots = new Dictionary<string, MetaVersionSnapshot>(StringComparer.OrdinalIgnoreCase);
-        var payloadFiles = new List<object>();
-        var runtimeAssemblies = new List<object>();
-        foreach (var record in currentRecords)
-        {
-            var snapshot = MetaVersionSnapshot.Create(record.path);
-            currentSnapshots.Add(record.name, snapshot);
-            var dllTarget = Path.Combine(payloadRoot, record.name + ".dll.bytes");
-            var mvTarget = Path.Combine(payloadRoot, record.name + ".mv.bytes");
-            var mvJsonTarget = Path.Combine(auditRoot, record.name + ".mv.json");
-            File.Copy(record.path, dllTarget, true);
-            File.WriteAllBytes(mvTarget, snapshot.ToBinary());
-            WriteJson(mvJsonTarget, snapshot.ToJson(record.path));
-            var dllAsset = "payload/" + record.name + ".dll.bytes";
-            var mvAsset = "payload/" + record.name + ".mv.bytes";
-            payloadFiles.Add(new
-            {
-                assemblyName = record.name,
-                dll = dllAsset,
-                currentMetaVersion = mvAsset,
-                dllSha256 = Sha256File(dllTarget),
-                currentMetaVersionSha256 = Sha256File(mvTarget),
-            });
-            runtimeAssemblies.Add(new
-            {
-                assemblyName = record.name,
-                current = runtimeAssetRoot + dllAsset,
-                currentMetaVersion = runtimeAssetRoot + mvAsset,
-                baseMetaVersion = baseMetaVersionAssetRoot + record.name + ".mv.bytes",
-                currentSha256 = Sha256File(dllTarget),
-                currentMetaVersionSha256 = Sha256File(mvTarget),
-            });
-        }
-        string[] currentAddressTakenFields = currentSnapshots.Values
-            .SelectMany(snapshot => snapshot.AddressTakenFieldIdentities)
-            .Distinct(StringComparer.Ordinal).ToArray();
+        var payloadFiles = defaultVariant.PayloadFiles;
+        var runtimeAssemblies = defaultVariant.RuntimeAssemblies;
 
         var metadataSetsById = new Dictionary<string, ResourceAotMetadataSet>(
             StringComparer.OrdinalIgnoreCase);
@@ -526,6 +609,10 @@ internal static partial class Program
             var nativeManifest = ReadJson<JsonElement>(nativeManifestPath);
             var buildIdentity = baseIdentities[baseIndex];
             string aotMetadataSetId = metadataSetIdsByBase[baseIndex];
+            string payloadVariantId = baseRegistry == null
+                ? "default"
+                : baseRegistry.Entries[baseIndex].PayloadVariantId;
+            CurrentVariantData currentVariant = currentVariants[payloadVariantId];
             var baseTarget = GetString(buildIdentity, "target") ?? string.Empty;
             var baseAotSnapshotSha256 = GetString(buildIdentity, "aotSnapshotSha256") ?? string.Empty;
             var baseNativeGuardSourceSha256 = GetString(buildIdentity,
@@ -580,9 +667,9 @@ internal static partial class Program
                 var baselineSnapshot = MetaVersionSnapshot.Create(baselineRecord.path);
                 var baselineMvBytes = baselineSnapshot.ToBinary();
                 baseMvSet.Add((baselineRecord.name, baselineMvBytes));
-                var currentSnapshot = currentSnapshots[baselineRecord.name];
+                var currentSnapshot = currentVariant.Snapshots[baselineRecord.name];
                 var compatibility = ResourceUpdateCompatibility.Analyze(baselineSnapshot,
-                    currentSnapshot, currentAddressTakenFields);
+                    currentSnapshot, currentVariant.AddressTakenFields);
                 requiredRuntimeCapabilities.UnionWith(
                     compatibility.RequiredRuntimeCapabilities);
                 var missingGuards = compatibility.GuardRequiredMethods.Where(method =>
@@ -643,6 +730,8 @@ internal static partial class Program
             {
                 baseId,
                 target = baseTarget,
+                payloadVariantId,
+                currentAssemblySetSha256 = currentVariant.CurrentSetHash,
                 managedAssemblySetSha256,
                 aotSnapshotSha256 = baseAotSnapshotSha256,
                 baseMetaVersionSetSha256 = baseMvSetHash,
@@ -667,7 +756,7 @@ internal static partial class Program
             };
             candidateBases.Add(baseRecord);
             resourceBaseSelections.Add(new ResourceAotMetadataBaseSelection(baseId,
-                aotMetadataSetId));
+                aotMetadataSetId, payloadVariantId, currentVariant.CurrentSetHash));
             if (!baseCompatible)
             {
                 releaseErrors.Add("Base " + baseId + " is incompatible: " +
@@ -685,6 +774,13 @@ internal static partial class Program
             compatibilityPolicy = ResourceUpdateCompatibility.Policy,
             runtimeProtocol = ResourceUpdateCompatibility.RuntimeProtocol,
             currentAssemblySetSha256 = currentSetHash,
+            payloadVariantSetSha256 = payloadVariantSetHash,
+            payloadVariants = currentVariants.Values.OrderBy(value => value.VariantId,
+                StringComparer.OrdinalIgnoreCase).Select(value => new
+            {
+                variantId = value.VariantId,
+                currentAssemblySetSha256 = value.CurrentSetHash,
+            }).ToArray(),
             baseRegistrySha256 = baseRegistry?.Sha256,
             baseRegistryEntryCount = baseRegistry?.Entries.Length,
             baseRegistryAuditPath,
@@ -704,6 +800,7 @@ internal static partial class Program
             format = "hybridclr.dhe-runtime-asset-plan.json",
             selection = "embedded-base-metaversion-and-aot-metadata-set",
             currentAssemblySetSha256 = currentSetHash,
+            payloadVariantSetSha256 = payloadVariantSetHash,
             runtimeAssetRoot,
             baseMetaVersionAssetRoot,
             aotMetadataSetId = string.Empty,
@@ -711,13 +808,21 @@ internal static partial class Program
             aotMetadataSets = runtimeAotMetadataSets,
             baseSelections = resourceBaseSelections.ToArray(),
             assemblies = runtimeAssemblies.ToArray(),
+            payloadVariants = currentVariants.Values.OrderBy(value => value.VariantId,
+                    StringComparer.OrdinalIgnoreCase).Select(value => new
+            {
+                variantId = value.VariantId,
+                currentAssemblySetSha256 = value.CurrentSetHash,
+                assemblies = value.RuntimeAssemblies.ToArray(),
+            }).ToArray(),
         });
         WriteJson(manifestPath, new
         {
             schemaVersion = 1,
             format = "hybridclr.dhe-resource-update.json",
             generatedAtUtc = DateTimeOffset.UtcNow,
-            payloadModel = "single-current-payload",
+            payloadModel,
+            payloadVariantSetSha256 = payloadVariantSetHash,
             metaVersionSchema = 1,
             compatibilityPolicy = ResourceUpdateCompatibility.Policy,
             runtimeProtocol = ResourceUpdateCompatibility.RuntimeProtocol,
@@ -725,6 +830,13 @@ internal static partial class Program
             validation = "dhe-resource-update-validation.json",
             validationSha256 = Sha256File(validationPath),
             currentAssemblySetSha256 = currentSetHash,
+            payloadVariants = currentVariants.Values.OrderBy(value => value.VariantId,
+                    StringComparer.OrdinalIgnoreCase).Select(value => new
+            {
+                variantId = value.VariantId,
+                currentAssemblySetSha256 = value.CurrentSetHash,
+                assemblies = value.PayloadFiles.ToArray(),
+            }).ToArray(),
             baseRegistrySha256 = baseRegistry?.Sha256,
             baseRegistryEntryCount = baseRegistry?.Entries.Length,
             baseRegistryAuditPath,
@@ -740,7 +852,7 @@ internal static partial class Program
             assemblies = payloadFiles.ToArray(),
             supportedBases = candidateBases.ToArray(),
         });
-        Console.WriteLine("DHE single-payload resource update: " + manifestPath);
+        Console.WriteLine("DHE " + payloadModel + " resource update: " + manifestPath);
         return 0;
     }
 
@@ -919,6 +1031,20 @@ internal static partial class Program
             sha.TransformBlock(record.bytes, 0, record.bytes.Length, record.bytes, 0);
             var separator = new byte[] { (byte)'\n' };
             sha.TransformBlock(separator, 0, separator.Length, separator, 0);
+        }
+        sha.TransformFinalBlock(Array.Empty<byte>(), 0, 0);
+        return Convert.ToHexString(sha.Hash!).ToLowerInvariant();
+    }
+
+    private static string NamedVariantSetHash(IEnumerable<(string variantId, string currentSetHash)> records)
+    {
+        using var sha = SHA256.Create();
+        foreach (var record in records.OrderBy(item => item.variantId,
+                     StringComparer.OrdinalIgnoreCase))
+        {
+            var bytes = Encoding.UTF8.GetBytes(record.variantId + "\n" +
+                record.currentSetHash.ToLowerInvariant() + "\n");
+            sha.TransformBlock(bytes, 0, bytes.Length, bytes, 0);
         }
         sha.TransformFinalBlock(Array.Empty<byte>(), 0, 0);
         return Convert.ToHexString(sha.Hash!).ToLowerInvariant();
@@ -3009,7 +3135,19 @@ internal static partial class Program
     private sealed record ResourceAotMetadataSet(string AotMetadataSetId,
         ResourceAotMetadataPayload[] Assemblies);
     private sealed record ResourceAotMetadataBaseSelection(string BaseId,
-        string AotMetadataSetId);
+        string AotMetadataSetId, string PayloadVariantId,
+        string CurrentAssemblySetSha256);
+    private sealed class CurrentVariantData
+    {
+        public string VariantId { get; set; } = string.Empty;
+        public string Root { get; set; } = string.Empty;
+        public string CurrentSetHash { get; set; } = string.Empty;
+        public Dictionary<string, MetaVersionSnapshot> Snapshots { get; set; } =
+            new(StringComparer.OrdinalIgnoreCase);
+        public string[] AddressTakenFields { get; set; } = Array.Empty<string>();
+        public List<object> PayloadFiles { get; set; } = new();
+        public List<object> RuntimeAssemblies { get; set; } = new();
+    }
     private sealed class DheException : Exception { public DheException(string message) : base(message) { } }
 }
 

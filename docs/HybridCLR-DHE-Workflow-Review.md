@@ -96,11 +96,11 @@ registry 中每个 Base 独立声明 `aotMetadataRoot`。`null` 只表示该 Pla
 文件集合。这个选择会写入 `baseSelections`，不会把上一份 current 或其他 Base 的 metadata
 写回 Player。相同 payload 可以因此服务不同 metadata set，但不能掩盖 managed DLL 的平台差异。
 
-current DLL 是一套按字节共享的程序集。若 Android、Windows 或 iOS 因条件编译增加了不同
-方法/PInvoke/类型布局，兼容性分析会对受影响 Base fail-closed；工具不会替换或裁剪这些
-声明。此时应维护独立 resource lane，只有从首个 Base 起保持相同 managed metadata 形状、
-并分别通过 target 的 native/Player 门禁，才可加入同一 registry。当前三引擎共享 payload
-证据均为 `StandaloneWindows64`，不能外推到 Android/iOS。
+单 target/legacy 模式下 current DLL 按字节共享。若 Android、Windows 或 iOS 因条件编译
+增加了不同方法/PInvoke/类型布局，不能把一个 target 的 DLL 伪装成另一个 target；可以在
+同一资源发布中声明多个 `payloadVariants`，由 registry 的 `payloadVariantId` 把每个 Base
+绑定到对应 DLL/MV 子目录。每个 variant 仍须分别通过 target 的 native/Player 门禁；
+当前已有的三引擎共享 payload 证据均为 `StandaloneWindows64`，不能外推到 Android/iOS。
 
 ## JSON 契约
 
@@ -118,7 +118,8 @@ DHE format、未支持的 schema 断言关键字、额外属性、错误类型�
 - `regression`：全部生产负例和 package/schema 认证通过；
 - `player-changed`：至少三份真实资源更新 Player 结果，Base ID 必须互不相同，覆盖 Unity 2021、
   Unity 2022、团结 2022，并由 `hybridclr.dhe-resource-player-workflow.json` 绑定回 immutable Base；
-  可以继续增加其他在线 Base，所有记录必须使用完全相同的 current payload；
+  可以继续增加其他在线 Base；同 target 可共用 default payload，metadata shape 不同的
+  target 则绑定各自 variant，但所有记录必须来自同一份 manifest/validation。
 - `demo-noop`：零变化 Player 路径通过；
 - `native-tuanjie2022`：团结 2022 锁定 runtime、真实外部 headers、CMake/CTest 通过；
 - `native-unity2022`：Unity 2022 锁定 runtime、真实外部 headers、CMake/CTest 通过；
@@ -139,7 +140,8 @@ DHE format、未支持的 schema 断言关键字、额外属性、错误类型�
 
 首次接入先运行 `Exploratory + StopAfterPreflight`，验证 adapter、全程序集 scope、package
 lock 和 MV 兼容性。随后用 `Bootstrap + RunPlayer` 在目标平台构建并归档 Base。每次后续
-更新把所有仍在线 Base 同时交给 `resource-update`，但只发布一份 current payload；不再执行
+更新把所有仍在线 Base 同时交给 `resource-update`，一次发布一个 manifest（可含多个
+target variant）；不再执行
 scripts-only/final Player。只有 Player、resource、release、archive 和 schema gate 全部通过，
 才能把对应 Base 标记为该资源版本支持。
 

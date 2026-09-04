@@ -165,11 +165,26 @@ The legacy parallel-argument form still requires an explicit root for every Base
 the project `patchAOTAssemblies` list is non-empty. `-AotMetadataRoot` remains available
 as a shorthand only when every Base intentionally shares one root.
 
-The current DLL set is still shared byte-for-byte across every registry entry. A target
-or engine that compiled a different managed metadata shape (for example, conditional
-platform methods or P/Invoke declarations) is expected to fail the compatibility audit;
-the tool does not transform one platform's assembly into another. Keep separate resource
-lanes unless all target Base Players were built from the same compatible shape.
+The default current DLL set remains shared byte-for-byte for legacy and single-target
+releases. When target-specific compilation produces different managed metadata shapes,
+the same release can carry multiple payload variants instead of transforming one
+platform's assembly into another. For example:
+
+```text
+dotnet HybridCLR.DheTool.dll resource-update \
+  -CurrentRoot C:/build/current-android \
+  -CurrentVariantRoots {"android":"C:/build/current-android","windows":"C:/build/current-windows"} \
+  -BaseRegistry C:/release/base-registry/supported-bases.json \
+  -SettingsFile C:/project/ProjectSettings/HybridCLRSettings.asset \
+  -OutputRoot C:/build/resource-update
+```
+
+Set `payloadVariantId` to `android` or `windows` in each registry entry. The manifest
+and runtime plan retain top-level default records for compatibility and add
+`payloadVariants[]`; each Base is bound to one variant hash and the runtime loads only
+that variant's DLL/MV files. This is still one resource package. Every variant must
+independently pass its target's guard and Player gates; if all targets share a compatible
+metadata shape, keep using one default variant.
 
 Use `stage-resource-update` from the resource/catalog build to copy this one
 payload. Supply the exact archived Base identity with `-BaseBuildIdentity`; the

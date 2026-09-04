@@ -1,5 +1,6 @@
 using System.Text;
 using System.Text.Json;
+using System.Security.Cryptography;
 
 namespace HybridCLR.DheTool;
 
@@ -18,8 +19,8 @@ internal static partial class Program
         if (GetInt(manifest, "schemaVersion") != 1 ||
             !string.Equals(GetString(manifest, "format"), "hybridclr.dhe-resource-update.json",
                 StringComparison.Ordinal) ||
-            !string.Equals(GetString(manifest, "payloadModel"), "single-current-payload",
-                StringComparison.Ordinal) ||
+            !new[] { "single-current-payload", "variant-current-payload" }.Contains(
+                GetString(manifest, "payloadModel"), StringComparer.Ordinal) ||
             !string.Equals(GetString(manifest, "compatibilityPolicy"),
                 ResourceUpdateCompatibility.Policy, StringComparison.Ordinal) ||
             !string.Equals(GetString(manifest, "runtimeProtocol"),
@@ -46,6 +47,11 @@ internal static partial class Program
         var embeddedBase = ValidateEmbeddedBaseMetaVersionSet(embeddedBaseRoot, manifest,
             baseBuildIdentity, selectedBase);
         var baseTreeBefore = TreeHashForRelease(embeddedBaseRoot, Array.Empty<string>());
+        string selectedVariantId = GetString(selectedBase, "payloadVariantId") ?? "default";
+        JsonElement manifestVariant = SelectPayloadVariant(manifest, selectedVariantId,
+            "Resource update manifest");
+        string selectedCurrentSetHash = GetString(manifestVariant, "currentAssemblySetSha256") ??
+            GetString(manifest, "currentAssemblySetSha256") ?? string.Empty;
 
         var runtimePlanRelative = GetString(manifest, "runtimePlan") ?? string.Empty;
         var runtimePlanSource = RequireFile(ResolveContainedPath(updateRoot, runtimePlanRelative,
@@ -56,13 +62,18 @@ internal static partial class Program
                 StringComparison.OrdinalIgnoreCase))
             throw new DheException("DHE runtime plan hash does not match the resource manifest.");
         var runtimePlan = ReadJson<JsonElement>(runtimePlanSource);
+        JsonElement runtimePlanVariant = SelectPayloadVariant(runtimePlan, selectedVariantId,
+            "DHE runtime plan");
         if (GetInt(runtimePlan, "schemaVersion") != 1 ||
             !string.Equals(GetString(runtimePlan, "format"),
                 "hybridclr.dhe-runtime-asset-plan.json", StringComparison.Ordinal) ||
             !string.Equals(GetString(runtimePlan, "selection"),
                 "embedded-base-metaversion-and-aot-metadata-set", StringComparison.Ordinal) ||
-            !string.Equals(GetString(runtimePlan, "currentAssemblySetSha256"),
-                GetString(manifest, "currentAssemblySetSha256"), StringComparison.OrdinalIgnoreCase) ||
+            !string.Equals(GetString(runtimePlanVariant, "currentAssemblySetSha256"),
+                selectedCurrentSetHash, StringComparison.OrdinalIgnoreCase) ||
+            (!string.IsNullOrWhiteSpace(GetString(selectedBase, "currentAssemblySetSha256")) &&
+             !string.Equals(GetString(selectedBase, "currentAssemblySetSha256"),
+                 selectedCurrentSetHash, StringComparison.OrdinalIgnoreCase)) ||
             !string.Equals(RequirePortableAssetRoot(GetString(runtimePlan, "baseMetaVersionAssetRoot"),
                     "runtime plan baseMetaVersionAssetRoot"), baseMetaVersionAssetRoot,
                 StringComparison.OrdinalIgnoreCase))
@@ -135,8 +146,10 @@ internal static partial class Program
             passed = true,
             updateRoot,
             assetRoot,
-            payloadModel = "single-current-payload",
-            currentAssemblySetSha256 = GetString(manifest, "currentAssemblySetSha256"),
+            payloadModel = GetString(manifest, "payloadModel") ?? "single-current-payload",
+            payloadVariantId = selectedVariantId,
+            payloadVariantSetSha256 = GetString(manifest, "payloadVariantSetSha256"),
+            currentAssemblySetSha256 = selectedCurrentSetHash,
             stagedPlanPath,
             stagedPlanSha256 = runtimePlanSha256,
             stagedManifestPath,
@@ -199,13 +212,17 @@ internal static partial class Program
         string selectedBaseId = GetString(stage, "selectedBaseId") ?? string.Empty;
         string selectedAotMetadataSetId = GetString(stage,
             "selectedAotMetadataSetId") ?? string.Empty;
+        string selectedVariantId = GetString(stage, "payloadVariantId") ?? "default";
         JsonElement selectedBase = manifest.GetProperty("supportedBases").EnumerateArray()
             .SingleOrDefault(item => string.Equals(GetString(item, "baseId"), selectedBaseId,
                 StringComparison.OrdinalIgnoreCase));
         if (selectedBase.ValueKind == JsonValueKind.Undefined || !GetBool(selectedBase, "compatible"))
             errors.Add("Resource stage did not select one compatible Base record.");
 
-        string currentSet = GetString(manifest, "currentAssemblySetSha256") ?? string.Empty;
+        JsonElement selectedManifestVariant = SelectPayloadVariant(manifest, selectedVariantId,
+            "Resource update manifest");
+        string currentSet = GetString(selectedManifestVariant, "currentAssemblySetSha256") ??
+            GetString(manifest, "currentAssemblySetSha256") ?? string.Empty;
         string target = GetString(player, "target") ?? string.Empty;
         if (!string.Equals(Path.GetFullPath(GetString(stage, "updateRoot") ?? string.Empty),
                 Path.GetFullPath(updateRoot), StringComparison.OrdinalIgnoreCase) ||
@@ -216,6 +233,10 @@ internal static partial class Program
             !string.Equals(GetString(selectedBase, "target"), target, StringComparison.OrdinalIgnoreCase) ||
             !string.Equals(GetString(selectedBase, "aotMetadataSetId"),
                 selectedAotMetadataSetId, StringComparison.OrdinalIgnoreCase) ||
+            !string.Equals(GetString(selectedBase, "payloadVariantId") ?? "default",
+                selectedVariantId, StringComparison.OrdinalIgnoreCase) ||
+            !string.Equals(GetString(selectedBase, "currentAssemblySetSha256"), currentSet,
+                StringComparison.OrdinalIgnoreCase) ||
             !string.Equals(GetString(player, "selectedBaseId"), selectedBaseId,
                 StringComparison.OrdinalIgnoreCase))
             errors.Add("Resource, stage, Base, and Player selection identities do not agree.");
@@ -257,7 +278,7 @@ internal static partial class Program
                 StringComparison.OrdinalIgnoreCase))
             errors.Add("Base build identity or native manifest is not bound to the selected resource record.");
 
-        string[] assemblyNames = manifest.GetProperty("assemblies").EnumerateArray()
+        string[] assemblyNames = selectedManifestVariant.GetProperty("assemblies").EnumerateArray()
             .Select(item => GetString(item, "assemblyName") ?? string.Empty)
             .Where(name => name.Length > 0).OrderBy(name => name, StringComparer.OrdinalIgnoreCase)
             .ToArray();
@@ -602,12 +623,30 @@ internal static partial class Program
         JsonElement runtimePlan, JsonElement selectedBase, string runtimeAssetRoot,
         string baseMetaVersionAssetRoot)
     {
-        if (!manifest.TryGetProperty("assemblies", out var assemblies) ||
-            assemblies.ValueKind != JsonValueKind.Array || assemblies.GetArrayLength() == 0 ||
-            !runtimePlan.TryGetProperty("assemblies", out var planAssemblies) ||
+        string variantId = GetString(selectedBase, "payloadVariantId") ?? "default";
+        JsonElement manifestVariant = SelectPayloadVariant(manifest, variantId,
+            "Resource update manifest");
+        JsonElement planVariant = SelectPayloadVariant(runtimePlan, variantId,
+            "DHE runtime plan");
+        JsonElement assemblies = manifestVariant.TryGetProperty("assemblies", out var selectedAssemblies)
+            ? selectedAssemblies
+            : default;
+        JsonElement planAssemblies = planVariant.TryGetProperty("assemblies", out var selectedPlanAssemblies)
+            ? selectedPlanAssemblies
+            : default;
+        if (assemblies.ValueKind != JsonValueKind.Array || assemblies.GetArrayLength() == 0 ||
             planAssemblies.ValueKind != JsonValueKind.Array ||
             planAssemblies.GetArrayLength() != assemblies.GetArrayLength())
             throw new DheException("Resource update assembly records are missing or inconsistent.");
+
+        string variantHash = GetString(manifestVariant, "currentAssemblySetSha256") ?? string.Empty;
+        if (!IsHex(variantHash, 64, 64) ||
+            !string.Equals(GetString(planVariant, "currentAssemblySetSha256"), variantHash,
+                StringComparison.OrdinalIgnoreCase) ||
+            (!string.IsNullOrWhiteSpace(GetString(selectedBase, "currentAssemblySetSha256")) &&
+             !string.Equals(GetString(selectedBase, "currentAssemblySetSha256"), variantHash,
+                 StringComparison.OrdinalIgnoreCase)))
+            throw new DheException("Resource update payload variant hash is not bound to the selected Base.");
 
         var planByName = planAssemblies.EnumerateArray().ToDictionary(
             item => NormalizeName(GetString(item, "assemblyName") ?? string.Empty),
@@ -711,7 +750,14 @@ internal static partial class Program
                 !validSetIds.Contains(setId) ||
                 !selectionsByBase.TryGetValue(baseId, out JsonElement selection) ||
                 !string.Equals(GetString(selection, "aotMetadataSetId"), setId,
-                    StringComparison.OrdinalIgnoreCase))
+                    StringComparison.OrdinalIgnoreCase) ||
+                !string.Equals(GetString(selection, "payloadVariantId") ?? "default",
+                    GetString(supportedBase, "payloadVariantId") ?? "default",
+                    StringComparison.OrdinalIgnoreCase) ||
+                (!string.IsNullOrWhiteSpace(GetString(selection, "currentAssemblySetSha256")) &&
+                 !string.Equals(GetString(selection, "currentAssemblySetSha256"),
+                     GetString(supportedBase, "currentAssemblySetSha256"),
+                     StringComparison.OrdinalIgnoreCase)))
                 throw new DheException("Resource update Base metadata selection is invalid: " + baseId);
         }
         if (!string.Equals(GetString(selectedBase, "aotMetadataSetId"),
@@ -719,6 +765,25 @@ internal static partial class Program
                     "aotMetadataSetId"), StringComparison.OrdinalIgnoreCase))
             throw new DheException("Selected Base AOT metadata set does not match the runtime plan.");
         return payloads.ToArray();
+    }
+
+    private static JsonElement SelectPayloadVariant(JsonElement document, string variantId,
+        string description)
+    {
+        if (document.TryGetProperty("payloadVariants", out JsonElement variants) &&
+            variants.ValueKind == JsonValueKind.Array)
+        {
+            JsonElement[] matches = variants.EnumerateArray().Where(item =>
+                string.Equals(GetString(item, "variantId"), variantId,
+                    StringComparison.OrdinalIgnoreCase)).ToArray();
+            if (matches.Length != 1)
+                throw new DheException(description + " does not contain exactly one payload variant: " +
+                    variantId);
+            return matches[0];
+        }
+        if (!string.Equals(variantId, "default", StringComparison.OrdinalIgnoreCase))
+            throw new DheException(description + " has no payload variant: " + variantId);
+        return document;
     }
 
     private static string ValidateResourceUpdateCompatibility(string updateRoot, JsonElement manifest)
@@ -764,6 +829,8 @@ internal static partial class Program
             validatedBases.GetArrayLength() != supportedBases.GetArrayLength())
             throw new DheException("DHE resource compatibility Base records are missing or inconsistent.");
 
+        ValidatePayloadVariantSet(manifest, validation);
+
         var validatedById = validatedBases.EnumerateArray().ToDictionary(
             ResourceBaseIdentityKey, item => item,
             StringComparer.OrdinalIgnoreCase);
@@ -794,6 +861,12 @@ internal static partial class Program
                     GetString(supportedBase, "nativeRuntimeContract"), StringComparison.Ordinal) ||
                 !string.Equals(GetString(validatedBase, "aotMetadataSetId"),
                     GetString(supportedBase, "aotMetadataSetId"), StringComparison.OrdinalIgnoreCase) ||
+                !string.Equals(GetString(validatedBase, "payloadVariantId") ?? "default",
+                    GetString(supportedBase, "payloadVariantId") ?? "default",
+                    StringComparison.OrdinalIgnoreCase) ||
+                !string.Equals(GetString(validatedBase, "currentAssemblySetSha256"),
+                    GetString(supportedBase, "currentAssemblySetSha256"),
+                    StringComparison.OrdinalIgnoreCase) ||
                 !new HashSet<string>(ReadRuntimeCapabilities(validatedBase,
                         "runtimeCapabilities"), StringComparer.Ordinal)
                     .SetEquals(runtimeCapabilities) ||
@@ -803,6 +876,55 @@ internal static partial class Program
                 throw new DheException("DHE resource update contains an unvalidated Base: " + baseId);
         }
         return validationPath;
+    }
+
+    private static void ValidatePayloadVariantSet(JsonElement manifest, JsonElement validation)
+    {
+        bool manifestHasVariants = manifest.TryGetProperty("payloadVariants", out JsonElement manifestVariants);
+        bool validationHasVariants = validation.TryGetProperty("payloadVariants", out JsonElement validationVariants);
+        if (manifestHasVariants != validationHasVariants)
+            throw new DheException("DHE resource payload variant records are not bound.");
+        if (!manifestHasVariants)
+            return;
+        if (manifestVariants.ValueKind != JsonValueKind.Array || validationVariants.ValueKind != JsonValueKind.Array ||
+            manifestVariants.GetArrayLength() == 0 ||
+            manifestVariants.GetArrayLength() != validationVariants.GetArrayLength())
+            throw new DheException("DHE resource payload variant records are invalid.");
+        var validationById = validationVariants.EnumerateArray().ToDictionary(item =>
+            GetString(item, "variantId") ?? string.Empty, item => item,
+            StringComparer.OrdinalIgnoreCase);
+        var ids = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+        foreach (JsonElement variant in manifestVariants.EnumerateArray())
+        {
+            string id = GetString(variant, "variantId") ?? string.Empty;
+            string hash = GetString(variant, "currentAssemblySetSha256") ?? string.Empty;
+            if (!IsPayloadVariantId(id) || !ids.Add(id) || !IsHex(hash, 64, 64) ||
+                !validationById.TryGetValue(id, out JsonElement validated) ||
+                !string.Equals(GetString(validated, "currentAssemblySetSha256"), hash,
+                    StringComparison.OrdinalIgnoreCase))
+                throw new DheException("DHE resource payload variant record is invalid: " + id);
+        }
+        string? setHash = GetString(manifest, "payloadVariantSetSha256");
+        if (!string.IsNullOrWhiteSpace(setHash) &&
+            (!IsHex(setHash, 64, 64) ||
+             !string.Equals(setHash, ComputePayloadVariantSetHash(manifestVariants),
+                 StringComparison.OrdinalIgnoreCase)))
+            throw new DheException("DHE resource payload variant set hash is invalid.");
+    }
+
+    private static string ComputePayloadVariantSetHash(JsonElement variants)
+    {
+        using var sha = SHA256.Create();
+        foreach (JsonElement variant in variants.EnumerateArray().OrderBy(item =>
+                     GetString(item, "variantId") ?? string.Empty, StringComparer.OrdinalIgnoreCase))
+        {
+            byte[] bytes = Encoding.UTF8.GetBytes((GetString(variant, "variantId") ?? string.Empty) +
+                "\n" + (GetString(variant, "currentAssemblySetSha256") ?? string.Empty).ToLowerInvariant() +
+                "\n");
+            sha.TransformBlock(bytes, 0, bytes.Length, bytes, 0);
+        }
+        sha.TransformFinalBlock(Array.Empty<byte>(), 0, 0);
+        return Convert.ToHexString(sha.Hash!).ToLowerInvariant();
     }
 
     private static void ValidateBaseRegistryAudit(string updateRoot, JsonElement manifest)

@@ -22,6 +22,7 @@
         "properties": {
           "baseId": { "type": "string", "pattern": "^[0-9a-fA-F]{64}$" },
           "engineWorkflow": { "enum": ["Unity2021Standard", "Unity2022Fgs", "Tuanjie2022Fgs"] },
+          "payloadVariantId": { "type": "string", "pattern": "^[A-Za-z0-9._-]{1,64}$" },
           "label": { "type": "string", "minLength": 1, "maxLength": 256 },
           "baselineRoot": { "type": "string", "minLength": 1 },
           "nativeManifest": { "type": "string", "minLength": 1 },
