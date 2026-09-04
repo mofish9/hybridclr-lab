@@ -91,10 +91,13 @@ namespace HybridCLR.Lab
                 !string.Equals(runtimePlan.format, "hybridclr.dhe-runtime-asset-plan.json", StringComparison.Ordinal) ||
                 (runtimePlan.selection != "embedded-base-metaversion" &&
                  runtimePlan.selection != "embedded-base-metaversion-and-aot-metadata-set") ||
-                runtimePlan.assemblies == null || runtimePlan.assemblies.Length == 0)
+                ((runtimePlan.assemblies == null || runtimePlan.assemblies.Length == 0) &&
+                 (runtimePlan.payloadVariants == null || runtimePlan.payloadVariants.Length == 0)))
             {
                 throw new InvalidDataException("DHE runtime plan is empty or invalid.");
             }
+            DheAssemblyPlanData[] selectedPlanAssemblies = SelectRuntimeAssemblies(runtimePlan,
+                runtimeIdentity.BaseId);
             if (!DheRuntime.LoadAotMetadataImages(provider, HomologousImageMode.SuperSet,
                     out LoadImageErrorCode metadataError, out string metadataMessage))
             {
@@ -108,7 +111,7 @@ namespace HybridCLR.Lab
             LoadImageErrorCode retryFailureCode = LoadImageErrorCode.OK;
             var batchAssemblyNames = new List<string>();
             var batchCurrentAssemblies = new List<byte[]>();
-            foreach (DheAssemblyPlanData assemblyPlan in runtimePlan.assemblies)
+            foreach (DheAssemblyPlanData assemblyPlan in selectedPlanAssemblies)
             {
                 if (assemblyPlan == null || string.IsNullOrWhiteSpace(assemblyPlan.assemblyName) ||
                     string.IsNullOrWhiteSpace(assemblyPlan.current) ||
@@ -180,7 +183,7 @@ namespace HybridCLR.Lab
             retryValidated = DheRuntime.TransactionRetryValidated;
             retryAssemblyName = DheRuntime.TransactionRetryAssemblyName;
             retryFailureCode = DheRuntime.TransactionRetryFailure;
-            if (loadedAssemblies.Count != runtimePlan.assemblies.Length ||
+            if (loadedAssemblies.Count != selectedPlanAssemblies.Length ||
                 !loadedAssemblies.ContainsKey(MainAssemblyName))
             {
                 throw new InvalidDataException("DHE runtime plan must load exactly its declared assemblies and include " + MainAssemblyName + ".");
@@ -548,7 +551,7 @@ namespace HybridCLR.Lab
 					structural.addedInstanceFieldReflectionResult,
 				structuralCurrentMemberDirectResult = structural.currentMemberDirectResult,
 				structuralNewSignatureResult = structural.newSignatureResult,
-                plannedDheAssemblies = GetAssemblyNames(runtimePlan),
+                plannedDheAssemblies = GetAssemblyNames(runtimePlan, runtimeIdentity.BaseId),
                 loadedDheAssemblies = GetAssemblyNames(loadedAssemblies),
                 target = GetArgument("-labTarget"),
                 resourceUpdateManifestPresent = resourceUpdateManifestPresent,
@@ -1335,9 +1338,33 @@ namespace HybridCLR.Lab
             return (string)run.Invoke(null, null);
         }
 
-        private static string[] GetAssemblyNames(DheRuntimePlanData plan)
+        private static string[] GetAssemblyNames(DheRuntimePlanData plan, string baseId)
         {
-            return plan.assemblies.Select(item => item.assemblyName).OrderBy(name => name, StringComparer.Ordinal).ToArray();
+            return SelectRuntimeAssemblies(plan, baseId)
+                .Select(item => item.assemblyName).OrderBy(name => name, StringComparer.Ordinal).ToArray();
+        }
+
+        private static DheAssemblyPlanData[] SelectRuntimeAssemblies(DheRuntimePlanData plan,
+            string baseId)
+        {
+            if (plan.payloadVariants == null || plan.payloadVariants.Length == 0)
+                return plan.assemblies ?? Array.Empty<DheAssemblyPlanData>();
+            DheRuntimeBaseSelectionData[] selections = plan.baseSelections ??
+                Array.Empty<DheRuntimeBaseSelectionData>();
+            DheRuntimeBaseSelectionData[] matches = selections.Where(item => item != null &&
+                string.Equals(item.baseId, baseId, StringComparison.OrdinalIgnoreCase)).ToArray();
+            if (matches.Length != 1)
+                throw new InvalidDataException("DHE runtime plan has no unique payload variant selection for this Base.");
+            string variantId = string.IsNullOrWhiteSpace(matches[0].payloadVariantId)
+                ? "default" : matches[0].payloadVariantId;
+            DheRuntimePayloadVariantData[] variants = plan.payloadVariants.Where(item => item != null &&
+                string.Equals(item.variantId, variantId, StringComparison.OrdinalIgnoreCase)).ToArray();
+            if (variants.Length != 1 || variants[0].assemblies == null ||
+                variants[0].assemblies.Length == 0 ||
+                !string.Equals(matches[0].currentAssemblySetSha256,
+                    variants[0].currentAssemblySetSha256, StringComparison.OrdinalIgnoreCase))
+                throw new InvalidDataException("DHE runtime plan payload variant is not bound to this Base.");
+            return variants[0].assemblies;
         }
 
         private static string[] GetAssemblyNames(Dictionary<string, LoadedDheAssembly> assemblies)
@@ -1516,7 +1543,26 @@ namespace HybridCLR.Lab
             public int schemaVersion;
             public string format;
             public string selection;
+            public string currentAssemblySetSha256;
             public DheAssemblyPlanData[] assemblies;
+            public DheRuntimePayloadVariantData[] payloadVariants;
+            public DheRuntimeBaseSelectionData[] baseSelections;
+        }
+
+        [Serializable]
+        private sealed class DheRuntimePayloadVariantData
+        {
+            public string variantId;
+            public string currentAssemblySetSha256;
+            public DheAssemblyPlanData[] assemblies;
+        }
+
+        [Serializable]
+        private sealed class DheRuntimeBaseSelectionData
+        {
+            public string baseId;
+            public string payloadVariantId;
+            public string currentAssemblySetSha256;
         }
 
         [Serializable]
