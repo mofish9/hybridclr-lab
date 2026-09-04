@@ -160,7 +160,8 @@ SHA-256；任一文件缺失或篡改都拒绝整包，不留下可接受的部�
 stage report、资源发布目录和归档的 Base `player-workflow-report.json` 绑定为
 `resource-player-workflow-report.json`。0.1.20 起以可扩展的 `player-changed` 列表记录所有
 代表性 Base，至少覆盖 Unity 2021、Unity 2022、团结 2022 三个不同 Base；所有记录必须绑定
-同一个 current manifest、validation 和 assembly set。不再要求、也不允许通过重建非
+同一个 current manifest、validation，并分别绑定自身选择的 payload variant 和 assembly set。
+不再要求、也不允许通过重建非
 universal-guard 的
 changed Player 来伪造线上流程。
 
