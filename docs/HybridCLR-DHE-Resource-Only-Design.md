@@ -69,8 +69,11 @@ dotnet HybridCLR.DheTool.dll resource-update \
 
 四组 Base 参数必须一一对应。需要补充 AOT metadata 时传入 `-AotMetadataRoots`，工具会按
 `patchAOTAssemblies` 从每个 root 完整收集，并按内容寻址跨 set 去重；单数
-`-AotMetadataRoot` 仅是所有 Base 共用同一 root 时的 shorthand。只有
-`patchAOTAssemblies` 为空时才允许省略 metadata roots。命令先
+`-AotMetadataRoot` 仅是所有 Base 共用同一 root 时的 shorthand。registry 模式下每个条目
+独立声明 `aotMetadataRoot`：`null` 表示该 Base 的 runtime 采用空 supplemental metadata
+set，非空值表示使用该 Base 自己的完整 set。空 set 仍以 SHA-256 身份写入 plan，并且必须
+与该 Base identity 的 `aotMetadataSetId` 相等；不能用 `null` 覆盖一个实际嵌入 metadata 的
+Player。命令先
 删除旧 manifest/runtime plan，随后：
 
 1. 每个 current DLL 和 current MetaVersion 只写入 `payload/` 一次；
@@ -85,6 +88,13 @@ dotnet HybridCLR.DheTool.dll resource-update \
 因此 CDN/资源系统发布的是一个目录（或由该目录制作的一个 bundle 集），不是按客户端版本
 选择的多个差分变体。加入新的线上 Base 只会扩大发布前审计集合；current payload 字节仍然
 相同。
+
+跨 target 或跨引擎共用 payload 还要求 current DLL 的 managed metadata 形状同时兼容所有
+Base。工具不会把平台条件编译产生的方法、P/Invoke 或类型布局差异翻译成另一套程序集；
+这类变化会在对应 Base 上 fail-closed。因而 Android、Windows、iOS 的程序集若包含不同
+的条件成员，应分别维护资源发布 lane；只有从首个 Base 起就保持相同程序集形状、并通过
+每个 target 的 guard/Player 门禁时，才可加入同一 registry。不同 Base 仍可以各自使用
+`null` 或非空的 AOT metadata set，但这不会消除 managed metadata 的跨 target 约束。
 
 ### 连续资源更新
 
@@ -209,23 +219,24 @@ plan。缺少能力的 Base 必须停止领取该资源版本或升级主包。
 ## 已有证据与剩余门禁
 
 identity 1 的同一 structural current payload 已在 Unity 2021、Unity 2022 和团结 2022 的
-三个不同 Base Player 上完成本地 MetaVersion 求差。current set 为
+三个 `StandaloneWindows64` Base Player 上完成本地 MetaVersion 求差。current set 为
 `4ca7b5a1c90cfccb4fb9e6d1eb0eb2fee133e4bb0e22c84ec2f36e0dc788229f`，对应 Base ID 为：
 
 - Unity 2021：`56f1b4cb3081e7af05518241635b7fc57274c7b6a472f303fa992542cde03db8`；
 - Unity 2022：`c047d8309159e3ec4474dda51d378739b6ca63848200adee76d570a3ab13519a`；
 - 团结 2022：`0e751fbfa0ebaecd8cf5d1ae05a1100ba4506a261acc18a3d9baf177e208a9b5`。
 
-三个 Player 都识别 43 个 changed/new 方法，并记录 12 次解释器入口和 35 次 AOT 入口；
+三个 Windows Player 都识别 43 个 changed/new 方法，并记录 12 次解释器入口和 35 次 AOT 入口；
 多程序集、结构演进、dispatch probe、事务回滚和同进程重试均通过。统一资源 manifest
 `0e16b4d67d9b8906245b74dc399d4b0197f82e9c4292eb3a55de7d7e6b6abba5` 包含 3 个按 Base
 选择的 AOT metadata set，跨 set 内容寻址后去重为 10 个 blob。三个 staging 均保持 Base
 MetaVersion、Player executable、`GameAssembly` 和引擎 Player DLL 不变。plan/payload、
 metadata set、错误 Base、废弃 sidecar 残留和缺 capability 等负例均 fail closed。
 
-这些 Player 和资源报告仍是 exploratory evidence，三个
+这些 Windows Player 和资源报告仍是 exploratory evidence，三个
 `resource-player-workflow-report.json` 的 `releaseReady` 均为 `false`，不能输入正式
-`release-evidence`。它们只证明当前 Windows Player 下的三 Base 共享 payload 链路。
+`release-evidence`。它们只证明当前 Windows Player 下的三 Base 共享 payload 链路，不能
+外推为 Android 或 iOS Player 证据。
 
 这套兼容只从首个采用 identity 1/runtime protocol v1 的正式 Base 开始。已经发布的旧 runtime
 不会因下载资源而获得新的 DHE runtime 能力；runtime 自身、IL2CPP ABI、native plugin 或

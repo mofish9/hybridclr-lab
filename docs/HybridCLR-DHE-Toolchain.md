@@ -157,10 +157,19 @@ When supplemental AOT metadata is required, `-AotMetadataRoots` supplies one com
 `patchAOTAssemblies` root per BaseRoot, in the same order. The command content-addresses
 and deduplicates equal blobs across sets. On disk, each blob uses a 128-bit SHA-256 prefix
 as a short lookup name so long Windows project/worktree paths remain readable by Unity;
-the full SHA-256 is still recorded and verified. A root is mandatory whenever
-`patchAOTAssemblies` is non-empty; a no-metadata workflow therefore requires an empty
-patch set and an independently validated project configuration. `-AotMetadataRoot` remains
-available as a shorthand only when every Base intentionally shares one root.
+the full SHA-256 is still recorded and verified. In registry mode each entry owns this
+choice independently: `aotMetadataRoot: null` selects the empty metadata set for that
+Base, while a directory supplies its complete set. The empty-set hash must match the
+Base identity, so `null` cannot be used to bypass metadata embedded in an existing Player.
+The legacy parallel-argument form still requires an explicit root for every Base whenever
+the project `patchAOTAssemblies` list is non-empty. `-AotMetadataRoot` remains available
+as a shorthand only when every Base intentionally shares one root.
+
+The current DLL set is still shared byte-for-byte across every registry entry. A target
+or engine that compiled a different managed metadata shape (for example, conditional
+platform methods or P/Invoke declarations) is expected to fail the compatibility audit;
+the tool does not transform one platform's assembly into another. Keep separate resource
+lanes unless all target Base Players were built from the same compatible shape.
 
 Use `stage-resource-update` from the resource/catalog build to copy this one
 payload. Supply the exact archived Base identity with `-BaseBuildIdentity`; the
@@ -213,6 +222,12 @@ The project provides a C# class containing these Unity execute-methods:
   `Target`, complete hotfix load list, AOT metadata roots, and project resource
   callbacks. `RuntimeAssetPathResolver` maps staged files to a YooAsset,
   Addressables, or other catalog locator; its default is StreamingAssets.
+- The demo adapter accepts the optional Unity argument
+  `dheAotMetadataAssemblies`. Leave it unset to use
+  `HybridCLRSettings.patchAOTAssemblies`; pass `none` when intentionally
+  building a Base with no supplemental AOT metadata. The resulting empty-set
+  hash is part of BuildIdentity and must be archived before a registry entry
+  can use `aotMetadataRoot: null`.
 - `BuildScriptsOnly` and `BuildFinalPlayer`: call
   `DheBuildPipeline.BuildPlayer` with the project build callback.
 - `BuildScriptsOnly`: call `DheBuildPipeline.FinalizeProjectNativeCode` with

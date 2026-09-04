@@ -38,8 +38,10 @@ and the versioned `il2cpp-generated-cpp-signature-v2` ABI adapter contract.
 The current MetaVersion Player result covers method bodies, field/type/method evolution,
 logical property/event metadata, custom attributes, reflection, and
 cross-assembly calls. Three independently built Unity 2021, Unity 2022, and Tuanjie 2022
-Base Players consumed the same four-assembly structural current payload while computing
-71 changed methods each.
+`StandaloneWindows64` Base Players consumed the same four-assembly structural current
+payload while computing 71 changed methods each. This is a Windows multi-engine result;
+it is not Android/iOS evidence, and target-specific managed metadata differences remain
+fail-closed for a shared payload.
 The 0.1.20 release contract extends this proof to an arbitrary changed-Player
 evidence list and requires Unity 2021, Unity 2022, and Tuanjie 2022 coverage
 over one shared current payload.

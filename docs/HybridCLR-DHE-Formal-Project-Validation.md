@@ -83,9 +83,17 @@ assembly set, target, generated AOT snapshot, embedded Base MetaVersion set, nat
 guard source, and native manifest. Any unsupported Base causes the whole command
 to fail and removes publish manifests.
 `-AotMetadataRoots` additionally packages one complete `patchAOTAssemblies` set per
-Base when the project uses supplemental AOT metadata; use the singular
-`-AotMetadataRoot` only when every Base intentionally shares one root. Omit both
-only for a separately validated no-metadata workflow.
+Base when the project uses supplemental AOT metadata; in registry mode each Base entry
+may instead set `aotMetadataRoot` to `null` to select the empty set. The empty-set hash
+must already be present in that Player's BuildIdentity. Use the singular
+`-AotMetadataRoot` only when every Base intentionally shares one root. Omit both in the
+legacy parallel-argument form only for a separately validated no-metadata workflow.
+
+The current DLL bytes are shared across the entire registry. Platform-specific conditional
+members, P/Invoke declarations, or other managed metadata differences are not translated;
+the affected Base fails the compatibility audit. Android/iOS and desktop may share a
+payload only after their Base assembly shapes and target-specific Player gates have both
+been independently validated.
 
 `stage-resource-update` copies this one payload into the project's resource
 catalog staging root. Pass the exact archived `build-identity.json` for the

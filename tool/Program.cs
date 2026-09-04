@@ -284,7 +284,7 @@ internal static partial class Program
         string[] baselineRoots;
         string[] nativeManifestPaths;
         string[] buildIdentityPaths;
-        string[] registryAotMetadataRoots = Array.Empty<string>();
+        string?[] registryAotMetadataRoots = Array.Empty<string?>();
         if (!string.IsNullOrWhiteSpace(baseRegistryPath))
         {
             string[] legacyInputs =
@@ -300,13 +300,8 @@ internal static partial class Program
             nativeManifestPaths = baseRegistry.Entries.Select(entry => entry.NativeManifest).ToArray();
             buildIdentityPaths = baseRegistry.Entries.Select(entry => entry.BuildIdentity).ToArray();
             if (baseRegistry.Entries.Any(entry => entry.AotMetadataRoot != null))
-            {
-                if (baseRegistry.Entries.Any(entry => entry.AotMetadataRoot == null))
-                    throw new DheException("Every Base registry entry must provide AotMetadataRoot " +
-                        "when any entry provides one.");
                 registryAotMetadataRoots = baseRegistry.Entries.Select(entry =>
-                    entry.AotMetadataRoot!).ToArray();
-            }
+                    entry.AotMetadataRoot).ToArray();
         }
         else
         {
@@ -369,7 +364,7 @@ internal static partial class Program
             path = RequireFile(Path.Combine(currentRoot, name + ".dll"), name + " current assembly"),
         }).ToArray();
         var currentSetHash = NamedAssemblySetHash(currentRecords.Select(record => (record.name, record.path)));
-        string[] aotMetadataRoots;
+        string?[] aotMetadataRoots;
         var explicitAotMetadataRoots = cli.GetList("aotmetadataroots")
             .Select(path => RequireDirectory(path, "AOT metadata root")).ToArray();
         var sharedAotMetadataRoot = cli.Optional("aotmetadataroot");

@@ -94,7 +94,7 @@ namespace HybridCLR.Lab.Editor
                 RuntimeAssetRoot = runtimeAssetRoot,
                 OutputRoot = outputRoot,
                 StrippedAotRoot = strippedAotRoot,
-                AotMetadataAssemblyNames = SettingsUtil.AOTAssemblyNames.ToArray(),
+                AotMetadataAssemblyNames = GetAotMetadataAssemblyNames(),
                 HotfixAssemblyNames = SettingsUtil.HotUpdateAssemblyNamesExcludePreserved.ToArray(),
                 HotfixLoadOrderResolver = names => names.OrderBy(name => name, StringComparer.OrdinalIgnoreCase).ToArray(),
             });
@@ -236,6 +236,24 @@ namespace HybridCLR.Lab.Editor
             if (!File.Exists(Path.Combine(ProjectRoot(), scenePath.Replace('/', Path.DirectorySeparatorChar))))
                 throw new FileNotFoundException("DHE demo scene was not found", scenePath);
             EditorBuildSettings.scenes = new[] { new EditorBuildSettingsScene(scenePath, true) };
+        }
+
+        private static string[] GetAotMetadataAssemblyNames()
+        {
+            // A Base may intentionally ship without supplemental AOT metadata.
+            // Keep the default tied to the project's HybridCLR settings, but
+            // let a workflow explicitly select the empty set for a target.
+            string configured = OptionalArgument("-dheAotMetadataAssemblies");
+            if (configured == null)
+                return SettingsUtil.AOTAssemblyNames.ToArray();
+            if (string.IsNullOrWhiteSpace(configured) ||
+                string.Equals(configured.Trim(), "none", StringComparison.OrdinalIgnoreCase))
+                return new string[0];
+            return configured.Split(new[] { ',', ';' }, StringSplitOptions.RemoveEmptyEntries)
+                .Select(value => Path.GetFileNameWithoutExtension(value.Trim()))
+                .Where(value => !string.IsNullOrWhiteSpace(value))
+                .Distinct(StringComparer.OrdinalIgnoreCase)
+                .ToArray();
         }
 
         private static void StageCurrentAssemblyInputs(string inputRoot, IEnumerable<string> assemblyNames)

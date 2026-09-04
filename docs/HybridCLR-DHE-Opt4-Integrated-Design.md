@@ -122,11 +122,14 @@ resource-only Player smoke and its immutable Base workflow. A changed Player
 rebuild is not a substitute and is rejected when it would lose universal guard
 coverage.
 
-The current release conclusion is conditional: Windows dual-Base Player
+The current release conclusion is conditional: Windows three-Base Player
 correctness and all three real-header native lanes are completed evidence
 surfaces. A Unity 2021 Android ARM64 APK has also passed exploratory offline
 IL2CPP/NDK compilation and packaged-asset identity checks, but it has no device
-result and is not bound to the current clean lab commit. Android device smoke,
+result and is not bound to the current clean lab commit. A separate Android
+no-supplemental-metadata Base has since passed host-side resource update and
+staging with an empty metadata-set identity, but still has no device result.
+Android device smoke,
 PSS/RSS, temperature and weak-core gates, plus all iOS/Xcode/device gates, are
 not complete and must not be inferred from the offline build.
 

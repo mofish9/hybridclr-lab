@@ -89,6 +89,19 @@ Release package 使用；以 `manifests/dhe-runtime-lock.json`、`dhe-package-lo
 8. archive gate 生成无绝对路径的可移植证据，保留 immutable native manifest 原始字节并在
    归档目录离线重跑 release 校验。
 
+## 跨 target 与 metadata set
+
+registry 中每个 Base 独立声明 `aotMetadataRoot`。`null` 只表示该 Player 的
+`aotMetadataSetId` 是空集合 hash；非空 root 必须包含项目 `patchAOTAssemblies` 的完整
+文件集合。这个选择会写入 `baseSelections`，不会把上一份 current 或其他 Base 的 metadata
+写回 Player。相同 payload 可以因此服务不同 metadata set，但不能掩盖 managed DLL 的平台差异。
+
+current DLL 是一套按字节共享的程序集。若 Android、Windows 或 iOS 因条件编译增加了不同
+方法/PInvoke/类型布局，兼容性分析会对受影响 Base fail-closed；工具不会替换或裁剪这些
+声明。此时应维护独立 resource lane，只有从首个 Base 起保持相同 managed metadata 形状、
+并分别通过 target 的 native/Player 门禁，才可加入同一 registry。当前三引擎共享 payload
+证据均为 `StandaloneWindows64`，不能外推到 Android/iOS。
+
 ## JSON 契约
 
 工具包内每种已登记 DHE `format` 都必须唯一映射到一个 schema。`schema-gate` 会拒绝未知
@@ -134,19 +147,15 @@ Android 和桌面证据不能替代 iOS。iOS 使用同一套 C# host/package/ad
 安装对应 Editor module，并完成 Xcode、签名和设备 smoke。缺少该环境时只能声明源码与
 Windows/Android lane 已通过，不能声明 iOS 已验证。
 
-当前 `0.1.20` 候选已有一轮 Unity `2021.3.45f2` Android ARM64 探索性离线证据：Base
-preflight 的 4/4 程序集兼容、26,287 个 universal native guards、IL2CPP/NDK 编译和 APK
-构建均通过；APK SHA-256 为
-`49c76a9425554ad575475af1a2b702d12e1f6f91b006599ac9a14b1d4531e849`，包内 24 个
-`HybridCLRLab` StreamingAssets 与 staging 逐字节一致。后续 current 也已由 Unity
-`Prepare` 编译链生成，并以单份 DLL/MV/AOT metadata payload 完成 resource update 和
-staging，Base MetaVersion tree 与 APK hash 均未变化。该证据位于
-`artifacts/dhe-u21-android-base-20260904-v4`、
-`artifacts/dhe-u21-android-current-preflight-20260904-v1`、
-`artifacts/resource-update-u21-android-20260904-v3` 和
-`artifacts/resource-stage-u21-android-20260904-v2.json`，属于本地 exploratory 产物，未绑定
-当前 clean lab commit。由于没有连接 Android 设备，也没有生成 `dhe-player-result.json`，
-Android 真机 correctness、PSS/RSS、温度和弱核门禁仍未完成；iOS/Xcode/device 也仍未验证。
+当前 `0.1.20` 候选已有 Unity `2021.3.45f2` Android ARM64 的两类探索性结果。旧归档
+`dhe-u21-android-base-20260904-v4` 虽完成 4/4 preflight、26,287 个 universal guards
+和 APK 构建，但其 identity 仍绑定非空 AOT metadata set，缺少对应 immutable root，不能
+作为 no-metadata registry 条目。随后生成的
+`dhe-u21-android-nometadata-base-20260905` 明确使用空 set
+`e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855`；以该 Base 的 current
+做单 Base resource update 和 staging 已通过，payload 不含 AOT metadata，APK 保持不变。
+由于没有 Android 设备，完整 workflow 在等待 `dhe-player-result.json` 处停止；Android
+真机 correctness、PSS/RSS、温度和弱核门禁仍未完成，iOS/Xcode/device 也仍未验证。
 
 ## 回滚
 
