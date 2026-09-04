@@ -17,6 +17,7 @@ Base Player（每个平台、每个商店版本各构建一次）
   dhe-runtime-plan.json
   dhe-resource-update.json
   dhe-resource-update-validation.json
+  audit/dhe-base-registry.json (registry-backed releases)
 
 客户端
   内置 Base MetaVersion + 远端 current MetaVersion -> 本地 changed/new 集合
