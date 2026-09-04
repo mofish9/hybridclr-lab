@@ -1809,6 +1809,16 @@ internal static partial class Program
         AddRegressionCheck(checks, errors, "resource-stage-aot-metadata-copied",
             positiveAotMetadataCopied,
             "a valid resource update must contain and copy every hashed AOT metadata payload.");
+        bool positiveAotMetadataShortPaths = positiveAotMetadata.All(metadata =>
+        {
+            string assetPath = GetString(metadata, "path") ?? string.Empty;
+            string fileName = Path.GetFileName(assetPath);
+            return System.Text.RegularExpressions.Regex.IsMatch(fileName,
+                "^[0-9a-fA-F]{32}\\.bytes$");
+        });
+        AddRegressionCheck(checks, errors, "resource-stage-aot-metadata-short-path",
+            positiveAotMetadataShortPaths,
+            "supplemental AOT metadata must use a 128-bit SHA-256 prefix file name to remain below Windows MAX_PATH.");
 
         var runtimePlanTamper = CopyFixture("runtime-plan-tamper");
         var runtimePlanTamperManifest = ReadJson<JsonElement>(Path.Combine(
