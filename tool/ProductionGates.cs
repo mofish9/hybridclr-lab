@@ -1558,6 +1558,25 @@ internal static partial class Program
 
         ValidateMultiBaseChangedEvidence(reports.Take(3).ToArray(), true);
         ValidateMultiBaseChangedEvidence(reports, true);
+        string variantMismatchPath = Path.Combine(root, "player-variant-mismatch.json");
+        var variantMismatch = System.Text.Json.Nodes.JsonNode.Parse(
+            reports[1].Report.GetRawText())!.AsObject();
+        variantMismatch["selectedPayloadVariantId"] = "windows";
+        File.WriteAllText(variantMismatchPath, variantMismatch.ToJsonString(Json),
+            new UTF8Encoding(false));
+        bool variantMismatchRejected = false;
+        try
+        {
+            ValidateMultiBaseChangedEvidence(new[]
+            {
+                reports[0], reports[2],
+                (ReadJson<JsonElement>(variantMismatchPath), variantMismatchPath),
+            }, true);
+        }
+        catch (DheException)
+        {
+            variantMismatchRejected = true;
+        }
         try
         {
             ValidateMultiBaseChangedEvidence(new[] { reports[0], reports[1], reports[3] }, true);
@@ -1565,7 +1584,7 @@ internal static partial class Program
         }
         catch (DheException)
         {
-            return true;
+            return variantMismatchRejected;
         }
     }
 
