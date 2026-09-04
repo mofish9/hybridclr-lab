@@ -1941,7 +1941,7 @@ internal static partial class Program
         // Compare the document identities globally and validate the selected
         // variant independently for every Base below.
         foreach (string property in new[] { "resourceUpdateManifestSha256",
-                     "resourceUpdateValidationSha256" })
+                     "resourceUpdateValidationSha256", "payloadVariantSetSha256" })
             if (identities.Skip(1).Any(item => !string.Equals(GetString(first.Report, property),
                     GetString(item.Item.Report, property), StringComparison.OrdinalIgnoreCase)))
                 throw new DheException("Multi-Base changed evidence does not share one resource release document: " +
