@@ -37,6 +37,7 @@
     "schemas/dhe-aot-metadata-manifest.schema.json",
     "schemas/dhe-base-registry.schema.json",
     "schemas/dhe-resource-evidence.schema.json",
+    "schemas/dhe-resource-player-workflow.schema.json",
     "schemas/dhe-resource-update.schema.json",
     "schemas/dhe-resource-update-validation.schema.json",
     "schemas/dhe-resource-stage.schema.json",
