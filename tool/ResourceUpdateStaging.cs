@@ -62,6 +62,7 @@ internal static partial class Program
                 StringComparison.OrdinalIgnoreCase))
             throw new DheException("DHE runtime plan hash does not match the resource manifest.");
         var runtimePlan = ReadJson<JsonElement>(runtimePlanSource);
+        ValidatePayloadVariantSetHash(runtimePlan, "DHE runtime plan");
         JsonElement runtimePlanVariant = SelectPayloadVariant(runtimePlan, selectedVariantId,
             "DHE runtime plan");
         if (GetInt(runtimePlan, "schemaVersion") != 1 ||
@@ -71,6 +72,8 @@ internal static partial class Program
                 "embedded-base-metaversion-and-aot-metadata-set", StringComparison.Ordinal) ||
             !string.Equals(GetString(runtimePlanVariant, "currentAssemblySetSha256"),
                 selectedCurrentSetHash, StringComparison.OrdinalIgnoreCase) ||
+            !string.Equals(GetString(runtimePlan, "payloadVariantSetSha256"),
+                GetString(manifest, "payloadVariantSetSha256"), StringComparison.OrdinalIgnoreCase) ||
             (!string.IsNullOrWhiteSpace(GetString(selectedBase, "currentAssemblySetSha256")) &&
              !string.Equals(GetString(selectedBase, "currentAssemblySetSha256"),
                  selectedCurrentSetHash, StringComparison.OrdinalIgnoreCase)) ||
@@ -880,6 +883,8 @@ internal static partial class Program
 
     private static void ValidatePayloadVariantSet(JsonElement manifest, JsonElement validation)
     {
+        ValidatePayloadVariantSetHash(manifest, "DHE resource manifest");
+        ValidatePayloadVariantSetHash(validation, "DHE resource validation");
         bool manifestHasVariants = manifest.TryGetProperty("payloadVariants", out JsonElement manifestVariants);
         bool validationHasVariants = validation.TryGetProperty("payloadVariants", out JsonElement validationVariants);
         if (manifestHasVariants != validationHasVariants)
@@ -904,12 +909,19 @@ internal static partial class Program
                     StringComparison.OrdinalIgnoreCase))
                 throw new DheException("DHE resource payload variant record is invalid: " + id);
         }
-        string? setHash = GetString(manifest, "payloadVariantSetSha256");
-        if (!string.IsNullOrWhiteSpace(setHash) &&
-            (!IsHex(setHash, 64, 64) ||
-             !string.Equals(setHash, ComputePayloadVariantSetHash(manifestVariants),
-                 StringComparison.OrdinalIgnoreCase)))
-            throw new DheException("DHE resource payload variant set hash is invalid.");
+    }
+
+    private static void ValidatePayloadVariantSetHash(JsonElement document, string description)
+    {
+        if (!document.TryGetProperty("payloadVariants", out JsonElement variants))
+            return;
+        if (variants.ValueKind != JsonValueKind.Array || variants.GetArrayLength() == 0)
+            throw new DheException(description + " payload variant records are invalid.");
+        string setHash = GetString(document, "payloadVariantSetSha256") ?? string.Empty;
+        if (!IsHex(setHash, 64, 64) ||
+            !string.Equals(setHash, ComputePayloadVariantSetHash(variants),
+                StringComparison.OrdinalIgnoreCase))
+            throw new DheException(description + " payload variant set hash is invalid.");
     }
 
     private static string ComputePayloadVariantSetHash(JsonElement variants)
