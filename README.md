@@ -45,7 +45,8 @@ it is not Android/iOS evidence, and target-specific managed metadata differences
 fail-closed for a shared payload.
 The 0.1.20 release contract extends this proof to an arbitrary changed-Player
 evidence list and requires Unity 2021, Unity 2022, and Tuanjie 2022 coverage
-over one shared current payload.
+over one resource manifest. A manifest can use one shared current payload or
+multiple target-specific `payloadVariants` selected by Base identity.
 `releaseReady=true` additionally requires `Mode Release`, clean
 and tracked project and tool source identities (each bound to its Git commit,
 HEAD tree, and source-boundary hash), clean locked runtime sources, and matching
