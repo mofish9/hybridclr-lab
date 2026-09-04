@@ -60,7 +60,7 @@
       "sourceMode": "integrated",
       "baseCommit": "623073baafd5a1d12ea46df8145de9fddc899fac",
       "integratedCommit": "70c163ed4860c5ea02e4558e7b32c36c3967a517",
-      "expectedTreeSha256": "CB43F55AF96607D8BD36B8BDE3BB77BA6EDB1FEBF65B12526518FE4622CCA42E",
+      "expectedTreeSha256": "4F330F52DE18256017A2767282639E59C42B27E9ACB0D178771E5803CBDC2AE7",
       "treeHashIgnoredPaths": [
         "Editor/BuildProcessors/AddLil2cppSourceCodeToXcodeproj2023OrNewer.cs.meta"
       ],
