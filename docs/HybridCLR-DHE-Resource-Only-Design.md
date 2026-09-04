@@ -61,13 +61,15 @@ dotnet HybridCLR.DheTool.dll resource-update \
   -BaseRoots <base-v1-dll-root>,<base-v2-dll-root>,<base-v3-dll-root> \
   -BaseNativeManifests <base-v1-native.json>,<base-v2-native.json>,<base-v3-native.json> \
   -BaseBuildIdentities <base-v1-identity.json>,<base-v2-identity.json>,<base-v3-identity.json> \
-  -AotMetadataRoot <stripped-aot-dll-root> \
+  -AotMetadataRoots <base-v1-aot-root>,<base-v2-aot-root>,<base-v3-aot-root> \
   -SettingsFile <ProjectSettings/HybridCLRSettings.asset> \
   -OutputRoot <resource-release-output>
 ```
 
-三个 Base 参数必须一一对应。需要补充 AOT metadata 时传入 `-AotMetadataRoot`，工具会按
-`patchAOTAssemblies` 完整收集；已经通过无补充 metadata 门禁的项目可省略该参数。命令先
+四组 Base 参数必须一一对应。需要补充 AOT metadata 时传入 `-AotMetadataRoots`，工具会按
+`patchAOTAssemblies` 从每个 root 完整收集，并按内容寻址跨 set 去重；单数
+`-AotMetadataRoot` 仅是所有 Base 共用同一 root 时的 shorthand。只有
+`patchAOTAssemblies` 为空时才允许省略 metadata roots。命令先
 删除旧 manifest/runtime plan，随后：
 
 1. 每个 current DLL 和 current MetaVersion 只写入 `payload/` 一次；
@@ -133,10 +135,12 @@ changed Player 来伪造线上流程。
 客户端拒绝新资源并继续使用上一份已验证资源。客户端版本号只能用于观测和灰度，不能代替
 加密身份匹配。
 
-所有资源更新都要求 `resource-update-plan-integrity-v1`；携带补充 AOT metadata 时还要求
-`resource-update-aot-metadata-path-v1`。这两个能力参与 BuildIdentity/baseId 计算，因此升级
-managed runtime 后旧 Player 不会被误认为可安全消费新 plan。缺少能力的 Base 必须停止领取
-该资源版本或升级主包。
+所有资源更新都要求 `resource-update-plan-integrity-v1`、`stable-method-identity-v1` 和
+`resource-update-aot-metadata-set-selection-v1`；携带非空补充 AOT metadata 时还要求
+`resource-update-aot-metadata-path-v1`。AOT metadata 以内容 SHA-256 寻址并跨 Base set 去重，
+runtime plan 用 `baseSelections` 将每个 `baseId` 映射到唯一 set。metadata set 身份参与
+BuildIdentity/baseId 计算，因此升级 managed runtime 后旧 Player 不会被误认为可安全消费新
+plan。缺少能力的 Base 必须停止领取该资源版本或升级主包。
 
 ## 当前兼容能力
 
@@ -169,25 +173,32 @@ managed runtime 后旧 Player 不会被误认为可安全消费新 plan。缺少
 
 ## 已有证据与剩余门禁
 
-identity 1 的同一 structural current payload 已在两个不同 Base Player 上完成本地 MetaVersion
-求差：current set 为
-`808f854c3e2171fe2dd932aa7dd8fff4999faccc98c6698aa1cb26143e46f318`，两个 Base 都识别
-72 个 changed 方法，并同时通过解释器/AOT、结构演进、custom attribute、事务回滚
-和重试。启用补充 metadata 时，两次 staging 都写入相同 8 个 current DLL/MetaVersion 和
-4 个 AOT metadata payload；删除测试 Player 副本中的旧根目录 metadata 后仍通过，证明
-runtime 按受哈希保护的 plan 从 `payload/` 加载。Base MetaVersion、Player executable 和
-`GameAssembly` 未变化。plan/payload 篡改、漏文件、错误 Base、废弃 sidecar 残留和缺
-capability 均会 fail closed。新能力 Player 的 Base ID 为
-`fd72fadeff6b8bed9f03e7156866b21a54d68b72b32f6690111cbf0db8746eb8` 和
-`1c468ef89d4ccb3f85b1ca66ff7e5ca494cb6d40836cdb3988c55226f27e3e8a`；旧身份缺少资源 plan
-能力，资源生成阶段即被拒绝。
+identity 1 的同一 structural current payload 已在 Unity 2021、Unity 2022 和团结 2022 的
+三个不同 Base Player 上完成本地 MetaVersion 求差。current set 为
+`4ca7b5a1c90cfccb4fb9e6d1eb0eb2fee133e4bb0e22c84ec2f36e0dc788229f`，对应 Base ID 为：
+
+- Unity 2021：`56f1b4cb3081e7af05518241635b7fc57274c7b6a472f303fa992542cde03db8`；
+- Unity 2022：`c047d8309159e3ec4474dda51d378739b6ca63848200adee76d570a3ab13519a`；
+- 团结 2022：`0e751fbfa0ebaecd8cf5d1ae05a1100ba4506a261acc18a3d9baf177e208a9b5`。
+
+三个 Player 都识别 43 个 changed/new 方法，并记录 12 次解释器入口和 35 次 AOT 入口；
+多程序集、结构演进、dispatch probe、事务回滚和同进程重试均通过。统一资源 manifest
+`0e16b4d67d9b8906245b74dc399d4b0197f82e9c4292eb3a55de7d7e6b6abba5` 包含 3 个按 Base
+选择的 AOT metadata set，跨 set 内容寻址后去重为 10 个 blob。三个 staging 均保持 Base
+MetaVersion、Player executable、`GameAssembly` 和引擎 Player DLL 不变。plan/payload、
+metadata set、错误 Base、废弃 sidecar 残留和缺 capability 等负例均 fail closed。
+
+这些 Player 和资源报告仍是 exploratory evidence，三个
+`resource-player-workflow-report.json` 的 `releaseReady` 均为 `false`，不能输入正式
+`release-evidence`。它们只证明当前 Windows Player 下的三 Base 共享 payload 链路。
 
 这套兼容只从首个采用 identity 1/runtime protocol v1 的正式 Base 开始。已经发布的旧 runtime
 不会因下载资源而获得新的 DHE runtime 能力；runtime 自身、IL2CPP ABI、native plugin 或
 平台层缺陷仍必须通过新 Base Player 修复。
 
 这证明“Base 只构建一次、后续一份资源包服务多个 Base”的架构链路成立，但不等于官方旗舰版
-DHE 的全部元数据能力。正式源码身份已收口到 `v8.13.0-opt4.1`、三条 il2cpp_plus
-`opt4.1` runtime tag 和 package commit `71a2e7b`。Android Player、iOS/Xcode/device、性能、
-内存和现有结构限制仍是正式发布前的独立门禁；当前结论只能是 Windows Player 与三引擎
-native 有条件通过，不能声明全平台生产发布完成。
+DHE 的全部元数据能力。当前候选源码使用 HybridCLR commit `71cf142`、package commit
+`442857ba` 和三条已锁定的 il2cpp_plus `opt4.1` 维护线；本轮尚未创建新的 runtime tag，也未
+合入正式 package 维护分支。Android Player、iOS/Xcode/device、性能、内存和现有结构限制仍是
+正式发布前的独立门禁；当前结论只能是 Windows Player 与三引擎 native 有条件通过，不能声明
+全平台生产发布完成。

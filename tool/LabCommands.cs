@@ -525,6 +525,12 @@ internal static class LabCommands
     {
         var lab = LabRoot(cli); var profile = cli.Optional("profile") ?? "Baseline-Clean"; var workflowId = cli.Optional("engineworkflow") ?? "Tuanjie2022Fgs";
         var lockDoc = ReadJson(Path.Combine(lab, "manifests/repo-lock.json")); var workflowDoc = ReadJson(Path.Combine(lab, "manifests/runtime-workflows.json"));
+        var packageLock = ReadJson(Path.Combine(lab, "manifests/dhe-package-lock.json"));
+        var packageTreeHashIgnoredPaths = packageLock.TryGetProperty("treeHashIgnoredPaths", out var ignoredValue) &&
+            ignoredValue.ValueKind == JsonValueKind.Array
+            ? ignoredValue.EnumerateArray().Select(value => value.GetString() ?? string.Empty)
+                .Where(value => value.Length > 0).ToArray()
+            : Array.Empty<string>();
         var runtimeLockPath = Path.Combine(lab, "manifests/dhe-runtime-lock.json");
         var runtimeLock = ReadJson(runtimeLockPath);
         var workflow = workflowDoc.GetProperty("workflows").EnumerateArray().Single(x => StringProperty(x, "id") == workflowId); var engine = workflow.GetProperty("engine");
@@ -566,7 +572,7 @@ internal static class LabCommands
         if (instrumented || fgs) WriteText(Path.Combine(stagedRuntime, "hybridclr/lab/InstrumentationConfig.h"), "#pragma once\n" + (instrumented ? "#define HYBRIDCLR_LAB_INSTRUMENTED 1\n" : "") + (fgs ? "#define HYBRIDCLR_LAB_FGS_TESTS 1\n" : ""));
         var appliedRuntimePatches = SelectLockedOverlays(runtimeLock, "il2cpp_plus", workflowId)
             .Concat(SelectLockedOverlays(runtimeLock, "hybridclr", workflowId)).ToArray();
-        var manifest = new { schemaVersion = 1, format = "hybridclr.dhe-runtime-manifest.json", profile, dheEnabled = dhe, pathSemantics = "workspace-absolute-v1", createdAtUtc = DateTimeOffset.UtcNow, engineWorkflow = workflowId, engine, fullGenericSharingDiagnostics = fgs, externalHeaders = new { sourcePath = external, stagedPath = stagedExternal, stagedTreeSha256 = TreeHash(stagedExternal), surrogate = !editorAvailable, editorAvailable, explicitlyAllowed = !editorAvailable && cli.Has("allowsurrogateexternalheaders") }, source = new { hybridclr = SourceRecord(lockDoc, "hybridclr", hybridclr, Path.Combine(hybridclr, "hybridclr")), il2cpp_plus = SourceRecord(lockDoc, "il2cpp_plus", il2cpp, Path.Combine(il2cpp, "libil2cpp")), hybridclr_unity = SourceRecord(lockDoc, "hybridclr_unity", hybridclrUnity, hybridclrUnity) }, stagedLibil2cpp = stagedRuntime, stagedRuntimeSha256 = TreeHash(stagedRuntime), dheRuntimeLock = runtimeLockPath, dheRuntimeLockSha256 = Sha256File(runtimeLockPath), dheRuntimeSourceMode = StringProperty(runtimeLock, "sourceMode"), dhePatches = appliedRuntimePatches };
+        var manifest = new { schemaVersion = 1, format = "hybridclr.dhe-runtime-manifest.json", profile, dheEnabled = dhe, pathSemantics = "workspace-absolute-v1", createdAtUtc = DateTimeOffset.UtcNow, engineWorkflow = workflowId, engine, fullGenericSharingDiagnostics = fgs, externalHeaders = new { sourcePath = external, stagedPath = stagedExternal, stagedTreeSha256 = TreeHash(stagedExternal), surrogate = !editorAvailable, editorAvailable, explicitlyAllowed = !editorAvailable && cli.Has("allowsurrogateexternalheaders") }, source = new { hybridclr = SourceRecord(lockDoc, "hybridclr", hybridclr, Path.Combine(hybridclr, "hybridclr")), il2cpp_plus = SourceRecord(lockDoc, "il2cpp_plus", il2cpp, Path.Combine(il2cpp, "libil2cpp")), hybridclr_unity = SourceRecord(lockDoc, "hybridclr_unity", hybridclrUnity, hybridclrUnity, packageTreeHashIgnoredPaths) }, stagedLibil2cpp = stagedRuntime, stagedRuntimeSha256 = TreeHash(stagedRuntime), dheRuntimeLock = runtimeLockPath, dheRuntimeLockSha256 = Sha256File(runtimeLockPath), dheRuntimeSourceMode = StringProperty(runtimeLock, "sourceMode"), dhePatches = appliedRuntimePatches };
         WriteJson(Path.Combine(stage, "runtime-manifest.json"), manifest); Console.WriteLine("Assembled " + profile + " runtime: " + stagedRuntime); return 0;
     }
 
@@ -582,11 +588,16 @@ internal static class LabCommands
         if (string.Equals(sourceMode, "integrated", StringComparison.Ordinal))
         {
             string treeRoot = RequireDirectory(integratedTreeRoot ?? destination);
-            string actualTree = CanonicalSourceTreeHash(treeRoot,
-                repository == "hybridclr_unity");
             foreach (JsonElement patch in patches)
             {
                 ValidateLockedPatchReference(lab, patch, repository);
+                var ignoredPaths = patch.TryGetProperty("treeHashIgnoredPaths", out var ignoredValue) &&
+                    ignoredValue.ValueKind == JsonValueKind.Array
+                    ? ignoredValue.EnumerateArray().Select(value => value.GetString() ?? string.Empty)
+                        .Where(value => value.Length > 0).ToArray()
+                    : Array.Empty<string>();
+                string actualTree = CanonicalSourceTreeHash(treeRoot,
+                    repository == "hybridclr_unity", ignoredPaths);
                 if (!string.Equals(StringProperty(patch, "sourceMode"), "integrated",
                         StringComparison.Ordinal))
                     throw new InvalidOperationException("DHE integrated patch sourceMode is invalid for " +
@@ -660,10 +671,12 @@ internal static class LabCommands
         }).ToArray();
     }
 
-    private static object SourceRecord(JsonElement lockDoc, string name, string path, string tree)
+    private static object SourceRecord(JsonElement lockDoc, string name, string path, string tree,
+        IEnumerable<string>? ignoredPaths = null)
     {
         var spec = lockDoc.GetProperty("repositories").GetProperty(name);
-        return new { url = StringProperty(spec, "fork"), path, commit = Git(path, "rev-parse", "HEAD"), dirty = !string.IsNullOrWhiteSpace(Git(path, "status", "--porcelain")), treeSha256 = CanonicalSourceTreeHash(tree, name == "hybridclr_unity") };
+        var ignored = (ignoredPaths ?? Array.Empty<string>()).ToArray();
+        return new { url = StringProperty(spec, "fork"), path, commit = Git(path, "rev-parse", "HEAD"), dirty = !string.IsNullOrWhiteSpace(Git(path, "status", "--porcelain")), treeSha256 = CanonicalSourceTreeHash(tree, name == "hybridclr_unity", ignored), treeHashIgnoredPaths = ignored };
     }
 
     private static string ResolveExternalHeaders(string editor, string? explicitRoot, JsonElement engine)

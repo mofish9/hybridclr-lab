@@ -4,7 +4,7 @@
   "title": "HybridCLR DHE Single-payload Resource Update",
   "type": "object",
   "additionalProperties": true,
-  "required": ["schemaVersion", "format", "payloadModel", "metaVersionSchema", "compatibilityPolicy", "runtimeProtocol", "compatibilityValidated", "validation", "validationSha256", "currentAssemblySetSha256", "playerUpdateRequired", "guardCoverageValidated", "runtimeComparison", "runtimePlan", "runtimePlanSha256", "runtimeAssetRoot", "baseMetaVersionAssetRoot", "aotMetadata", "assemblies", "supportedBases"],
+  "required": ["schemaVersion", "format", "payloadModel", "metaVersionSchema", "compatibilityPolicy", "runtimeProtocol", "compatibilityValidated", "validation", "validationSha256", "currentAssemblySetSha256", "playerUpdateRequired", "guardCoverageValidated", "runtimeComparison", "runtimePlan", "runtimePlanSha256", "runtimeAssetRoot", "baseMetaVersionAssetRoot", "aotMetadataSets", "assemblies", "supportedBases"],
   "properties": {
     "schemaVersion": { "const": 1 },
     "format": { "const": "hybridclr.dhe-resource-update.json" },
@@ -23,17 +23,28 @@
     "runtimePlanSha256": { "type": "string", "pattern": "^[0-9a-fA-F]{64}$" },
     "runtimeAssetRoot": { "type": "string", "minLength": 1 },
     "baseMetaVersionAssetRoot": { "type": "string", "minLength": 1 },
-    "aotMetadata": {
+    "aotMetadataSets": {
       "type": "array",
+      "minItems": 1,
       "items": {
         "type": "object",
-        "required": ["assemblyName", "sourceKind", "sha256", "manifestSha256", "path"],
+        "required": ["aotMetadataSetId", "assemblies"],
         "properties": {
-          "assemblyName": { "type": "string", "minLength": 1 },
-          "sourceKind": { "const": "resource-update" },
-          "sha256": { "type": "string", "pattern": "^[0-9a-fA-F]{64}$" },
-          "manifestSha256": { "const": "" },
-          "path": { "type": "string", "minLength": 1 }
+          "aotMetadataSetId": { "type": "string", "pattern": "^[0-9a-fA-F]{64}$" },
+          "assemblies": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "required": ["assemblyName", "sourceKind", "sha256", "manifestSha256", "path"],
+              "properties": {
+                "assemblyName": { "type": "string", "minLength": 1 },
+                "sourceKind": { "const": "resource-update" },
+                "sha256": { "type": "string", "pattern": "^[0-9a-fA-F]{64}$" },
+                "manifestSha256": { "const": "" },
+                "path": { "type": "string", "pattern": "^.+/payload/aot-metadata/[^/]+\\.bytes$" }
+              }
+            }
+          }
         }
       }
     },
@@ -57,13 +68,14 @@
       "minItems": 1,
       "items": {
         "type": "object",
-        "required": ["baseId", "target", "managedAssemblySetSha256", "aotSnapshotSha256", "baseMetaVersionSetSha256", "nativeGuardSourceSha256", "nativeManifestSha256", "runtimeProtocol", "nativeRuntimeContract", "runtimeCapabilities", "requiredRuntimeCapabilities", "runtimeAssetRoot", "baseMetaVersionAssetRoot", "buildIdentitySha256", "compatibilityPolicy", "compatible", "guardCoverageValidated", "unsupportedChangeCount", "unsupportedChanges", "assemblies"],
+        "required": ["baseId", "target", "managedAssemblySetSha256", "aotSnapshotSha256", "baseMetaVersionSetSha256", "aotMetadataSetId", "nativeGuardSourceSha256", "nativeManifestSha256", "runtimeProtocol", "nativeRuntimeContract", "runtimeCapabilities", "requiredRuntimeCapabilities", "runtimeAssetRoot", "baseMetaVersionAssetRoot", "buildIdentitySha256", "compatibilityPolicy", "compatible", "guardCoverageValidated", "unsupportedChangeCount", "unsupportedChanges", "assemblies"],
         "properties": {
           "baseId": { "type": "string", "pattern": "^[0-9a-fA-F]{64}$" },
           "target": { "type": "string", "pattern": "^[A-Za-z0-9._-]+$" },
           "managedAssemblySetSha256": { "type": "string", "pattern": "^[0-9a-fA-F]{64}$" },
           "aotSnapshotSha256": { "type": "string", "pattern": "^[0-9a-fA-F]{64}$" },
           "baseMetaVersionSetSha256": { "type": "string", "pattern": "^[0-9a-fA-F]{64}$" },
+          "aotMetadataSetId": { "type": "string", "pattern": "^[0-9a-fA-F]{64}$" },
           "nativeGuardSourceSha256": { "type": "string", "pattern": "^[0-9a-fA-F]{64}$" },
           "nativeManifestSha256": { "type": "string", "pattern": "^[0-9a-fA-F]{64}$" },
           "runtimeProtocol": { "const": "dhe-runtime-protocol-v1" },

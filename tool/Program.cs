@@ -16,6 +16,8 @@ internal static partial class Program
     {
         "mv-field-order", "mv-switch-target", "mv-assembly-metadata", "mv-flags-tamper",
         "mv-token-tamper", "verify-require-release", "verify-expected-id", "verify-package-id-recompute",
+        "aot-metadata-set-order-independent", "aot-metadata-set-deduplicated",
+        "aot-metadata-set-selection-bound", "aot-metadata-set-tamper-rejected",
         "verify-extra-source", "verify-release-bit-tamper", "evidence-role-format",
         "evidence-native-runtime-binding", "runtime-package-source-binding", "archive-safe-replace",
         "evidence-noop-aot-proof", "evidence-native-matrix-roles",
@@ -274,9 +276,10 @@ internal static partial class Program
         var outputRoot = SafeOutputRoot(cli.Require("outputroot"), new[] { currentRoot, settingsPath });
         var baselineRoots = (cli.Optional("baseroots") ?? cli.Require("baselineroot"))
             .Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries)
-            .Select(path => RequireDirectory(path, "DHE base snapshot root"))
-            .Distinct(StringComparer.OrdinalIgnoreCase).ToArray();
+            .Select(path => RequireDirectory(path, "DHE base snapshot root")).ToArray();
         if (baselineRoots.Length == 0) throw new DheException("At least one base snapshot root is required.");
+        if (baselineRoots.Distinct(StringComparer.OrdinalIgnoreCase).Count() != baselineRoots.Length)
+            throw new DheException("BaseRoots must not contain duplicate Base snapshot roots.");
         var nativeManifestValue = cli.Optional("basenativemanifests") ?? cli.Optional("basenativemanifest") ??
             throw new DheException("Missing -BaseNativeManifests (one universal native manifest per BaseRoot).");
         var nativeManifestPaths = nativeManifestValue
@@ -309,7 +312,8 @@ internal static partial class Program
             "RuntimeAssetRoot");
         ValidateRequestedAssetRoot(cli.Optional("basemetaversionassetroot"),
             baseMetaVersionAssetRoot, "BaseMetaVersionAssetRoot");
-        var names = Settings.Read(settingsPath).Dhe;
+        var settings = Settings.Read(settingsPath);
+        var names = settings.Dhe;
         if (names.Length == 0) throw new DheException("No DHE assemblies are configured.");
         var currentRecords = names.Select(name => new
         {
@@ -317,8 +321,22 @@ internal static partial class Program
             path = RequireFile(Path.Combine(currentRoot, name + ".dll"), name + " current assembly"),
         }).ToArray();
         var currentSetHash = NamedAssemblySetHash(currentRecords.Select(record => (record.name, record.path)));
-        var aotMetadataRoot = cli.Optional("aotmetadataroot");
-        if (!string.IsNullOrWhiteSpace(aotMetadataRoot)) aotMetadataRoot = RequireDirectory(aotMetadataRoot, "AOT metadata root");
+        var aotMetadataRoots = cli.GetList("aotmetadataroots")
+            .Select(path => RequireDirectory(path, "AOT metadata root")).ToArray();
+        var sharedAotMetadataRoot = cli.Optional("aotmetadataroot");
+        if (aotMetadataRoots.Length != 0 && !string.IsNullOrWhiteSpace(sharedAotMetadataRoot))
+            throw new DheException("Use either -AotMetadataRoots or -AotMetadataRoot, not both.");
+        if (aotMetadataRoots.Length == 0 && !string.IsNullOrWhiteSpace(sharedAotMetadataRoot))
+        {
+            string root = RequireDirectory(sharedAotMetadataRoot, "AOT metadata root");
+            aotMetadataRoots = Enumerable.Repeat(root, baselineRoots.Length).ToArray();
+        }
+        if (aotMetadataRoots.Length != 0 && aotMetadataRoots.Length != baselineRoots.Length)
+            throw new DheException("AotMetadataRoots must contain one entry per BaseRoot.");
+        if (aotMetadataRoots.Length == 0 && settings.Patch.Length != 0)
+            throw new DheException(
+                "AotMetadataRoots is required when patchAOTAssemblies is non-empty; " +
+                "pass one metadata root per BaseRoot.");
 
         var payloadRoot = Path.Combine(outputRoot, "payload");
         var auditRoot = Path.Combine(outputRoot, "audit");
@@ -373,27 +391,52 @@ internal static partial class Program
             .SelectMany(snapshot => snapshot.AddressTakenFieldIdentities)
             .Distinct(StringComparer.Ordinal).ToArray();
 
-        var runtimeAotMetadata = new List<object>();
-        if (!string.IsNullOrWhiteSpace(aotMetadataRoot))
+        var metadataSetsById = new Dictionary<string, ResourceAotMetadataSet>(
+            StringComparer.OrdinalIgnoreCase);
+        var metadataSetIdsByBase = new string[baselineRoots.Length];
+        for (int baseIndex = 0; baseIndex < baselineRoots.Length; baseIndex++)
         {
-            foreach (var metadataName in Settings.Read(settingsPath).Patch)
+            var setBytes = new List<(string name, byte[] bytes)>();
+            var setAssemblies = new List<ResourceAotMetadataPayload>();
+            string? metadataRoot = aotMetadataRoots.Length == 0 ? null : aotMetadataRoots[baseIndex];
+            if (metadataRoot != null)
             {
-                var source = RequireFile(Path.Combine(aotMetadataRoot, metadataName + ".dll"),
-                    metadataName + " AOT metadata");
-                var target = Path.Combine(payloadRoot, metadataName + ".bytes");
-                File.Copy(source, target, true);
-                runtimeAotMetadata.Add(new
+                foreach (var metadataName in settings.Patch.OrderBy(value => value, StringComparer.Ordinal))
                 {
-                    assemblyName = metadataName,
-                    sourceKind = "resource-update",
-                    sha256 = Sha256File(target),
-                    manifestSha256 = "",
-                    path = runtimeAssetRoot + "payload/" + metadataName + ".bytes",
-                });
+                    var source = RequireFile(Path.Combine(metadataRoot, metadataName + ".dll"),
+                        metadataName + " AOT metadata");
+                    byte[] bytes = File.ReadAllBytes(source);
+                    string hash = Sha256Bytes(bytes);
+                    string relativePath = "payload/aot-metadata/" + hash + ".bytes";
+                    string target = ResolveContainedPath(outputRoot, relativePath,
+                        "AOT metadata blob");
+                    Directory.CreateDirectory(Path.GetDirectoryName(target)!);
+                    if (File.Exists(target) && !string.Equals(Sha256File(target), hash,
+                            StringComparison.OrdinalIgnoreCase))
+                        throw new DheException("AOT metadata content-address collision: " + hash);
+                    if (!File.Exists(target)) File.WriteAllBytes(target, bytes);
+                    setBytes.Add((metadataName, bytes));
+                    setAssemblies.Add(new ResourceAotMetadataPayload(metadataName,
+                        "resource-update", hash, string.Empty,
+                        runtimeAssetRoot + relativePath));
+                }
             }
+            string setId = NamedByteSetHash(setBytes);
+            metadataSetIdsByBase[baseIndex] = setId;
+            var set = new ResourceAotMetadataSet(setId, setAssemblies.ToArray());
+            if (metadataSetsById.TryGetValue(setId, out ResourceAotMetadataSet? existing))
+            {
+                if (!JsonSerializer.Serialize(existing, Json).Equals(
+                        JsonSerializer.Serialize(set, Json), StringComparison.Ordinal))
+                    throw new DheException("AOT metadata set identity collision: " + setId);
+            }
+            else metadataSetsById.Add(setId, set);
         }
+        ResourceAotMetadataSet[] runtimeAotMetadataSets = metadataSetsById.Values
+            .OrderBy(set => set.AotMetadataSetId, StringComparer.Ordinal).ToArray();
 
         var candidateBases = new List<object>();
+        var resourceBaseSelections = new List<ResourceAotMetadataBaseSelection>();
         var candidateBaseIdentityKeys = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
         var releaseErrors = new List<string>();
         for (var baseIndex = 0; baseIndex < baselineRoots.Length; baseIndex++)
@@ -403,6 +446,7 @@ internal static partial class Program
             var buildIdentityPath = buildIdentityPaths[baseIndex];
             var nativeManifest = ReadJson<JsonElement>(nativeManifestPath);
             var buildIdentity = baseIdentities[baseIndex];
+            string aotMetadataSetId = metadataSetIdsByBase[baseIndex];
             var baseTarget = GetString(buildIdentity, "target") ?? string.Empty;
             var baseAotSnapshotSha256 = GetString(buildIdentity, "aotSnapshotSha256") ?? string.Empty;
             var baseNativeGuardSourceSha256 = GetString(buildIdentity,
@@ -439,8 +483,10 @@ internal static partial class Program
             var requiredRuntimeCapabilities = new HashSet<string>(StringComparer.Ordinal)
             {
                 "resource-update-plan-integrity-v1",
+                "resource-update-aot-metadata-set-selection-v1",
             };
-            if (runtimeAotMetadata.Count > 0)
+            if (runtimeAotMetadataSets.Single(set => string.Equals(set.AotMetadataSetId,
+                    aotMetadataSetId, StringComparison.OrdinalIgnoreCase)).Assemblies.Length > 0)
                 requiredRuntimeCapabilities.Add("resource-update-aot-metadata-path-v1");
             if (!string.Equals(baseRuntimeProtocol,
                     ResourceUpdateCompatibility.RuntimeProtocol, StringComparison.Ordinal) ||
@@ -496,7 +542,7 @@ internal static partial class Program
             var baseMvSetHash = NamedByteSetHash(baseMvSet);
             var identityErrors = ValidateResourceBaseIdentity(buildIdentity, buildIdentityPath,
                 nativeManifestPath, managedAssemblySetSha256, baseMvSetHash,
-                runtimeAssetRoot, baseMetaVersionAssetRoot);
+                aotMetadataSetId, runtimeAssetRoot, baseMetaVersionAssetRoot);
             unsupported.AddRange(identityErrors);
             string[] missingRuntimeCapabilities = requiredRuntimeCapabilities
                 .Except(baseNativeRuntimeCapabilities, StringComparer.Ordinal)
@@ -521,6 +567,7 @@ internal static partial class Program
                 managedAssemblySetSha256,
                 aotSnapshotSha256 = baseAotSnapshotSha256,
                 baseMetaVersionSetSha256 = baseMvSetHash,
+                aotMetadataSetId,
                 nativeGuardSourceSha256 = baseNativeGuardSourceSha256,
                 nativeManifestSha256,
                 runtimeProtocol = baseRuntimeProtocol,
@@ -540,6 +587,8 @@ internal static partial class Program
                 assemblies = assemblyCompatibility.ToArray(),
             };
             candidateBases.Add(baseRecord);
+            resourceBaseSelections.Add(new ResourceAotMetadataBaseSelection(baseId,
+                aotMetadataSetId));
             if (!baseCompatible)
             {
                 releaseErrors.Add("Base " + baseId + " is incompatible: " +
@@ -570,11 +619,14 @@ internal static partial class Program
         {
             schemaVersion = 1,
             format = "hybridclr.dhe-runtime-asset-plan.json",
-            selection = "embedded-base-metaversion",
+            selection = "embedded-base-metaversion-and-aot-metadata-set",
             currentAssemblySetSha256 = currentSetHash,
             runtimeAssetRoot,
             baseMetaVersionAssetRoot,
-            aotMetadata = runtimeAotMetadata.ToArray(),
+            aotMetadataSetId = string.Empty,
+            aotMetadata = Array.Empty<ResourceAotMetadataPayload>(),
+            aotMetadataSets = runtimeAotMetadataSets,
+            baseSelections = resourceBaseSelections.ToArray(),
             assemblies = runtimeAssemblies.ToArray(),
         });
         WriteJson(manifestPath, new
@@ -597,7 +649,7 @@ internal static partial class Program
             runtimePlanSha256 = Sha256File(runtimePlanPath),
             runtimeAssetRoot,
             baseMetaVersionAssetRoot,
-            aotMetadata = runtimeAotMetadata.ToArray(),
+            aotMetadataSets = runtimeAotMetadataSets,
             assemblies = payloadFiles.ToArray(),
             supportedBases = candidateBases.ToArray(),
         });
@@ -607,7 +659,7 @@ internal static partial class Program
 
     private static string[] ValidateResourceBaseIdentity(JsonElement identity, string identityPath,
         string nativeManifestPath, string managedAssemblySetSha256,
-        string baseMetaVersionSetSha256, string runtimeAssetRoot,
+        string baseMetaVersionSetSha256, string aotMetadataSetId, string runtimeAssetRoot,
         string baseMetaVersionAssetRoot)
     {
         var errors = new List<string>();
@@ -634,6 +686,9 @@ internal static partial class Program
         if (!string.Equals(GetString(identity, "baseMetaVersionSetSha256"),
                 baseMetaVersionSetSha256, StringComparison.OrdinalIgnoreCase))
             errors.Add("base-build-identity-metaversion-set-mismatch:" + identityPath);
+        if (!string.Equals(GetString(identity, "aotMetadataSetId"), aotMetadataSetId,
+                StringComparison.OrdinalIgnoreCase))
+            errors.Add("base-build-identity-aot-metadata-set-mismatch:" + identityPath);
         if (!string.Equals(GetString(identity, "nativeManifestSha256"), Sha256File(nativeManifestPath),
                 StringComparison.OrdinalIgnoreCase))
             errors.Add("base-build-identity-native-manifest-mismatch:" + identityPath);
@@ -662,7 +717,7 @@ internal static partial class Program
             errors.Add("base-build-identity-asset-roots:" + identityPath);
         string computedBaseId = ComputeBaseId(target, managedAssemblySetSha256,
             GetString(identity, "aotSnapshotSha256") ?? string.Empty,
-            baseMetaVersionSetSha256,
+            baseMetaVersionSetSha256, aotMetadataSetId,
             GetString(identity, "nativeGuardSourceSha256") ?? string.Empty,
             GetString(identity, "nativeManifestSha256") ?? string.Empty,
             runtimeProtocol, runtimeContract, runtimeCapabilities, runtimeAssetRoot,
@@ -728,6 +783,7 @@ internal static partial class Program
 
     private static string ComputeBaseId(string target, string managedAssemblySetSha256,
         string aotSnapshotSha256, string baseMetaVersionSetSha256,
+        string aotMetadataSetId,
         string nativeGuardSourceSha256, string nativeManifestSha256,
         string runtimeProtocol, string runtimeContract, IEnumerable<string> runtimeCapabilities,
         string runtimeAssetRoot, string baseMetaVersionAssetRoot)
@@ -739,6 +795,7 @@ internal static partial class Program
             "managedAssemblySetSha256=" + managedAssemblySetSha256.ToLowerInvariant() + "\n" +
             "aotSnapshotSha256=" + aotSnapshotSha256.ToLowerInvariant() + "\n" +
             "baseMetaVersionSetSha256=" + baseMetaVersionSetSha256.ToLowerInvariant() + "\n" +
+            "aotMetadataSetId=" + aotMetadataSetId.ToLowerInvariant() + "\n" +
             "nativeGuardSourceSha256=" + nativeGuardSourceSha256.ToLowerInvariant() + "\n" +
             "nativeManifestSha256=" + nativeManifestSha256.ToLowerInvariant() + "\n" +
             "runtimeProtocol=" + runtimeProtocol + "\n" +
@@ -1650,6 +1707,9 @@ internal static partial class Program
         if (baseIds.Any(baseId => !IsHex(baseId, 64, 64)) ||
             baseIds.Distinct(StringComparer.OrdinalIgnoreCase).Count() != baseIds.Length)
             throw new DheException("Multi-Base changed evidence contains invalid or duplicate Base identities.");
+        if (reports.Select(item => GetString(item.Report, "selectedAotMetadataSetId") ?? string.Empty)
+                .Any(setId => !IsHex(setId, 64, 64)))
+            throw new DheException("Multi-Base changed evidence contains an invalid AOT metadata set identity.");
         var identities = reports.Select(item =>
             (Item: item, Identity: GetChangedPlayerEvidenceIdentity(item.Report, item.Path))).ToArray();
         if (requireEngineMatrix)
@@ -1723,15 +1783,26 @@ internal static partial class Program
         RequireEvidenceFormat(player, "hybridclr.dhe-player-result.json", "Resource Player result");
         RequireEvidenceFormat(baseWorkflow, "hybridclr.dhe-project-player-workflow.json",
             "Base workflow report");
+        JsonElement[] selectedManifestBases = manifest.GetProperty("supportedBases")
+            .EnumerateArray().Where(item => string.Equals(GetString(item, "baseId"),
+                GetString(report, "selectedBaseId"), StringComparison.OrdinalIgnoreCase)).ToArray();
+        if (selectedManifestBases.Length != 1 ||
+            !string.Equals(GetString(selectedManifestBases[0], "aotMetadataSetId"),
+                GetString(report, "selectedAotMetadataSetId"), StringComparison.OrdinalIgnoreCase))
+            throw new DheException("Resource Player evidence selects a Base with the wrong AOT metadata set.");
         if (!GetBool(validation, "passed") || !GetBool(stage, "passed") ||
             !GetBool(player, "passed") || !GetBool(baseWorkflow, "passed") ||
             !string.Equals(JsonSerializer.Serialize(player),
                 JsonSerializer.Serialize(report.GetProperty("player")), StringComparison.Ordinal) ||
-            !string.Equals(GetString(stage, "selectedBaseId"), GetString(report, "selectedBaseId"),
-                StringComparison.OrdinalIgnoreCase) ||
-            !string.Equals(GetString(player, "selectedBaseId"), GetString(report, "selectedBaseId"),
-                StringComparison.OrdinalIgnoreCase) ||
-            !string.Equals(GetString(manifest, "currentAssemblySetSha256"),
+             !string.Equals(GetString(stage, "selectedBaseId"), GetString(report, "selectedBaseId"),
+                 StringComparison.OrdinalIgnoreCase) ||
+             !string.Equals(GetString(player, "selectedBaseId"), GetString(report, "selectedBaseId"),
+                 StringComparison.OrdinalIgnoreCase) ||
+             !string.Equals(GetString(stage, "selectedAotMetadataSetId"),
+                 GetString(report, "selectedAotMetadataSetId"), StringComparison.OrdinalIgnoreCase) ||
+             !string.Equals(GetString(player, "selectedAotMetadataSetId"),
+                 GetString(report, "selectedAotMetadataSetId"), StringComparison.OrdinalIgnoreCase) ||
+             !string.Equals(GetString(manifest, "currentAssemblySetSha256"),
                 GetString(report, "currentAssemblySetSha256"), StringComparison.OrdinalIgnoreCase) ||
             !string.Equals(GetString(stage, "currentAssemblySetSha256"),
                 GetString(report, "currentAssemblySetSha256"), StringComparison.OrdinalIgnoreCase) ||
@@ -2846,6 +2917,12 @@ internal static partial class Program
         int ChangedMethodCount, int AddedMethodCount, int RemovedMethodCount,
         int ChangedExistingTypeCount, int AddedTypeCount, int RemovedTypeCount,
         string[] UnsupportedChanges, string? Error);
+    private sealed record ResourceAotMetadataPayload(string AssemblyName, string SourceKind,
+        string Sha256, string ManifestSha256, string Path);
+    private sealed record ResourceAotMetadataSet(string AotMetadataSetId,
+        ResourceAotMetadataPayload[] Assemblies);
+    private sealed record ResourceAotMetadataBaseSelection(string BaseId,
+        string AotMetadataSetId);
     private sealed class DheException : Exception { public DheException(string message) : base(message) { } }
 }
 

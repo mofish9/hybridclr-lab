@@ -248,7 +248,9 @@ namespace HybridCLR.Lab.Editor
                 if (!File.Exists(sourcePath))
                     throw new FileNotFoundException("DHE current assembly input was not found", sourcePath);
                 string destinationPath = Path.Combine(destinationRoot, assemblyName + ".dll");
-                File.Copy(sourcePath, destinationPath, true);
+                if (!Path.GetFullPath(sourcePath).Equals(Path.GetFullPath(destinationPath),
+                        StringComparison.OrdinalIgnoreCase))
+                    File.Copy(sourcePath, destinationPath, true);
                 AssetDatabase.ImportAsset(
                     "Assets/Plugins/HybridCLRLab/" + assemblyName + ".dll",
                     ImportAssetOptions.ForceUpdate | ImportAssetOptions.ForceSynchronousImport);

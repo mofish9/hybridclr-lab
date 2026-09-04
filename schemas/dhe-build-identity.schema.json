@@ -21,6 +21,7 @@
     "nativeGuardSourceSha256",
     "nativeManifestSha256",
     "baseMetaVersionSetSha256",
+    "aotMetadataSetId",
     "runtimeProtocol",
     "runtimeContract",
     "runtimeCapabilities",
@@ -49,6 +50,7 @@
     "nativeGuardSourceSha256": { "type": "string", "pattern": "^[0-9a-fA-F]{64}$" },
     "nativeManifestSha256": { "type": "string", "pattern": "^[0-9a-fA-F]{64}$" },
     "baseMetaVersionSetSha256": { "type": "string", "pattern": "^[0-9a-fA-F]{64}$" },
+    "aotMetadataSetId": { "type": "string", "pattern": "^[0-9a-fA-F]{64}$" },
     "runtimeProtocol": { "const": "dhe-runtime-protocol-v1" },
     "runtimeContract": { "const": "dhe-runtime-v1" },
     "runtimeCapabilities": {

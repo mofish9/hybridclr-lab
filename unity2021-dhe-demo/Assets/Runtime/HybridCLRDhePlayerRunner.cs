@@ -89,7 +89,8 @@ namespace HybridCLR.Lab
                 provider.LoadText(runtimePlanFile));
             if (runtimePlan == null || runtimePlan.schemaVersion != 1 ||
                 !string.Equals(runtimePlan.format, "hybridclr.dhe-runtime-asset-plan.json", StringComparison.Ordinal) ||
-                !string.Equals(runtimePlan.selection, "embedded-base-metaversion", StringComparison.Ordinal) ||
+                (runtimePlan.selection != "embedded-base-metaversion" &&
+                 runtimePlan.selection != "embedded-base-metaversion-and-aot-metadata-set") ||
                 runtimePlan.assemblies == null || runtimePlan.assemblies.Length == 0)
             {
                 throw new InvalidDataException("DHE runtime plan is empty or invalid.");
@@ -199,6 +200,13 @@ namespace HybridCLR.Lab
 
             MethodInfo addMethod = typeof(DheDemoCalculator).GetMethod("Add", BindingFlags.Public | BindingFlags.Static);
             MethodInfo stableMethod = typeof(DheDemoCalculator).GetMethod("Stable", BindingFlags.Public | BindingFlags.Static);
+            // Keep the unchanged identity probe on a type that is not altered
+            // by the structural fixture. DheDemoCalculator intentionally
+            // evolves fields/properties/events, so its methods may be marked
+            // changed through type dependencies even when their bodies stay
+            // identical.
+            MethodInfo identityUnchangedMethod = typeof(PerformanceWorkload).GetProperty(
+                "All", BindingFlags.Public | BindingFlags.Static)?.GetMethod;
             MethodInfo addViaStableMethod = typeof(DheDemoCalculator).GetMethod("AddViaStable", BindingFlags.Public | BindingFlags.Static);
             MethodInfo addPairMethod = typeof(DheDemoCalculator).GetMethod("AddPair", BindingFlags.Public | BindingFlags.Static);
             MethodInfo wideMethod = typeof(DheDemoCalculator).GetMethod("Wide", BindingFlags.Public | BindingFlags.Static);
@@ -206,7 +214,8 @@ namespace HybridCLR.Lab
             MethodInfo instanceStableMethod = typeof(DheDemoCalculator).GetMethod("InstanceStable", BindingFlags.Public | BindingFlags.Instance);
             MethodInfo instanceAddMethod = typeof(DheDemoCalculator).GetMethod("InstanceAdd", BindingFlags.Public | BindingFlags.Instance);
             MethodInfo instanceAddViaStableMethod = typeof(DheDemoCalculator).GetMethod("InstanceAddViaStable", BindingFlags.Public | BindingFlags.Instance);
-            if (addMethod == null || stableMethod == null || addViaStableMethod == null || addPairMethod == null ||
+            if (addMethod == null || stableMethod == null || identityUnchangedMethod == null ||
+                addViaStableMethod == null || addPairMethod == null ||
                 wideMethod == null || touchMethod == null || instanceStableMethod == null ||
                 instanceAddMethod == null || instanceAddViaStableMethod == null)
             {
@@ -215,6 +224,7 @@ namespace HybridCLR.Lab
 
             bool addChanged = RuntimeApi.IsDifferentialMethodChanged(addMethod);
             bool stableChanged = RuntimeApi.IsDifferentialMethodChanged(stableMethod);
+            bool identityUnchangedChanged = RuntimeApi.IsDifferentialMethodChanged(identityUnchangedMethod);
             bool addViaStableChanged = RuntimeApi.IsDifferentialMethodChanged(addViaStableMethod);
             bool addPairChanged = RuntimeApi.IsDifferentialMethodChanged(addPairMethod);
             bool wideChanged = RuntimeApi.IsDifferentialMethodChanged(wideMethod);
@@ -227,6 +237,7 @@ namespace HybridCLR.Lab
             RuntimeApi.ResetDifferentialDispatchCounters();
             int addResult = DheDemoCalculator.Add(1);
             int stableResult = DheDemoCalculator.Stable(2);
+            int identityUnchangedResult = PerformanceWorkload.All.Count;
             int addViaStableResult = DheDemoCalculator.AddViaStable(2);
             int addPairResult = DheDemoCalculator.AddPair(3, 4);
             long wideResult = DheDemoCalculator.Wide(5L);
@@ -259,9 +270,15 @@ namespace HybridCLR.Lab
             int mainInterpreterEntryCount = RuntimeApi.GetDifferentialInterpreterEntryCount();
             int mainAotBridgeCallCount = RuntimeApi.GetDifferentialAotBridgeCallCount();
             int mainAotEntryCount = RuntimeApi.GetDifferentialAotEntryCount();
-            bool structuralExpected = CountAddedTypes(mainLoaded.baseMetaVersion,
-                    mainLoaded.currentMetaVersion) > 0 ||
-                CountAddedMethods(mainLoaded.baseMetaVersion, mainLoaded.currentMetaVersion) > 0;
+            // Keep the full additions fixture gate separate from dispatch
+            // classification. A current payload may remove members or evolve a
+            // type without containing the optional additions fixture; that
+            // still changes Stable dispatch, but must not require reflection
+            // assertions for types that are absent from the payload.
+            bool structuralExpected = HasStructuralAdditions(mainLoaded.baseMetaVersion,
+                mainLoaded.currentMetaVersion);
+            bool structuralDispatchExpected = HasStructuralChanges(mainLoaded.baseMetaVersion,
+                mainLoaded.currentMetaVersion);
             CapabilityDirectRun directCapability = ExecuteCapabilityDirect(structuralExpected);
             CapabilityRun capability = ExecuteCapabilityReflection(structuralExpected);
             StructuralRun structural = ExecuteStructural(mainLoaded.assembly, structuralExpected,
@@ -306,6 +323,10 @@ namespace HybridCLR.Lab
                 mainIdentity != null &&
                 string.Equals(mainIdentity.baselineSha256, ToHex(baselineHash), StringComparison.OrdinalIgnoreCase) &&
                 IsSha256(buildIdentity.baseMetaVersionSetSha256) &&
+                IsSha256(buildIdentity.aotMetadataSetId) &&
+                string.Equals(buildIdentity.aotMetadataSetId,
+                    HybridCLRDheBuildIdentity.AotMetadataSetId,
+                    StringComparison.OrdinalIgnoreCase) &&
                 IsSha256(buildIdentity.nativeGuardSourceSha256) &&
                 IsSha256(buildIdentity.nativeManifestSha256) &&
                 !string.Equals(buildIdentity.nativeManifestSha256, new string('0', 64), StringComparison.Ordinal) &&
@@ -316,6 +337,7 @@ namespace HybridCLR.Lab
             bool noOpMainBehaviorValidated = addResult == 2 && stableResult == 4 &&
                 addViaStableResult == 5 && addPairResult == 8 && wideResult == 6L && touchValue == 12 &&
                 instanceAddResult == 3 && instanceStableResult == 6 && instanceAddViaStableResult == 8 &&
+                identityUnchangedResult == 21 && !identityUnchangedChanged &&
                 !addChanged && !stableChanged && !addViaStableChanged && !addPairChanged && !wideChanged &&
                 !touchChanged && !instanceStableChanged && !instanceAddChanged && !instanceAddViaStableChanged;
             bool noOpMultiAssemblyValidated = loadedAssemblies.Count >= 4 && metadataStressResult > 0 &&
@@ -328,7 +350,7 @@ namespace HybridCLR.Lab
             bool noOpAotBehaviorValidated = changedMethodCount == 0 && noOpMainBehaviorValidated &&
                 noOpMultiAssemblyValidated && noOpCapabilityDirectValidated &&
                 noOpCapabilityReflectionValidated && mainInterpreterEntryCount == 0;
-			bool stableDispatchValidated = structuralExpected
+            bool stableDispatchValidated = structuralDispatchExpected
 				? stableChanged && instanceStableChanged
 				: !stableChanged && !instanceStableChanged;
             bool changedBehaviorValidated = changedMethodCount == 0
@@ -448,6 +470,7 @@ namespace HybridCLR.Lab
                 capabilityVirtualResult = capability.virtualResult,
                 capabilityGenericVirtualResult = capability.genericVirtualResult,
                 structuralExpected = structural.expected,
+                structuralDispatchExpected = structuralDispatchExpected,
                 structuralPassed = structural.passed,
                 structuralError = structural.error,
                 structuralExistingEntryResult = structural.existingEntryResult,
@@ -531,13 +554,14 @@ namespace HybridCLR.Lab
                 resourceUpdateManifestPresent = resourceUpdateManifestPresent,
                 resourceUpdateValidated = initialized,
                 selectedBaseId = runtimeIdentity.BaseId,
+                selectedAotMetadataSetId = runtimeIdentity.AotMetadataSetId,
                 selectedBaseMetaVersionSetSha256 = runtimeIdentity.BaseMetaVersionSetSha256,
                 changedMethodCount = changedMethodCount,
                 expectedChangedMethodCount = changedMethodCount,
                 dispatchProbeValidated = dispatchProbeValidated,
                 noOpAotBehaviorValidated = noOpAotBehaviorValidated,
                 changedProbeChanged = addChanged,
-                unchangedProbeChanged = stableChanged,
+                unchangedProbeChanged = identityUnchangedChanged,
                 dispatchProbeError = dispatchProbeValidated ? null : "DHE changed/unchanged dispatch assertions failed.",
                 transactionStatus = transactionStatus,
                 retryValidated = retryValidated,
@@ -562,7 +586,7 @@ namespace HybridCLR.Lab
                 metadataStressResult = metadataStressResult,
                 crossAssemblyResult = crossAssemblyResult,
                 changedMethod = addChanged ? "interpreter" : "aot",
-                unchangedMethod = stableChanged ? "interpreter" : "aot",
+                unchangedMethod = identityUnchangedChanged ? "interpreter" : "aot",
 				changedCallingUnchangedMethod = addViaStableChanged
 					? stableChanged ? "interpreter + interpreter callee" : "interpreter + AOT callee"
 					: "aot",
@@ -589,7 +613,7 @@ namespace HybridCLR.Lab
                 nativeGuardSourceSha256 = buildIdentity == null ? string.Empty : buildIdentity.nativeGuardSourceSha256,
                 nativeManifestSha256 = buildIdentity == null ? string.Empty : buildIdentity.nativeManifestSha256,
                 changedToken = addMethod.MetadataToken,
-                unchangedToken = stableMethod.MetadataToken,
+                unchangedToken = identityUnchangedMethod.MetadataToken,
                 changedCallingUnchangedToken = addViaStableMethod.MetadataToken,
                 changedMultiArgumentToken = addPairMethod.MetadataToken,
                 changedInt64Token = wideMethod.MetadataToken,
@@ -1491,6 +1515,32 @@ namespace HybridCLR.Lab
             MetaVersionInfo current) => current.methods.Keys.Count(id =>
                 !baseline.methods.ContainsKey(id));
 
+        private static int CountRemovedTypes(MetaVersionInfo baseline,
+            MetaVersionInfo current) => baseline.types.Keys.Count(id =>
+                !current.types.ContainsKey(id));
+
+        private static int CountRemovedMethods(MetaVersionInfo baseline,
+            MetaVersionInfo current) => baseline.methods.Keys.Count(id =>
+                !current.methods.ContainsKey(id));
+
+        private static int CountChangedTypes(MetaVersionInfo baseline,
+            MetaVersionInfo current) => baseline.types.Count(item =>
+                current.types.TryGetValue(item.Key, out string version) &&
+                !string.Equals(item.Value, version, StringComparison.OrdinalIgnoreCase));
+
+        private static bool HasStructuralChanges(MetaVersionInfo baseline,
+            MetaVersionInfo current) =>
+            CountAddedTypes(baseline, current) > 0 ||
+            CountRemovedTypes(baseline, current) > 0 ||
+            CountChangedTypes(baseline, current) > 0 ||
+            CountAddedMethods(baseline, current) > 0 ||
+            CountRemovedMethods(baseline, current) > 0;
+
+        private static bool HasStructuralAdditions(MetaVersionInfo baseline,
+            MetaVersionInfo current) =>
+            CountAddedTypes(baseline, current) > 0 ||
+            CountAddedMethods(baseline, current) > 0;
+
         private static int CountChangedMethods(MetaVersionInfo baseline,
             MetaVersionInfo current)
         {
@@ -1742,6 +1792,7 @@ namespace HybridCLR.Lab
             public string nativeGuardSourceSha256;
             public string nativeManifestSha256;
             public string baseMetaVersionSetSha256;
+            public string aotMetadataSetId;
             public string runtimeProtocol;
             public string runtimeContract;
             public string[] runtimeCapabilities;
@@ -1767,6 +1818,7 @@ namespace HybridCLR.Lab
             public bool resourceUpdateManifestPresent;
             public bool resourceUpdateValidated;
             public string selectedBaseId;
+            public string selectedAotMetadataSetId;
             public string selectedBaseMetaVersionSetSha256;
             public bool passed;
             public string error;
@@ -1866,6 +1918,7 @@ namespace HybridCLR.Lab
             public int capabilityVirtualResult;
             public int capabilityGenericVirtualResult;
             public bool structuralExpected;
+            public bool structuralDispatchExpected;
             public bool structuralPassed;
             public string structuralError;
             public int structuralExistingEntryResult;

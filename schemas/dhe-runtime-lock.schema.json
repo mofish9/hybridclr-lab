@@ -32,7 +32,12 @@
           "applyRoot": { "enum": ["libil2cpp", "package"] },
           "stripComponents": { "type": "integer", "minimum": 0, "maximum": 8 },
           "integratedCommit": { "type": "string", "pattern": "^[0-9a-f]{40}$" },
-          "expectedTreeSha256": { "type": "string", "pattern": "^[0-9A-Fa-f]{64}$" }
+          "expectedTreeSha256": { "type": "string", "pattern": "^[0-9A-Fa-f]{64}$" },
+          "treeHashIgnoredPaths": {
+            "type": "array",
+            "uniqueItems": true,
+            "items": { "type": "string", "minLength": 1 }
+          }
         }
       }
     }

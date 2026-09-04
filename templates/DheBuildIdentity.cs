@@ -12,6 +12,7 @@ namespace __DHE_IDENTITY_NAMESPACE__
         public const string NativeGuardSourceSha256 = "0000000000000000000000000000000000000000000000000000000000000000";
         public const string NativeManifestSha256 = "0000000000000000000000000000000000000000000000000000000000000000";
         public const string BaseMetaVersionSetSha256 = "0000000000000000000000000000000000000000000000000000000000000000";
+        public const string AotMetadataSetId = "0000000000000000000000000000000000000000000000000000000000000000";
         public const string RuntimeProtocol = "";
         public const string RuntimeContract = "";
         public const string RuntimeAssetRoot = "";
@@ -33,6 +34,7 @@ namespace __DHE_IDENTITY_NAMESPACE__
                 NativeGuardSourceSha256 = NativeGuardSourceSha256,
                 NativeManifestSha256 = NativeManifestSha256,
                 BaseMetaVersionSetSha256 = BaseMetaVersionSetSha256,
+                AotMetadataSetId = AotMetadataSetId,
                 RuntimeProtocol = RuntimeProtocol,
                 RuntimeContract = RuntimeContract,
                 RuntimeCapabilities = RuntimeCapabilities,

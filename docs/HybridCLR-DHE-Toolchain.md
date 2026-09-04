@@ -118,7 +118,7 @@ dotnet HybridCLR.DheTool.dll resource-update \
   -BaseRoots C:/release/base-100/dlls,C:/release/base-110/dlls \
   -BaseNativeManifests C:/release/base-100/dhe-native-manifest.json,C:/release/base-110/dhe-native-manifest.json \
   -BaseBuildIdentities C:/release/base-100/build-identity.json,C:/release/base-110/build-identity.json \
-  -AotMetadataRoot C:/build/stripped-aot \
+  -AotMetadataRoots C:/release/base-100/aot-metadata,C:/release/base-110/aot-metadata \
   -SettingsFile C:/project/ProjectSettings/HybridCLRSettings.asset \
   -OutputRoot C:/build/resource-update
 ```
@@ -129,9 +129,12 @@ runtime each Player compares the remote current MetaVersion with its own embedde
 MetaVersion, so different Base versions may produce different changed-method sets from
 the same payload. If any declared Base is incompatible, the command removes
 the publish manifests and fails instead of producing a partial release.
-When supplemental AOT metadata is required, `-AotMetadataRoot` adds the complete
-`patchAOTAssemblies` set to the same payload. Projects that have separately proved a
-no-supplemental-metadata workflow may omit it.
+When supplemental AOT metadata is required, `-AotMetadataRoots` supplies one complete
+`patchAOTAssemblies` root per BaseRoot, in the same order. The command content-addresses
+and deduplicates equal blobs across sets. A root is mandatory whenever
+`patchAOTAssemblies` is non-empty; a no-metadata workflow therefore requires an empty
+patch set and an independently validated project configuration. `-AotMetadataRoot` remains
+available as a shorthand only when every Base intentionally shares one root.
 
 Use `stage-resource-update` from the resource/catalog build to copy this one
 payload. Supply the exact archived Base identity with `-BaseBuildIdentity`; the

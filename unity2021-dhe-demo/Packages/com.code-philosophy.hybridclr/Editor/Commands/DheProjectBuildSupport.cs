@@ -196,9 +196,11 @@ namespace HybridCLR.Editor.Commands
                 File.ReadAllText(runtimePlanPath));
             if (runtimePlan == null || runtimePlan.schemaVersion != 1 ||
                 !string.Equals(runtimePlan.format,
-                    "hybridclr.dhe-runtime-asset-plan.json", StringComparison.Ordinal))
+                    "hybridclr.dhe-runtime-asset-plan.json", StringComparison.Ordinal) ||
+                !IsSha256(runtimePlan.aotMetadataSetId))
                 throw new BuildFailedException(
                     "DHE build identity requires the current runtime plan schema.");
+            ValidateBaseRuntimePlanMetadata(options.ProjectRoot, runtimePlanPath, runtimePlan);
             string runtimeAssetRoot = NormalizeAssetRoot(runtimePlan.runtimeAssetRoot,
                 "runtime asset root");
             string baseMetaVersionAssetRoot = NormalizeAssetRoot(
@@ -217,13 +219,15 @@ namespace HybridCLR.Editor.Commands
                 .Distinct(StringComparer.Ordinal).OrderBy(value => value,
                     StringComparer.Ordinal).ToArray();
             string baseId = ComputeBaseId(options.Target, baselineSetHash, snapshotSetHash,
-                baseMetaVersionSetHash, guard.NativeGuardSourceSha256,
+                baseMetaVersionSetHash, runtimePlan.aotMetadataSetId,
+                guard.NativeGuardSourceSha256,
                 guard.NativeManifestSha256, guard.RuntimeProtocol, guard.RuntimeContract,
                 runtimeCapabilities, runtimeAssetRoot, baseMetaVersionAssetRoot);
             string sourcePath = ResolveProjectAsset(options.ProjectRoot,
                 options.BuildIdentityAssetPath);
             string source = BuildIdentitySource(options, baseId, baselineSetHash,
-                snapshotSetHash, baseMetaVersionSetHash, guard, runtimeCapabilities,
+                snapshotSetHash, baseMetaVersionSetHash, runtimePlan.aotMetadataSetId,
+                guard, runtimeCapabilities,
                 runtimeAssetRoot, baseMetaVersionAssetRoot, assemblyNames,
                 baseMetaVersionHashes.ToArray());
             File.WriteAllText(sourcePath, source, new UTF8Encoding(false));
@@ -249,6 +253,7 @@ namespace HybridCLR.Editor.Commands
                 nativeGuardSourceSha256 = guard.NativeGuardSourceSha256,
                 nativeManifestSha256 = guard.NativeManifestSha256,
                 baseMetaVersionSetSha256 = baseMetaVersionSetHash,
+                aotMetadataSetId = runtimePlan.aotMetadataSetId,
                 runtimeProtocol = guard.RuntimeProtocol,
                 runtimeContract = guard.RuntimeContract,
                 runtimeCapabilities = runtimeCapabilities,
@@ -282,7 +287,8 @@ namespace HybridCLR.Editor.Commands
                     identity.stagedSourceSha256, StringComparison.OrdinalIgnoreCase) ||
                 !string.Equals(identity.baseId, ComputeBaseId(identity.target,
                     identity.managedAssemblySetSha256, identity.aotSnapshotSha256,
-                    identity.baseMetaVersionSetSha256, identity.nativeGuardSourceSha256,
+                    identity.baseMetaVersionSetSha256, identity.aotMetadataSetId,
+                    identity.nativeGuardSourceSha256,
                     identity.nativeManifestSha256, identity.runtimeProtocol,
                     identity.runtimeContract, identity.runtimeCapabilities,
                     identity.runtimeAssetRoot, identity.baseMetaVersionAssetRoot),
@@ -362,7 +368,7 @@ namespace HybridCLR.Editor.Commands
 
         private static string BuildIdentitySource(DheProjectIdentityOptions options,
             string baseId, string managedAssemblySetHash, string snapshotHash,
-            string baseMetaVersionSetHash, DheNativeGuardResult guard,
+            string baseMetaVersionSetHash, string aotMetadataSetId, DheNativeGuardResult guard,
             string[] runtimeCapabilities, string runtimeAssetRoot,
             string baseMetaVersionAssetRoot, string[] assemblyNames,
             string[] baseMetaVersionHashes)
@@ -388,6 +394,8 @@ namespace HybridCLR.Editor.Commands
                 guard.NativeManifestSha256 + "\";\n" +
                 "        public const string BaseMetaVersionSetSha256 = \"" +
                 baseMetaVersionSetHash + "\";\n" +
+                "        public const string AotMetadataSetId = \"" +
+                aotMetadataSetId + "\";\n" +
                 "        public const string RuntimeProtocol = " + Quote(guard.RuntimeProtocol) + ";\n" +
                 "        public const string RuntimeContract = " + Quote(guard.RuntimeContract) + ";\n" +
                 "        public const string RuntimeAssetRoot = " + Quote(runtimeAssetRoot) + ";\n" +
@@ -417,6 +425,7 @@ namespace HybridCLR.Editor.Commands
                 "        public const string NativeGuardSourceSha256 = \"" + ZeroSha256 + "\";\n" +
                 "        public const string NativeManifestSha256 = \"" + ZeroSha256 + "\";\n" +
                 "        public const string BaseMetaVersionSetSha256 = \"" + ZeroSha256 + "\";\n" +
+                "        public const string AotMetadataSetId = \"" + ZeroSha256 + "\";\n" +
                 "        public const string RuntimeProtocol = \"\";\n" +
                 "        public const string RuntimeContract = \"\";\n" +
                 "        public const string RuntimeAssetRoot = \"\";\n" +
@@ -443,6 +452,7 @@ namespace HybridCLR.Editor.Commands
                 "                NativeGuardSourceSha256 = NativeGuardSourceSha256,\n" +
                 "                NativeManifestSha256 = NativeManifestSha256,\n" +
                 "                BaseMetaVersionSetSha256 = BaseMetaVersionSetSha256,\n" +
+                "                AotMetadataSetId = AotMetadataSetId,\n" +
                 "                RuntimeProtocol = RuntimeProtocol,\n" +
                 "                RuntimeContract = RuntimeContract,\n" +
                 "                RuntimeCapabilities = RuntimeCapabilities,\n" +
@@ -528,12 +538,60 @@ namespace HybridCLR.Editor.Commands
             return true;
         }
 
+        private static void ValidateBaseRuntimePlanMetadata(string projectRoot,
+            string runtimePlanPath, BuildIdentityRuntimePlan runtimePlan)
+        {
+            if (!string.Equals(runtimePlan.selection, "embedded-base-metaversion",
+                    StringComparison.Ordinal) ||
+                (runtimePlan.aotMetadataSets != null && runtimePlan.aotMetadataSets.Length != 0) ||
+                (runtimePlan.baseSelections != null && runtimePlan.baseSelections.Length != 0) ||
+                runtimePlan.aotMetadata == null)
+                throw new BuildFailedException(
+                    "DHE Base runtime plan must use embedded-base metadata selection.");
+
+            string runtimeAssetRoot = NormalizeAssetRoot(runtimePlan.runtimeAssetRoot,
+                "runtime asset root");
+            string planDirectory = Path.GetDirectoryName(Path.GetFullPath(runtimePlanPath));
+            planDirectory = RequireProjectChild(projectRoot, planDirectory,
+                "DHE runtime plan directory");
+            var names = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+            var records = new List<KeyValuePair<string, byte[]>>();
+            foreach (BuildIdentityAotMetadata metadata in runtimePlan.aotMetadata)
+            {
+                string name = NormalizeAssemblyName(metadata?.assemblyName);
+                string logicalPath = (metadata?.path ?? string.Empty).Replace('\\', '/');
+                if (metadata == null || string.IsNullOrWhiteSpace(name) || !names.Add(name) ||
+                    !IsSha256(metadata.sha256) || string.IsNullOrWhiteSpace(logicalPath) ||
+                    !logicalPath.StartsWith(runtimeAssetRoot, StringComparison.OrdinalIgnoreCase) ||
+                    logicalPath.Split('/').Any(segment => segment == "." || segment == ".."))
+                    throw new BuildFailedException(
+                        "DHE Base runtime plan contains an invalid AOT metadata record.");
+                // The plan path is a logical catalog locator and may be
+                // produced by YooAsset/Addressables. StageRuntimePlan writes
+                // the physical metadata beside the plan, so hash that file
+                // directly instead of assuming a StreamingAssets layout.
+                string path = Path.Combine(planDirectory, name + ".bytes");
+                byte[] bytes = File.ReadAllBytes(RequireFile(path,
+                    name + " AOT metadata for build identity"));
+                if (!string.Equals(ToHex(Sha256(bytes)), metadata.sha256,
+                        StringComparison.OrdinalIgnoreCase))
+                    throw new BuildFailedException(
+                        "DHE Base runtime plan AOT metadata hash mismatch for " + name + ".");
+                records.Add(new KeyValuePair<string, byte[]>(name, bytes));
+            }
+            if (!string.Equals(Sha256NamedByteSet(records), runtimePlan.aotMetadataSetId,
+                    StringComparison.OrdinalIgnoreCase))
+                throw new BuildFailedException(
+                    "DHE Base runtime plan AOT metadata set identity is invalid.");
+        }
+
         private static string Sha256NamedByteSet(
             IEnumerable<KeyValuePair<string, byte[]>> records)
         {
             using (SHA256 sha = SHA256.Create())
             {
-                foreach (KeyValuePair<string, byte[]> record in records)
+                foreach (KeyValuePair<string, byte[]> record in records.OrderBy(item => item.Key,
+                    StringComparer.Ordinal))
                 {
                     byte[] name = Encoding.UTF8.GetBytes(record.Key + "\n");
                     sha.TransformBlock(name, 0, name.Length, name, 0);
@@ -560,6 +618,7 @@ namespace HybridCLR.Editor.Commands
 
         private static string ComputeBaseId(string target, string managedAssemblySetSha256,
             string aotSnapshotSha256, string baseMetaVersionSetSha256,
+            string aotMetadataSetId,
             string nativeGuardSourceSha256, string nativeManifestSha256,
             string runtimeProtocol, string runtimeContract, IEnumerable<string> runtimeCapabilities,
             string runtimeAssetRoot, string baseMetaVersionAssetRoot)
@@ -576,6 +635,8 @@ namespace HybridCLR.Editor.Commands
                 (aotSnapshotSha256 ?? string.Empty).ToLowerInvariant() + "\n" +
                 "baseMetaVersionSetSha256=" +
                 (baseMetaVersionSetSha256 ?? string.Empty).ToLowerInvariant() + "\n" +
+                "aotMetadataSetId=" +
+                (aotMetadataSetId ?? string.Empty).ToLowerInvariant() + "\n" +
                 "nativeGuardSourceSha256=" +
                 (nativeGuardSourceSha256 ?? string.Empty).ToLowerInvariant() + "\n" +
                 "nativeManifestSha256=" +
@@ -689,6 +750,7 @@ namespace HybridCLR.Editor.Commands
             public string nativeGuardSourceSha256;
             public string nativeManifestSha256;
             public string baseMetaVersionSetSha256;
+            public string aotMetadataSetId;
             public string runtimeProtocol;
             public string runtimeContract;
             public string[] runtimeCapabilities;
@@ -733,6 +795,33 @@ namespace HybridCLR.Editor.Commands
             public string format;
             public string runtimeAssetRoot;
             public string baseMetaVersionAssetRoot;
+            public string selection;
+            public string aotMetadataSetId;
+            public BuildIdentityAotMetadata[] aotMetadata;
+            public BuildIdentityAotMetadataSet[] aotMetadataSets;
+            public BuildIdentityBaseSelection[] baseSelections;
+        }
+
+        [Serializable]
+        private sealed class BuildIdentityAotMetadata
+        {
+            public string assemblyName;
+            public string sha256;
+            public string path;
+        }
+
+        [Serializable]
+        private sealed class BuildIdentityAotMetadataSet
+        {
+            public string aotMetadataSetId;
+            public BuildIdentityAotMetadata[] assemblies;
+        }
+
+        [Serializable]
+        private sealed class BuildIdentityBaseSelection
+        {
+            public string baseId;
+            public string aotMetadataSetId;
         }
     }
 

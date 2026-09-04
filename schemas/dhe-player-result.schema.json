@@ -37,6 +37,8 @@
     "nativeGuardSourceSha256": { "type": ["string", "null"] },
     "nativeManifestSha256": { "type": ["string", "null"] },
     "target": { "type": ["string", "null"], "pattern": "^[A-Za-z0-9._-]+$" },
+    "selectedBaseId": { "type": ["string", "null"], "pattern": "^[0-9a-fA-F]{64}$" },
+    "selectedAotMetadataSetId": { "type": ["string", "null"], "pattern": "^[0-9a-fA-F]{64}$" },
     "expectedChangedMethodCount": { "type": "integer", "minimum": 0 },
     "dispatchProbeValidated": { "type": "boolean" },
     "noOpAotBehaviorValidated": { "type": "boolean" },
@@ -46,6 +48,7 @@
     "interpreterEntryCount": { "type": "integer", "minimum": 0 },
     "aotEntryCount": { "type": "integer", "minimum": 0 },
     "structuralExpected": { "type": "boolean" },
+    "structuralDispatchExpected": { "type": "boolean" },
     "structuralPassed": { "type": "boolean" },
     "structuralError": { "type": ["string", "null"] },
     "structuralExistingEntryResult": { "type": "integer" },
@@ -106,7 +109,7 @@
     {
       "if": { "properties": { "passed": { "const": true } }, "required": ["passed"] },
       "then": {
-        "required": ["loadError", "target", "plannedDheAssemblies", "loadedDheAssemblies", "changedMethodCount", "retryValidated", "retryAssemblyName", "retryFailure", "transactionStatus", "assemblyValidations", "multiAssemblyValidated", "buildIdentityValidated", "identityVersion", "aotSnapshotKind", "nativeGuardSourceSha256", "nativeManifestSha256", "expectedChangedMethodCount", "dispatchProbeValidated", "noOpAotBehaviorValidated", "changedProbeChanged", "unchangedProbeChanged", "interpreterEntryCount", "aotEntryCount"],
+        "required": ["loadError", "target", "plannedDheAssemblies", "loadedDheAssemblies", "changedMethodCount", "retryValidated", "retryAssemblyName", "retryFailure", "transactionStatus", "assemblyValidations", "multiAssemblyValidated", "buildIdentityValidated", "identityVersion", "aotSnapshotKind", "nativeGuardSourceSha256", "nativeManifestSha256", "selectedBaseId", "selectedAotMetadataSetId", "expectedChangedMethodCount", "dispatchProbeValidated", "noOpAotBehaviorValidated", "changedProbeChanged", "unchangedProbeChanged", "interpreterEntryCount", "aotEntryCount"],
         "properties": {
           "loadError": { "const": "OK" },
           "plannedDheAssemblies": { "type": "array", "minItems": 1, "uniqueItems": true },

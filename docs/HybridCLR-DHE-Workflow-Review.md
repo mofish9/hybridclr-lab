@@ -30,7 +30,8 @@ property/event 和既有成员 custom attribute。以下变化仍会在发布资
 
 ## 锁定身份
 
-当前正式 MetaVersion 工作流由以下 integrated 输入组成：
+历史条件发布 `0.1.18` 使用以下 integrated 输入；这些身份和报告只作为审计基线，
+不代表当前候选：
 
 - HybridCLR runtime commit `f777ed7` / annotated tag `v8.13.0-opt4.1`；
 - Unity 2021、Unity 2022、团结 2022 的 il2cpp_plus commit 分别为 `b3fdf1e`、
@@ -44,6 +45,12 @@ property/event 和既有成员 custom attribute。以下变化仍会在发布资
 Release preflight 会实时重算上述身份。dirty、mixed SVN revision、surrogate headers、错误
 Editor 版本、integrated commit/tree、审计 patch hash、目标引擎不匹配、未登记 package 文件或
 runtime tree 漂移都会失败。integrated 模式只校验源码，不再应用 overlay。
+
+当前 `0.1.19` 候选的锁已经更新为：HybridCLR `71cf142da1c00fc2a690e0063da14866f678d57c`、
+HybridCLR Unity package `442857ba695acb54c27299c7dc8bde9d437eba65`，以及同一三引擎
+`il2cpp_plus` opt4.1 维护线。候选尚未创建新的 runtime tag、尚未推送，也不能作为
+Release package 使用；以 `manifests/dhe-runtime-lock.json`、`dhe-package-lock.json` 和
+`repo-lock.json` 中的完整 commit/tree/hash 为准。
 
 ## 标准工作流
 
@@ -68,7 +75,7 @@ runtime tree 漂移都会失败。integrated 模式只校验源码，不再应�
    文件 SHA 后精确命中一个 `supportedBases` 记录，再证明 Player、GameAssembly 及 Player
    内置 Base MetaVersion 的 hash 未变化。MetaVersion 集合相同但 runtime/native 身份不同的
    Player 不会再被误判为歧义。
-   `resource-update-plan-integrity-v1` 和可选的
+   `resource-update-plan-integrity-v1`、`stable-method-identity-v1`、`resource-update-aot-metadata-set-selection-v1` 和可选的
    `resource-update-aot-metadata-path-v1` 必须参与 capability/baseId；旧 Player 缺少任一必要
    能力时整个 Base 记录不兼容。
 6. Player smoke 验证程序集集合、payload hash、changed/interpreter 路径、仍保留的 AOT

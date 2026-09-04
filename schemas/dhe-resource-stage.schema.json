@@ -4,7 +4,7 @@
   "title": "HybridCLR DHE Resource Stage",
   "type": "object",
   "additionalProperties": true,
-  "required": ["schemaVersion", "format", "generatedAtUtc", "passed", "updateRoot", "assetRoot", "payloadModel", "currentAssemblySetSha256", "stagedPlanPath", "stagedPlanSha256", "stagedManifestPath", "stagedValidationPath", "embeddedBaseRoot", "selectedBaseId", "baseBuildIdentityPath", "baseBuildIdentitySha256", "baseMetaVersionSetSha256", "baseMetaVersionTreeSha256Before", "baseMetaVersionTreeSha256After", "baseMetaVersionUnchanged", "stagedFiles", "immutableFiles"],
+  "required": ["schemaVersion", "format", "generatedAtUtc", "passed", "updateRoot", "assetRoot", "payloadModel", "currentAssemblySetSha256", "stagedPlanPath", "stagedPlanSha256", "stagedManifestPath", "stagedValidationPath", "embeddedBaseRoot", "selectedBaseId", "selectedAotMetadataSetId", "baseBuildIdentityPath", "baseBuildIdentitySha256", "baseMetaVersionSetSha256", "baseMetaVersionTreeSha256Before", "baseMetaVersionTreeSha256After", "baseMetaVersionUnchanged", "stagedFiles", "immutableFiles"],
   "properties": {
     "schemaVersion": { "const": 1 },
     "format": { "const": "hybridclr.dhe-resource-stage.json" },
@@ -20,6 +20,7 @@
     "stagedValidationPath": { "type": "string", "minLength": 1 },
     "embeddedBaseRoot": { "type": "string", "minLength": 1 },
     "selectedBaseId": { "type": "string", "pattern": "^[0-9a-fA-F]{64}$" },
+    "selectedAotMetadataSetId": { "type": "string", "pattern": "^[0-9a-fA-F]{64}$" },
     "baseBuildIdentityPath": { "type": "string", "minLength": 1 },
     "baseBuildIdentitySha256": { "type": "string", "pattern": "^[0-9a-fA-F]{64}$" },
     "baseMetaVersionSetSha256": { "type": "string", "pattern": "^[0-9a-fA-F]{64}$" },

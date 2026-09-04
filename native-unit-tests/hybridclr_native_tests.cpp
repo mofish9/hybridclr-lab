@@ -564,6 +564,16 @@ namespace
         MethodInfo unchanged{};
         unchanged.klass = klass;
         unchanged.token = 0x06000003;
+        // The current image is allowed to assign different method tokens. In
+        // particular, exercise both directions of a token collision: a
+        // changed current method carries the unchanged Base token, while an
+        // unchanged current method carries the changed Base token.
+        MethodInfo reorderedCurrentChanged{};
+        reorderedCurrentChanged.klass = klass;
+        reorderedCurrentChanged.token = unchanged.token;
+        MethodInfo reorderedCurrentUnchanged{};
+        reorderedCurrentUnchanged.klass = klass;
+        reorderedCurrentUnchanged.token = changed.token;
         changed.methodPointerCallByInterp = reinterpret_cast<Il2CppMethodPointer>(InterpreterProbeMethod);
         unchanged.methodPointerCallByInterp = reinterpret_cast<Il2CppMethodPointer>(InterpreterProbeMethod);
 		const MethodInfo* resolverMethods[] = { &changed, &unchanged };
@@ -592,13 +602,19 @@ namespace
 		baseMethod.flags = 8;
 		hybridclr::dhe::MetaVersionMethod currentMethod = baseMethod;
 		currentMethod.version.fill(5);
-		baseMetaVersion.methods.push_back(baseMethod);
-		currentMetaVersion.methods.push_back(currentMethod);
-		CHECK(hybridclr::dhe::PrepareAndRegisterMetaVersion(&assembly,
-			baseMetaVersion, currentMetaVersion));
+        baseMetaVersion.methods.push_back(baseMethod);
+        currentMetaVersion.methods.push_back(currentMethod);
+        CHECK(hybridclr::dhe::RegisterLogicalMethodMapping(&assembly,
+            &reorderedCurrentChanged, &changed));
+        CHECK(hybridclr::dhe::RegisterLogicalMethodMapping(&assembly,
+            &reorderedCurrentUnchanged, &unchanged));
+        CHECK(hybridclr::dhe::PrepareAndRegisterMetaVersion(&assembly,
+            baseMetaVersion, currentMetaVersion));
 		CHECK(changed.isInterpterImpl);
 		CHECK(hybridclr::dhe::IsDheAssembly(&assembly));
-		CHECK(hybridclr::dhe::IsChangedMethod(&changed));
+        CHECK(hybridclr::dhe::IsChangedMethod(&changed));
+        CHECK(hybridclr::dhe::IsChangedMethod(&reorderedCurrentChanged));
+        CHECK(!hybridclr::dhe::IsChangedMethod(&reorderedCurrentUnchanged));
 		CHECK(!hybridclr::dhe::PrepareAndRegisterMetaVersion(&assembly,
 			baseMetaVersion, currentMetaVersion));
         CHECK(!hybridclr::dhe::IsChangedMethod(&unchanged));

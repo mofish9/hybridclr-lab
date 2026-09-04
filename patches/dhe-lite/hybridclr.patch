@@ -1,5 +1,5 @@
 diff --git a/hybridclr/DheRuntime.cpp b/hybridclr/DheRuntime.cpp
-index 7103ed2..f57de23 100644
+index 7103ed2..74d76a8 100644
 --- a/hybridclr/DheRuntime.cpp
 +++ b/hybridclr/DheRuntime.cpp
 @@ -18,6 +18,7 @@
@@ -10,7 +10,7 @@ index 7103ed2..f57de23 100644
  #include "vm/Exception.h"
  #include "Il2CppCompatibleDef.h"
  
-@@ -25,14 +26,19 @@ namespace hybridclr::dhe
+@@ -25,14 +26,22 @@ namespace hybridclr::dhe
  {
  namespace
  {
@@ -29,10 +29,25 @@ index 7103ed2..f57de23 100644
 +		std::unordered_set<uint32_t> removedTypeTokens;
          std::unordered_map<uint32_t, const MethodInfo*> resolvedMethods;
 +        std::unordered_map<uint32_t, const MethodInfo*> baseMethods;
++        // Both Base and current-image MethodInfo pointers are normalized to
++        // the immutable Base method token before the changed set is queried.
++        std::unordered_map<const MethodInfo*, uint32_t> methodBaseTokens;
      };
  
      struct PublishedState
-@@ -154,6 +160,22 @@ namespace
+@@ -46,6 +55,11 @@ namespace
+     std::recursive_mutex s_registrationMutex;
+     const PublishedState* s_emptyState = new PublishedState();
+     std::atomic<const PublishedState*> s_publishedState{ s_emptyState };
++    // SUPERSET creates the current MethodInfo objects before DHE receives the
++    // MetaVersion pair. Keep these mappings until the registration snapshot
++    // copies them into its lock-free dispatch state.
++    std::unordered_map<const Il2CppAssembly*,
++        std::unordered_map<const MethodInfo*, const MethodInfo*>> s_logicalMethodMappings;
+     std::atomic<int32_t> s_interpreterEntryCount{ 0 };
+     std::atomic<int32_t> s_aotBridgeCallCount{ 0 };
+     std::atomic<int32_t> s_aotEntryCount{ 0 };
+@@ -154,6 +168,22 @@ namespace
          offset += sizeof(value);
          return true;
      }
@@ -55,7 +70,7 @@ index 7103ed2..f57de23 100644
  }
  
  bool ComputeSha256(const void* data, uint32_t size, Sha256Digest& result)
-@@ -206,37 +228,28 @@ bool ParseMetaVersion(const void* data, uint32_t size, MetaVersionData& result)
+@@ -206,37 +236,28 @@ bool ParseMetaVersion(const void* data, uint32_t size, MetaVersionData& result)
      size_t offset = kMetaVersionMagicSize;
      uint32_t schemaVersion = 0;
      uint32_t assemblyNameSize = 0;
@@ -73,17 +88,17 @@ index 7103ed2..f57de23 100644
      }
      if (schemaVersion != kMetaVersionSchema || assemblyNameSize == 0 || assemblyNameSize > 1024 ||
 -        (result.flags & ~kMetaVersionKnownFlags) != 0)
+-    {
+-        return false;
+-    }
+-
+-    // The first format stores 32 bytes each for baseline/current SHA-256.
+-    if (size - offset < 64 || size - offset - 64 < assemblyNameSize)
 +        (result.flags & ~kMetaVersionKnownFlags) != 0 ||
 +        typeCount > (size - offset) / kMetaVersionTypeSize)
      {
          return false;
      }
--
--    // The first format stores 32 bytes each for baseline/current SHA-256.
--    if (size - offset < 64 || size - offset - 64 < assemblyNameSize)
--    {
--        return false;
--    }
 -    std::memcpy(result.baselineAssemblyHash.data(), bytes + offset, kSha256DigestSize);
 -    std::memcpy(result.currentAssemblyHash.data(), bytes + offset + kSha256DigestSize, kSha256DigestSize);
 -    offset += 64;
@@ -104,7 +119,7 @@ index 7103ed2..f57de23 100644
      {
          return false;
      }
-@@ -249,17 +262,48 @@ bool ParseMetaVersion(const void* data, uint32_t size, MetaVersionData& result)
+@@ -249,17 +270,48 @@ bool ParseMetaVersion(const void* data, uint32_t size, MetaVersionData& result)
      }
      offset += assemblyNameSize;
  
@@ -115,7 +130,9 @@ index 7103ed2..f57de23 100644
 +    std::unordered_set<uint32_t> typeTokens;
 +    result.types.reserve(typeCount);
 +    for (uint32_t index = 0; index < typeCount; ++index)
-+    {
+     {
+-        uint32_t token = 0;
+-        if (!ReadU32(bytes, size, offset, token) || token == 0 || !uniqueTokens.insert(token).second)
 +        MetaVersionType type;
 +        if (!ReadDigest(bytes, size, offset, type.stableId) ||
 +            !ReadDigest(bytes, size, offset, type.version) ||
@@ -125,10 +142,11 @@ index 7103ed2..f57de23 100644
 +            (type.flags & ~kMetaVersionKnownTypeFlags) != 0 ||
 +            !typeIds.insert(DigestKey(type.stableId)).second ||
 +            !typeTokens.insert(type.token).second)
-+        {
-+            result = MetaVersionData{};
-+            return false;
-+        }
+         {
+             result = MetaVersionData{};
+             return false;
+         }
+-        result.changedMethodTokens.push_back(token);
 +        result.types.push_back(type);
 +    }
 +
@@ -136,9 +154,7 @@ index 7103ed2..f57de23 100644
 +    std::unordered_set<uint32_t> methodTokens;
 +    result.methods.reserve(methodCount);
 +    for (uint32_t index = 0; index < methodCount; ++index)
-     {
--        uint32_t token = 0;
--        if (!ReadU32(bytes, size, offset, token) || token == 0 || !uniqueTokens.insert(token).second)
++    {
 +        MetaVersionMethod method;
 +        if (!ReadDigest(bytes, size, offset, method.stableId) ||
 +            !ReadDigest(bytes, size, offset, method.version) ||
@@ -150,37 +166,44 @@ index 7103ed2..f57de23 100644
 +            typeIds.find(DigestKey(method.declaringTypeStableId)) == typeIds.end() ||
 +            !methodIds.insert(DigestKey(method.stableId)).second ||
 +            !methodTokens.insert(method.token).second)
-         {
-             result = MetaVersionData{};
-             return false;
-         }
--        result.changedMethodTokens.push_back(token);
++        {
++            result = MetaVersionData{};
++            return false;
++        }
 +        result.methods.push_back(method);
      }
      return offset == size;
  }
-@@ -369,48 +413,6 @@ bool ParseMetaVersion(const void* data, uint32_t size, MetaVersionData& result)
+@@ -369,58 +421,34 @@ bool ParseMetaVersion(const void* data, uint32_t size, MetaVersionData& result)
          }
      }
  
 -bool RegisterChangedMethods(const Il2CppAssembly* assembly,
 -    const std::vector<uint32_t>& changedMethodTokens,
 -    const std::vector<const MethodInfo*>& resolvedMethods)
--{
--    if (!assembly)
--    {
--        return false;
--    }
++bool IsDheAssembly(const Il2CppAssembly* assembly)
+ {
+     if (!assembly)
+     {
+         return false;
+     }
 -    if (resolvedMethods.size() != changedMethodTokens.size())
 -    {
 -        return false;
 -    }
--
++    const PublishedState* state = s_publishedState.load(std::memory_order_acquire);
++    return state->assemblyStates.find(assembly) != state->assemblyStates.end();
++}
+ 
 -    DHEAssemblyState state;
 -    state.changedMethodTokens.reserve(changedMethodTokens.size());
 -    state.resolvedMethods.reserve(resolvedMethods.size());
 -    for (size_t index = 0; index < changedMethodTokens.size(); ++index)
--    {
++bool RegisterLogicalMethodMapping(const Il2CppAssembly* assembly,
++    const MethodInfo* currentMethod, const MethodInfo* baseMethod)
++{
++    if (!assembly || !currentMethod || !baseMethod || currentMethod == baseMethod)
+     {
 -        const uint32_t token = changedMethodTokens[index];
 -        if (token == 0)
 -        {
@@ -191,24 +214,39 @@ index 7103ed2..f57de23 100644
 -            return false;
 -        }
 -        state.resolvedMethods.emplace(token, resolvedMethods[index]);
--    }
++        return false;
+     }
 -
--    std::lock_guard<std::recursive_mutex> lock(s_registrationMutex);
+     std::lock_guard<std::recursive_mutex> lock(s_registrationMutex);
 -    const PublishedState* current = s_publishedState.load(std::memory_order_acquire);
 -    if (current->assemblyStates.find(assembly) != current->assemblyStates.end())
--    {
--        return false;
--    }
++    auto& mappings = s_logicalMethodMappings[assembly];
++    auto existing = mappings.find(currentMethod);
++    if (existing != mappings.end() && existing->second != baseMethod)
+     {
+         return false;
+     }
 -    std::unique_ptr<PublishedState> next(new PublishedState(*current));
 -    next->assemblyStates.emplace(assembly, std::move(state));
 -    s_publishedState.store(next.release(), std::memory_order_release);
--    return true;
++    mappings[currentMethod] = baseMethod;
+     return true;
+ }
+ 
+-bool IsDheAssembly(const Il2CppAssembly* assembly)
+-{
+-    if (!assembly)
+-    {
+-        return false;
+-    }
+-    const PublishedState* state = s_publishedState.load(std::memory_order_acquire);
+-    return state->assemblyStates.find(assembly) != state->assemblyStates.end();
 -}
 -
- bool IsDheAssembly(const Il2CppAssembly* assembly)
+ bool IsChangedMethod(const MethodInfo* method)
  {
-     if (!assembly)
-@@ -433,8 +435,56 @@ bool IsChangedMethod(const MethodInfo* method)
+     if (!method || !method->klass || !method->klass->image || !method->klass->image->assembly)
+@@ -433,8 +461,64 @@ bool IsChangedMethod(const MethodInfo* method)
      {
          return false;
      }
@@ -218,10 +256,13 @@ index 7103ed2..f57de23 100644
 +        method->genericMethod->methodDefinition
 +        ? method->genericMethod->methodDefinition
 +        : method;
-+    const uint32_t token = definition->token;
-+    auto baseMethod = state->second.baseMethods.find(token);
-+    return baseMethod != state->second.baseMethods.end() &&
-+        baseMethod->second == definition &&
++    auto identity = state->second.methodBaseTokens.find(definition);
++    if (identity == state->second.methodBaseTokens.end())
++    {
++        return false;
++    }
++    const uint32_t token = identity->second;
++    return state->second.baseMethods.find(token) != state->second.baseMethods.end() &&
 +        state->second.changedMethodTokens.find(token) !=
 +            state->second.changedMethodTokens.end();
 +}
@@ -243,8 +284,13 @@ index 7103ed2..f57de23 100644
 +		method->genericMethod->methodDefinition
 +		? method->genericMethod->methodDefinition
 +		: method;
-+	const uint32_t token = definition->token;
-+	auto baseMethod = state->second.baseMethods.find(token);
++    auto identity = state->second.methodBaseTokens.find(definition);
++    if (identity == state->second.methodBaseTokens.end())
++    {
++        return false;
++    }
++    const uint32_t token = identity->second;
++    auto baseMethod = state->second.baseMethods.find(token);
 +	if (baseMethod == state->second.baseMethods.end() || baseMethod->second != definition)
 +	{
 +		return false;
@@ -267,7 +313,7 @@ index 7103ed2..f57de23 100644
  }
  
  bool ShouldDispatchToInterpreter(const MethodInfo* method)
-@@ -444,28 +494,12 @@ bool ShouldDispatchToInterpreter(const MethodInfo* method)
+@@ -444,28 +528,12 @@ bool ShouldDispatchToInterpreter(const MethodInfo* method)
      return IsChangedMethod(method);
  }
  
@@ -275,16 +321,16 @@ index 7103ed2..f57de23 100644
 +static const MethodInfo* ResolveMethodInAssembly(const Il2CppAssembly* assembly, uint32_t token)
  {
 -    if (!assemblyName || assemblyName[0] == '\0' || token == 0)
+-    {
+-        return nullptr;
+-    }
+-
+-    const Il2CppAssembly* assembly = il2cpp::vm::MetadataCache::GetAssemblyByName(assemblyName);
+-    if (!assembly)
 +    if (!assembly || token == 0)
      {
          return nullptr;
      }
--
--    const Il2CppAssembly* assembly = il2cpp::vm::MetadataCache::GetAssemblyByName(assemblyName);
--    if (!assembly)
--    {
--        return nullptr;
--    }
 -    const PublishedState* published = s_publishedState.load(std::memory_order_acquire);
 -    auto assemblyState = published->assemblyStates.find(assembly);
 -    if (assemblyState != published->assemblyStates.end())
@@ -298,7 +344,7 @@ index 7103ed2..f57de23 100644
      const Il2CppImage* image = il2cpp::vm::Assembly::GetImage(assembly);
      if (!image)
      {
-@@ -494,6 +528,70 @@ const MethodInfo* ResolveMethodByToken(const char* assemblyName, uint32_t token)
+@@ -494,6 +562,78 @@ const MethodInfo* ResolveMethodByToken(const char* assemblyName, uint32_t token)
      return nullptr;
  }
  
@@ -336,14 +382,22 @@ index 7103ed2..f57de23 100644
 +        baseMethod->genericMethod->methodDefinition
 +        ? baseMethod->genericMethod->methodDefinition
 +        : baseMethod;
-+    const uint32_t token = baseDefinition->token;
 +    const PublishedState* published = s_publishedState.load(std::memory_order_acquire);
 +    auto state = published->assemblyStates.find(baseMethod->klass->image->assembly);
-+    if (state == published->assemblyStates.end() ||
-+        state->second.changedMethodTokens.find(token) == state->second.changedMethodTokens.end())
++    if (state == published->assemblyStates.end())
 +    {
 +        return baseMethod;
 +    }
++	auto identity = state->second.methodBaseTokens.find(baseDefinition);
++	if (identity == state->second.methodBaseTokens.end())
++	{
++		return baseMethod;
++	}
++	const uint32_t token = identity->second;
++	if (state->second.changedMethodTokens.find(token) == state->second.changedMethodTokens.end())
++	{
++		return baseMethod;
++	}
 +	auto registeredBaseMethod = state->second.baseMethods.find(token);
 +	if (registeredBaseMethod == state->second.baseMethods.end() ||
 +		registeredBaseMethod->second != baseDefinition)
@@ -369,7 +423,7 @@ index 7103ed2..f57de23 100644
  const MethodInfo* ResolveMethodByNameAndToken(const char* assemblyName,
      const char* declaringType, const char* methodName, uint32_t parameterCount, uint32_t token)
  {
-@@ -524,43 +622,36 @@ const MethodInfo* ResolveMethodByNameAndToken(const char* assemblyName,
+@@ -524,43 +664,36 @@ const MethodInfo* ResolveMethodByNameAndToken(const char* assemblyName,
      return method && method->token == token ? method : nullptr;
  }
  
@@ -433,7 +487,7 @@ index 7103ed2..f57de23 100644
              return false;
          }
  
-@@ -581,8 +672,6 @@ bool PrepareChangedMethods(const Il2CppAssembly* assembly,
+@@ -581,8 +714,6 @@ bool PrepareChangedMethods(const Il2CppAssembly* assembly,
              hybridclr::InitAndGetInterpreterDirectlyCallMethodPointer(method);
          if (!interpreterPointer)
          {
@@ -442,7 +496,7 @@ index 7103ed2..f57de23 100644
              return false;
          }
          // The direct-call pointer can have been initialized by an earlier
-@@ -590,31 +679,196 @@ bool PrepareChangedMethods(const Il2CppAssembly* assembly,
+@@ -590,31 +721,228 @@ bool PrepareChangedMethods(const Il2CppAssembly* assembly,
          // token, so make the interpreter implementation bit explicit.
          const_cast<MethodInfo*>(method)->isInterpterImpl = true;
      }
@@ -480,7 +534,7 @@ index 7103ed2..f57de23 100644
 +            return false;
          }
 +        resolvedMethods.push_back(method);
-+    }
+     }
 +
 +    std::vector<MethodPreparationSnapshot> snapshots;
 +    snapshots.reserve(resolvedMethods.size());
@@ -489,7 +543,7 @@ index 7103ed2..f57de23 100644
 +        RollbackMethodPreparations(snapshots);
 +        resolvedMethods.clear();
 +        return false;
-     }
++    }
 +    CommitMethodPreparations(snapshots);
      return true;
  }
@@ -571,6 +625,32 @@ index 7103ed2..f57de23 100644
 +
 +        PendingMetaVersionRegistration plan;
 +        plan.baseAssembly = registration.baseAssembly;
++
++        auto logicalMappings = s_logicalMethodMappings.find(registration.baseAssembly);
++        if (logicalMappings != s_logicalMethodMappings.end())
++        {
++            plan.state.methodBaseTokens.reserve(logicalMappings->second.size() * 2);
++            for (const auto& mapping : logicalMappings->second)
++            {
++                if (!mapping.first || !mapping.second || mapping.second->token == 0)
++                {
++                    return false;
++                }
++                const uint32_t baseToken = mapping.second->token;
++                auto currentIdentity = plan.state.methodBaseTokens.emplace(
++                    mapping.first, baseToken);
++                if (!currentIdentity.second && currentIdentity.first->second != baseToken)
++                {
++                    return false;
++                }
++                auto baseIdentity = plan.state.methodBaseTokens.emplace(
++                    mapping.second, baseToken);
++                if (!baseIdentity.second && baseIdentity.first->second != baseToken)
++                {
++                    return false;
++                }
++            }
++        }
 +        for (const MetaVersionType& baseType : baseMetaVersion.types)
 +        {
 +            if (currentTypes.find(DigestKey(baseType.stableId)) == currentTypes.end())
@@ -603,6 +683,12 @@ index 7103ed2..f57de23 100644
 +            }
 +            plan.state.changedMethodTokens.insert(baseMethodVersion.token);
 +            plan.state.baseMethods.emplace(baseMethodVersion.token, baseMethod);
++            auto baseIdentity = plan.state.methodBaseTokens.emplace(
++                baseMethod, baseMethodVersion.token);
++            if (!baseIdentity.second && baseIdentity.first->second != baseMethodVersion.token)
++            {
++                return false;
++            }
 +            if (!currentMethodVersion)
 +            {
 +                plan.state.resolvedMethods.emplace(baseMethodVersion.token, nullptr);
@@ -651,11 +737,19 @@ index 7103ed2..f57de23 100644
  }
  
  int32_t ExecuteInterpreterI4I4(const MethodInfo* method, int32_t value)
+@@ -867,6 +1195,7 @@ void ResetForTests()
+ {
+     std::lock_guard<std::recursive_mutex> lock(s_registrationMutex);
+     s_publishedState.store(new PublishedState(), std::memory_order_release);
++    s_logicalMethodMappings.clear();
+     ResetDispatchCounters();
+ }
+ }
 diff --git a/hybridclr/DheRuntime.h b/hybridclr/DheRuntime.h
-index e143176..46b5f9d 100644
+index e143176..23a52e9 100644
 --- a/hybridclr/DheRuntime.h
 +++ b/hybridclr/DheRuntime.h
-@@ -6,43 +6,73 @@
+@@ -6,43 +6,79 @@
  #include <vector>
  
  struct Il2CppAssembly;
@@ -726,6 +820,12 @@ index e143176..46b5f9d 100644
          std::vector<const MethodInfo*>& resolvedMethods);
 -    bool PrepareAndRegisterChangedMethods(const Il2CppAssembly* assembly,
 -        const std::vector<uint32_t>& changedMethodTokens);
++    // SUPERSET metadata keeps a current-image MethodInfo for reflection and a
++    // logical Base MethodInfo for execution. Register that relationship while
++    // the image is built so DHE dispatch can identify methods without relying
++    // on current metadata tokens (which may be reordered).
++    bool RegisterLogicalMethodMapping(const Il2CppAssembly* assembly,
++        const MethodInfo* currentMethod, const MethodInfo* baseMethod);
 +    bool PrepareAndRegisterMetaVersion(const Il2CppAssembly* baseAssembly,
 +        const MetaVersionData& baseMetaVersion, const MetaVersionData& currentMetaVersion);
 +    // Resolve and prepare every assembly first, then publish the complete set
@@ -740,7 +840,7 @@ index e143176..46b5f9d 100644
  
      // Called by generated AOT entry guards to select changed methods without
      // replacing the AOT method pointer used by unchanged methods.
-@@ -54,6 +84,7 @@ namespace hybridclr::dhe
+@@ -54,6 +90,7 @@ namespace hybridclr::dhe
      const MethodInfo* ResolveMethodByToken(const char* assemblyName, uint32_t token);
      const MethodInfo* ResolveMethodByNameAndToken(const char* assemblyName,
          const char* declaringType, const char* methodName, uint32_t parameterCount, uint32_t token);
@@ -2272,7 +2372,7 @@ index 4989130..915e300 100644
  		static bool HasAttribute(const Il2CppImage* image, uint32_t token, Il2CppClass* attribute)
  		{
 diff --git a/hybridclr/metadata/SuperSetAOTHomologousImage.cpp b/hybridclr/metadata/SuperSetAOTHomologousImage.cpp
-index 3682882..52719ef 100644
+index 3682882..ff4f1e0 100644
 --- a/hybridclr/metadata/SuperSetAOTHomologousImage.cpp
 +++ b/hybridclr/metadata/SuperSetAOTHomologousImage.cpp
 @@ -8,6 +8,8 @@
@@ -2366,7 +2466,7 @@ index 3682882..52719ef 100644
  			}
  		}
  	}
-@@ -197,23 +246,47 @@ namespace metadata
+@@ -197,23 +246,53 @@ namespace metadata
  			{
  				SuperSetMethodDefDetail& method = _methodDefs[i - 1];
  				TbMethod data = _rawImage->ReadMethod(i);
@@ -2422,10 +2522,16 @@ index 3682882..52719ef 100644
 +				if (currentMethod && logicalMethod)
 +				{
 +					_logicalMethods[currentMethod] = logicalMethod;
++					if (!dhe::RegisterLogicalMethodMapping(_targetAssembly,
++						currentMethod, logicalMethod))
++					{
++						RaiseExecutionEngineException(
++							"DHE logical method identity registration failed.");
++					}
  				}
  			}
  		}
-@@ -264,23 +337,162 @@ namespace metadata
+@@ -264,23 +343,162 @@ namespace metadata
  
  				//field.declaringTypeDef = type.aotTypeDef;
  				field.declaringIl2CppType = type.aotIl2CppType;
@@ -2599,7 +2705,7 @@ index 3682882..52719ef 100644
  			}
  		}
  	}
-@@ -293,6 +505,10 @@ namespace metadata
+@@ -293,6 +511,10 @@ namespace metadata
  			return nullptr;
  		}
  		SuperSetMethodDefDetail* method = it->second;
@@ -2610,7 +2716,7 @@ index 3682882..52719ef 100644
  		uint32_t rowIndex = (uint32_t)(method - &_methodDefs[0] + 1);
  		TbMethod methodData = _rawImage->ReadMethod(rowIndex);
  		MethodBody* body = new (HYBRIDCLR_MALLOC_ZERO(sizeof(MethodBody))) MethodBody();
-@@ -402,6 +618,302 @@ namespace metadata
+@@ -402,6 +624,302 @@ namespace metadata
  		}
  		}
  	}

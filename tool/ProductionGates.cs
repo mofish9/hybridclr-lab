@@ -284,6 +284,7 @@ internal static partial class Program
             var sourcePath = GetString(source, "path");
             var commit = GetString(source, "commit");
             var treeHash = GetString(source, "treeSha256");
+            var ignoredPaths = ReadStringArray(source, "treeHashIgnoredPaths");
             var treeRoot = string.IsNullOrWhiteSpace(sourcePath) ? "" : name switch
             {
                 "hybridclr" => Path.Combine(sourcePath, "hybridclr"),
@@ -295,7 +296,8 @@ internal static partial class Program
                 !string.Equals(GitValue(sourcePath, "rev-parse", "HEAD"), commit, StringComparison.OrdinalIgnoreCase) ||
                 !string.IsNullOrWhiteSpace(GitValue(sourcePath, "status", "--porcelain")) ||
                 !Directory.Exists(treeRoot) || !LabCommands.CanonicalSourceTreeHash(treeRoot,
-                    name == "hybridclr_unity").Equals(treeHash, StringComparison.OrdinalIgnoreCase)))
+                    name == "hybridclr_unity", ignoredPaths).Equals(treeHash,
+                    StringComparison.OrdinalIgnoreCase)))
             {
                 errors.Add("Runtime source identity cannot be reproduced: " + name);
                 valid = false;
@@ -805,6 +807,7 @@ internal static partial class Program
         string[] requiredCapabilities =
         {
             "aot-guard-v1",
+            "stable-method-identity-v1",
             "single-current-multibase-v1",
             "supplemental-existing-type-instance-fields-v1",
         };
@@ -818,7 +821,7 @@ internal static partial class Program
             "runtime-contract-capability-negotiation", v1Compatible && v2Compatible,
             "different runtime build contracts under protocol v1 must be accepted by capability subset");
         string[] missingCapability = ResourceUpdateCompatibility.KnownRuntimeCapabilities
-            .Where(value => value != "supplemental-existing-type-instance-fields-v1").ToArray();
+            .Where(value => value != "stable-method-identity-v1").ToArray();
         AddRegressionCheck(checks, errors, "runtime-capability-missing-rejected",
             !ResourceUpdateCompatibility.CanExecuteUpdate(
                 ResourceUpdateCompatibility.RuntimeProtocol, "dhe-runtime-v0",
@@ -827,18 +830,62 @@ internal static partial class Program
         string identityHash = new string('a', 64);
         string baseIdV1 = ComputeBaseId("StandaloneWindows64", identityHash,
             new string('b', 64), new string('c', 64), new string('d', 64),
-            new string('e', 64), ResourceUpdateCompatibility.RuntimeProtocol,
+            new string('e', 64), new string('f', 64), ResourceUpdateCompatibility.RuntimeProtocol,
             "dhe-runtime-v1", requiredCapabilities,
             "HybridCLRLab/DheDemo/", "HybridCLRLab/DheDemo/BaseMetaVersion/");
         string baseIdV2 = ComputeBaseId("StandaloneWindows64", identityHash,
             new string('b', 64), new string('c', 64), new string('d', 64),
-            new string('e', 64), ResourceUpdateCompatibility.RuntimeProtocol,
+            new string('e', 64), new string('f', 64), ResourceUpdateCompatibility.RuntimeProtocol,
             "dhe-runtime-v2", requiredCapabilities,
             "HybridCLRLab/DheDemo/", "HybridCLRLab/DheDemo/BaseMetaVersion/");
         AddRegressionCheck(checks, errors, "composite-base-id-runtime-bound",
             IsHex(baseIdV1, 64, 64) && IsHex(baseIdV2, 64, 64) &&
             !string.Equals(baseIdV1, baseIdV2, StringComparison.OrdinalIgnoreCase),
             "Base ID must distinguish runtime contracts even for identical managed assemblies");
+
+        var metadataOne = Encoding.UTF8.GetBytes("metadata-one");
+        var metadataTwo = Encoding.UTF8.GetBytes("metadata-two");
+        var metadataSetA = new[]
+        {
+            new KeyValuePair<string, byte[]>("System", metadataOne),
+            new KeyValuePair<string, byte[]>("mscorlib", metadataTwo),
+        };
+        var metadataSetB = metadataSetA.Reverse().ToArray();
+        string metadataSetIdA = NamedByteSetHash(metadataSetA);
+        string metadataSetIdB = NamedByteSetHash(metadataSetB);
+        AddRegressionCheck(checks, errors, "aot-metadata-set-order-independent",
+            string.Equals(metadataSetIdA, metadataSetIdB, StringComparison.OrdinalIgnoreCase),
+            "AOT metadata set identity must be independent of input assembly order");
+        var metadataSetIds = new[] { metadataSetIdA, metadataSetIdB }
+            .ToHashSet(StringComparer.OrdinalIgnoreCase);
+        AddRegressionCheck(checks, errors, "aot-metadata-set-deduplicated",
+            metadataSetIds.Count == 1,
+            "equal AOT metadata sets must collapse to one content-addressed set");
+        var metadataSelection = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase)
+        {
+            [baseIdV1] = metadataSetIdA,
+            [baseIdV2] = metadataSetIdA,
+        };
+        var invalidMetadataSelection = new Dictionary<string, string>(metadataSelection,
+            StringComparer.OrdinalIgnoreCase)
+        {
+            [baseIdV1] = new string('f', 64),
+        };
+        var knownMetadataSetIds = new HashSet<string>(new[] { metadataSetIdA },
+            StringComparer.OrdinalIgnoreCase);
+        AddRegressionCheck(checks, errors, "aot-metadata-set-selection-bound",
+            metadataSelection.Count == 2 && metadataSelection.Values.All(knownMetadataSetIds.Contains) &&
+            !invalidMetadataSelection.Values.All(knownMetadataSetIds.Contains),
+            "every Base must resolve through one authenticated AOT metadata set selection");
+        var metadataTampered = new[]
+        {
+            new KeyValuePair<string, byte[]>("System", metadataOne),
+            new KeyValuePair<string, byte[]>("mscorlib", metadataTwo.Concat(new byte[] { 0x5a }).ToArray()),
+        };
+        AddRegressionCheck(checks, errors, "aot-metadata-set-tamper-rejected",
+            !string.Equals(metadataSetIdA, NamedByteSetHash(metadataTampered),
+                StringComparison.OrdinalIgnoreCase),
+            "AOT metadata set identity must change when any metadata blob changes");
 
         var mvPath = Path.Combine(regressionRoot, "switch.mv.bytes");
         File.WriteAllBytes(mvPath, switchMetaVersion.ToBinary());
@@ -1431,6 +1478,7 @@ internal static partial class Program
                 schemaVersion = 1,
                 format = "hybridclr.dhe-resource-player-workflow.json",
                 selectedBaseId = baseIds[index],
+                selectedAotMetadataSetId = new string((char)('1' + index), 64),
                 runtimeSource = runtimePath,
                 target = "StandaloneWindows64",
                 currentAssemblySetSha256 = new string('1', 64),
@@ -1620,16 +1668,23 @@ internal static partial class Program
             "dhe-resource-update.json"));
         string positiveRuntimeAssetRoot = RequirePortableAssetRoot(
             GetString(positiveManifest, "runtimeAssetRoot"), "runtimeAssetRoot");
-        JsonElement positiveAotMetadata = positiveManifest.GetProperty("aotMetadata");
+        JsonElement[] positiveAotMetadata = positiveManifest.GetProperty("aotMetadataSets")
+            .EnumerateArray()
+            .SelectMany(set => set.GetProperty("assemblies").EnumerateArray())
+            .ToArray();
         JsonElement positiveBases = positiveManifest.GetProperty("supportedBases");
         bool planCapabilityBound = positiveBases.EnumerateArray().All(supportedBase =>
-            supportedBase.GetProperty("requiredRuntimeCapabilities").EnumerateArray().Any(value =>
-                string.Equals(value.GetString(), "resource-update-plan-integrity-v1",
-                    StringComparison.Ordinal)));
+        {
+            var capabilities = supportedBase.GetProperty("requiredRuntimeCapabilities")
+                .EnumerateArray().Select(value => value.GetString() ?? string.Empty).ToHashSet(
+                    StringComparer.Ordinal);
+            return capabilities.Contains("resource-update-plan-integrity-v1") &&
+                capabilities.Contains("resource-update-aot-metadata-set-selection-v1");
+        });
         AddRegressionCheck(checks, errors, "resource-stage-plan-capability-bound",
             planCapabilityBound,
             "every resource update Base must require manifest-bound runtime plan validation.");
-        bool aotMetadataCapabilityBound = positiveAotMetadata.GetArrayLength() == 0 ||
+        bool aotMetadataCapabilityBound = positiveAotMetadata.Length == 0 ||
             positiveBases.EnumerateArray().All(supportedBase =>
                 supportedBase.GetProperty("requiredRuntimeCapabilities").EnumerateArray().Any(value =>
                     string.Equals(value.GetString(), "resource-update-aot-metadata-path-v1",
@@ -1638,8 +1693,7 @@ internal static partial class Program
             aotMetadataCapabilityBound,
             "a resource update with AOT metadata must require plan-directed metadata loading.");
         bool positiveAotMetadataCopied = positiveStaged &&
-            positiveAotMetadata.ValueKind == JsonValueKind.Array &&
-            positiveAotMetadata.EnumerateArray().All(metadata =>
+            positiveAotMetadata.All(metadata =>
             {
                 string assetPath = GetString(metadata, "path") ?? string.Empty;
                 string expectedHash = GetString(metadata, "sha256") ?? string.Empty;
@@ -1668,15 +1722,14 @@ internal static partial class Program
                 runtimePlanTamper.Assets, runtimePlanTamper.Identity),
             "a runtime plan whose bytes do not match the manifest must be rejected.");
 
-        if (positiveAotMetadata.GetArrayLength() > 0)
+        if (positiveAotMetadata.Length > 0)
         {
             var aotMetadataTamper = CopyFixture("aot-metadata-tamper");
             var aotMetadataTamperManifest = ReadJson<JsonElement>(Path.Combine(
                 aotMetadataTamper.Update, "dhe-resource-update.json"));
             string aotMetadataRuntimeRoot = RequirePortableAssetRoot(
                 GetString(aotMetadataTamperManifest, "runtimeAssetRoot"), "runtimeAssetRoot");
-            string aotMetadataAssetPath = GetString(
-                aotMetadataTamperManifest.GetProperty("aotMetadata")[0], "path") ?? string.Empty;
+            string aotMetadataAssetPath = GetString(positiveAotMetadata[0], "path") ?? string.Empty;
             string aotMetadataTamperPath = ResolveContainedPath(aotMetadataTamper.Update,
                 aotMetadataAssetPath[aotMetadataRuntimeRoot.Length..],
                 "Regression AOT metadata payload");
@@ -1693,8 +1746,7 @@ internal static partial class Program
                 aotMetadataMissing.Update, "dhe-resource-update.json"));
             string aotMetadataMissingRuntimeRoot = RequirePortableAssetRoot(
                 GetString(aotMetadataMissingManifest, "runtimeAssetRoot"), "runtimeAssetRoot");
-            string aotMetadataMissingAssetPath = GetString(
-                aotMetadataMissingManifest.GetProperty("aotMetadata")[0], "path") ?? string.Empty;
+            string aotMetadataMissingAssetPath = GetString(positiveAotMetadata[0], "path") ?? string.Empty;
             File.Delete(ResolveContainedPath(aotMetadataMissing.Update,
                 aotMetadataMissingAssetPath[aotMetadataMissingRuntimeRoot.Length..],
                 "Regression AOT metadata payload"));
@@ -1726,7 +1778,19 @@ internal static partial class Program
         sharedValidation["bases"]!.AsArray().Add(duplicateValidationBase);
         File.WriteAllText(sharedValidationPath, sharedValidation.ToJsonString(Json),
             new UTF8Encoding(false));
+        string sharedPlanPath = ResolveContainedPath(sharedMetaVersion.Update,
+            sharedManifest["runtimePlan"]!.GetValue<string>(),
+            "Regression runtime plan");
+        var sharedPlan = System.Text.Json.Nodes.JsonNode.Parse(
+            File.ReadAllText(sharedPlanPath))!.AsObject();
+        var duplicateSelection = System.Text.Json.Nodes.JsonNode.Parse(
+            sharedPlan["baseSelections"]!.AsArray()[0]!.ToJsonString())!.AsObject();
+        duplicateSelection["baseId"] = new string('f', 64);
+        sharedPlan["baseSelections"]!.AsArray().Add(duplicateSelection);
+        File.WriteAllText(sharedPlanPath, sharedPlan.ToJsonString(Json),
+            new UTF8Encoding(false));
         sharedManifest["validationSha256"] = Sha256File(sharedValidationPath);
+        sharedManifest["runtimePlanSha256"] = Sha256File(sharedPlanPath);
         File.WriteAllText(sharedManifestPath, sharedManifest.ToJsonString(Json),
             new UTF8Encoding(false));
         AddRegressionCheck(checks, errors, "resource-stage-shared-metaversion-valid",
@@ -1800,6 +1864,10 @@ internal static partial class Program
             File.Copy(currentMetaVersion,
                 Path.Combine(embeddedBase, name + ".mv.bytes"), true);
         }
+        File.Copy(Path.Combine(embeddedBase,
+                NormalizeName(GetString(wrongBaseManifest.GetProperty("assemblies")[0],
+                    "assemblyName") ?? string.Empty) + ".mv.bytes"),
+            Path.Combine(embeddedBase, "Unexpected.mv.bytes"), true);
         AddRegressionCheck(checks, errors, "resource-stage-unsupported-base-rejected",
             !Stage("unsupported-base-stage", wrongBase.Update, wrongBase.Assets,
                 wrongBase.Identity),
@@ -2164,7 +2232,7 @@ internal static partial class Program
         {
             string computedBaseId = ComputeBaseId(GetString(identity, "target") ?? string.Empty,
                 managedAssemblySetSha256, GetString(identity, "aotSnapshotSha256") ?? string.Empty,
-                baseMetaVersionSetSha256,
+                baseMetaVersionSetSha256, GetString(identity, "aotMetadataSetId") ?? string.Empty,
                 GetString(identity, "nativeGuardSourceSha256") ?? string.Empty,
                 GetString(identity, "nativeManifestSha256") ?? string.Empty,
                 GetString(identity, "runtimeProtocol") ?? string.Empty,

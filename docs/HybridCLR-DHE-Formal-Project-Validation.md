@@ -72,7 +72,7 @@ dotnet HybridCLR.DheTool.dll resource-update \
   -BaseRoots C:/release/base-100/baseline,C:/release/base-110/baseline \
   -BaseNativeManifests C:/release/base-100/native/dhe-native-manifest.json,C:/release/base-110/native/dhe-native-manifest.json \
   -BaseBuildIdentities C:/release/base-100/build-identity.json,C:/release/base-110/build-identity.json \
-  -AotMetadataRoot C:/build/stripped-aot \
+  -AotMetadataRoots C:/release/base-100/aot-metadata,C:/release/base-110/aot-metadata \
   -SettingsFile C:/project/ProjectSettings/HybridCLRSettings.asset \
   -OutputRoot C:/build/resource-205
 ```
@@ -82,9 +82,10 @@ emit per-Base MV/delta files. Each supported Base record binds the managed
 assembly set, target, generated AOT snapshot, embedded Base MetaVersion set, native
 guard source, and native manifest. Any unsupported Base causes the whole command
 to fail and removes publish manifests.
-`-AotMetadataRoot` additionally packages the complete `patchAOTAssemblies` set when
-the project uses supplemental AOT metadata; omit it only for a separately validated
-no-metadata workflow.
+`-AotMetadataRoots` additionally packages one complete `patchAOTAssemblies` set per
+Base when the project uses supplemental AOT metadata; use the singular
+`-AotMetadataRoot` only when every Base intentionally shares one root. Omit both
+only for a separately validated no-metadata workflow.
 
 `stage-resource-update` copies this one payload into the project's resource
 catalog staging root. Pass the exact archived `build-identity.json` for the
