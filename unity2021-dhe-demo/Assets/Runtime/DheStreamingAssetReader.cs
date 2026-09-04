@@ -35,7 +35,7 @@ namespace HybridCLR.Lab
             using (FileStream apk = File.OpenRead(Application.dataPath))
             using (ZipArchive archive = new ZipArchive(apk, ZipArchiveMode.Read, false))
             {
-                ZipArchiveEntry entry = archive.GetEntry(GetAndroidEntryName(normalized));
+                ZipArchiveEntry? entry = archive.GetEntry(GetAndroidEntryName(normalized));
                 if (entry == null)
                     throw new FileNotFoundException("DHE StreamingAssets entry was not found in APK.",
                         normalized);
