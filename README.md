@@ -75,6 +75,15 @@ two concurrent promoters, gate/snapshot tampering, orphan staging recovery, and
 post-commit snapshot-output recovery. Its `filesystem-cas-v1` guarantee requires
 filesystem support for exclusive handles and same-directory atomic rename;
 object stores require an equivalent conditional-write adapter.
+Toolchain `0.1.26` is the portable evidence-authority candidate. Its authenticated
+`explicit-package-id-set-v1` manifest allows one resource release to revalidate
+active Base Players created by several explicitly named historical Release
+packages without retaining the DHE Git repository. The aggregate gate records
+the package ID, resolved package root, source identity, and authority mode for
+every Player; unknown or revoked package IDs cannot fall back to Git ancestry.
+The toolchain's own production regression must independently verify every package
+listed by the authority manifest, while a project release supplies only the
+historical packages actually referenced by its active Bases.
 Base identity now also binds `engineWorkflow` and `il2cppCodeGeneration`.
 Unity 2021 is locked to `OptimizeSpeed`; Unity 2022 FGS and Tuanjie 2022 FGS
 are locked to `OptimizeSize`. Base evidence created before these fields existed

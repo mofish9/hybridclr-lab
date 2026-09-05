@@ -155,6 +155,15 @@ Base's target, payload variant, metadata set, changed/interpreter/AOT counts, an
 report SHA-256. Missing, duplicate, foreign-release, stale-parent, or reinitialized
 continuation inputs fail without producing a passing gate report.
 
+When active Bases were built by older DHE toolchains, install the current pinned
+Release package plus each referenced historical Release package and pass their
+locations with `-EvidenceToolchainRoots`. The current package's authenticated
+`explicit-package-id-set-v1` manifest must authorize each historical Package ID and
+exact version/head/tree. The gate records the resolved roots and per-Player authority
+mode, and `channel-state promote` repeats the same validation. No DHE Git checkout is
+required for this normal project path. Unknown, revoked, wrong-ID, duplicate-ID, or
+unused historical packages fail even when `ValidationSourceRoot` is present.
+
 The first resource release explicitly passes `-InitializeReleaseLedger`; every
 later release derives its parent from the initialized snapshot. Promote the
 state-bound aggregate gate with `channel-state -Operation promote` and the exact
@@ -182,11 +191,12 @@ then archives both registry documents and staging revalidates that every parent 
 was retained or explicitly retired. Do not build a new registry from a hand-picked
 subset of Base directories.
 
-An online Base is not rebuilt merely because the DHE tool advances. Release evidence
-accepts its earlier clean tool identity only when Git proves the ordered chain from
-the Release package that authorized that workflow, through the evidence commit, to
-the current release commit, and every recorded commit resolves to the recorded tree.
-A divergent commit or tree mismatch fails closed.
+An online Base is not rebuilt merely because the DHE tool advances. Its earlier clean
+tool identity remains usable only while the current authenticated authority manifest
+names that exact historical Release package. Removing the ID is a revocation: retire
+or replace every active Base that depends on it before the next resource release.
+Git ancestry remains a migration bootstrap only for older current packages without an
+authority manifest; it is not a bypass for an explicit set.
 
 For consecutive hotfix releases, keep the same archived Base registry and run
 `resource-update` again with the new current DLL set. Release mode must also pass

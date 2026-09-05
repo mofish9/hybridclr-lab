@@ -188,11 +188,15 @@ the same Base ID. `resource-update` requires `-PreviousBaseRegistry` for revisio
 or later, verifies the direct transition, and archives both current and parent
 registry bytes. This prevents an accidentally incomplete registry from producing a
 green hotfix package merely because the omitted Player was never checked.
-Historical Base Player evidence remains valid across tool releases only when its
-clean source commit and tree are on the verified Git ancestry path from the Release
-toolchain that authorized the workflow to the current release source. This permits
-an already shipped Base to be revalidated without rebuilding it while rejecting
-divergent branches, missing commits, or forged tree identities.
+Historical Base Player evidence remains valid across tool releases when the
+currently pinned Release package explicitly authorizes its immutable package ID in
+`manifests/dhe-toolchain-evidence-authorities.json`. Each record binds the historical
+toolchain version, Package ID, source commit, and source tree; the manifest itself is
+part of the current Package ID. The release system keeps those historical Release
+packages by content identity and can relocate them with `-EvidenceToolchainRoots`,
+so it does not need the DHE Git repository. A legacy package without the authority
+manifest may use verified Git ancestry during migration qualification. Once an
+explicit manifest exists, an unknown or removed ID cannot use Git fallback.
 
 Registry lineage alone cannot identify the head used by the last published hotfix:
 without an external head, another revision 1 could omit old Bases. Release mode
@@ -373,6 +377,7 @@ gate once for the resource release:
 dotnet HybridCLR.DheTool.dll resource-release-gate \
   -ToolchainRoot C:/tools/HybridCLRDhe \
   -ExpectedToolchainPackageId <pinned-release-package-id> \
+  -EvidenceToolchainRoots C:/tools/history/dhe-0.1.20-a,C:/tools/history/dhe-0.1.20-b \
   -ResourceUpdateRoot C:/build/resource-205 \
   -ChangedPlayers C:/evidence/base-100.json,C:/evidence/base-101.json \
   -ChannelSnapshot C:/build/snapshots/production.json \
@@ -390,10 +395,19 @@ the exact protected parent hash. `-RequireEngineMatrix` is an optional lab or
 cross-engine-channel policy. A normal project channel needs reports for all of its
 active Bases, not artificial Bases from engines it has never shipped.
 
-`ValidationSourceRoot` is only needed while qualifying a newer tool against
-historical reports produced by an earlier authenticated Release package. Normal
-project releases omit it and require every report to name the currently pinned
-package ID. The successful output uses
+`EvidenceToolchainRoots` is the comma-separated set of historical Release package
+locations actually referenced by active Base reports. The gate resolves them by
+recomputed Package ID, verifies version/head/tree against the current authenticated
+authority set, and rejects duplicate IDs, wrong packages, current-package
+substitution, and unused roots. It records all resolved package identities and each
+Player's `current-package` or `authorized-historical-package` mode. During promotion,
+`channel-state promote` passes those roots back through a complete gate regeneration
+and compares every field before CAS publication.
+
+`ValidationSourceRoot` is only a bootstrap compatibility input for a legacy current
+package that has no authority manifest. Normal project releases omit it. An explicit
+authority set always fails closed on unknown or revoked IDs even if a Git checkout is
+also supplied. The successful output uses
 `hybridclr.dhe-resource-release-gate.json`; it is the project release system's
 approval input for publishing the already-built single resource directory. Put
 the output in a separate release-gate directory; the command rejects output
@@ -656,6 +670,10 @@ and the SHA-256 of the package's `DheBuildPipeline.cs`. The production
 partial matrix or a report from a different package source is rejected. Its
 `-WorkflowChangedRoots` argument is the comma-separated list of changed Player
 evidence directories; `-WorkflowNoopRoot` supplies the no-op directory.
+It must also receive every historical Release package named by the candidate's
+authority manifest through `-EvidenceToolchainRoots`. This is an exact-set check:
+missing, extra, duplicate-ID, non-Release, or version/head/tree-mismatched packages
+fail the toolchain release regression.
 
 ```text
 dotnet HybridCLR.DheTool.dll release-evidence \

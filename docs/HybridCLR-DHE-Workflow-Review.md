@@ -111,6 +111,11 @@ commit/tree/hash 为准。
    资源报告实时重算结果，要求 Base 集合与 candidate 完全相等，并将受保护的 channel、revision、
    candidate ledger 和 parent ledger 期望值逐项绑定；不能只信任报告中的 `passed`。
    revision 1 必须显式授权初始化，后续 revision 必须提供精确 parent 且禁止重新初始化。
+   若 active Base 来自旧 DHE 工具包，当前 Release 包必须通过已认证的
+   `explicit-package-id-set-v1` 清单显式授权其 Package ID；发布机用
+   `-EvidenceToolchainRoots` 提供这些历史 Release 包的当前位置。gate 会逐包重算 Package ID，
+   核对 version/head/tree，并记录每个 Player 的 authority mode。未知、已撤销、wrong-ID、重复 ID、
+   未被 active Base 使用的 root 都失败，且存在显式清单后不能用 Git ancestry 绕过。
 8. `channel-state promote` 重新执行 aggregate gate，把资源与审批写入内容寻址目录，随后在
    channel 独占锁内比较 snapshot 绑定的 head SHA 并原子替换 `head.json`。两个并发 candidate
    只能一个成功，stale gate 不能重放；已有线上 ledger 首次接管必须显式执行
@@ -154,7 +159,8 @@ DHE format、未支持的 schema 断言关键字、额外属性、错误类型�
 必须正确且报告格式匹配：
 
 - `regression`：全部生产负例和 package/schema 认证通过，包括 channel snapshot 篡改、gate
-  重算字段篡改、stale replay、并发 CAS、孤立 staging 和提交后 snapshot 恢复；
+  重算字段篡改、stale replay、并发 CAS、孤立 staging、提交后 snapshot 恢复，以及 authority
+  清单全部历史 Release 包的 Package ID/version/head/tree 精确核对和 relocation 负例；
 - `player-changed`：至少三份真实资源更新 Player 结果，Base ID 必须互不相同，覆盖 Unity 2021、
   Unity 2022、团结 2022，并由 `hybridclr.dhe-resource-player-workflow.json` 绑定回 immutable Base；
   可以继续增加其他在线 Base；同 target 可共用 default payload，metadata shape 不同的
@@ -168,7 +174,8 @@ DHE format、未支持的 schema 断言关键字、额外属性、错误类型�
 所有 managed Player 角色都必须来自 `Release` workflow，并绑定 integrated runtime、真实 headers
 和 clean/tracked 项目源码；Exploratory 报告不能再提升工具包的 Release 位。Player 可以由上一份
 已认证 Release 工具包执行，再由当前 clean host 独立重算证据，避免待发布工具包必须先认证自身
-的循环依赖。
+的循环依赖。工具链发布回归必须用 `-EvidenceToolchainRoots` 提供 authority 清单中的完整包集合；
+项目资源发布则只提供 active Base 实际引用的历史包，两者不能混用门禁范围。
 
 发布后的 `dhe-toolchain-manifest.json` 必须同时满足 `mode=Release`、
 `releaseReady=true`、`sourceIdentity.clean=true`，并通过包外和包内两次

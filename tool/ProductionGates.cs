@@ -1988,6 +1988,9 @@ internal static partial class Program
         var channelStateCasWorkflowPassed = false;
         var channelStateCasWorkflowDetails =
             "the distributed package contains the protected channel-state implementation and schemas";
+        var portableMixedToolchainAuthoritiesPassed = false;
+        var portableMixedToolchainAuthoritiesDetails =
+            "the distributed package contains its evidence authority set and schema";
         object? validatedResourceRelease = null;
         var workflowOutputs = new List<object>();
         var changedWorkflowRoots = cli.GetList("workflowchangedroots");
@@ -2076,6 +2079,11 @@ internal static partial class Program
                 MultiBaseResourceReleaseProof releaseProof =
                     ReadMultiBaseResourceReleaseProof(changedReports, true);
                 resourcePlayerEvidenceBindingPassed = true;
+                portableMixedToolchainAuthoritiesPassed =
+                    RunEvidenceAuthoritySetRegression(regressionRoot, packageRoot,
+                        changedReports, cli.GetList("evidencetoolchainroots")
+                            .Select(Path.GetFullPath).ToArray(),
+                        out portableMixedToolchainAuthoritiesDetails);
                 if (!string.IsNullOrWhiteSpace(resourceUpdateRoot) &&
                     !string.IsNullOrWhiteSpace(resourceUpdateRoot2))
                 {
@@ -2326,6 +2334,14 @@ internal static partial class Program
                     "dhe-channel-snapshot.schema.json")) &&
                 File.ReadAllText(Path.Combine(packageRoot, "tool", "ChannelState.cs"))
                     .Contains("private static int ChannelState", StringComparison.Ordinal);
+            portableMixedToolchainAuthoritiesPassed = File.Exists(Path.Combine(packageRoot,
+                    "manifests", "dhe-toolchain-evidence-authorities.json")) &&
+                File.Exists(Path.Combine(packageRoot, "schemas",
+                    "dhe-toolchain-evidence-authorities.schema.json")) &&
+                File.ReadAllText(Path.Combine(packageRoot, "tool",
+                    "EvidenceAuthorities.cs")).Contains(
+                    "private static EvidenceAuthoritySet ReadEvidenceAuthoritySet",
+                    StringComparison.Ordinal);
         }
         AddRegressionCheck(checks, errors, "schema-workflow-output-contract", workflowSchemaPassed,
             realWorkflowOutputsValidated
@@ -2348,6 +2364,10 @@ internal static partial class Program
             "incomplete, stale, forked, reinitialized, or input-mutating release evidence");
         AddRegressionCheck(checks, errors, "channel-state-cas-workflow",
             channelStateCasWorkflowPassed, channelStateCasWorkflowDetails);
+        AddRegressionCheck(checks, errors,
+            "evidence-portable-mixed-toolchain-authorities",
+            portableMixedToolchainAuthoritiesPassed,
+            portableMixedToolchainAuthoritiesDetails);
         using var releaseResourceBase = JsonDocument.Parse("{\"mode\":\"Release\",\"releaseReady\":true}");
         using var incompleteResourceBase = JsonDocument.Parse("{\"mode\":\"Release\",\"releaseReady\":false}");
         using var exploratoryResourceBase = JsonDocument.Parse("{\"mode\":\"Exploratory\",\"releaseReady\":true}");

@@ -19,6 +19,8 @@ internal static partial class Program
         string? channelSnapshotPath = string.IsNullOrWhiteSpace(channelSnapshotOption)
             ? null
             : Path.GetFullPath(channelSnapshotOption);
+        List<string> evidenceToolchainRoots = cli.GetList("evidencetoolchainroots")
+            .Select(Path.GetFullPath).Distinct(StringComparer.OrdinalIgnoreCase).ToList();
         List<string> playerPaths = cli.GetList("changedplayers")
             .Select(Path.GetFullPath).Distinct(StringComparer.OrdinalIgnoreCase).ToList();
         if (playerPaths.Count == 0 || playerPaths.Count > MaxChangedPlayerEvidenceCount)
@@ -31,7 +33,8 @@ internal static partial class Program
         foreach (string protectedRoot in new[]
                  {
                      updateRoot, toolchainRoot, validationSourceRoot, schemaRoot,
-                 }.Concat(playerPaths.Select(path => Path.GetDirectoryName(path)!))
+                 }.Concat(evidenceToolchainRoots)
+                 .Concat(playerPaths.Select(path => Path.GetDirectoryName(path)!))
                  .Distinct(StringComparer.OrdinalIgnoreCase))
             EnsureOutputOutsideRoot(output, protectedRoot);
         ChannelSnapshotDocument? channelSnapshot = null;
@@ -67,6 +70,10 @@ internal static partial class Program
         JsonElement authoritySource = authorityManifest.GetProperty("sourceIdentity");
         string authorityHead = GetString(authoritySource, "head") ?? string.Empty;
         string authorityTree = GetString(authoritySource, "tree") ?? string.Empty;
+        EvidenceAuthoritySet evidenceAuthoritySet = ReadEvidenceAuthoritySet(
+            toolchainRoot, schemaRoot, authority.PackageId!);
+        IReadOnlyDictionary<string, string> evidenceToolchainPackages =
+            ReadEvidenceToolchainRoots(evidenceToolchainRoots, authority.PackageId!);
         string currentHead = string.IsNullOrWhiteSpace(validationSourceOption)
             ? authorityHead
             : GitValue(validationSourceRoot, "rev-parse", "HEAD");
@@ -82,7 +89,14 @@ internal static partial class Program
                 "resource release validation source.");
 
         var reports = new List<(JsonElement Report, string Path)>();
+        var playerAuthorityModes = new Dictionary<string, string>(
+            StringComparer.OrdinalIgnoreCase);
+        var playerAuthorityPackageIds = new Dictionary<string, string>(
+            StringComparer.OrdinalIgnoreCase);
+        var playerAuthorities = new Dictionary<string, PlayerToolchainAuthority>(
+            StringComparer.OrdinalIgnoreCase);
         bool historicalToolEvidenceAccepted = false;
+        bool portableHistoricalToolEvidenceAccepted = false;
         foreach (string playerPath in playerPaths)
         {
             string path = RequireFile(playerPath, "Resource release Player report");
@@ -101,19 +115,45 @@ internal static partial class Program
             if (string.Equals(reportPackageId, expectedPackageId,
                     StringComparison.OrdinalIgnoreCase))
             {
-                ValidateExactPlayerToolchainAuthority(report, path, expectedPackageId);
+                playerAuthorities.Add(path, ValidateExactPlayerToolchainAuthority(
+                    report, path, expectedPackageId, toolchainRoot));
+                playerAuthorityModes.Add(path, "current-package");
+            }
+            else if (evidenceAuthoritySet.Authorities.TryGetValue(reportPackageId,
+                         out EvidenceAuthority? expectedAuthority))
+            {
+                PlayerToolchainAuthority actualAuthority =
+                    ValidateExactPlayerToolchainAuthority(report, path, reportPackageId,
+                        evidenceToolchainPackages.TryGetValue(reportPackageId,
+                            out string? relocatedRoot) ? relocatedRoot : null);
+                ValidateAuthorizedHistoricalPackage(expectedAuthority, actualAuthority);
+                playerAuthorities.Add(path, actualAuthority);
+                playerAuthorityModes.Add(path, "authorized-historical-package");
+                historicalToolEvidenceAccepted = true;
+                portableHistoricalToolEvidenceAccepted = true;
             }
             else
             {
+                if (evidenceAuthoritySet.Policy != "none")
+                    throw new DheException("Historical Player toolchain package is not " +
+                        "authorized by the current Release package: " + reportPackageId + ".");
                 if (string.IsNullOrWhiteSpace(validationSourceOption))
                     throw new DheException("Historical Player toolchain evidence requires " +
                         "ValidationSourceRoot ancestry validation.");
                 ValidateEvidenceToolIdentity(report, path, validationSourceRoot,
                     currentHead, currentTree);
+                playerAuthorities.Add(path, ValidateExactPlayerToolchainAuthority(
+                    report, path, reportPackageId,
+                    evidenceToolchainPackages.TryGetValue(reportPackageId,
+                        out string? relocatedRoot) ? relocatedRoot : null));
+                playerAuthorityModes.Add(path, "git-ancestry");
                 historicalToolEvidenceAccepted = true;
             }
+            playerAuthorityPackageIds.Add(path, reportPackageId.ToLowerInvariant());
             reports.Add((report, path));
         }
+        EnsureEvidenceToolchainRootsAreReferenced(evidenceToolchainPackages,
+            playerAuthorityPackageIds.Values);
 
         bool requireEngineMatrix = cli.Has("requireenginematrix");
         MultiBaseResourceReleaseProof proof = ReadMultiBaseResourceReleaseProof(reports,
@@ -218,6 +258,8 @@ internal static partial class Program
                 changedMethodCount = GetInt(player, "changedMethodCount"),
                 interpreterEntryCount = GetInt(player, "interpreterEntryCount"),
                 aotEntryCount = GetInt(player, "aotEntryCount"),
+                toolchainPackageId = playerAuthorityPackageIds[item.Path],
+                toolchainAuthorityMode = playerAuthorityModes[item.Path],
                 report = item.Path,
                 reportSha256 = Sha256File(item.Path),
             };
@@ -239,6 +281,25 @@ internal static partial class Program
             validationSourceHead = currentHead,
             validationSourceTree = currentTree,
             historicalToolEvidenceAccepted,
+            portableHistoricalToolEvidenceAccepted,
+            evidenceAuthorityPolicy = evidenceAuthoritySet.Policy,
+            evidenceAuthoritySet = evidenceAuthoritySet.SourcePath,
+            evidenceAuthoritySetSha256 = evidenceAuthoritySet.Sha256,
+            evidencePackageIds = playerAuthorityPackageIds.Values
+                .Distinct(StringComparer.OrdinalIgnoreCase)
+                .OrderBy(value => value, StringComparer.Ordinal).ToArray(),
+            evidenceToolchainPackages = playerAuthorities.Values
+                .GroupBy(item => item.PackageId, StringComparer.OrdinalIgnoreCase)
+                .Select(group => group.First())
+                .OrderBy(item => item.PackageId, StringComparer.Ordinal)
+                .Select(item => new
+                {
+                    packageId = item.PackageId,
+                    packageRoot = item.PackageRoot,
+                    toolchainVersion = item.ToolchainVersion,
+                    sourceHead = item.SourceHead,
+                    sourceTree = item.SourceTree,
+                }).ToArray(),
             resourceUpdateRoot = updateRoot,
             resourceUpdateManifest = manifestPath,
             resourceUpdateManifestSha256 = proof.ResourceUpdateManifestSha256,
@@ -293,8 +354,8 @@ internal static partial class Program
         return 0;
     }
 
-    private static void ValidateExactPlayerToolchainAuthority(JsonElement report,
-        string reportPath, string expectedPackageId)
+    private static PlayerToolchainAuthority ValidateExactPlayerToolchainAuthority(JsonElement report,
+        string reportPath, string expectedPackageId, string? packageRootOverride = null)
     {
         string root = Path.GetDirectoryName(reportPath)!;
         string gatePath = ResolveEvidencePath(GetString(report, "toolchainGate"), root,
@@ -302,14 +363,20 @@ internal static partial class Program
         JsonElement gate = ReadJson<JsonElement>(gatePath);
         RequireEvidenceFormat(gate, "hybridclr.dhe-toolchain-gate.json",
             "Resource Player toolchain gate");
-        string packageRoot = RequireDirectory(GetString(gate, "packageRoot") ?? string.Empty,
-            "Resource Player toolchain package");
-        PackageInspection inspection = InspectPackage(packageRoot, expectedPackageId, true);
-        if (!inspection.Passed || !GetBool(gate, "passed") ||
+        string recordedPackageRoot = GetString(gate, "packageRoot") ?? string.Empty;
+        if (string.IsNullOrWhiteSpace(recordedPackageRoot))
+            throw new DheException("Resource Player toolchain gate lacks its package root.");
+        string packageRoot = packageRootOverride == null
+            ? RequireDirectory(recordedPackageRoot, "Resource Player toolchain package")
+            : RequireDirectory(packageRootOverride, "Relocated Resource Player toolchain package");
+        PlayerToolchainAuthority authority = InspectReleaseToolchainAuthority(packageRoot,
+            expectedPackageId, "Resource Player toolchain package");
+        if (!GetBool(gate, "passed") ||
             !GetBool(gate, "requireRelease") || !GetBool(gate, "releaseReady") ||
             !string.Equals(GetString(gate, "packageId"), expectedPackageId,
                 StringComparison.OrdinalIgnoreCase))
             throw new DheException("Resource Player was not produced by the expected Release toolchain.");
+        return authority;
     }
 
     private static void ValidateResourceReleasePlayerCorrectness(JsonElement report)

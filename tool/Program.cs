@@ -53,6 +53,7 @@ internal static partial class Program
         "resource-player-consecutive-release-head",
         "resource-release-aggregate-gate",
         "channel-state-cas-workflow",
+        "evidence-portable-mixed-toolchain-authorities",
         "resource-player-legacy-single-payload-compatibility",
         "resource-player-assembly-mode-binding",
         "resource-player-interpreter-only-update",
@@ -3951,7 +3952,33 @@ internal static partial class Program
         }
     }
 
-    private static void PrintHelp() => Console.WriteLine("HybridCLR DHE C# tool\nCommands: version, mv, batch, base-registry, resource-update, stage-resource-update, resource-player-evidence, resource-release-gate, channel-state, baseline-manifest, aot-metadata-manifest, preflight, workflow, release-gate, regression, schema-validate, schema-gate, validate, archive, doctor, verify-package, release-evidence, publish, install, new-adapter, new-config, assemble-runtime, native-tests, build-managed-cases, generate-test-manifest, generate-metadata-stress-source, reference, compare-results, check-environment, clear-unity-project-locks, wait-editor, prepare-engine-test-project, bootstrap-repos, tree-hash, file-hash\nBase registry accepts -ExistingRegistry or comma-separated -BaseIdentities, -BaselineRoots, -BaseNativeManifests, -EngineWorkflows, with optional -PayloadVariantIds, -Labels, and -AotMetadataRoots. Retiring an online Base requires -RetireBaseIds and -RetirementReason.\nRelease resource update accepts a protected -ChannelSnapshot, or the legacy explicit ledger arguments. Registry revision 2 or later also requires -PreviousBaseRegistry when its Base set changes.\nResource release qualification uses resource-release-gate with the same channel snapshot and one Player report per active Base. channel-state atomically promotes only a state-bound passing gate.\nExample: dotnet run --project tool/HybridCLR.DheTool.csproj -- workflow -Config <project/dhe-workflow-config.json>");
+    private static void PrintHelp() => Console.WriteLine(string.Join(Environment.NewLine,
+        "HybridCLR DHE C# tool",
+        "Commands: version, mv, batch, base-registry, resource-update, " +
+        "stage-resource-update, resource-player-evidence, resource-release-gate, " +
+        "channel-state, baseline-manifest, aot-metadata-manifest, preflight, workflow, " +
+        "release-gate, regression, schema-validate, schema-gate, validate, archive, " +
+        "doctor, verify-package, release-evidence, publish, install, new-adapter, " +
+        "new-config, assemble-runtime, native-tests, build-managed-cases, " +
+        "generate-test-manifest, generate-metadata-stress-source, reference, " +
+        "compare-results, check-environment, clear-unity-project-locks, wait-editor, " +
+        "prepare-engine-test-project, bootstrap-repos, tree-hash, file-hash",
+        "Base registry accepts -ExistingRegistry or comma-separated -BaseIdentities, " +
+        "-BaselineRoots, -BaseNativeManifests, -EngineWorkflows, with optional " +
+        "-PayloadVariantIds, -Labels, and -AotMetadataRoots. Retiring an online Base " +
+        "requires -RetireBaseIds and -RetirementReason.",
+        "Release resource update accepts a protected -ChannelSnapshot, or the legacy " +
+        "explicit ledger arguments. Registry revision 2 or later also requires " +
+        "-PreviousBaseRegistry when its Base set changes.",
+        "Resource release qualification uses resource-release-gate with the same " +
+        "channel snapshot and one Player report per active Base. Pass historical " +
+        "Release package locations with -EvidenceToolchainRoots when active Bases " +
+        "were built by authorized older toolchains. channel-state atomically promotes " +
+        "only a state-bound passing gate.",
+        "Toolchain publication regression requires -EvidenceToolchainRoots to exactly " +
+        "cover the authenticated historical authority set.",
+        "Example: dotnet run --project tool/HybridCLR.DheTool.csproj -- workflow " +
+        "-Config <project/dhe-workflow-config.json>"));
 
     private static string ResolveUnity(Cli cli, string project) => RequireFile(cli.Optional("unity") ?? Environment.GetEnvironmentVariable("DHE_UNITY_EXE") ?? throw new DheException("Set -Unity or DHE_UNITY_EXE."), "Unity editor");
     private static void RunUnity(string executable, string workingDirectory, IEnumerable<string> arguments, IDictionary<string, string> environment, string logPath, int timeoutSeconds)

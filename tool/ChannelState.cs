@@ -376,6 +376,16 @@ internal static partial class Program
                 values["initializereleaseledger"] = "true";
             if (GetBool(gate, "requireEngineMatrix"))
                 values["requireenginematrix"] = "true";
+            string[] evidenceToolchainRoots = gate.GetProperty("evidenceToolchainPackages")
+                .EnumerateArray()
+                .Where(item => !string.Equals(GetString(item, "packageId"),
+                    GetString(gate, "toolchainPackageId"),
+                    StringComparison.OrdinalIgnoreCase))
+                .Select(item => GetString(item, "packageRoot") ?? string.Empty)
+                .Where(value => value.Length > 0).ToArray();
+            if (evidenceToolchainRoots.Length != 0)
+                values["evidencetoolchainroots"] = string.Join(',',
+                    evidenceToolchainRoots);
             if (ResourceReleaseGate(new Cli("resource-release-gate", values)) != 0)
                 throw new DheException("Resource release aggregate gate revalidation failed.");
 
@@ -712,6 +722,8 @@ internal static partial class Program
                 !GetBool(gate, "channelStateBound") ||
                 GetString(gate, "releaseChannelId") != channelId ||
                 GetInt(gate, "releaseRevision") != revision ||
+                !string.Equals(GetString(gate, "toolchainPackageId"),
+                    toolchainPackageId, StringComparison.OrdinalIgnoreCase) ||
                 !string.Equals(GetString(gate, "releaseLedgerSha256"), ledgerSha256,
                     StringComparison.OrdinalIgnoreCase) ||
                 GetInt(gate, "activeBaseCount") != activeBaseCount ||
