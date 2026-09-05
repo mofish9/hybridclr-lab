@@ -188,6 +188,11 @@ the same Base ID. `resource-update` requires `-PreviousBaseRegistry` for revisio
 or later, verifies the direct transition, and archives both current and parent
 registry bytes. This prevents an accidentally incomplete registry from producing a
 green hotfix package merely because the omitted Player was never checked.
+Historical Base Player evidence remains valid across tool releases only when its
+clean source commit and tree are on the verified Git ancestry path from the Release
+toolchain that authorized the workflow to the current release source. This permits
+an already shipped Base to be revalidated without rebuilding it while rejecting
+divergent branches, missing commits, or forged tree identities.
 
 The output contains one copy of each current DLL and current MetaVersion. Base inputs
 are compatibility evidence only and are never copied into `payload/`. At

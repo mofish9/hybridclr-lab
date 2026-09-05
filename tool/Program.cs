@@ -2357,7 +2357,8 @@ internal static partial class Program
                     : "hybridclr.dhe-project-player-workflow.json", role);
                 if (!GetBool(report, "validationPassed") || !GetBool(report, "coverageGatePassed"))
                     throw new DheException(role + " evidence did not pass validation and coverage.");
-                ValidateEvidenceToolIdentity(report, reportPath, sourceHead, sourceTree);
+                ValidateEvidenceToolIdentity(report, reportPath, sourceRoot, sourceHead,
+                    sourceTree);
                 ValidateManagedReleaseEvidence(report, reportPath, sourceRoot);
                 var changed = GetInt(report.GetProperty("capability"), "changedMethodCount");
                 var player = report.GetProperty("player");
@@ -2898,8 +2899,8 @@ internal static partial class Program
             throw new DheException("Native evidence headers do not match the locked engine workflow.");
     }
 
-    private static void ValidateEvidenceToolIdentity(JsonElement report, string reportPath, string sourceHead,
-        string sourceTree)
+    private static void ValidateEvidenceToolIdentity(JsonElement report, string reportPath,
+        string sourceRoot, string sourceHead, string sourceTree)
     {
         string reportRoot = Path.GetDirectoryName(reportPath)!;
         var cleanPath = ResolveEvidencePath(GetString(report, "cleanCheckoutGate"),
@@ -2926,15 +2927,62 @@ internal static partial class Program
 
         JsonElement packageManifest = ReadJson<JsonElement>(inspection.ManifestPath);
         JsonElement packageSource = packageManifest.GetProperty("sourceIdentity");
-        bool currentSource = string.Equals(GetString(tool, "head"), sourceHead,
-                StringComparison.OrdinalIgnoreCase) &&
-            string.Equals(GetString(tool, "tree"), sourceTree, StringComparison.OrdinalIgnoreCase);
-        bool authorityPackageSource = string.Equals(GetString(tool, "head"),
-                GetString(packageSource, "head"), StringComparison.OrdinalIgnoreCase) &&
-            string.Equals(GetString(tool, "tree"), GetString(packageSource, "tree"),
-                StringComparison.OrdinalIgnoreCase);
-        if (!currentSource && !authorityPackageSource)
-            throw new DheException("Demo clean-checkout identity matches neither the current release source nor its authenticated authority package.");
+        if (!IsAuthorizedEvidenceToolSource(sourceRoot, sourceHead, sourceTree,
+                GetString(tool, "head"), GetString(tool, "tree"),
+                GetString(packageSource, "head"), GetString(packageSource, "tree")))
+            throw new DheException("Player clean-checkout identity is not on the authenticated " +
+                "authority-to-current tool source chain.");
+    }
+
+    private static bool IsAuthorizedEvidenceToolSource(string sourceRoot,
+        string currentHead, string currentTree, string? evidenceHead, string? evidenceTree,
+        string? authorityHead, string? authorityTree)
+    {
+        if (!IsHex(currentHead, 40, 64) || !IsHex(currentTree, 40, 64) ||
+            !IsHex(evidenceHead, 40, 64) || !IsHex(evidenceTree, 40, 64) ||
+            !IsHex(authorityHead, 40, 64) || !IsHex(authorityTree, 40, 64))
+            return false;
+        if (!GitCommitHasTree(sourceRoot, currentHead, currentTree) ||
+            !GitCommitHasTree(sourceRoot, evidenceHead!, evidenceTree!) ||
+            !GitCommitHasTree(sourceRoot, authorityHead!, authorityTree!))
+            return false;
+        return GitCommitIsAncestor(sourceRoot, authorityHead!, evidenceHead!) &&
+            GitCommitIsAncestor(sourceRoot, evidenceHead!, currentHead);
+    }
+
+    private static bool GitCommitHasTree(string root, string commit, string expectedTree) =>
+        string.Equals(GitValue(root, "rev-parse", commit + "^{tree}"), expectedTree,
+            StringComparison.OrdinalIgnoreCase);
+
+    private static bool GitCommitIsAncestor(string root, string ancestor, string descendant)
+    {
+        try
+        {
+            root = Path.GetFullPath(root);
+            var start = new ProcessStartInfo("git")
+            {
+                WorkingDirectory = root,
+                UseShellExecute = false,
+                RedirectStandardOutput = true,
+                RedirectStandardError = true,
+            };
+            start.ArgumentList.Add("-C");
+            start.ArgumentList.Add(root);
+            start.ArgumentList.Add("merge-base");
+            start.ArgumentList.Add("--is-ancestor");
+            start.ArgumentList.Add(ancestor);
+            start.ArgumentList.Add(descendant);
+            using Process? process = Process.Start(start);
+            if (process == null) return false;
+            _ = process.StandardOutput.ReadToEnd();
+            _ = process.StandardError.ReadToEnd();
+            process.WaitForExit();
+            return process.ExitCode == 0;
+        }
+        catch
+        {
+            return false;
+        }
     }
 
     private static void RequireEvidenceFormat(JsonElement report, string expected, string description)

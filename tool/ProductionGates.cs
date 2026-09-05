@@ -1413,6 +1413,25 @@ internal static partial class Program
         AddRegressionCheck(checks, errors, "evidence-managed-release-binding",
             exploratoryManagedRejected,
             "managed release evidence must reject exploratory or runtime-unbound Player workflows");
+        string currentToolHead = GitValue(cli.Root, "rev-parse", "HEAD");
+        string currentToolTree = GitValue(cli.Root, "rev-parse", "HEAD^{tree}");
+        string evidenceToolHead = GitValue(cli.Root, "rev-parse", "HEAD^");
+        string evidenceToolTree = GitValue(cli.Root, "rev-parse", "HEAD^^{tree}");
+        string authorityToolHead = GitValue(cli.Root, "rev-parse", "HEAD^^");
+        string authorityToolTree = GitValue(cli.Root, "rev-parse", "HEAD^^^{tree}");
+        bool historicalToolSourceAccepted = IsAuthorizedEvidenceToolSource(cli.Root,
+            currentToolHead, currentToolTree, evidenceToolHead, evidenceToolTree,
+            authorityToolHead, authorityToolTree);
+        bool historicalToolTreeTamperRejected = !IsAuthorizedEvidenceToolSource(cli.Root,
+            currentToolHead, currentToolTree, evidenceToolHead, new string('f', 40),
+            authorityToolHead, authorityToolTree);
+        AddRegressionCheck(checks, errors, "evidence-tool-source-ancestor-chain",
+            historicalToolSourceAccepted,
+            "historical Base evidence must remain valid only on an authenticated " +
+            "authority-to-current Git ancestry chain");
+        AddRegressionCheck(checks, errors, "evidence-tool-source-tree-tamper",
+            historicalToolTreeTamperRejected,
+            "historical Base evidence with a forged Git tree must be rejected");
 
         var duplicateBaseRejected = false;
         try

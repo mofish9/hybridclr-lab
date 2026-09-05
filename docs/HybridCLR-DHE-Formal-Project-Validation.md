@@ -155,6 +155,12 @@ then archives both registry documents and staging revalidates that every parent 
 was retained or explicitly retired. Do not build a new registry from a hand-picked
 subset of Base directories.
 
+An online Base is not rebuilt merely because the DHE tool advances. Release evidence
+accepts its earlier clean tool identity only when Git proves the ordered chain from
+the Release package that authorized that workflow, through the evidence commit, to
+the current release commit, and every recorded commit resolves to the recorded tree.
+A divergent commit or tree mismatch fails closed.
+
 For consecutive hotfix releases, keep the same archived Base registry and run
 `resource-update` again with the new current DLL set. Stage the resulting
 manifest/payload over the same Player resource root after the previous smoke;
