@@ -148,13 +148,16 @@ internal static partial class Program
         var sets = Settings.Read(settingsPath);
         var records = sets.Dhe.Select(name => new AssemblyRecord(name, Sha256File(RequireFile(Path.Combine(root, name + ".dll"), name + " baseline assembly")))).ToArray();
         var packageLock = cli.Optional("packagelockpath");
+        var package = string.IsNullOrWhiteSpace(packageLock)
+            ? (JsonElement?)null
+            : ReadJson<JsonElement>(RequireFile(packageLock, "Package lock"));
         var doc = new Dictionary<string, object?>
         {
             ["schemaVersion"] = 1, ["format"] = "hybridclr.dhe-baseline-manifest.json", ["generatedAtUtc"] = DateTimeOffset.UtcNow,
             ["pathSemantics"] = "workspace-absolute-v1", ["baselineKind"] = "stripped-aot", ["target"] = cli.Require("target"),
             ["sourceRoot"] = root, ["engineWorkflow"] = GetString(runtime, "engineWorkflow"), ["engine"] = runtime.TryGetProperty("engine", out var engine) ? engine : null,
-            ["runtime"] = new { profile = GetString(runtime, "profile"), stagedRuntimeSha256 = GetString(runtime, "stagedRuntimeSha256"), runtimeManifestSha256 = Sha256File(runtimePath) },
-            ["package"] = string.IsNullOrWhiteSpace(packageLock) ? null : ReadJson<JsonElement>(RequireFile(packageLock, "Package lock")), ["assemblies"] = records
+            ["runtime"] = new { profile = GetString(runtime, "profile"), stagedRuntimeSha256 = GetString(runtime, "stagedRuntimeSha256"), runtimeManifestSha256 = Sha256File(runtimePath), packageTreeSha256 = package.HasValue ? GetString(package.Value, "treeSha256") : null },
+            ["package"] = package, ["assemblies"] = records
         };
         WriteJson(output, doc);
         Console.WriteLine("DHE baseline manifest: " + output);
