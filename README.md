@@ -24,11 +24,11 @@ Its formal entry points, generated-output boundary, and complete four-assembly
 Player evidence are documented in
 `docs/HybridCLR-DHE-Toolchain.md`,
 `docs/HybridCLR-DHE-Workflow-Review.md` and
-`docs/HybridCLR-DHE-Formal-Project-Validation.md`. Toolchain `0.1.20` is the
+`docs/HybridCLR-DHE-Formal-Project-Validation.md`. Toolchain `0.1.21` is the
 current conditionally accepted source and three-engine Windows release; its exact
 evidence and remaining platform gates are recorded in
-`docs/HybridCLR-DHE-Opt4-Release-0.1.20.md`. Toolchain `0.1.18` is retained as
-historical evidence. Projects must install an
+`docs/HybridCLR-DHE-Opt4-Release-0.1.21.md`. Toolchains `0.1.18` and `0.1.20`
+are retained as historical evidence. Projects must install an
 authenticated package whose manifest has `releaseReady=true` and pin its exact
 package ID.
 Toolchain `0.1.20` replaces generated-function
@@ -36,7 +36,8 @@ name guessing with IL2CPP MethodDef/MethodSpec table resolution and requires a
 source-bound resolver regression report from each of the three locked Editors
 before it can be published as Release. The released package ID is
 `3982eeb07d7204171fe5d2aa4b5435942e421bdbe8fe2e0e48c152fddda2183d`.
-Toolchain `0.1.21` is the active multi-Base lifecycle candidate. It adds an
+Toolchain `0.1.21` promotes the multi-Base lifecycle to Release. Its package ID is
+`f17795a3f9105cae2112fce220e187f389638170f45cee3e700ed59782483e0c`. It adds an
 authenticated registry revision chain so every online Base is retained by
 default and retirement requires an explicit Base ID and reason. Historical Base
 evidence remains admissible only when its clean tool commit is on the verified
@@ -66,9 +67,10 @@ The 0.1.20 release contract extends this proof to an arbitrary changed-Player
 evidence list and requires Unity 2021, Unity 2022, and Tuanjie 2022 coverage
 over one resource manifest. A manifest can use one shared current payload or
 multiple target-specific `payloadVariants` selected by Base identity.
-The current Release registry contains one Unity 2021, one Unity 2022, and one
-Tuanjie 2022 Windows Base. All three consumed one current payload and passed
-resource-only Player correctness. A separate exploratory registry contains four
+The current Release registry revision contains one Unity 2021, three Unity 2022,
+and one Tuanjie 2022 Windows Base. All five consumed one current payload and passed
+resource-only Player correctness, and a no-op run proved unchanged methods stay
+on AOT. A separate exploratory registry contains four
 Windows and three Android Bases;
 all seven pass compatibility and staging. All four Windows Players pass runtime
 correctness. The three Android lanes rebuild their APK after native finalize
