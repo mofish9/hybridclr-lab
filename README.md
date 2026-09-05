@@ -24,11 +24,11 @@ Its formal entry points, generated-output boundary, and complete four-assembly
 Player evidence are documented in
 `docs/HybridCLR-DHE-Toolchain.md`,
 `docs/HybridCLR-DHE-Workflow-Review.md` and
-`docs/HybridCLR-DHE-Formal-Project-Validation.md`. Toolchain `0.1.24` is the
+`docs/HybridCLR-DHE-Formal-Project-Validation.md`. Toolchain `0.1.25` is the
 current conditionally accepted source and three-engine Windows release; its exact
 evidence and remaining platform gates are recorded in
-`docs/HybridCLR-DHE-Opt4-Release-0.1.24.md`. Toolchains `0.1.18`, `0.1.20`,
-`0.1.21`, `0.1.22`, and `0.1.23` are retained as historical evidence. Projects must install an
+`docs/HybridCLR-DHE-Opt4-Release-0.1.25.md`. Toolchains `0.1.18`, `0.1.20`,
+`0.1.21`, `0.1.22`, `0.1.23`, and `0.1.24` are retained as historical evidence. Projects must install an
 authenticated package whose manifest has `releaseReady=true` and pin its exact
 package ID.
 Toolchain `0.1.20` replaces generated-function
@@ -58,18 +58,19 @@ to the exact manifest and ledger supplied as the consecutive resource release he
 The clean regression passes 118/118 checks using one ledger revision 2 payload that
 was executed by all five Windows Base Players. Missing-Base and wrong-release-head
 report sets fail closed. Android/iOS device and CAT project gates remain pending.
-Toolchain `0.1.24` is the active project-facing release.
+Toolchain `0.1.24` introduced the project-facing aggregate release gate.
 It promotes the multi-Base aggregation logic from the lab-only regression into a
 standalone C# `resource-release-gate` command. The command validates one report
 per active Base, the exact candidate and parent ledger heads, genesis versus
 continuation policy, payload variants, runtime identity, and Player dispatch
 before emitting a release-ready resource approval report. Its clean regression
 passes 119/119 checks.
-Toolchain `0.1.25` adds the protected `channel-state` workflow. A single
+Toolchain `0.1.25` is the active protected-channel release. Its package ID is
+`7f5998a95c8474b46b0eb9487d7369bc055f52bf05e3e9bc5087e7a9902eb44d`. A single
 SHA-256-pinned snapshot now drives resource construction and aggregate Player
 qualification, while promotion stores the resource and approval by content hash
-and compare-and-swaps `head.json` under an exclusive channel lock. The candidate
-regression contains 120 checks, including historical-head adoption, stale replay,
+and compare-and-swaps `head.json` under an exclusive channel lock. The clean
+regression passed 120/120 checks, including historical-head adoption, stale replay,
 two concurrent promoters, gate/snapshot tampering, orphan staging recovery, and
 post-commit snapshot-output recovery. Its `filesystem-cas-v1` guarantee requires
 filesystem support for exclusive handles and same-directory atomic rename;
