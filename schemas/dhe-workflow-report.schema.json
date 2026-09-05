@@ -32,6 +32,8 @@
     "archiveGate": { "type": ["string", "null"] },
     "runtimePlan": { "type": "string", "minLength": 1 },
     "runtimePlanProjectPath": { "type": "string", "minLength": 1 },
+    "aotMetadataRoot": { "type": ["string", "null"] },
+    "aotMetadataSetId": { "type": "string", "pattern": "^[0-9a-fA-F]{64}$" },
     "projectPlan": { "type": "string", "minLength": 1 },
     "projectPlanValidation": { "type": "string", "minLength": 1 },
     "batchReport": { "type": "string", "minLength": 1 },

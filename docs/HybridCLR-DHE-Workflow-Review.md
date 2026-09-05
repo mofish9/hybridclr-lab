@@ -96,7 +96,9 @@ commit/tree/hash 为准。
 registry 中每个 Base 独立声明 `aotMetadataRoot`。`null` 只表示该 Player 的
 `aotMetadataSetId` 是空集合 hash；非空 root 必须包含项目 `patchAOTAssemblies` 的完整
 文件集合。这个选择会写入 `baseSelections`，不会把上一份 current 或其他 Base 的 metadata
-写回 Player。相同 payload 可以因此服务不同 metadata set，但不能掩盖 managed DLL 的平台差异。
+写回 Player。完整 Base workflow 会从已认证 runtime handoff plan 自动生成这个 root，并把
+root 与 set ID 写入 workflow 报告；项目不得再从临时 Unity 目录手工拼装。相同 payload 可以
+因此服务不同 metadata set，但不能掩盖 managed DLL 的平台差异。
 
 单 target/legacy 模式下 current DLL 按字节共享。若 Android、Windows 或 iOS 因条件编译
 增加了不同方法/PInvoke/类型布局，不能把一个 target 的 DLL 伪装成另一个 target；可以在

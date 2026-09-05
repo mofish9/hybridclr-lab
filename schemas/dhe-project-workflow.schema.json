@@ -22,6 +22,8 @@
     "cleanCheckout": { "type": ["string", "null"] },
     "projectPreflight": { "type": ["string", "null"] },
     "workflowReport": { "type": ["string", "null"] },
+    "aotMetadataRoot": { "type": ["string", "null"] },
+    "aotMetadataSetId": { "type": ["string", "null"], "pattern": "^[0-9a-fA-F]{64}$" },
     "archiveGate": { "type": ["string", "null"] },
     "releaseGate": { "type": ["string", "null"] },
     "stages": {

@@ -1283,6 +1283,9 @@ internal static partial class Program
         AddRegressionCheck(checks, errors, "metadata-stress-touch-bounded",
             boundedMetadataStressTouch,
             "metadata stress must preserve 128 direct type probes without an IL2CPP-foldable accumulation chain");
+        AddRegressionCheck(checks, errors, "base-workflow-aot-metadata-archive",
+            RunBaseAotMetadataArchiveRegression(regressionRoot),
+            "Base workflow metadata archives must be content-bound, registry-ready, and fail closed on tampering");
         var bootstrapWorkflowDoc = ReadJson<JsonElement>(Path.Combine(cli.Root, "manifests",
             "runtime-workflows.json"));
         JsonElement[] bootstrapWorkflows = LabCommands.SelectBootstrapWorkflowRecords(bootstrapWorkflowDoc, null, true);
@@ -1836,6 +1839,66 @@ internal static partial class Program
         {
             return variantMismatchRejected && variantMatrixAccepted && variantSelectionRejected;
         }
+    }
+
+    private static bool RunBaseAotMetadataArchiveRegression(string regressionRoot)
+    {
+        string root = Path.Combine(regressionRoot, "base-aot-metadata-archive");
+        string planRoot = Path.Combine(root, "runtime-plan");
+        Directory.CreateDirectory(planRoot);
+        byte[] alpha = Encoding.UTF8.GetBytes("alpha-metadata");
+        byte[] beta = Encoding.UTF8.GetBytes("beta-metadata");
+        string alphaPath = Path.Combine(planRoot, "Alpha.aot-metadata.bytes");
+        string betaPath = Path.Combine(planRoot, "Beta.aot-metadata.bytes");
+        File.WriteAllBytes(alphaPath, alpha);
+        File.WriteAllBytes(betaPath, beta);
+        string planPath = Path.Combine(planRoot, "dhe-runtime-plan.json");
+
+        void WritePlan(object[] metadata) => WriteJson(planPath, new
+        {
+            schemaVersion = 1,
+            format = "hybridclr.dhe-runtime-handoff-plan.json",
+            aotMetadata = metadata,
+        });
+
+        WritePlan(new object[]
+        {
+            new { assemblyName = "Beta", sha256 = Sha256Bytes(beta), path = Path.GetFileName(betaPath) },
+            new { assemblyName = "Alpha", sha256 = Sha256Bytes(alpha), path = Path.GetFileName(alphaPath) },
+        });
+        var archive = MaterializeBaseAotMetadataRoot(root, planPath);
+        string expectedSetId = NamedByteSetHash(new[] { ("Alpha", alpha), ("Beta", beta) });
+        bool valid = archive.Root != null &&
+            string.Equals(archive.SetId, expectedSetId, StringComparison.OrdinalIgnoreCase) &&
+            File.ReadAllBytes(Path.Combine(archive.Root, "Alpha.dll")).SequenceEqual(alpha) &&
+            File.ReadAllBytes(Path.Combine(archive.Root, "Beta.dll")).SequenceEqual(beta);
+        string archiveTree = archive.Root == null ? string.Empty :
+            TreeHashForRelease(archive.Root, Array.Empty<string>());
+
+        File.WriteAllText(alphaPath, "tampered", new UTF8Encoding(false));
+        bool tamperRejected = false;
+        try { _ = MaterializeBaseAotMetadataRoot(root, planPath); }
+        catch (DheException) { tamperRejected = true; }
+        bool archivePreserved = archive.Root != null && Directory.Exists(archive.Root) &&
+            string.Equals(TreeHashForRelease(archive.Root, Array.Empty<string>()), archiveTree,
+                StringComparison.OrdinalIgnoreCase);
+
+        File.WriteAllBytes(alphaPath, alpha);
+        WritePlan(new object[]
+        {
+            new { assemblyName = "Alpha", sha256 = Sha256Bytes(alpha), path = "../outside.bytes" },
+        });
+        bool traversalRejected = false;
+        try { _ = MaterializeBaseAotMetadataRoot(root, planPath); }
+        catch (DheException) { traversalRejected = true; }
+
+        WritePlan(Array.Empty<object>());
+        var empty = MaterializeBaseAotMetadataRoot(root, planPath);
+        bool emptySetValid = empty.Root == null &&
+            string.Equals(empty.SetId, Sha256Bytes(Array.Empty<byte>()),
+                StringComparison.OrdinalIgnoreCase) &&
+            !Directory.Exists(Path.Combine(root, "aot-metadata-root"));
+        return valid && tamperRejected && archivePreserved && traversalRejected && emptySetValid;
     }
 
     private static bool RunLegacySinglePayloadSelectionRegression()

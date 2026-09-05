@@ -299,6 +299,14 @@ The project provides a C# class containing these Unity execute-methods:
   the editor-owned Bee graph, and invokes `NativeFinalizeResultCallback` before
   temporary baseline assembly inputs are restored.
 
+After `StageRuntimePlan`, the C# host materializes every authenticated
+`aotMetadata` record into `<OutputRoot>/aot-metadata-root/<AssemblyName>.dll`.
+The Player and project workflow reports expose this directory and its
+content-addressed `aotMetadataSetId`; use that directory directly as the new
+Base registry entry's `AotMetadataRoot`. An empty metadata set reports a null
+root and retains the SHA-256 empty-set identity. Payload hash or path traversal
+failures stop the workflow before the Player build.
+
 The host starts Unity directly with `ProcessStartInfo`.
 The final-player phase binds `HYBRIDCLR_DHE_AOT_BASELINE_ROOT`, while
 current-generation clears that variable and always regenerates the current

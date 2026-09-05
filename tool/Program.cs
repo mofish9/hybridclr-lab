@@ -50,6 +50,7 @@ internal static partial class Program
         "unity-stale-lock-recovery",
         "native-universal-body-filter",
         "metadata-stress-touch-bounded",
+        "base-workflow-aot-metadata-archive",
         "integrated-source-lock-line-ending-stable",
         "integrated-source-lock-valid", "integrated-source-lock-commit-tamper",
         "integrated-source-lock-tree-tamper", "integrated-source-lock-patch-tamper",
@@ -1641,7 +1642,7 @@ internal static partial class Program
         {
             var reportPath = Path.Combine(output, "project-workflow-report.json");
             WriteJson(reportPath, ProjectWorkflowReport(output, mode, target, project, settings, adapterClass,
-                productionEvidence, preparePath, null, null, null, null, false, null, null));
+                productionEvidence, preparePath, null, null, null, null, null, null, false, null, null));
             RunWorkflowSchemaGate(cli, output);
             Console.WriteLine("DHE workflow preflight passed: " + reportPath);
             return 0;
@@ -1653,6 +1654,8 @@ internal static partial class Program
         if (cli.Has("bootstrap")) common.AddRange(new[] { "-dheBootstrap", "true" });
         AppendUnityArguments(common, cli);
         RunUnity(unity, project, common.Append("-executeMethod").Append(adapterType + ".StageRuntimePlan").Append("-logFile").Append(Path.Combine(output, "unity-stage.log")), new Dictionary<string, string> { ["DHE_BASELINE_ROOT"] = baseline }, Path.Combine(output, "unity-stage-process.log"), timeout);
+        var runtimePlanPath = Path.Combine(output, "runtime-plan", "dhe-runtime-plan.json");
+        var baseAotMetadataArchive = MaterializeBaseAotMetadataRoot(output, runtimePlanPath);
         RunUnity(unity, project, common.Append("-executeMethod").Append(adapterType + ".BuildDheYooAsset").Append("-logFile").Append(Path.Combine(output, "unity-yooasset.log")), new Dictionary<string, string> { ["DHE_BASELINE_ROOT"] = baseline }, Path.Combine(output, "unity-yooasset-process.log"), timeout);
         var resourcePath = Path.Combine(output, "adapter", "resource-evidence.json");
         ValidateResourceEvidence(resourcePath, target);
@@ -1670,11 +1673,12 @@ internal static partial class Program
         RequireFile(playerPath, "DHE Player result");
         var nativePath = Path.Combine(output, "native", "dhe-native-manifest.json");
         var identityPath = Path.Combine(output, "build-identity.json");
-        var runtimePlanPath = Path.Combine(output, "runtime-plan", "dhe-runtime-plan.json");
+        ValidateBaseAotMetadataArchive(identityPath, baseAotMetadataArchive.SetId);
         if (mode == "Release") productionEvidence = PrepareProductionEvidence(cli, mode, project, settings, baseline, target, output);
         var workflowPath = Path.Combine(output, "player-workflow-report.json");
         WriteJson(workflowPath, PlayerWorkflowReport(output, mode, target, playerPath, nativePath, identityPath,
-            runtimePlanPath, productionEvidence));
+            runtimePlanPath, baseAotMetadataArchive.Root, baseAotMetadataArchive.SetId,
+            productionEvidence));
         string? gatePath = null;
         string? archiveGatePath = null;
         if (mode == "Release")
@@ -1697,8 +1701,8 @@ internal static partial class Program
         }
         var projectWorkflowPath = Path.Combine(output, "project-workflow-report.json");
         WriteJson(projectWorkflowPath, ProjectWorkflowReport(output, mode, target, project, settings, adapterClass,
-            productionEvidence, preparePath, playerPath, nativePath, identityPath, runtimePlanPath, true,
-            archiveGatePath, gatePath));
+            productionEvidence, preparePath, playerPath, nativePath, identityPath, runtimePlanPath,
+            baseAotMetadataArchive.Root, baseAotMetadataArchive.SetId, true, archiveGatePath, gatePath));
         RunWorkflowSchemaGate(cli, output);
         Console.WriteLine("DHE workflow passed: " + projectWorkflowPath);
         return 0;
@@ -1721,9 +1725,72 @@ internal static partial class Program
         }
     }
 
+    internal static (string? Root, string SetId) MaterializeBaseAotMetadataRoot(
+        string outputRoot, string runtimePlanPath)
+    {
+        string output = RequireDirectory(outputRoot, "DHE workflow output root");
+        string planPath = RequireFile(runtimePlanPath, "DHE runtime handoff plan");
+        JsonElement plan = ReadJson<JsonElement>(planPath);
+        if (!string.Equals(GetString(plan, "format"),
+                "hybridclr.dhe-runtime-handoff-plan.json", StringComparison.Ordinal) ||
+            !plan.TryGetProperty("aotMetadata", out JsonElement metadata) ||
+            metadata.ValueKind != JsonValueKind.Array)
+            throw new DheException("DHE runtime handoff plan has no authenticated AOT metadata set.");
+
+        string archiveRoot = ResolveContainedPath(output, "aot-metadata-root",
+            "Base AOT metadata archive");
+        var names = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+        var setBytes = new List<(string name, byte[] bytes)>();
+        string planRoot = Path.GetDirectoryName(planPath)!;
+        foreach (JsonElement item in metadata.EnumerateArray())
+        {
+            string name = NormalizeName(GetString(item, "assemblyName") ?? string.Empty);
+            if (string.IsNullOrWhiteSpace(name) || !string.Equals(Path.GetFileName(name), name,
+                    StringComparison.Ordinal) || !names.Add(name))
+                throw new DheException("DHE AOT metadata archive contains an invalid or duplicate assembly name.");
+            string source = RequireFile(ResolveContainedPath(planRoot,
+                GetString(item, "path") ?? string.Empty, "DHE AOT metadata payload"),
+                name + " AOT metadata payload");
+            byte[] bytes = File.ReadAllBytes(source);
+            string expectedHash = GetString(item, "sha256") ?? string.Empty;
+            if (!IsHex(expectedHash, 64, 64) || !string.Equals(Sha256Bytes(bytes), expectedHash,
+                    StringComparison.OrdinalIgnoreCase))
+                throw new DheException("DHE AOT metadata payload hash mismatch: " + name);
+            setBytes.Add((name, bytes));
+        }
+        string setId = NamedByteSetHash(setBytes);
+        if (setBytes.Count == 0)
+        {
+            if (Directory.Exists(archiveRoot)) Directory.Delete(archiveRoot, true);
+            return (null, setId);
+        }
+
+        string stagingRoot = ResolveContainedPath(output, "aot-metadata-root.staging",
+            "Base AOT metadata archive staging");
+        if (Directory.Exists(stagingRoot)) Directory.Delete(stagingRoot, true);
+        Directory.CreateDirectory(stagingRoot);
+        foreach (var item in setBytes)
+            File.WriteAllBytes(ResolveContainedPath(stagingRoot, item.name + ".dll",
+                "Base AOT metadata assembly"), item.bytes);
+        if (Directory.Exists(archiveRoot)) Directory.Delete(archiveRoot, true);
+        Directory.Move(stagingRoot, archiveRoot);
+        return (archiveRoot, setId);
+    }
+
+    private static void ValidateBaseAotMetadataArchive(string identityPath, string setId)
+    {
+        JsonElement identity = ReadJson<JsonElement>(RequireFile(identityPath,
+            "DHE Base build identity"));
+        if (!string.Equals(GetString(identity, "aotMetadataSetId"), setId,
+                StringComparison.OrdinalIgnoreCase))
+            throw new DheException(
+                "DHE Base AOT metadata archive does not match the final Player identity.");
+    }
+
     private static object ProjectWorkflowReport(string output, string mode, string target, string project, string settings,
         string adapter, ProductionEvidence evidence, string prepare, string? player, string? native, string? identity,
-        string? runtimePlan, bool playerExecuted, string? archiveGate, string? releaseGate)
+        string? runtimePlan, string? aotMetadataRoot, string? aotMetadataSetId, bool playerExecuted,
+        string? archiveGate, string? releaseGate)
     {
         var preflight = Path.Combine(output, "project-preflight", "project-preflight-report.json");
         var plan = Path.Combine(output, "project-preflight", "dhe-project-plan.json");
@@ -1750,13 +1817,15 @@ internal static partial class Program
             expectedToolchainPackageId = evidence.ExpectedPackageId, sourcePreflight = evidence.SourcePreflight,
             cleanCheckout = evidence.CleanCheckout, projectPreflight = preflight,
             workflowReport = playerExecuted ? Path.Combine(output, "player-workflow-report.json") : null,
+            aotMetadataRoot, aotMetadataSetId,
             archiveGate, releaseGate, stages, errors = Array.Empty<string>(),
             warnings = playerExecuted ? Array.Empty<string>() : new[] { "Player, archive, and release stages were not executed." }
         };
     }
 
     private static object PlayerWorkflowReport(string output, string mode, string target, string playerPath,
-        string nativePath, string identityPath, string runtimePlanPath, ProductionEvidence evidence)
+        string nativePath, string identityPath, string runtimePlanPath, string? aotMetadataRoot,
+        string aotMetadataSetId, ProductionEvidence evidence)
     {
         var planPath = Path.Combine(output, "project-preflight", "dhe-project-plan.json");
         var planValidationPath = Path.Combine(output, "project-preflight", "project-plan-validation.json");
@@ -1790,6 +1859,7 @@ internal static partial class Program
             nativeGuardSourceSha256 = GetString(identity, "nativeGuardSourceSha256"), nativeManifestSha256 = GetString(identity, "nativeManifestSha256"),
             pathSemantics = "workspace-absolute-v1", projectPlan = planPath, projectPlanValidation = planValidationPath,
             batchReport = batchPath, runtimePlan = runtimePlanPath, runtimePlanProjectPath = runtimePlanPath,
+            aotMetadataRoot, aotMetadataSetId,
             sourcePreflight = evidence.SourcePreflight, cleanCheckoutGate = evidence.CleanCheckout,
             toolchainGate = evidence.ToolchainGate, expectedToolchainPackageId = evidence.ExpectedPackageId,
             transaction = new { status = transactionStatus, retryValidated = GetBool(player, "retryValidated"), retryAssemblyName = GetString(player, "retryAssemblyName"), retryFailure = GetString(player, "retryFailure") },
