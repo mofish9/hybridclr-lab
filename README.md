@@ -6,8 +6,10 @@ HybridCLR community runtime on Tuanjie 1.10.0.
 ## Fixed baseline
 
 - Tuanjie: `1.10.0` (`2022.3.62t12`)
-- HybridCLR package candidate: `v8.13.0` (`22fb364`, tree `89C676E9CF77083776DA66F9F05A02F0E8CA981824970165556B93079862C23A`, no package opt tag). The published `optimize/v8.13.0` branch remains at `ae5faf2` until the candidate gates complete.
-- HybridCLR runtime: DHE candidate based on `v8.13.0-opt4.1` (`fe3b1ed`, no new runtime tag)
+- HybridCLR package: `v8.13.0` (`22fb364`, tree
+  `89C676E9CF77083776DA66F9F05A02F0E8CA981824970165556B93079862C23A`,
+  no package opt tag), published on `optimize/v8.13.0`.
+- HybridCLR runtime: `v8.13.0-opt4.2` (`fe3b1ed`)
 - il2cpp_plus: `v2022-tuanjie-8.13.0-opt4.1` (`52968ad`)
 
 The runtime source repositories live beside this repository under `../repos`.
@@ -22,16 +24,18 @@ Its formal entry points, generated-output boundary, and complete four-assembly
 Player evidence are documented in
 `docs/HybridCLR-DHE-Toolchain.md`,
 `docs/HybridCLR-DHE-Workflow-Review.md` and
-`docs/HybridCLR-DHE-Formal-Project-Validation.md`. Toolchain `0.1.18` is the
-conditionally accepted source/Windows reference release; its exact evidence
-and remaining platform gates are recorded in
-`docs/HybridCLR-DHE-Opt4-Release-0.1.18.md`. Projects must install an
+`docs/HybridCLR-DHE-Formal-Project-Validation.md`. Toolchain `0.1.20` is the
+current conditionally accepted source and three-engine Windows release; its exact
+evidence and remaining platform gates are recorded in
+`docs/HybridCLR-DHE-Opt4-Release-0.1.20.md`. Toolchain `0.1.18` is retained as
+historical evidence. Projects must install an
 authenticated package whose manifest has `releaseReady=true` and pin its exact
 package ID.
-Toolchain `0.1.20` is the active candidate. It replaces generated-function
+Toolchain `0.1.20` replaces generated-function
 name guessing with IL2CPP MethodDef/MethodSpec table resolution and requires a
 source-bound resolver regression report from each of the three locked Editors
-before it can be published as Release.
+before it can be published as Release. The released package ID is
+`3982eeb07d7204171fe5d2aa4b5435942e421bdbe8fe2e0e48c152fddda2183d`.
 Base identity now also binds `engineWorkflow` and `il2cppCodeGeneration`.
 Unity 2021 is locked to `OptimizeSpeed`; Unity 2022 FGS and Tuanjie 2022 FGS
 are locked to `OptimizeSize`. Base evidence created before these fields existed
@@ -57,7 +61,10 @@ The 0.1.20 release contract extends this proof to an arbitrary changed-Player
 evidence list and requires Unity 2021, Unity 2022, and Tuanjie 2022 coverage
 over one resource manifest. A manifest can use one shared current payload or
 multiple target-specific `payloadVariants` selected by Base identity.
-The latest exploratory registry contains four Windows and three Android Bases;
+The current Release registry contains one Unity 2021, one Unity 2022, and one
+Tuanjie 2022 Windows Base. All three consumed one current payload and passed
+resource-only Player correctness. A separate exploratory registry contains four
+Windows and three Android Bases;
 all seven pass compatibility and staging. All four Windows Players pass runtime
 correctness. The three Android lanes rebuild their APK after native finalize
 and verify packaged `libil2cpp.so` hashes against Bee staging, but have no device
