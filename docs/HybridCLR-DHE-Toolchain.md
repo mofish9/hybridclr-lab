@@ -652,9 +652,10 @@ type sidecar fields. Existing value-type layout, inheritance/interface/vtable,
 unsupported field shapes, and unsupported declaration changes fail closed. A no-op
 release is valid when all changed/interpreter/native counts are zero and the
 transaction status is `notApplicable`. The Player must also set
-`noOpAotBehaviorValidated=true` after checking baseline results, the complete
-multi-assembly scope, direct/reflection capability probes, and the absence of
-interpreter dispatch.
+`noOpAotBehaviorValidated=true` after checking generation-local AOT results
+against equivalent reflection calls, the complete multi-assembly scope, a
+positive AOT entry count, and the absence of interpreter dispatch. The no-op
+gate must not encode business-result constants from the first Base generation.
 
 Publishing the toolchain itself in `-Mode Release` requires
 `-ReleaseEvidence <report>`. Generate it from a clean source identity with the

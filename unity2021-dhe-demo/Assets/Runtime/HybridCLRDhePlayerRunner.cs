@@ -286,6 +286,7 @@ namespace HybridCLR.Lab
             int instanceAddResult = calculator.InstanceAdd(1);
             int instanceStableResult = calculator.InstanceStable(2);
             int instanceAddViaStableResult = calculator.InstanceAddViaStable(2);
+            MainBehaviorRun reflectedMain = ExecuteMainReflection(mainLoaded.assembly);
             MethodInfo managedSecondaryChangedMethod = typeof(ManagedCasesSecondary.DheSecondaryCases)
                 .GetMethod("Changed", BindingFlags.Public | BindingFlags.Static);
             MethodInfo managedSecondaryUnchangedMethod = typeof(ManagedCasesSecondary.DheSecondaryCases)
@@ -307,6 +308,7 @@ namespace HybridCLR.Lab
             int managedSecondaryUnchangedDirectResult = ManagedCasesSecondary.DheSecondaryCases.Unchanged(3);
             int metadataSecondaryDirectResult = MetadataStressSecondary.Changed(3);
             int crossSecondaryDirectResult = CrossAssemblySecondary.Changed(3);
+            string crossAssemblyDirectResult = CrossAssemblySecondary.Run();
             int mainInterpreterEntryCount = RuntimeApi.GetDifferentialInterpreterEntryCount();
             int mainAotBridgeCallCount = RuntimeApi.GetDifferentialAotBridgeCallCount();
             int mainAotEntryCount = RuntimeApi.GetDifferentialAotEntryCount();
@@ -324,8 +326,14 @@ namespace HybridCLR.Lab
             StructuralRun structural = ExecuteStructural(mainLoaded.assembly, structuralExpected,
                 directCapability.genericContainerResult);
             long metadataStressResult = ExecuteMetadataStress(loadedAssemblies);
+            int managedSecondaryReflectionResult = ExecuteSecondaryChanged(
+                loadedAssemblies, "HybridCLR.ManagedCases",
+                "HybridCLR.Lab.ManagedCases.DheSecondaryCases");
             int metadataSecondaryReflectionResult = ExecuteSecondaryChanged(
                 loadedAssemblies, "HybridCLR.MetadataStress", "HybridCLR.Lab.MetadataStress.DheSecondaryCases");
+            int managedSecondaryUnchangedReflectionResult = ExecuteSecondaryMethod(
+                loadedAssemblies, "HybridCLR.ManagedCases",
+                "HybridCLR.Lab.ManagedCases.DheSecondaryCases", "Unchanged");
             string crossAssemblyResult = ExecuteCrossAssembly(loadedAssemblies);
             bool newHotfixPlanned = selectedPlanAssemblies.Any(item => string.Equals(
                 item.assemblyName, NewHotfixAssemblyName, StringComparison.OrdinalIgnoreCase));
@@ -391,23 +399,31 @@ namespace HybridCLR.Lab
                 string.Equals(buildIdentity.nativeGuardSourceSha256, HybridCLRDheBuildIdentity.NativeGuardSourceSha256, StringComparison.OrdinalIgnoreCase) &&
                 string.Equals(buildIdentity.nativeManifestSha256, HybridCLRDheBuildIdentity.NativeManifestSha256, StringComparison.OrdinalIgnoreCase);
             bool noOpCapabilityDirectValidated = ValidateNoOpCapabilityDirect(directCapability);
-            bool noOpCapabilityReflectionValidated = ValidateNoOpCapabilityReflection(capability);
-            bool noOpMainBehaviorValidated = addResult == 2 && stableResult == 4 &&
-                addViaStableResult == 5 && addPairResult == 8 && wideResult == 6L && touchValue == 12 &&
-                instanceAddResult == 3 && instanceStableResult == 6 && instanceAddViaStableResult == 8 &&
-                identityUnchangedResult == 21 && !identityUnchangedChanged &&
+            bool noOpCapabilityReflectionValidated = ValidateNoOpCapabilityReflection(
+                capability, directCapability);
+            bool noOpMainBehaviorValidated = string.IsNullOrEmpty(reflectedMain.error) &&
+                reflectedMain.addResult == addResult && reflectedMain.stableResult == stableResult &&
+                reflectedMain.addViaStableResult == addViaStableResult &&
+                reflectedMain.addPairResult == addPairResult && reflectedMain.wideResult == wideResult &&
+                reflectedMain.touchValue == touchValue &&
+                reflectedMain.instanceAddResult == instanceAddResult &&
+                reflectedMain.instanceStableResult == instanceStableResult &&
+                reflectedMain.instanceAddViaStableResult == instanceAddViaStableResult &&
+                reflectedMain.identityUnchangedResult == identityUnchangedResult && !identityUnchangedChanged &&
                 !addChanged && !stableChanged && !addViaStableChanged && !addPairChanged && !wideChanged &&
                 !touchChanged && !instanceStableChanged && !instanceAddChanged && !instanceAddViaStableChanged;
-            bool noOpMultiAssemblyValidated = loadedAssemblies.Count >= 4 && metadataStressResult > 0 &&
+            bool noOpMultiAssemblyValidated = loadedAssemblies.Count >= 4 &&
                 !managedSecondaryChanged && !managedSecondaryUnchanged && !metadataSecondaryChanged &&
-                !crossSecondaryChanged && managedSecondaryDirectResult == 13 &&
-                managedSecondaryUnchangedDirectResult == 6 && metadataSecondaryDirectResult == 13 &&
-                crossSecondaryDirectResult == 13 && metadataSecondaryReflectionResult == 13 &&
-                crossSecondaryReflectionResult == 13 &&
-                string.Equals(crossAssemblyResult, "derived:26:34", StringComparison.Ordinal);
+                !crossSecondaryChanged &&
+                managedSecondaryDirectResult == managedSecondaryReflectionResult &&
+                managedSecondaryUnchangedDirectResult == managedSecondaryUnchangedReflectionResult &&
+                metadataSecondaryDirectResult == metadataSecondaryReflectionResult &&
+                crossSecondaryDirectResult == crossSecondaryReflectionResult &&
+                string.Equals(crossAssemblyDirectResult, crossAssemblyResult, StringComparison.Ordinal);
             bool noOpAotBehaviorValidated = changedMethodCount == 0 && noOpMainBehaviorValidated &&
                 noOpMultiAssemblyValidated && noOpCapabilityDirectValidated &&
-                noOpCapabilityReflectionValidated && mainInterpreterEntryCount == 0;
+                noOpCapabilityReflectionValidated && mainInterpreterEntryCount == 0 &&
+                mainAotEntryCount > 0;
             bool stableDispatchValidated = structuralDispatchExpected
 				? stableChanged && instanceStableChanged
 				: !stableChanged && !instanceStableChanged;
@@ -704,22 +720,80 @@ namespace HybridCLR.Lab
             };
         }
 
-        private static bool ValidateNoOpCapabilityDirect(CapabilityDirectRun result)
+        private static MainBehaviorRun ExecuteMainReflection(Assembly assembly)
         {
-            return string.IsNullOrEmpty(result.error) && result.interfaceResult == 7 &&
-                result.delegateResult == 7 && result.genericSelectResult == 9 &&
-                !result.genericSelectNullPassed && result.genericConstrainedResult == 7 &&
-                result.genericVirtualResult == 7 && result.mutateValueResult.Number == 4 &&
-                result.mutateValueResult.Wide == 5L && result.boxValueResult.Number == 3 &&
-                result.boxValueResult.Wide == 4L && result.refOutResult == 5 && result.asyncResult == 4 &&
-                result.iteratorResult == "4,5" && result.genericContainerResult == 8 &&
-                result.nullableResult == 4 && result.delegateClosedInstanceResult == 9 &&
-                result.delegateOpenInstanceResult == 9 && result.delegateMulticastResult == 19 &&
-                result.exceptionFinallyResult == 4 && result.virtualResult == 4 &&
-                result.unchangedVirtualResult == 9 && result.interpreterEntryCount == 0;
+            MainBehaviorRun result = new MainBehaviorRun();
+            try
+            {
+                Type calculatorType = assembly.GetType(typeof(DheDemoCalculator).FullName, true);
+                Type workloadType = assembly.GetType(typeof(PerformanceWorkload).FullName, true);
+                const BindingFlags staticFlags = BindingFlags.Public | BindingFlags.Static;
+                const BindingFlags instanceFlags = BindingFlags.Public | BindingFlags.Instance;
+                MethodInfo add = calculatorType.GetMethod("Add", staticFlags, null,
+                    new[] { typeof(int) }, null);
+                MethodInfo stable = calculatorType.GetMethod("Stable", staticFlags, null,
+                    new[] { typeof(int) }, null);
+                MethodInfo addViaStable = calculatorType.GetMethod("AddViaStable", staticFlags, null,
+                    new[] { typeof(int) }, null);
+                MethodInfo addPair = calculatorType.GetMethod("AddPair", staticFlags, null,
+                    new[] { typeof(int), typeof(int) }, null);
+                MethodInfo wide = calculatorType.GetMethod("Wide", staticFlags, null,
+                    new[] { typeof(long) }, null);
+                MethodInfo touch = calculatorType.GetMethod("Touch", staticFlags, null,
+                    new[] { typeof(int) }, null);
+                FieldInfo touchValue = calculatorType.GetField("TouchValue", staticFlags);
+                MethodInfo instanceAdd = calculatorType.GetMethod("InstanceAdd", instanceFlags, null,
+                    new[] { typeof(int) }, null);
+                MethodInfo instanceStable = calculatorType.GetMethod("InstanceStable", instanceFlags, null,
+                    new[] { typeof(int) }, null);
+                MethodInfo instanceAddViaStable = calculatorType.GetMethod("InstanceAddViaStable",
+                    instanceFlags, null, new[] { typeof(int) }, null);
+                PropertyInfo all = workloadType.GetProperty("All", staticFlags);
+                if (add == null || stable == null || addViaStable == null || addPair == null ||
+                    wide == null || touch == null || touchValue == null || instanceAdd == null ||
+                    instanceStable == null || instanceAddViaStable == null || all == null)
+                {
+                    throw new MissingMethodException(calculatorType.FullName);
+                }
+
+                object calculator = Activator.CreateInstance(calculatorType);
+                result.addResult = Convert.ToInt32(add.Invoke(null, new object[] { 1 }));
+                result.stableResult = Convert.ToInt32(stable.Invoke(null, new object[] { 2 }));
+                result.addViaStableResult = Convert.ToInt32(
+                    addViaStable.Invoke(null, new object[] { 2 }));
+                result.addPairResult = Convert.ToInt32(
+                    addPair.Invoke(null, new object[] { 3, 4 }));
+                result.wideResult = Convert.ToInt64(wide.Invoke(null, new object[] { 5L }));
+                touch.Invoke(null, new object[] { 5 });
+                result.touchValue = Convert.ToInt32(touchValue.GetValue(null));
+                result.instanceAddResult = Convert.ToInt32(
+                    instanceAdd.Invoke(calculator, new object[] { 1 }));
+                result.instanceStableResult = Convert.ToInt32(
+                    instanceStable.Invoke(calculator, new object[] { 2 }));
+                result.instanceAddViaStableResult = Convert.ToInt32(
+                    instanceAddViaStable.Invoke(calculator, new object[] { 2 }));
+                object workloads = all.GetValue(null);
+                if (!(workloads is System.Collections.ICollection collection))
+                {
+                    throw new InvalidDataException("Performance workload list is not countable.");
+                }
+                result.identityUnchangedResult = collection.Count;
+            }
+            catch (Exception exception)
+            {
+                result.error = exception.ToString();
+            }
+            return result;
         }
 
-        private static bool ValidateNoOpCapabilityReflection(CapabilityRun result)
+        private static bool ValidateNoOpCapabilityDirect(CapabilityDirectRun result)
+        {
+            return string.IsNullOrEmpty(result.error) && result.interpreterEntryCount == 0 &&
+                result.aotEntryCount > 0;
+        }
+
+        private static bool ValidateNoOpCapabilityReflection(CapabilityRun result,
+            CapabilityDirectRun direct)
         {
             bool noChangedMethods = !result.interfaceChanged && !result.delegateChanged &&
                 !result.genericSelectChanged && !result.genericConstrainedChanged &&
@@ -729,17 +803,30 @@ namespace HybridCLR.Lab
                 !result.genericContainerChanged && !result.nullableChanged &&
                 !result.delegateClosedInstanceChanged && !result.delegateOpenInstanceChanged &&
                 !result.delegateMulticastChanged && !result.exceptionFinallyChanged &&
-                !result.virtualChanged && !result.genericVirtualChanged;
-            return string.IsNullOrEmpty(result.error) && noChangedMethods && result.interfaceResult == 7 &&
-                result.delegateResult == 7 && result.genericSelectResult == 9 &&
-                !result.genericSelectNullPassed && result.genericConstrainedResult == 7 &&
-                result.genericVirtualResult == 7 && result.valueNumber == 4 && result.valueWide == 5L &&
-                result.boxNumber == 3 && result.boxWide == 4L && result.refOutResult == 5 &&
-                result.asyncResult == 4 && result.iteratorResult == "4,5" &&
-                result.genericContainerResult == 8 && result.nullableResult == 4 &&
-                result.delegateClosedInstanceResult == 9 && result.delegateOpenInstanceResult == 9 &&
-                result.delegateMulticastResult == 19 && result.exceptionFinallyResult == 4 &&
-                result.virtualResult == 4;
+                !result.virtualChanged && !result.genericVirtualChanged &&
+                !result.unchangedVirtualChanged;
+            return string.IsNullOrEmpty(result.error) && noChangedMethods &&
+                result.interfaceResult == direct.interfaceResult &&
+                result.delegateResult == direct.delegateResult &&
+                result.genericSelectResult == direct.genericSelectResult &&
+                result.genericSelectNullPassed == direct.genericSelectNullPassed &&
+                result.genericConstrainedResult == direct.genericConstrainedResult &&
+                result.genericVirtualResult == direct.genericVirtualResult &&
+                result.valueNumber == direct.mutateValueResult.Number &&
+                result.valueWide == direct.mutateValueResult.Wide &&
+                result.boxNumber == direct.boxValueResult.Number &&
+                result.boxWide == direct.boxValueResult.Wide &&
+                result.refOutResult == direct.refOutResult &&
+                result.asyncResult == direct.asyncResult &&
+                string.Equals(result.iteratorResult, direct.iteratorResult, StringComparison.Ordinal) &&
+                result.genericContainerResult == direct.genericContainerResult &&
+                result.nullableResult == direct.nullableResult &&
+                result.delegateClosedInstanceResult == direct.delegateClosedInstanceResult &&
+                result.delegateOpenInstanceResult == direct.delegateOpenInstanceResult &&
+                result.delegateMulticastResult == direct.delegateMulticastResult &&
+                result.exceptionFinallyResult == direct.exceptionFinallyResult &&
+                result.virtualResult == direct.virtualResult &&
+                result.unchangedVirtualResult == direct.unchangedVirtualResult;
         }
 
         private static CapabilityDirectRun ExecuteCapabilityDirect(bool structuralExpected)
@@ -796,13 +883,23 @@ namespace HybridCLR.Lab
             string assemblyName,
             string declaringTypeName)
         {
+            return ExecuteSecondaryMethod(loadedAssemblies, assemblyName, declaringTypeName,
+                "Changed");
+        }
+
+        private static int ExecuteSecondaryMethod(
+            Dictionary<string, LoadedDheAssembly> loadedAssemblies,
+            string assemblyName,
+            string declaringTypeName,
+            string methodName)
+        {
             if (!loadedAssemblies.TryGetValue(assemblyName, out LoadedDheAssembly loaded))
             {
                 throw new InvalidDataException("DHE runtime plan omitted " + assemblyName + ".");
             }
             Type declaringType = loaded.assembly.GetType(declaringTypeName, true);
-            MethodInfo method = declaringType.GetMethod("Changed", BindingFlags.Public | BindingFlags.Static);
-            if (method == null) throw new MissingMethodException(declaringTypeName, "Changed");
+            MethodInfo method = declaringType.GetMethod(methodName, BindingFlags.Public | BindingFlags.Static);
+            if (method == null) throw new MissingMethodException(declaringTypeName, methodName);
             return Convert.ToInt32(method.Invoke(null, new object[] { 3 }));
         }
 
@@ -1249,6 +1346,8 @@ namespace HybridCLR.Lab
                 MethodInfo exceptionFinally = capabilityType.GetMethod("ExceptionFinally", BindingFlags.Public | BindingFlags.Static);
                 MethodInfo virtualApply = typeof(VirtualOperationBase).GetMethod("Apply", BindingFlags.Public | BindingFlags.Instance);
                 MethodInfo genericVirtualApply = typeof(GenericVirtualOperation<IntOperationStruct>).GetMethod("Apply", BindingFlags.Public | BindingFlags.Instance);
+                MethodInfo unchangedVirtualApply = typeof(VirtualOperationDerived).GetMethod("Apply",
+                    BindingFlags.Public | BindingFlags.Instance);
                 Type asyncStateMachineType = capabilityType.GetNestedType("<AsyncValue>d__7", BindingFlags.NonPublic);
                 Type iteratorStateMachineType = capabilityType.GetNestedType("<IterateValue>d__8", BindingFlags.NonPublic);
                 MethodInfo asyncMoveNext = asyncStateMachineType?.GetMethod("MoveNext", BindingFlags.Public | BindingFlags.NonPublic | BindingFlags.Instance);
@@ -1258,7 +1357,7 @@ namespace HybridCLR.Lab
                     genericContainerValue == null || nullableValue == null || delegateClosedInstance == null ||
                     delegateOpenInstance == null ||
                     delegateMulticast == null || exceptionFinally == null || asyncMoveNext == null || iteratorMoveNext == null ||
-                    virtualApply == null || genericVirtualApply == null)
+                    virtualApply == null || genericVirtualApply == null || unchangedVirtualApply == null)
                 {
                     throw new MissingMethodException(capabilityType.FullName);
                 }
@@ -1282,6 +1381,8 @@ namespace HybridCLR.Lab
                 result.exceptionFinallyChanged = RuntimeApi.IsDifferentialMethodChanged(exceptionFinally);
                 result.virtualChanged = RuntimeApi.IsDifferentialMethodChanged(virtualApply);
                 result.genericVirtualChanged = RuntimeApi.IsDifferentialMethodChanged(genericVirtualApply);
+                result.unchangedVirtualChanged = RuntimeApi.IsDifferentialMethodChanged(
+                    unchangedVirtualApply);
 
                 void Capture(string name, Action action)
                 {
@@ -1363,6 +1464,9 @@ namespace HybridCLR.Lab
                 Capture("GenericVirtualApply", () =>
                     result.genericVirtualResult = (int)genericVirtualApply.Invoke(
                         new GenericVirtualOperation<IntOperationStruct>(), new object[] { new IntOperationStruct(), 3 }));
+                Capture("UnchangedVirtualApply", () =>
+                    result.unchangedVirtualResult = (int)unchangedVirtualApply.Invoke(
+                        new VirtualOperationDerived(), new object[] { 3 }));
                 result.genericVirtualPassed = result.genericVirtualChanged && result.genericVirtualResult == 106;
                 result.genericBehaviorValidated = result.genericSelectResult == 7 &&
                     result.genericSelectNullPassed &&
@@ -1818,6 +1922,7 @@ namespace HybridCLR.Lab
             public bool exceptionFinallyChanged;
             public bool virtualChanged;
             public bool genericVirtualChanged;
+            public bool unchangedVirtualChanged;
             public bool genericVirtualPassed;
             public bool genericBehaviorValidated;
             public int interfaceResult;
@@ -1840,6 +1945,22 @@ namespace HybridCLR.Lab
             public string iteratorResult;
             public int virtualResult;
             public int genericVirtualResult;
+            public int unchangedVirtualResult;
+        }
+
+        private sealed class MainBehaviorRun
+        {
+            public string error;
+            public int addResult;
+            public int stableResult;
+            public int addViaStableResult;
+            public int addPairResult;
+            public long wideResult;
+            public int touchValue;
+            public int instanceAddResult;
+            public int instanceStableResult;
+            public int instanceAddViaStableResult;
+            public int identityUnchangedResult;
         }
 
         private sealed class CapabilityDirectRun
