@@ -24,11 +24,11 @@ Its formal entry points, generated-output boundary, and complete four-assembly
 Player evidence are documented in
 `docs/HybridCLR-DHE-Toolchain.md`,
 `docs/HybridCLR-DHE-Workflow-Review.md` and
-`docs/HybridCLR-DHE-Formal-Project-Validation.md`. Toolchain `0.1.25` is the
+`docs/HybridCLR-DHE-Formal-Project-Validation.md`. Toolchain `0.1.26` is the
 current conditionally accepted source and three-engine Windows release; its exact
 evidence and remaining platform gates are recorded in
-`docs/HybridCLR-DHE-Opt4-Release-0.1.25.md`. Toolchains `0.1.18`, `0.1.20`,
-`0.1.21`, `0.1.22`, `0.1.23`, and `0.1.24` are retained as historical evidence. Projects must install an
+`docs/HybridCLR-DHE-Opt4-Release-0.1.26.md`. Toolchains `0.1.18`, `0.1.20`,
+`0.1.21`, `0.1.22`, `0.1.23`, `0.1.24`, and `0.1.25` are retained as historical evidence. Projects must install an
 authenticated package whose manifest has `releaseReady=true` and pin its exact
 package ID.
 Toolchain `0.1.20` replaces generated-function
@@ -75,7 +75,8 @@ two concurrent promoters, gate/snapshot tampering, orphan staging recovery, and
 post-commit snapshot-output recovery. Its `filesystem-cas-v1` guarantee requires
 filesystem support for exclusive handles and same-directory atomic rename;
 object stores require an equivalent conditional-write adapter.
-Toolchain `0.1.26` is the portable evidence-authority candidate. Its authenticated
+Toolchain `0.1.26` is the active portable evidence-authority release. Its package
+ID is `b23759fccd900ba6f5ff6f250d75676c3b539f9af400ae2644412678183a3cf9`. Its authenticated
 `explicit-package-id-set-v1` manifest allows one resource release to revalidate
 active Base Players created by several explicitly named historical Release
 packages without retaining the DHE Git repository. The aggregate gate records
@@ -84,6 +85,9 @@ every Player; unknown or revoked package IDs cannot fall back to Git ancestry.
 The toolchain's own production regression must independently verify every package
 listed by the authority manifest, while a project release supplies only the
 historical packages actually referenced by its active Bases.
+The clean regression passed 121/121 checks. A formal five-Base gate used two
+relocated 0.1.20 packages, no `ValidationSourceRoot`, and promoted a state-bound
+revision 2 head with all five Players in `authorized-historical-package` mode.
 Base identity now also binds `engineWorkflow` and `il2cppCodeGeneration`.
 Unity 2021 is locked to `OptimizeSpeed`; Unity 2022 FGS and Tuanjie 2022 FGS
 are locked to `OptimizeSize`. Base evidence created before these fields existed
