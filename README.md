@@ -24,11 +24,11 @@ Its formal entry points, generated-output boundary, and complete four-assembly
 Player evidence are documented in
 `docs/HybridCLR-DHE-Toolchain.md`,
 `docs/HybridCLR-DHE-Workflow-Review.md` and
-`docs/HybridCLR-DHE-Formal-Project-Validation.md`. Toolchain `0.1.21` is the
+`docs/HybridCLR-DHE-Formal-Project-Validation.md`. Toolchain `0.1.22` is the
 current conditionally accepted source and three-engine Windows release; its exact
 evidence and remaining platform gates are recorded in
-`docs/HybridCLR-DHE-Opt4-Release-0.1.21.md`. Toolchains `0.1.18` and `0.1.20`
-are retained as historical evidence. Projects must install an
+`docs/HybridCLR-DHE-Opt4-Release-0.1.22.md`. Toolchains `0.1.18`, `0.1.20`, and
+`0.1.21` are retained as historical evidence. Projects must install an
 authenticated package whose manifest has `releaseReady=true` and pin its exact
 package ID.
 Toolchain `0.1.20` replaces generated-function
@@ -42,14 +42,15 @@ authenticated registry revision chain so every online Base is retained by
 default and retirement requires an explicit Base ID and reason. Historical Base
 evidence remains admissible only when its clean tool commit is on the verified
 Git ancestry chain from its authenticated Release authority to the current source.
-Toolchain `0.1.22` is the active release-ledger candidate. It binds every Release
-resource update to a stable channel, a monotonic release revision, the exact
+Toolchain `0.1.22` is the active release-ledger version. Its package ID is
+`78299b3850296103114f866c46b681fcdcc8ef771a430e58a6a92e002e68887f`. It binds
+every Release resource update to a stable channel, a monotonic release revision, the exact
 previous ledger hash held by the release system, and the Base registry head used
 by the last published hotfix. A continuation may keep that registry or use its
 direct successor; a reset revision, omitted Base set, stale head, or fork fails
-before a Release manifest is accepted. The current exploratory regression passes
+before a Release manifest is accepted. The final clean regression passes
 117/117 checks over five ledger-aware Windows Base reports and a four-to-five-Base
-direct-successor release; clean-source and platform release gates are still pending.
+direct-successor release. Android/iOS device and CAT project gates remain pending.
 Base identity now also binds `engineWorkflow` and `il2cppCodeGeneration`.
 Unity 2021 is locked to `OptimizeSpeed`; Unity 2022 FGS and Tuanjie 2022 FGS
 are locked to `OptimizeSize`. Base evidence created before these fields existed
