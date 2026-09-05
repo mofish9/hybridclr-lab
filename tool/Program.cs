@@ -1854,8 +1854,16 @@ internal static partial class Program
                     "Managed Player il2cpp_plus source tree"),
                 _ => sourcePath,
             };
+            var ignoredPaths = actual.TryGetProperty("treeHashIgnoredPaths", out var ignoredValue) &&
+                ignoredValue.ValueKind == JsonValueKind.Array
+                ? ignoredValue.EnumerateArray()
+                    .Where(value => value.ValueKind == JsonValueKind.String)
+                    .Select(value => value.GetString() ?? string.Empty)
+                    .Where(value => value.Length > 0)
+                    .ToArray()
+                : Array.Empty<string>();
             string liveTree = LabCommands.CanonicalSourceTreeHash(treeRoot,
-                repository == "hybridclr_unity");
+                repository == "hybridclr_unity", ignoredPaths);
             if (!liveTree.Equals(GetString(actual, "treeSha256"), StringComparison.OrdinalIgnoreCase))
                 throw new DheException("Managed Player runtime source tree has changed: " + repository);
         }
