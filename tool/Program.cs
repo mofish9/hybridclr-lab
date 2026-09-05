@@ -1730,6 +1730,9 @@ internal static partial class Program
             "-dheCurrentRoot", current, "-dheMode", mode, "-dheProjectPlan", planPath,
             "-dheEngineWorkflow", buildConfiguration.EngineWorkflow,
             "-dheIl2CppCodeGeneration", buildConfiguration.Il2CppCodeGeneration };
+        if (buildConfiguration.AotMetadataAssemblies != null)
+            common.AddRange(new[] { "-dheAotMetadataAssemblies",
+                buildConfiguration.AotMetadataAssemblies });
         if (cli.Has("bootstrap")) common.AddRange(new[] { "-dheBootstrap", "true" });
         AppendUnityArguments(common, cli);
         RunUnity(unity, project, common.Append("-executeMethod").Append(adapterType + ".StageRuntimePlan").Append("-logFile").Append(Path.Combine(output, "unity-stage.log")), new Dictionary<string, string> { ["DHE_BASELINE_ROOT"] = baseline }, Path.Combine(output, "unity-stage-process.log"), timeout);
@@ -1807,13 +1810,14 @@ internal static partial class Program
         }
     }
 
-    private static (string EngineWorkflow, string Il2CppCodeGeneration)
+    private static (string EngineWorkflow, string Il2CppCodeGeneration,
+        string? AotMetadataAssemblies)
         ResolveWorkflowBuildConfiguration(Cli cli, string? runtimeManifestPath)
     {
         if (string.IsNullOrWhiteSpace(runtimeManifestPath))
         {
             return (cli.Optional("engineworkflow") ?? "Exploratory",
-                cli.Optional("il2cppcodegeneration") ?? "OptimizeSpeed");
+                cli.Optional("il2cppcodegeneration") ?? "OptimizeSpeed", null);
         }
 
         JsonElement runtime = ReadJson<JsonElement>(RequireFile(runtimeManifestPath,
@@ -1829,13 +1833,25 @@ internal static partial class Program
         if (workflow.ValueKind == JsonValueKind.Undefined)
             throw new DheException("Runtime manifest engine workflow is not locked: " +
                 engineWorkflow);
-        string il2cppCodeGeneration = GetString(workflow.GetProperty("productionWorkflow"),
+        JsonElement productionWorkflow = workflow.GetProperty("productionWorkflow");
+        string il2cppCodeGeneration = GetString(productionWorkflow,
             "il2cppCodeGeneration") ?? string.Empty;
         if (!string.Equals(il2cppCodeGeneration,
                 ExpectedIl2CppCodeGeneration(engineWorkflow), StringComparison.Ordinal))
             throw new DheException("Locked IL2CPP code generation is invalid for " +
                 engineWorkflow + ".");
-        return (engineWorkflow, il2cppCodeGeneration);
+        string aotMetadataMode = GetString(productionWorkflow, "aotMetadataMode") ??
+            string.Empty;
+        string aotMetadataPackaging = GetString(productionWorkflow,
+            "aotMetadataPackaging") ?? string.Empty;
+        bool supplemental = engineWorkflow == "Unity2021Standard" &&
+            aotMetadataMode == "supplemental" && aotMetadataPackaging == "include";
+        bool none = engineWorkflow != "Unity2021Standard" &&
+            aotMetadataMode == "none" && aotMetadataPackaging == "exclude";
+        if (!supplemental && !none)
+            throw new DheException("Locked AOT metadata workflow is invalid for " +
+                engineWorkflow + ".");
+        return (engineWorkflow, il2cppCodeGeneration, none ? "none" : null);
     }
 
     internal static (string? Root, string SetId) MaterializeBaseAotMetadataRoot(
@@ -3487,6 +3503,9 @@ internal static partial class Program
                 property.Name.Equals("dheMode", StringComparison.OrdinalIgnoreCase) ||
                 property.Name.Equals("dheProjectPlan", StringComparison.OrdinalIgnoreCase) ||
                 property.Name.Equals("dheCurrentInputRoot", StringComparison.OrdinalIgnoreCase) ||
+                property.Name.Equals("dheEngineWorkflow", StringComparison.OrdinalIgnoreCase) ||
+                property.Name.Equals("dheIl2CppCodeGeneration", StringComparison.OrdinalIgnoreCase) ||
+                property.Name.Equals("dheAotMetadataAssemblies", StringComparison.OrdinalIgnoreCase) ||
                 property.Name.Equals("extraScriptingDefines", StringComparison.OrdinalIgnoreCase))
                 throw new DheException("Workflow unityArguments cannot override a host-owned argument: " + property.Name);
             if (property.Value.ValueKind != JsonValueKind.String && property.Value.ValueKind != JsonValueKind.Number && property.Value.ValueKind != JsonValueKind.True && property.Value.ValueKind != JsonValueKind.False)

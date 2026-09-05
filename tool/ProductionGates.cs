@@ -1378,13 +1378,60 @@ internal static partial class Program
         var bootstrapWorkflowDoc = ReadJson<JsonElement>(Path.Combine(cli.Root, "manifests",
             "runtime-workflows.json"));
         JsonElement[] bootstrapWorkflows = LabCommands.SelectBootstrapWorkflowRecords(bootstrapWorkflowDoc, null, true);
+        bool bootstrapProductionConfigurationPassed = true;
+        foreach (JsonElement workflow in bootstrapWorkflows)
+        {
+            string workflowId = GetString(workflow, "id") ?? string.Empty;
+            string runtimePath = Path.Combine(regressionRoot,
+                "runtime-" + workflowId + ".json");
+            WriteJson(runtimePath, new
+            {
+                schemaVersion = 1,
+                format = "hybridclr.dhe-runtime-manifest.json",
+                engineWorkflow = workflowId,
+            });
+            try
+            {
+                var configuration = ResolveWorkflowBuildConfiguration(new Cli("workflow",
+                    new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase)
+                    {
+                        ["validationsourceroot"] = cli.Root,
+                    }), runtimePath);
+                bool unity2021 = workflowId == "Unity2021Standard";
+                bootstrapProductionConfigurationPassed &=
+                    string.Equals(configuration.Il2CppCodeGeneration,
+                        unity2021 ? "OptimizeSpeed" : "OptimizeSize",
+                        StringComparison.Ordinal) &&
+                    string.Equals(configuration.AotMetadataAssemblies,
+                        unity2021 ? null : "none", StringComparison.Ordinal);
+            }
+            catch
+            {
+                bootstrapProductionConfigurationPassed = false;
+            }
+        }
+        bool bootstrapOverrideRejected = false;
+        try
+        {
+            AppendUnityArguments(new List<string>(), new Cli("workflow",
+                new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase)
+                {
+                    ["unityarguments"] =
+                        "{\"dheAotMetadataAssemblies\":\"mscorlib\"}",
+                }));
+        }
+        catch (DheException)
+        {
+            bootstrapOverrideRejected = true;
+        }
         bool bootstrapMatrixPassed = bootstrapWorkflows.Length == 3 &&
             bootstrapWorkflows.Select(item => GetString(item.GetProperty("il2cppPlus"), "commit"))
                 .Distinct(StringComparer.OrdinalIgnoreCase).Count() == 3 &&
             bootstrapWorkflows.All(item => LabCommands.SelectBootstrapWorkflowRecords(bootstrapWorkflowDoc,
-                GetString(item, "id"), false).Length == 1);
+                GetString(item, "id"), false).Length == 1) &&
+            bootstrapProductionConfigurationPassed && bootstrapOverrideRejected;
         AddRegressionCheck(checks, errors, "bootstrap-engine-workflow-matrix", bootstrapMatrixPassed,
-            "bootstrap must resolve all three distinct il2cpp_plus workflow commits and each single lane");
+            "bootstrap must resolve all three production build configurations and reject identity overrides");
         var boundaryErrors = new List<string>();
         bool gitRootBoundaryPassed = ValidateBoundary(Path.Combine(cli.Root, "unity2021-dhe-demo"),
             Path.Combine(cli.Root, "manifests", "dhe-source-boundary.json"), boundaryErrors);

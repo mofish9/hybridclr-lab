@@ -59,6 +59,9 @@ The identity and composite `baseId` bind the engine workflow and actual IL2CPP
 code-generation mode. The locked mappings are `Unity2021Standard/OptimizeSpeed`,
 `Unity2022Fgs/OptimizeSize`, and `Tuanjie2022Fgs/OptimizeSize`; a missing or
 mismatched pair fails before the Player or registry can be published.
+The host also owns AOT metadata selection: Unity 2021 uses the configured
+supplemental set, while both FGS workflows pass an explicit empty set. Project
+`UnityArguments` cannot override workflow, code generation, or metadata mode.
 
 Every external/precompiled hot-update DLL used to create the Base must come
 from the active target's current-generation compilation. In particular, an
