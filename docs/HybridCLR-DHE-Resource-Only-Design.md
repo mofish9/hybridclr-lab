@@ -168,6 +168,14 @@ count、原始 registry 的精确副本 `audit/dhe-base-registry.json` 及其 SH
 缺失或篡改会整体拒绝。新增线上 Base 只需先归档并加入 registry，下一次资源构建会将它
 与所有旧 Base 一起审计。
 
+registry 同时是在线 Base 生命周期账本。正式生成的文件包含稳定 `registryId`、递增
+`revision`、直接父 registry SHA-256 和累计 `retiredBases`。使用 `-ExistingRegistry` 时默认
+保留全部旧 Base；只有同时传入 `-RetireBaseIds` 与 `-RetirementReason` 才能退役条目，且退役
+BaseId 不得重新激活。revision 2 及以后执行 `resource-update` 时必须传入
+`-PreviousBaseRegistry`。工具验证每个父版本 Base 要么仍在线、要么恰好在当前 revision 被
+显式退役，并把当前/父 registry 原始字节都写入 `audit/`。因此误用一个遗漏旧 Base 的新
+registry 会在生成资源包之前失败，而不是绕过该 Base 的兼容性检查。
+
 不要手工编辑 registry 的条目。先用工具从已归档的 Base identity 生成规范化文件；
 已有线上集合通过 `-ExistingRegistry` 保留，新 Base 用等长的逗号分隔列表追加：
 

@@ -179,6 +179,16 @@ new registry atomically together with the next resource build. A registry is onl
 considered complete when the `regression` gate has exercised both normalization and
 duplicate-Base rejection.
 
+Every generated registry has a stable `registryId`, a monotonically increasing
+`revision`, and the SHA-256 of its direct parent. `-ExistingRegistry` retains every
+active Base by default. Removing an online Base requires both
+`-RetireBaseIds <baseId,...>` and `-RetirementReason <reason>`; the generated
+registry carries the cumulative retirement audit and rejects later reactivation of
+the same Base ID. `resource-update` requires `-PreviousBaseRegistry` for revision 2
+or later, verifies the direct transition, and archives both current and parent
+registry bytes. This prevents an accidentally incomplete registry from producing a
+green hotfix package merely because the omitted Player was never checked.
+
 The output contains one copy of each current DLL and current MetaVersion. Base inputs
 are compatibility evidence only and are never copied into `payload/`. At
 runtime each Player compares the remote current MetaVersion with its own embedded Base

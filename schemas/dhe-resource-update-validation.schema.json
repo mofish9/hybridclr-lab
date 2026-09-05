@@ -4,7 +4,7 @@
   "title": "HybridCLR DHE Resource Update Compatibility Validation",
   "type": "object",
   "additionalProperties": false,
-  "required": ["schemaVersion", "format", "generatedAtUtc", "passed", "compatibilityPolicy", "runtimeProtocol", "currentAssemblySetSha256", "candidateBaseCount", "compatibleBaseCount", "bases", "errors"],
+  "required": ["schemaVersion", "format", "generatedAtUtc", "passed", "compatibilityPolicy", "runtimeProtocol", "currentAssemblySetSha256", "baseRegistrySha256", "baseRegistryEntryCount", "baseRegistryAuditPath", "baseRegistryAuditSha256", "baseRegistryId", "baseRegistryRevision", "baseRegistryParentSha256", "baseRegistryParentAuditPath", "baseRegistryParentAuditSha256", "baseRegistryRetiredBaseCount", "baseRegistryLineageValidated", "candidateBaseCount", "compatibleBaseCount", "bases", "errors"],
   "properties": {
     "schemaVersion": { "const": 1 },
     "format": { "const": "hybridclr.dhe-resource-update-validation.json" },
@@ -29,6 +29,13 @@
     "baseRegistryEntryCount": { "type": ["integer", "null"], "minimum": 1 },
     "baseRegistryAuditPath": { "type": ["string", "null"], "enum": ["audit/dhe-base-registry.json", null] },
     "baseRegistryAuditSha256": { "type": ["string", "null"], "pattern": "^[0-9a-fA-F]{64}$" },
+    "baseRegistryId": { "type": ["string", "null"], "pattern": "^[A-Za-z0-9._-]{1,128}$" },
+    "baseRegistryRevision": { "type": ["integer", "null"], "minimum": 1 },
+    "baseRegistryParentSha256": { "type": ["string", "null"], "pattern": "^[0-9a-fA-F]{64}$" },
+    "baseRegistryParentAuditPath": { "type": ["string", "null"], "enum": ["audit/dhe-base-registry-parent.json", null] },
+    "baseRegistryParentAuditSha256": { "type": ["string", "null"], "pattern": "^[0-9a-fA-F]{64}$" },
+    "baseRegistryRetiredBaseCount": { "type": ["integer", "null"], "minimum": 0 },
+    "baseRegistryLineageValidated": { "type": "boolean" },
     "candidateBaseCount": { "type": "integer", "minimum": 1 },
     "compatibleBaseCount": { "type": "integer", "minimum": 0 },
     "bases": {

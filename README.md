@@ -36,6 +36,9 @@ name guessing with IL2CPP MethodDef/MethodSpec table resolution and requires a
 source-bound resolver regression report from each of the three locked Editors
 before it can be published as Release. The released package ID is
 `3982eeb07d7204171fe5d2aa4b5435942e421bdbe8fe2e0e48c152fddda2183d`.
+Toolchain `0.1.21` is the active multi-Base lifecycle candidate. It adds an
+authenticated registry revision chain so every online Base is retained by
+default and retirement requires an explicit Base ID and reason.
 Base identity now also binds `engineWorkflow` and `il2cppCodeGeneration`.
 Unity 2021 is locked to `OptimizeSpeed`; Unity 2022 FGS and Tuanjie 2022 FGS
 are locked to `OptimizeSize`. Base evidence created before these fields existed

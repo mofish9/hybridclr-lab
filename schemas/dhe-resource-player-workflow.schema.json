@@ -19,6 +19,8 @@
     "playerResultSha256", "buildIdentitySha256", "runtimePlanSha256", "selectedBaseId",
     "selectedAotMetadataSetId", "selectedPayloadVariantId",
     "selectedPayloadCurrentAssemblySetSha256", "currentAssemblySetSha256",
+    "baseRegistrySha256", "baseRegistryId", "baseRegistryRevision",
+    "baseRegistryLineageValidated",
     "artifactValidation", "runtimeSource"
   ],
   "properties": {
@@ -138,6 +140,10 @@
     "selectedPayloadCurrentAssemblySetSha256": { "type": "string", "pattern": "^[0-9a-fA-F]{64}$" },
     "payloadVariantSetSha256": { "type": ["string", "null"], "pattern": "^[0-9a-fA-F]{64}$" },
     "currentAssemblySetSha256": { "type": "string", "pattern": "^[0-9a-fA-F]{64}$" },
+    "baseRegistrySha256": { "type": ["string", "null"], "pattern": "^[0-9a-fA-F]{64}$" },
+    "baseRegistryId": { "type": ["string", "null"], "pattern": "^[A-Za-z0-9._-]{1,128}$" },
+    "baseRegistryRevision": { "type": ["integer", "null"], "minimum": 1 },
+    "baseRegistryLineageValidated": { "type": "boolean" },
     "artifactValidation": { "type": "string", "minLength": 1 },
     "archiveManifest": { "type": ["string", "null"] },
     "archiveGate": { "type": ["string", "null"] },

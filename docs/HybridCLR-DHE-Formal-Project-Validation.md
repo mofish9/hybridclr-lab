@@ -146,6 +146,15 @@ payload variant. The input
 is extensible, so additional representative Base reports can be bound as the
 matrix grows. Every online Base remains a mandatory input to `resource-update`.
 
+Treat the Base registry as an append-only online-support ledger. Creating a new
+Base app version appends its archived identity with `-ExistingRegistry`; the
+resulting revision names the previous registry SHA-256. A Base may disappear only
+through `-RetireBaseIds` plus a recorded reason. For registry revision 2 or later,
+pass the exact parent as `-PreviousBaseRegistry` to `resource-update`. The release
+then archives both registry documents and staging revalidates that every parent Base
+was retained or explicitly retired. Do not build a new registry from a hand-picked
+subset of Base directories.
+
 For consecutive hotfix releases, keep the same archived Base registry and run
 `resource-update` again with the new current DLL set. Stage the resulting
 manifest/payload over the same Player resource root after the previous smoke;

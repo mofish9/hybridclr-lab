@@ -160,6 +160,14 @@ internal static partial class Program
             embeddedBaseRoot,
             selectedBaseId = embeddedBase.BaseId,
             selectedAotMetadataSetId = GetString(selectedBase, "aotMetadataSetId"),
+            baseRegistrySha256 = GetString(manifest, "baseRegistrySha256"),
+            baseRegistryId = GetString(manifest, "baseRegistryId"),
+            baseRegistryRevision = manifest.TryGetProperty("baseRegistryRevision",
+                out JsonElement registryRevision) && registryRevision.ValueKind == JsonValueKind.Number
+                ? registryRevision.GetInt32()
+                : (int?)null,
+            baseRegistryLineageValidated = GetBool(manifest,
+                "baseRegistryLineageValidated"),
             baseBuildIdentityPath,
             baseBuildIdentitySha256 = Sha256File(baseBuildIdentityPath),
             baseMetaVersionSetSha256 = embeddedBase.SetSha256,
@@ -247,6 +255,11 @@ internal static partial class Program
                 StringComparison.OrdinalIgnoreCase) ||
             !string.Equals(GetString(player, "selectedBaseId"), selectedBaseId,
                 StringComparison.OrdinalIgnoreCase) ||
+            !OptionalJsonPropertiesEqual(stage, manifest, "baseRegistrySha256") ||
+            !OptionalJsonPropertiesEqual(stage, manifest, "baseRegistryId") ||
+            !OptionalJsonPropertiesEqual(stage, manifest, "baseRegistryRevision") ||
+            !OptionalJsonPropertiesEqual(stage, manifest,
+                "baseRegistryLineageValidated") ||
             payloadSelectionError is not null)
             errors.Add(payloadSelectionError ??
                 "Resource, stage, Base, and Player selection identities do not agree.");
@@ -429,6 +442,14 @@ internal static partial class Program
             selectedPayloadCurrentAssemblySetSha256 = currentSet,
             payloadVariantSetSha256 = GetString(manifest, "payloadVariantSetSha256"),
             currentAssemblySetSha256 = currentSet,
+            baseRegistrySha256 = GetString(manifest, "baseRegistrySha256"),
+            baseRegistryId = GetString(manifest, "baseRegistryId"),
+            baseRegistryRevision = manifest.TryGetProperty("baseRegistryRevision",
+                out JsonElement registryRevision) && registryRevision.ValueKind == JsonValueKind.Number
+                ? registryRevision.GetInt32()
+                : (int?)null,
+            baseRegistryLineageValidated = GetBool(manifest,
+                "baseRegistryLineageValidated"),
             artifactValidation = validationPath,
             archiveManifest = (string?)null,
             archiveGate = (string?)null,
@@ -1141,7 +1162,10 @@ internal static partial class Program
         foreach (string property in new[]
         {
             "baseRegistrySha256", "baseRegistryEntryCount", "baseRegistryAuditPath",
-            "baseRegistryAuditSha256"
+            "baseRegistryAuditSha256", "baseRegistryId", "baseRegistryRevision",
+            "baseRegistryParentSha256", "baseRegistryParentAuditPath",
+            "baseRegistryParentAuditSha256", "baseRegistryRetiredBaseCount",
+            "baseRegistryLineageValidated"
         })
         {
             if (!OptionalJsonPropertiesEqual(validation, manifest, property))
@@ -1279,7 +1303,17 @@ internal static partial class Program
             if (!manifest.TryGetProperty("baseRegistryEntryCount", out JsonElement entryCount) ||
                 entryCount.ValueKind != JsonValueKind.Null ||
                 !string.IsNullOrWhiteSpace(auditPathValue) ||
-                !string.IsNullOrWhiteSpace(auditSha256))
+                !string.IsNullOrWhiteSpace(auditSha256) ||
+                !string.IsNullOrWhiteSpace(GetString(manifest, "baseRegistryId")) ||
+                manifest.TryGetProperty("baseRegistryRevision", out JsonElement noRegistryRevision) &&
+                    noRegistryRevision.ValueKind != JsonValueKind.Null ||
+                !string.IsNullOrWhiteSpace(GetString(manifest, "baseRegistryParentSha256")) ||
+                !string.IsNullOrWhiteSpace(GetString(manifest, "baseRegistryParentAuditPath")) ||
+                !string.IsNullOrWhiteSpace(GetString(manifest, "baseRegistryParentAuditSha256")) ||
+                manifest.TryGetProperty("baseRegistryRetiredBaseCount",
+                    out JsonElement noRegistryRetiredCount) &&
+                    noRegistryRetiredCount.ValueKind != JsonValueKind.Null ||
+                GetBool(manifest, "baseRegistryLineageValidated"))
                 throw new DheException("DHE resource update has Base registry audit fields without a registry.");
             return;
         }
@@ -1302,26 +1336,192 @@ internal static partial class Program
         // and entry set here, while ReadBaseRegistry validates paths at build
         // time before the copy is made.
         JsonElement archived = ReadJson<JsonElement>(auditPath);
+        string registryId = GetString(archived, "registryId") ?? string.Empty;
+        int revision = archived.TryGetProperty("revision", out JsonElement archivedRevision) &&
+                       archivedRevision.ValueKind == JsonValueKind.Number
+            ? archivedRevision.GetInt32()
+            : 1;
+        string? parentSha256 = GetString(archived, "parentRegistrySha256");
+        JsonElement retiredBases = archived.TryGetProperty("retiredBases",
+            out JsonElement archivedRetiredBases)
+            ? archivedRetiredBases
+            : default;
+        int retiredCount = retiredBases.ValueKind == JsonValueKind.Array
+            ? retiredBases.GetArrayLength()
+            : 0;
         if (GetInt(archived, "schemaVersion") != 1 ||
             !string.Equals(GetString(archived, "format"),
                 "hybridclr.dhe-base-registry.json", StringComparison.Ordinal) ||
             (GetString(archived, "pathSemantics") is not ("registry-relative-v1" or
                 "workspace-absolute-v1")) ||
+            !IsRegistryId(registryId) || revision < 1 ||
+            (revision == 1 && !string.IsNullOrWhiteSpace(parentSha256)) ||
+            (revision > 1 && !IsHex(parentSha256, 64, 64)) ||
             !archived.TryGetProperty("bases", out JsonElement bases) ||
             bases.ValueKind != JsonValueKind.Array || bases.GetArrayLength() == 0 ||
-            GetInt(manifest, "baseRegistryEntryCount") != bases.GetArrayLength())
+            GetInt(manifest, "baseRegistryEntryCount") != bases.GetArrayLength() ||
+            !string.Equals(GetString(manifest, "baseRegistryId"), registryId,
+                StringComparison.Ordinal) ||
+            GetInt(manifest, "baseRegistryRevision") != revision ||
+            !string.Equals(GetString(manifest, "baseRegistryParentSha256"), parentSha256,
+                StringComparison.OrdinalIgnoreCase) ||
+            GetInt(manifest, "baseRegistryRetiredBaseCount") != retiredCount ||
+            !GetBool(manifest, "baseRegistryLineageValidated"))
             throw new DheException("DHE archived Base registry identity or entry count is invalid.");
 
-        var ids = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+        var active = new Dictionary<string, JsonElement>(StringComparer.OrdinalIgnoreCase);
         foreach (JsonElement entry in bases.EnumerateArray())
         {
             string baseId = GetString(entry, "baseId") ?? string.Empty;
             string workflow = GetString(entry, "engineWorkflow") ?? string.Empty;
-            if (!IsHex(baseId, 64, 64) || !ids.Add(baseId) ||
+            string label = GetString(entry, "label") ?? string.Empty;
+            string payloadVariantId = GetString(entry, "payloadVariantId") ?? "default";
+            if (!IsHex(baseId, 64, 64) || !active.TryAdd(baseId, entry) ||
                 !RequiredPlayerEngineWorkflows.Contains(workflow,
-                    StringComparer.Ordinal))
+                    StringComparer.Ordinal) ||
+                string.IsNullOrWhiteSpace(label) || label.Length > 256 ||
+                !IsPayloadVariantId(payloadVariantId))
                 throw new DheException("DHE archived Base registry contains an invalid entry.");
         }
+
+        var retired = ReadArchivedRetirements(retiredBases, revision,
+            active.Keys.ToHashSet(StringComparer.OrdinalIgnoreCase));
+        string? parentAuditPathValue = GetString(manifest,
+            "baseRegistryParentAuditPath");
+        string? parentAuditSha256 = GetString(manifest,
+            "baseRegistryParentAuditSha256");
+        if (revision == 1)
+        {
+            if (!string.IsNullOrWhiteSpace(parentAuditPathValue) ||
+                !string.IsNullOrWhiteSpace(parentAuditSha256))
+                throw new DheException(
+                    "DHE registry revision 1 must not contain a parent registry audit.");
+            return;
+        }
+        if (!string.Equals(parentAuditPathValue,
+                "audit/dhe-base-registry-parent.json", StringComparison.Ordinal) ||
+            !IsHex(parentAuditSha256, 64, 64) ||
+            !string.Equals(parentAuditSha256, parentSha256,
+                StringComparison.OrdinalIgnoreCase))
+            throw new DheException("DHE parent Base registry audit binding is invalid.");
+        string parentAuditPath = RequireFile(ResolveContainedPath(updateRoot,
+            parentAuditPathValue!, "DHE parent Base registry audit copy"),
+            "DHE parent Base registry audit copy");
+        if (!string.Equals(Sha256File(parentAuditPath), parentSha256,
+                StringComparison.OrdinalIgnoreCase))
+            throw new DheException(
+                "DHE parent Base registry audit copy hash does not match the manifest.");
+        JsonElement parent = ReadJson<JsonElement>(parentAuditPath);
+        string parentRegistryId = GetString(parent, "registryId") ?? string.Empty;
+        int parentRevision = parent.TryGetProperty("revision", out JsonElement parentRevisionValue) &&
+                             parentRevisionValue.ValueKind == JsonValueKind.Number
+            ? parentRevisionValue.GetInt32()
+            : 1;
+        if (GetInt(parent, "schemaVersion") != 1 ||
+            !string.Equals(GetString(parent, "format"),
+                "hybridclr.dhe-base-registry.json", StringComparison.Ordinal) ||
+            !string.Equals(parentRegistryId, registryId, StringComparison.Ordinal) ||
+            parentRevision + 1 != revision ||
+            !parent.TryGetProperty("bases", out JsonElement parentBases) ||
+            parentBases.ValueKind != JsonValueKind.Array || parentBases.GetArrayLength() == 0)
+            throw new DheException("DHE parent Base registry identity is invalid.");
+
+        var parentActive = new Dictionary<string, JsonElement>(
+            StringComparer.OrdinalIgnoreCase);
+        foreach (JsonElement entry in parentBases.EnumerateArray())
+        {
+            string baseId = GetString(entry, "baseId") ?? string.Empty;
+            string workflow = GetString(entry, "engineWorkflow") ?? string.Empty;
+            string label = GetString(entry, "label") ?? string.Empty;
+            string payloadVariantId = GetString(entry, "payloadVariantId") ?? "default";
+            if (!IsHex(baseId, 64, 64) || !parentActive.TryAdd(baseId, entry) ||
+                !RequiredPlayerEngineWorkflows.Contains(workflow,
+                    StringComparer.Ordinal) ||
+                string.IsNullOrWhiteSpace(label) || label.Length > 256 ||
+                !IsPayloadVariantId(payloadVariantId))
+                throw new DheException(
+                    "DHE parent Base registry contains an invalid entry.");
+        }
+        JsonElement parentRetiredValues = parent.TryGetProperty("retiredBases",
+            out JsonElement parsedParentRetired)
+            ? parsedParentRetired
+            : default;
+        var parentRetired = ReadArchivedRetirements(parentRetiredValues,
+            parentRevision, parentActive.Keys.ToHashSet(StringComparer.OrdinalIgnoreCase));
+        foreach (var item in parentRetired)
+        {
+            if (!retired.TryGetValue(item.Key, out BaseRegistryRetirement? carried) ||
+                !SameRetirement(item.Value, carried))
+                throw new DheException(
+                    "DHE Base registry dropped or changed a previous retirement.");
+        }
+        foreach (var item in retired)
+        {
+            BaseRegistryRetirement retirement = item.Value;
+            if (retirement.RetiredAtRevision < revision)
+            {
+                if (!parentRetired.TryGetValue(item.Key,
+                        out BaseRegistryRetirement? earlier) ||
+                    !SameRetirement(retirement, earlier))
+                    throw new DheException(
+                        "DHE Base registry introduced a backdated retirement.");
+                continue;
+            }
+            if (!parentActive.TryGetValue(item.Key, out JsonElement parentEntry) ||
+                !string.Equals(GetString(parentEntry, "engineWorkflow"),
+                    retirement.EngineWorkflow, StringComparison.Ordinal) ||
+                !string.Equals(GetString(parentEntry, "label"), retirement.Label,
+                    StringComparison.Ordinal))
+                throw new DheException(
+                    "DHE Base registry retirement does not match an active parent Base.");
+        }
+        foreach (var item in parentActive)
+        {
+            bool retained = active.TryGetValue(item.Key, out JsonElement retainedEntry);
+            bool explicitlyRetired = retired.TryGetValue(item.Key,
+                out BaseRegistryRetirement? retirement) &&
+                retirement.RetiredAtRevision == revision;
+            if (retained == explicitlyRetired)
+                throw new DheException(
+                    "DHE Base registry parent entry was not retained or explicitly retired.");
+            if (retained && !string.Equals(GetString(item.Value, "engineWorkflow"),
+                    GetString(retainedEntry, "engineWorkflow"), StringComparison.Ordinal))
+                throw new DheException(
+                    "DHE Base registry changed an active Base engine workflow.");
+        }
+    }
+
+    private static Dictionary<string, BaseRegistryRetirement> ReadArchivedRetirements(
+        JsonElement values, int registryRevision, HashSet<string> activeIds)
+    {
+        var result = new Dictionary<string, BaseRegistryRetirement>(
+            StringComparer.OrdinalIgnoreCase);
+        if (values.ValueKind == JsonValueKind.Undefined)
+            return result;
+        if (values.ValueKind != JsonValueKind.Array || values.GetArrayLength() > 1024)
+            throw new DheException("DHE archived Base registry retirements are invalid.");
+        foreach (JsonElement value in values.EnumerateArray())
+        {
+            var retirement = new BaseRegistryRetirement(
+                GetString(value, "baseId") ?? string.Empty,
+                GetString(value, "engineWorkflow") ?? string.Empty,
+                GetString(value, "label") ?? string.Empty,
+                GetInt(value, "retiredAtRevision"),
+                GetString(value, "reason") ?? string.Empty);
+            if (!IsHex(retirement.BaseId, 64, 64) ||
+                activeIds.Contains(retirement.BaseId) ||
+                !RequiredPlayerEngineWorkflows.Contains(retirement.EngineWorkflow,
+                    StringComparer.Ordinal) ||
+                string.IsNullOrWhiteSpace(retirement.Label) || retirement.Label.Length > 256 ||
+                retirement.RetiredAtRevision < 2 ||
+                retirement.RetiredAtRevision > registryRevision ||
+                string.IsNullOrWhiteSpace(retirement.Reason) ||
+                retirement.Reason.Length > 512 ||
+                !result.TryAdd(retirement.BaseId, retirement))
+                throw new DheException(
+                    "DHE archived Base registry contains an invalid retirement record.");
+        }
+        return result;
     }
 
     private static string[] ReadRuntimeCapabilities(JsonElement value, string property)

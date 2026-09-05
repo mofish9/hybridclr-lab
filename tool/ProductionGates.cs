@@ -1039,6 +1039,16 @@ internal static partial class Program
                             "baseRegistrySha256"), registry.Sha256,
                             StringComparison.OrdinalIgnoreCase) &&
                         GetInt(updateManifest, "baseRegistryEntryCount") == registry.Entries.Length &&
+                        string.Equals(GetString(updateManifest, "baseRegistryId"),
+                            registry.RegistryId, StringComparison.Ordinal) &&
+                        GetInt(updateManifest, "baseRegistryRevision") == registry.Revision &&
+                        string.Equals(GetString(updateManifest,
+                                "baseRegistryParentSha256"),
+                            registry.ParentRegistrySha256,
+                            StringComparison.OrdinalIgnoreCase) &&
+                        GetInt(updateManifest, "baseRegistryRetiredBaseCount") ==
+                            registry.RetiredBases.Length &&
+                        GetBool(updateManifest, "baseRegistryLineageValidated") &&
                         !string.IsNullOrWhiteSpace(auditSource) && File.Exists(auditSource) &&
                         string.Equals(Sha256File(auditSource), registry.Sha256,
                             StringComparison.OrdinalIgnoreCase) &&
@@ -1066,6 +1076,10 @@ internal static partial class Program
 
         bool baseRegistryBuilderPassed = false;
         bool baseRegistryBuildConfigurationTamperRejected = false;
+        bool baseRegistryLineagePassed = false;
+        bool baseRegistryInPlaceOverwriteRejected = false;
+        bool baseRegistryImplicitRemovalRejected = false;
+        bool baseRegistryExplicitRetirementPassed = false;
         string baseRegistryBuilderDetails =
             "Regression requires an authenticated Base registry input.";
         if (!string.IsNullOrWhiteSpace(resourceBaseRegistry))
@@ -1081,10 +1095,26 @@ internal static partial class Program
                     {
                         ["existingregistry"] = resourceBaseRegistry,
                         ["output"] = normalizedPath,
-                        ["forceoutput"] = "true",
-                        ["registryid"] = "regression-normalized"
+                        ["forceoutput"] = "true"
                     }));
                 BaseRegistryDocument normalizedRegistry = ReadBaseRegistry(normalizedPath);
+                string inPlacePath = Path.Combine(builderRoot,
+                    "in-place-overwrite-rejected.json");
+                File.Copy(normalizedPath, inPlacePath, true);
+                try
+                {
+                    _ = BuildBaseRegistry(new Cli("base-registry",
+                        new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase)
+                        {
+                            ["existingregistry"] = inPlacePath,
+                            ["output"] = inPlacePath,
+                            ["forceoutput"] = "true"
+                        }));
+                }
+                catch (DheException)
+                {
+                    baseRegistryInPlaceOverwriteRejected = true;
+                }
                 bool normalizedEntriesMatch = sourceRegistry.Entries.Length ==
                     normalizedRegistry.Entries.Length && sourceRegistry.Entries.Zip(
                         normalizedRegistry.Entries).All(pair =>
@@ -1104,11 +1134,63 @@ internal static partial class Program
                             StringComparison.OrdinalIgnoreCase) &&
                         string.Equals(pair.First.AotMetadataRoot, pair.Second.AotMetadataRoot,
                             StringComparison.OrdinalIgnoreCase));
+                baseRegistryLineagePassed = normalizedRegistry.Revision ==
+                    sourceRegistry.Revision + 1 &&
+                    string.Equals(normalizedRegistry.RegistryId, sourceRegistry.RegistryId,
+                        StringComparison.Ordinal) &&
+                    string.Equals(normalizedRegistry.ParentRegistrySha256,
+                        sourceRegistry.Sha256, StringComparison.OrdinalIgnoreCase) &&
+                    ValidateBaseRegistryLineage(normalizedRegistry,
+                        resourceBaseRegistry) != null;
 
                 bool duplicateRejected = false;
                 if (sourceRegistry.Entries.Length > 0)
                 {
                     BaseRegistryEntry first = sourceRegistry.Entries[0];
+                    string implicitRemovalPath = Path.Combine(builderRoot,
+                        "implicit-removal.json");
+                    var implicitRemoval = System.Text.Json.Nodes.JsonNode.Parse(
+                        File.ReadAllText(normalizedPath))!.AsObject();
+                    implicitRemoval["bases"]!.AsArray().RemoveAt(0);
+                    File.WriteAllText(implicitRemovalPath,
+                        implicitRemoval.ToJsonString(
+                            new JsonSerializerOptions { WriteIndented = true }),
+                        new UTF8Encoding(false));
+                    try
+                    {
+                        BaseRegistryDocument removed = ReadBaseRegistry(implicitRemovalPath);
+                        _ = ValidateBaseRegistryLineage(removed, resourceBaseRegistry);
+                    }
+                    catch (DheException)
+                    {
+                        baseRegistryImplicitRemovalRejected = true;
+                    }
+
+                    if (sourceRegistry.Entries.Length > 1)
+                    {
+                        string retiredPath = Path.Combine(builderRoot,
+                            "explicit-retirement.json");
+                        int retiredExit = BuildBaseRegistry(new Cli("base-registry",
+                            new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase)
+                            {
+                                ["existingregistry"] = resourceBaseRegistry,
+                                ["retirebaseids"] = first.BaseId,
+                                ["retirementreason"] = "regression retirement",
+                                ["output"] = retiredPath,
+                                ["forceoutput"] = "true"
+                            }));
+                        BaseRegistryDocument retired = ReadBaseRegistry(retiredPath);
+                        BaseRegistryDocument? retiredParent =
+                            ValidateBaseRegistryLineage(retired, resourceBaseRegistry);
+                        baseRegistryExplicitRetirementPassed = retiredExit == 0 &&
+                            retiredParent != null &&
+                            retired.Entries.All(item => !string.Equals(item.BaseId,
+                                first.BaseId, StringComparison.OrdinalIgnoreCase)) &&
+                            retired.RetiredBases.Count(item => string.Equals(item.BaseId,
+                                first.BaseId, StringComparison.OrdinalIgnoreCase) &&
+                                item.RetiredAtRevision == retired.Revision &&
+                                item.Reason == "regression retirement") == 1;
+                    }
                     string duplicateRoot = Path.Combine(builderRoot, "duplicate");
                     Directory.CreateDirectory(duplicateRoot);
                     string identityA = Path.Combine(duplicateRoot, "identity-a.json");
@@ -1222,6 +1304,19 @@ internal static partial class Program
             "base-registry-build-configuration-tamper-rejected",
             baseRegistryBuildConfigurationTamperRejected,
             "registry workflow and build identity code generation tampering must be rejected");
+        AddRegressionCheck(checks, errors, "base-registry-lineage",
+            baseRegistryLineagePassed,
+            "a generated registry revision must authenticate its direct parent");
+        AddRegressionCheck(checks, errors, "base-registry-in-place-overwrite-rejected",
+            baseRegistryInPlaceOverwriteRejected,
+            "a new registry revision must not overwrite the parent registry input");
+        AddRegressionCheck(checks, errors,
+            "base-registry-implicit-removal-rejected",
+            baseRegistryImplicitRemovalRejected,
+            "an online Base cannot disappear without an explicit retirement record");
+        AddRegressionCheck(checks, errors, "base-registry-explicit-retirement",
+            baseRegistryExplicitRetirementPassed,
+            "an explicit retirement must preserve the parent chain, Base identity, and reason");
 
         var packageRoot = cli.Optional("packageroot");
         if (!string.IsNullOrWhiteSpace(packageRoot))
@@ -2690,6 +2785,14 @@ internal static partial class Program
                         GetString(secondReport, "selectedBaseId"), StringComparison.OrdinalIgnoreCase) &&
                     string.Equals(GetString(firstReport, "selectedAotMetadataSetId"),
                         GetString(secondReport, "selectedAotMetadataSetId"), StringComparison.OrdinalIgnoreCase) &&
+                    string.Equals(GetString(firstReport, "baseRegistrySha256"),
+                        GetString(secondReport, "baseRegistrySha256"), StringComparison.OrdinalIgnoreCase) &&
+                    string.Equals(GetString(firstReport, "baseRegistryId"),
+                        GetString(secondReport, "baseRegistryId"), StringComparison.Ordinal) &&
+                    GetInt(firstReport, "baseRegistryRevision") ==
+                        GetInt(secondReport, "baseRegistryRevision") &&
+                    GetBool(firstReport, "baseRegistryLineageValidated") &&
+                    GetBool(secondReport, "baseRegistryLineageValidated") &&
                     string.Equals(GetString(firstReport, "baseMetaVersionSetSha256"),
                         GetString(secondReport, "baseMetaVersionSetSha256"), StringComparison.OrdinalIgnoreCase) &&
                     string.Equals(GetString(firstReport, "baseMetaVersionTreeSha256Before"),
@@ -2703,7 +2806,8 @@ internal static partial class Program
             }
             AddRegressionCheck(checks, errors, "resource-stage-consecutive-base-stable",
                 consecutiveStable,
-                "consecutive updates must reuse the immutable Base MetaVersion and select the same Base/AOT identity.");
+                "consecutive updates must reuse the same validated Base registry and immutable " +
+                "Base MetaVersion while selecting the same Base/AOT identity.");
         }
 
         var positiveManifest = ReadJson<JsonElement>(Path.Combine(positive.Update,
@@ -2781,12 +2885,16 @@ internal static partial class Program
         foreach (string property in new[]
         {
             "baseRegistrySha256", "baseRegistryEntryCount", "baseRegistryAuditPath",
-            "baseRegistryAuditSha256"
+            "baseRegistryAuditSha256", "baseRegistryId", "baseRegistryRevision",
+            "baseRegistryParentSha256", "baseRegistryParentAuditPath",
+            "baseRegistryParentAuditSha256", "baseRegistryRetiredBaseCount"
         })
         {
             directManifest[property] = null;
             directValidation[property] = null;
         }
+        directManifest["baseRegistryLineageValidated"] = false;
+        directValidation["baseRegistryLineageValidated"] = false;
         File.WriteAllText(directValidationPath, directValidation.ToJsonString(Json),
             new UTF8Encoding(false));
         directManifest["validationSha256"] = Sha256File(directValidationPath);
@@ -2814,6 +2922,68 @@ internal static partial class Program
         AddRegressionCheck(checks, errors, "resource-stage-base-registry-audit-bound",
             registryAuditBound,
             "a registry-backed resource update must archive and hash the exact registry bytes.");
+
+        bool StageReboundRegistryTamper(string name,
+            Action<System.Text.Json.Nodes.JsonObject> mutate)
+        {
+            var fixture = CopyFixture(name);
+            string manifestPath = Path.Combine(fixture.Update,
+                "dhe-resource-update.json");
+            string validationPath = Path.Combine(fixture.Update,
+                "dhe-resource-update-validation.json");
+            string registryPath = Path.Combine(fixture.Update,
+                positiveRegistryAuditPath);
+            var manifest = System.Text.Json.Nodes.JsonNode.Parse(
+                File.ReadAllText(manifestPath))!.AsObject();
+            var validation = System.Text.Json.Nodes.JsonNode.Parse(
+                File.ReadAllText(validationPath))!.AsObject();
+            var registry = System.Text.Json.Nodes.JsonNode.Parse(
+                File.ReadAllText(registryPath))!.AsObject();
+            mutate(registry);
+            File.WriteAllText(registryPath, registry.ToJsonString(Json),
+                new UTF8Encoding(false));
+            string registryHash = Sha256File(registryPath);
+            int retiredCount = registry["retiredBases"]?.AsArray().Count ?? 0;
+            foreach (var document in new[] { manifest, validation })
+            {
+                document["baseRegistrySha256"] = registryHash;
+                document["baseRegistryAuditSha256"] = registryHash;
+                document["baseRegistryRetiredBaseCount"] = retiredCount;
+            }
+            File.WriteAllText(validationPath, validation.ToJsonString(Json),
+                new UTF8Encoding(false));
+            manifest["validationSha256"] = Sha256File(validationPath);
+            File.WriteAllText(manifestPath, manifest.ToJsonString(Json),
+                new UTF8Encoding(false));
+            return !Stage(name + "-stage", fixture.Update, fixture.Assets,
+                fixture.Identity);
+        }
+
+        int positiveRegistryRevision = GetInt(positiveManifest,
+            "baseRegistryRevision");
+        string positiveParentHash = GetString(positiveManifest,
+            "baseRegistryParentSha256") ?? string.Empty;
+        string positiveParentAuditRelative = GetString(positiveManifest,
+            "baseRegistryParentAuditPath") ?? string.Empty;
+        string positiveParentAudit = string.IsNullOrWhiteSpace(positiveParentAuditRelative)
+            ? string.Empty
+            : ResolveContainedPath(positive.Update, positiveParentAuditRelative,
+                "Regression parent Base registry audit copy");
+        bool registryLineageBound = GetBool(positiveManifest,
+                "baseRegistryLineageValidated") &&
+            positiveRegistryRevision >= 1 &&
+            (positiveRegistryRevision == 1
+                ? string.IsNullOrWhiteSpace(positiveParentHash) &&
+                  string.IsNullOrWhiteSpace(positiveParentAuditRelative)
+                : IsHex(positiveParentHash, 64, 64) &&
+                  positiveParentAuditRelative ==
+                      "audit/dhe-base-registry-parent.json" &&
+                  File.Exists(positiveParentAudit) &&
+                  string.Equals(Sha256File(positiveParentAudit), positiveParentHash,
+                      StringComparison.OrdinalIgnoreCase));
+        AddRegressionCheck(checks, errors,
+            "resource-stage-base-registry-lineage-bound", registryLineageBound,
+            "a resource update must bind the active registry revision and its direct parent audit.");
 
         if (registryAuditBound)
         {
@@ -2845,6 +3015,59 @@ internal static partial class Program
                     registryBindingRemoval.Assets, registryBindingRemoval.Identity),
                 "removing registry binding fields from the manifest must be rejected by validation consistency.");
         }
+
+        bool parentAuditTamperRejected = positiveRegistryRevision == 1;
+        if (positiveRegistryRevision > 1 && registryLineageBound)
+        {
+            var parentAuditTamper = CopyFixture("base-registry-parent-audit-tamper");
+            File.AppendAllText(Path.Combine(parentAuditTamper.Update,
+                positiveParentAuditRelative), Environment.NewLine,
+                new UTF8Encoding(false));
+            parentAuditTamperRejected = !Stage(
+                "base-registry-parent-audit-tamper-stage",
+                parentAuditTamper.Update, parentAuditTamper.Assets,
+                parentAuditTamper.Identity);
+        }
+        AddRegressionCheck(checks, errors,
+            "resource-stage-base-registry-parent-tamper-rejected",
+            parentAuditTamperRejected,
+            "a tampered parent registry audit must be rejected before staging.");
+
+        bool fabricatedRetirementRejected = positiveRegistryRevision == 1;
+        bool activeWorkflowTamperRejected = positiveRegistryRevision == 1;
+        if (positiveRegistryRevision > 1 && registryLineageBound && registryAuditBound)
+        {
+            fabricatedRetirementRejected = StageReboundRegistryTamper(
+                "base-registry-fabricated-retirement", registry =>
+                {
+                    registry["retiredBases"]!.AsArray().Add(
+                        new System.Text.Json.Nodes.JsonObject
+                        {
+                            ["baseId"] = new string('e', 64),
+                            ["engineWorkflow"] = "Unity2021Standard",
+                            ["label"] = "fabricated Base",
+                            ["retiredAtRevision"] = positiveRegistryRevision,
+                            ["reason"] = "semantic tamper"
+                        });
+                });
+            activeWorkflowTamperRejected = StageReboundRegistryTamper(
+                "base-registry-active-workflow-tamper", registry =>
+                {
+                    var entry = registry["bases"]!.AsArray()[0]!.AsObject();
+                    string workflow = entry["engineWorkflow"]!.GetValue<string>();
+                    entry["engineWorkflow"] = workflow == "Unity2021Standard"
+                        ? "Unity2022Fgs"
+                        : "Unity2021Standard";
+                });
+        }
+        AddRegressionCheck(checks, errors,
+            "resource-stage-base-registry-fabricated-retirement-rejected",
+            fabricatedRetirementRejected,
+            "a hash-rebound retirement must still match an active Base in the parent registry.");
+        AddRegressionCheck(checks, errors,
+            "resource-stage-base-registry-active-workflow-tamper-rejected",
+            activeWorkflowTamperRejected,
+            "a hash-rebound active Base workflow change must fail parent lineage validation.");
 
         string positiveRuntimeAssetRoot = RequirePortableAssetRoot(
             GetString(positiveManifest, "runtimeAssetRoot"), "runtimeAssetRoot");

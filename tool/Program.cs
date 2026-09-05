@@ -35,9 +35,13 @@ internal static partial class Program
         "resource-stage-base-registry-audit-bound",
         "resource-stage-base-registry-audit-tamper-rejected",
         "resource-stage-base-registry-binding-removal-rejected",
+        "resource-stage-base-registry-lineage-bound",
+        "resource-stage-base-registry-parent-tamper-rejected",
         "resource-stage-direct-base-valid",
         "resource-base-registry", "base-registry-builder",
         "base-registry-build-configuration-tamper-rejected",
+        "base-registry-lineage", "base-registry-implicit-removal-rejected",
+        "base-registry-explicit-retirement",
         "resource-player-evidence-binding",
         "resource-player-legacy-single-payload-compatibility",
         "resource-player-assembly-mode-binding",
@@ -345,6 +349,17 @@ internal static partial class Program
         string[] variantValues = cli.GetList("payloadvariantids").ToArray();
         string[] labelValues = cli.GetList("labels").ToArray();
         string[] aotValues = cli.GetList("aotmetadataroots").ToArray();
+        string[] retireBaseIds = cli.GetList("retirebaseids").ToArray();
+        string? retirementReason = cli.Optional("retirementreason")?.Trim();
+        if (retireBaseIds.Distinct(StringComparer.OrdinalIgnoreCase).Count() !=
+            retireBaseIds.Length || retireBaseIds.Any(value => !IsHex(value, 64, 64)))
+            throw new DheException("RetireBaseIds contains an invalid or duplicate Base ID.");
+        if (retireBaseIds.Length == 0 && !string.IsNullOrWhiteSpace(retirementReason))
+            throw new DheException("RetirementReason requires RetireBaseIds.");
+        if (retireBaseIds.Length != 0 &&
+            (string.IsNullOrWhiteSpace(retirementReason) || retirementReason.Length > 512))
+            throw new DheException(
+                "Retiring a Base requires a non-empty RetirementReason of at most 512 characters.");
 
         var protectedPaths = new List<string>();
         protectedPaths.AddRange(identityPaths);
@@ -355,12 +370,7 @@ internal static partial class Program
         {
             if (File.Exists(path) && Path.GetFullPath(path).Equals(outputPath,
                     StringComparison.OrdinalIgnoreCase))
-            {
-                if (string.IsNullOrWhiteSpace(existingPath) ||
-                    !Path.GetFullPath(existingPath).Equals(outputPath,
-                        StringComparison.OrdinalIgnoreCase))
-                    throw new DheException("Registry output must not overwrite an input: " + outputPath);
-            }
+                throw new DheException("Registry output must not overwrite an input: " + outputPath);
             else if (Directory.Exists(path))
             {
                 EnsureOutputOutsideRoot(outputPath, path);
@@ -372,12 +382,17 @@ internal static partial class Program
             string? AotMetadataRoot)>();
         var baseIds = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
         var identityFiles = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+        var retiredBases = new List<BaseRegistryRetirement>();
+        var retiredIds = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+        string registryId;
+        int revision;
+        string? parentRegistrySha256;
 
         void AddEntry(string baseId, string engineWorkflow, string payloadVariantId,
             string label, string baselineRoot, string nativeManifest, string buildIdentity,
             string? aotMetadataRoot)
         {
-            if (!IsHex(baseId, 64, 64) || !baseIds.Add(baseId))
+            if (!IsHex(baseId, 64, 64) || retiredIds.Contains(baseId) || !baseIds.Add(baseId))
                 throw new DheException("Registry contains an invalid or duplicate Base ID: " + baseId);
             if (!RequiredPlayerEngineWorkflows.Contains(engineWorkflow,
                     StringComparer.Ordinal) || !IsPayloadVariantId(payloadVariantId))
@@ -392,6 +407,19 @@ internal static partial class Program
         if (!string.IsNullOrWhiteSpace(existingPath))
         {
             BaseRegistryDocument existing = ReadBaseRegistry(existingPath);
+            registryId = cli.Optional("registryid") ?? existing.RegistryId;
+            if (!string.Equals(registryId, existing.RegistryId, StringComparison.Ordinal))
+                throw new DheException("RegistryId cannot change across Base registry revisions.");
+            revision = checked(existing.Revision + 1);
+            parentRegistrySha256 = existing.Sha256;
+            retiredBases.AddRange(existing.RetiredBases);
+            retiredIds.UnionWith(existing.RetiredBases.Select(item => item.BaseId));
+            var retireSet = retireBaseIds.ToHashSet(StringComparer.OrdinalIgnoreCase);
+            string[] missingRetirements = retireSet.Except(existing.Entries.Select(item => item.BaseId),
+                StringComparer.OrdinalIgnoreCase).ToArray();
+            if (missingRetirements.Length != 0)
+                throw new DheException("RetireBaseIds contains a Base that is not active in the previous registry: " +
+                    string.Join(",", missingRetirements));
             foreach (BaseRegistryEntry entry in existing.Entries)
             {
                 string identityBaseId = ValidateBaseRegistryArtifacts(entry.BuildIdentity,
@@ -400,11 +428,28 @@ internal static partial class Program
                         StringComparison.OrdinalIgnoreCase))
                     throw new DheException("Existing registry Base ID does not match its build identity: " +
                         entry.BuildIdentity);
+                if (retireSet.Contains(entry.BaseId))
+                {
+                    retiredIds.Add(entry.BaseId);
+                    retiredBases.Add(new BaseRegistryRetirement(entry.BaseId,
+                        entry.EngineWorkflow, entry.Label, revision, retirementReason!));
+                    continue;
+                }
                 AddEntry(entry.BaseId, entry.EngineWorkflow, entry.PayloadVariantId,
                     entry.Label, entry.BaselineRoot, entry.NativeManifest,
                     entry.BuildIdentity, entry.AotMetadataRoot);
             }
         }
+        else
+        {
+            if (retireBaseIds.Length != 0)
+                throw new DheException("RetireBaseIds requires ExistingRegistry.");
+            registryId = cli.Optional("registryid") ?? Path.GetFileNameWithoutExtension(outputPath);
+            revision = 1;
+            parentRegistrySha256 = null;
+        }
+        if (!IsRegistryId(registryId))
+            throw new DheException("RegistryId must contain only letters, digits, '.', '_' or '-'.");
 
         if (identityPaths.Length == 0 && baselineRoots.Length == 0 &&
             nativeManifestPaths.Length == 0 && workflowValues.Length == 0 &&
@@ -449,10 +494,7 @@ internal static partial class Program
             throw new DheException("Base registry cannot be empty.");
         string outputDirectory = Path.GetDirectoryName(outputPath)!;
         Directory.CreateDirectory(outputDirectory);
-        if (File.Exists(outputPath) && !cli.Has("forceoutput") &&
-            !(!string.IsNullOrWhiteSpace(existingPath) &&
-              Path.GetFullPath(existingPath).Equals(outputPath,
-                  StringComparison.OrdinalIgnoreCase)))
+        if (File.Exists(outputPath) && !cli.Has("forceoutput"))
             throw new DheException("Registry output already exists; pass -ForceOutput to replace it.");
 
         string Relative(string path)
@@ -476,14 +518,26 @@ internal static partial class Program
             buildIdentity = Relative(entry.BuildIdentity),
             aotMetadataRoot = entry.AotMetadataRoot == null ? null : Relative(entry.AotMetadataRoot),
         }).ToArray();
+        var outputRetiredBases = retiredBases.OrderBy(entry => entry.RetiredAtRevision)
+            .ThenBy(entry => entry.BaseId, StringComparer.OrdinalIgnoreCase).Select(entry => new
+            {
+                baseId = entry.BaseId,
+                engineWorkflow = entry.EngineWorkflow,
+                label = entry.Label,
+                retiredAtRevision = entry.RetiredAtRevision,
+                reason = entry.Reason,
+            }).ToArray();
         WriteJson(outputPath, new
         {
             schemaVersion = 1,
             format = "hybridclr.dhe-base-registry.json",
             pathSemantics = "registry-relative-v1",
-            registryId = cli.Optional("registryid") ?? Path.GetFileNameWithoutExtension(outputPath),
+            registryId,
+            revision,
+            parentRegistrySha256,
             generatedAtUtc = DateTimeOffset.UtcNow,
             bases = outputBases,
+            retiredBases = outputRetiredBases,
         });
         // Re-read through the same resolver used by resource-update so a
         // generated registry cannot pass merely because its JSON is shaped
@@ -591,10 +645,14 @@ internal static partial class Program
         var currentRoot = RequireDirectory(cli.Require("currentroot"), "Current root");
         var settingsPath = RequireFile(cli.Require("settingsfile"), "HybridCLR settings");
         var currentVariantRoots = ReadCurrentVariantRoots(cli, currentRoot);
-        var outputInputs = currentVariantRoots.Values.Append(settingsPath).ToArray();
-        var outputRoot = SafeOutputRoot(cli.Require("outputroot"), outputInputs);
         string? baseRegistryPath = cli.Optional("baseregistry");
+        string? previousBaseRegistryPath = cli.Optional("previousbaseregistry");
+        var outputInputs = currentVariantRoots.Values.Append(settingsPath)
+            .Concat(new[] { baseRegistryPath, previousBaseRegistryPath }.OfType<string>())
+            .ToArray();
+        var outputRoot = SafeOutputRoot(cli.Require("outputroot"), outputInputs);
         BaseRegistryDocument? baseRegistry = null;
+        BaseRegistryDocument? previousBaseRegistry = null;
         string[] baselineRoots;
         string[] nativeManifestPaths;
         string[] buildIdentityPaths;
@@ -610,6 +668,8 @@ internal static partial class Program
                 throw new DheException("BaseRegistry cannot be combined with parallel BaseRoots, " +
                     "BaseNativeManifests, BaseBuildIdentities, or AotMetadataRoots arguments.");
             baseRegistry = ReadBaseRegistry(baseRegistryPath);
+            previousBaseRegistry = ValidateBaseRegistryLineage(baseRegistry,
+                previousBaseRegistryPath);
             baselineRoots = baseRegistry.Entries.Select(entry => entry.BaselineRoot).ToArray();
             nativeManifestPaths = baseRegistry.Entries.Select(entry => entry.NativeManifest).ToArray();
             buildIdentityPaths = baseRegistry.Entries.Select(entry => entry.BuildIdentity).ToArray();
@@ -626,6 +686,8 @@ internal static partial class Program
         }
         else
         {
+            if (!string.IsNullOrWhiteSpace(previousBaseRegistryPath))
+                throw new DheException("PreviousBaseRegistry requires BaseRegistry.");
             if (currentVariantRoots.Count != 1)
                 throw new DheException("CurrentVariantRoots requires a BaseRegistry with payloadVariantId entries.");
             baselineRoots = (cli.Optional("baseroots") ?? cli.Require("baselineroot"))
@@ -810,6 +872,8 @@ internal static partial class Program
 
         string? baseRegistryAuditPath = null;
         string? baseRegistryAuditSha256 = null;
+        string? baseRegistryParentAuditPath = null;
+        string? baseRegistryParentAuditSha256 = null;
         if (baseRegistry != null)
         {
             // Keep the exact authenticated registry bytes beside the release
@@ -823,6 +887,18 @@ internal static partial class Program
             if (!string.Equals(baseRegistryAuditSha256, baseRegistry.Sha256,
                     StringComparison.OrdinalIgnoreCase))
                 throw new DheException("DHE Base registry audit copy hash mismatch.");
+            if (previousBaseRegistry != null)
+            {
+                baseRegistryParentAuditPath = "audit/dhe-base-registry-parent.json";
+                string parentAuditPath = ResolveContainedPath(outputRoot,
+                    baseRegistryParentAuditPath, "DHE parent Base registry audit copy");
+                File.Copy(previousBaseRegistry.SourcePath, parentAuditPath, true);
+                baseRegistryParentAuditSha256 = Sha256File(parentAuditPath);
+                if (!string.Equals(baseRegistryParentAuditSha256,
+                        previousBaseRegistry.Sha256, StringComparison.OrdinalIgnoreCase))
+                    throw new DheException(
+                        "DHE parent Base registry audit copy hash mismatch.");
+            }
         }
 
         var payloadFiles = defaultVariant.PayloadFiles;
@@ -1147,6 +1223,13 @@ internal static partial class Program
             baseRegistryEntryCount = baseRegistry?.Entries.Length,
             baseRegistryAuditPath,
             baseRegistryAuditSha256,
+            baseRegistryId = baseRegistry?.RegistryId,
+            baseRegistryRevision = baseRegistry?.Revision,
+            baseRegistryParentSha256 = baseRegistry?.ParentRegistrySha256,
+            baseRegistryParentAuditPath,
+            baseRegistryParentAuditSha256,
+            baseRegistryRetiredBaseCount = baseRegistry?.RetiredBases.Length,
+            baseRegistryLineageValidated = baseRegistry != null,
             candidateBaseCount = candidateBases.Count,
             compatibleBaseCount = candidateBases.Count - releaseErrors.Count,
             bases = candidateBases.ToArray(),
@@ -1203,6 +1286,13 @@ internal static partial class Program
             baseRegistryEntryCount = baseRegistry?.Entries.Length,
             baseRegistryAuditPath,
             baseRegistryAuditSha256,
+            baseRegistryId = baseRegistry?.RegistryId,
+            baseRegistryRevision = baseRegistry?.Revision,
+            baseRegistryParentSha256 = baseRegistry?.ParentRegistrySha256,
+            baseRegistryParentAuditPath,
+            baseRegistryParentAuditSha256,
+            baseRegistryRetiredBaseCount = baseRegistry?.RetiredBases.Length,
+            baseRegistryLineageValidated = baseRegistry != null,
             playerUpdateRequired = false,
             guardCoverageValidated = true,
             runtimeComparison = "embedded-base-mv-vs-current-mv",
@@ -2728,6 +2818,16 @@ internal static partial class Program
              (!string.IsNullOrWhiteSpace(payloadVariantSetHash) &&
               !string.Equals(GetString(report, "payloadVariantSetSha256"), payloadVariantSetHash,
                   StringComparison.OrdinalIgnoreCase)) ||
+             !OptionalJsonPropertiesEqual(report, manifest, "baseRegistrySha256") ||
+             !OptionalJsonPropertiesEqual(report, manifest, "baseRegistryId") ||
+             !OptionalJsonPropertiesEqual(report, manifest, "baseRegistryRevision") ||
+             !OptionalJsonPropertiesEqual(report, manifest,
+                 "baseRegistryLineageValidated") ||
+             !OptionalJsonPropertiesEqual(stage, manifest, "baseRegistrySha256") ||
+             !OptionalJsonPropertiesEqual(stage, manifest, "baseRegistryId") ||
+             !OptionalJsonPropertiesEqual(stage, manifest, "baseRegistryRevision") ||
+             !OptionalJsonPropertiesEqual(stage, manifest,
+                 "baseRegistryLineageValidated") ||
              !string.Equals(GetString(baseWorkflow, "cleanCheckoutGate"),
                 GetString(report, "cleanCheckoutGate"), StringComparison.OrdinalIgnoreCase))
             throw new DheException("Resource Player evidence live bindings do not agree.");
@@ -3575,7 +3675,7 @@ internal static partial class Program
         }
     }
 
-    private static void PrintHelp() => Console.WriteLine("HybridCLR DHE C# tool\nCommands: version, mv, batch, base-registry, resource-update, stage-resource-update, resource-player-evidence, baseline-manifest, aot-metadata-manifest, preflight, workflow, release-gate, regression, schema-validate, schema-gate, validate, archive, doctor, verify-package, release-evidence, publish, install, new-adapter, new-config, assemble-runtime, native-tests, build-managed-cases, generate-test-manifest, generate-metadata-stress-source, reference, compare-results, check-environment, clear-unity-project-locks, wait-editor, prepare-engine-test-project, bootstrap-repos, tree-hash, file-hash\nBase registry accepts -ExistingRegistry or comma-separated -BaseIdentities, -BaselineRoots, -BaseNativeManifests, -EngineWorkflows, with optional -PayloadVariantIds, -Labels, and -AotMetadataRoots.\nResource update accepts -BaseRegistry <registry.json> for an authenticated multi-Base input.\nExample: dotnet run --project tool/HybridCLR.DheTool.csproj -- workflow -Config <project/dhe-workflow-config.json>");
+    private static void PrintHelp() => Console.WriteLine("HybridCLR DHE C# tool\nCommands: version, mv, batch, base-registry, resource-update, stage-resource-update, resource-player-evidence, baseline-manifest, aot-metadata-manifest, preflight, workflow, release-gate, regression, schema-validate, schema-gate, validate, archive, doctor, verify-package, release-evidence, publish, install, new-adapter, new-config, assemble-runtime, native-tests, build-managed-cases, generate-test-manifest, generate-metadata-stress-source, reference, compare-results, check-environment, clear-unity-project-locks, wait-editor, prepare-engine-test-project, bootstrap-repos, tree-hash, file-hash\nBase registry accepts -ExistingRegistry or comma-separated -BaseIdentities, -BaselineRoots, -BaseNativeManifests, -EngineWorkflows, with optional -PayloadVariantIds, -Labels, and -AotMetadataRoots. Retiring an online Base requires -RetireBaseIds and -RetirementReason.\nResource update accepts -BaseRegistry <registry.json>; revision 2 or later also requires -PreviousBaseRegistry <parent.json>.\nExample: dotnet run --project tool/HybridCLR.DheTool.csproj -- workflow -Config <project/dhe-workflow-config.json>");
 
     private static string ResolveUnity(Cli cli, string project) => RequireFile(cli.Optional("unity") ?? Environment.GetEnvironmentVariable("DHE_UNITY_EXE") ?? throw new DheException("Set -Unity or DHE_UNITY_EXE."), "Unity editor");
     private static void RunUnity(string executable, string workingDirectory, IEnumerable<string> arguments, IDictionary<string, string> environment, string logPath, int timeoutSeconds)

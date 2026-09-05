@@ -4,12 +4,14 @@
   "title": "HybridCLR DHE Supported Base Registry",
   "type": "object",
   "additionalProperties": false,
-  "required": ["schemaVersion", "format", "pathSemantics", "bases"],
+  "required": ["schemaVersion", "format", "pathSemantics", "registryId", "bases"],
   "properties": {
     "schemaVersion": { "const": 1 },
     "format": { "const": "hybridclr.dhe-base-registry.json" },
     "pathSemantics": { "enum": ["registry-relative-v1", "workspace-absolute-v1"] },
-    "registryId": { "type": "string", "minLength": 1, "maxLength": 256 },
+    "registryId": { "type": "string", "pattern": "^[A-Za-z0-9._-]{1,128}$" },
+    "revision": { "type": "integer", "minimum": 1 },
+    "parentRegistrySha256": { "type": ["string", "null"], "pattern": "^[0-9a-fA-F]{64}$" },
     "generatedAtUtc": { "type": "string", "minLength": 1 },
     "bases": {
       "type": "array",
@@ -28,6 +30,22 @@
           "nativeManifest": { "type": "string", "minLength": 1 },
           "buildIdentity": { "type": "string", "minLength": 1 },
           "aotMetadataRoot": { "type": ["string", "null"], "minLength": 1 }
+        }
+      }
+    },
+    "retiredBases": {
+      "type": "array",
+      "maxItems": 1024,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["baseId", "engineWorkflow", "label", "retiredAtRevision", "reason"],
+        "properties": {
+          "baseId": { "type": "string", "pattern": "^[0-9a-fA-F]{64}$" },
+          "engineWorkflow": { "enum": ["Unity2021Standard", "Unity2022Fgs", "Tuanjie2022Fgs"] },
+          "label": { "type": "string", "minLength": 1, "maxLength": 256 },
+          "retiredAtRevision": { "type": "integer", "minimum": 2 },
+          "reason": { "type": "string", "minLength": 1, "maxLength": 512 }
         }
       }
     }
