@@ -147,6 +147,31 @@ validated even after the build host is gone. Add a newly shipped Base by adding
 its archived entry before the next resource build; the current DLL/MV payload
 remains a single shared payload.
 
+Use the C# `base-registry` command to create or extend that registry. It validates
+each archived identity, the universal native manifest hash, every baseline DLL hash,
+and the managed assembly-set hash before writing a portable registry. Existing
+entries are retained with `-ExistingRegistry`; new entries are supplied as equal-length
+comma-separated lists:
+
+```text
+dotnet HybridCLR.DheTool.dll base-registry \
+  -ExistingRegistry C:/release/base-registry/supported-bases.json \
+  -BaseIdentities C:/release/base-120/build-identity.json \
+  -BaselineRoots C:/release/base-120/dlls \
+  -BaseNativeManifests C:/release/base-120/dhe-native-manifest.json \
+  -EngineWorkflows Unity2022Fgs \
+  -PayloadVariantIds windows \
+  -AotMetadataRoots C:/release/base-120/aot-metadata \
+  -Labels "Unity 2022 Base 120" \
+  -Output C:/release/base-registry/supported-bases.next.json
+```
+
+The command never copies Base artifacts and refuses to overwrite an input. The
+output is re-read through the same resolver used by `resource-update`; publish the
+new registry atomically together with the next resource build. A registry is only
+considered complete when the `regression` gate has exercised both normalization and
+duplicate-Base rejection.
+
 The output contains one copy of each current DLL and current MetaVersion. Base inputs
 are compatibility evidence only and are never copied into `payload/`. At
 runtime each Player compares the remote current MetaVersion with its own embedded Base

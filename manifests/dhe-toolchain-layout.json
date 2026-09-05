@@ -96,6 +96,7 @@
     "aot-metadata-manifest",
     "baseline-manifest",
     "batch",
+    "base-registry",
     "resource-update",
     "stage-resource-update",
     "resource-player-evidence",

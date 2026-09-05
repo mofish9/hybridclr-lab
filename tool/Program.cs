@@ -1,4 +1,5 @@
 using System.Diagnostics;
+using System.Globalization;
 using System.Security.Cryptography;
 using System.Text;
 using System.Text.Json;
@@ -32,7 +33,7 @@ internal static partial class Program
         "resource-stage-base-registry-audit-tamper-rejected",
         "resource-stage-base-registry-binding-removal-rejected",
         "resource-stage-direct-base-valid",
-        "resource-base-registry",
+        "resource-base-registry", "base-registry-builder",
         "resource-player-evidence-binding",
         "resource-player-legacy-single-payload-compatibility",
         "resource-player-release-readiness",
@@ -81,6 +82,7 @@ internal static partial class Program
                 "version" => Version(cli),
                 "mv" or "metaversion" => GenerateMetaVersion(cli),
                 "batch" => Batch(cli),
+                "base-registry" => BuildBaseRegistry(cli),
                 "resource-update" => ResourceUpdate(cli),
                 "stage-resource-update" => StageResourceUpdate(cli),
                 "resource-player-evidence" => ResourcePlayerEvidence(cli),
@@ -303,6 +305,242 @@ internal static partial class Program
             roots[property.Name] = root;
         }
         return roots;
+    }
+
+    /// <summary>
+    /// Creates the authenticated registry consumed by resource-update. Base
+    /// artifacts are deliberately referenced, never copied: the registry is
+    /// the stable index for every online Base while the hotfix payload remains
+    /// one current DLL/MV set. Existing entries can be normalized and new
+    /// identities appended in one operation.
+    /// </summary>
+    private static int BuildBaseRegistry(Cli cli)
+    {
+        string outputPath = Path.GetFullPath(cli.Require("output"));
+        string? existingPath = cli.Optional("existingregistry");
+        string[] identityPaths = ReadPathList(cli, "baseidentities", "baseidentity");
+        string[] baselineRoots = ReadPathList(cli, "baselineroots", "baselineroot");
+        string[] nativeManifestPaths = ReadPathList(cli, "basenativemanifests", "basenativemanifest");
+        string[] workflowValues = cli.GetList("engineworkflows").ToArray();
+        string[] variantValues = cli.GetList("payloadvariantids").ToArray();
+        string[] labelValues = cli.GetList("labels").ToArray();
+        string[] aotValues = cli.GetList("aotmetadataroots").ToArray();
+
+        var protectedPaths = new List<string>();
+        protectedPaths.AddRange(identityPaths);
+        protectedPaths.AddRange(baselineRoots);
+        protectedPaths.AddRange(nativeManifestPaths);
+        if (!string.IsNullOrWhiteSpace(existingPath)) protectedPaths.Add(existingPath);
+        foreach (string path in protectedPaths)
+        {
+            if (File.Exists(path) && Path.GetFullPath(path).Equals(outputPath,
+                    StringComparison.OrdinalIgnoreCase))
+            {
+                if (string.IsNullOrWhiteSpace(existingPath) ||
+                    !Path.GetFullPath(existingPath).Equals(outputPath,
+                        StringComparison.OrdinalIgnoreCase))
+                    throw new DheException("Registry output must not overwrite an input: " + outputPath);
+            }
+            else if (Directory.Exists(path))
+            {
+                EnsureOutputOutsideRoot(outputPath, path);
+            }
+        }
+
+        var entries = new List<(string BaseId, string EngineWorkflow, string PayloadVariantId,
+            string Label, string BaselineRoot, string NativeManifest, string BuildIdentity,
+            string? AotMetadataRoot)>();
+        var baseIds = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+        var identityFiles = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+
+        void AddEntry(string baseId, string engineWorkflow, string payloadVariantId,
+            string label, string baselineRoot, string nativeManifest, string buildIdentity,
+            string? aotMetadataRoot)
+        {
+            if (!IsHex(baseId, 64, 64) || !baseIds.Add(baseId))
+                throw new DheException("Registry contains an invalid or duplicate Base ID: " + baseId);
+            if (!RequiredPlayerEngineWorkflows.Contains(engineWorkflow,
+                    StringComparer.Ordinal) || !IsPayloadVariantId(payloadVariantId))
+                throw new DheException("Registry Base workflow or payload variant is invalid: " +
+                    engineWorkflow + "/" + payloadVariantId);
+            if (!identityFiles.Add(Path.GetFullPath(buildIdentity)))
+                throw new DheException("Registry reuses one BuildIdentity path: " + buildIdentity);
+            entries.Add((baseId, engineWorkflow, payloadVariantId, label, baselineRoot,
+                nativeManifest, buildIdentity, aotMetadataRoot));
+        }
+
+        if (!string.IsNullOrWhiteSpace(existingPath))
+        {
+            BaseRegistryDocument existing = ReadBaseRegistry(existingPath);
+            foreach (BaseRegistryEntry entry in existing.Entries)
+            {
+                string identityBaseId = ValidateBaseRegistryArtifacts(entry.BuildIdentity,
+                    entry.BaselineRoot, entry.NativeManifest);
+                if (!string.Equals(identityBaseId, entry.BaseId,
+                        StringComparison.OrdinalIgnoreCase))
+                    throw new DheException("Existing registry Base ID does not match its build identity: " +
+                        entry.BuildIdentity);
+                AddEntry(entry.BaseId, entry.EngineWorkflow, entry.PayloadVariantId,
+                    entry.Label, entry.BaselineRoot, entry.NativeManifest,
+                    entry.BuildIdentity, entry.AotMetadataRoot);
+            }
+        }
+
+        if (identityPaths.Length == 0 && baselineRoots.Length == 0 &&
+            nativeManifestPaths.Length == 0 && workflowValues.Length == 0 &&
+            string.IsNullOrWhiteSpace(existingPath))
+            throw new DheException("Base registry requires ExistingRegistry or new Base inputs.");
+        if (identityPaths.Length != baselineRoots.Length ||
+            identityPaths.Length != nativeManifestPaths.Length ||
+            identityPaths.Length != workflowValues.Length)
+            throw new DheException("Base identity, baseline, native manifest, and workflow lists must have equal lengths.");
+        if (variantValues.Length != 0 && variantValues.Length != identityPaths.Length)
+            throw new DheException("PayloadVariantIds must contain one value per new Base.");
+        if (labelValues.Length != 0 && labelValues.Length != identityPaths.Length)
+            throw new DheException("Labels must contain one value per new Base.");
+        if (aotValues.Length != 0 && aotValues.Length != identityPaths.Length)
+            throw new DheException("AotMetadataRoots must contain one value per new Base; use null for an empty set.");
+
+        for (int index = 0; index < identityPaths.Length; index++)
+        {
+            string identityPath = RequireFile(identityPaths[index], "Base build identity");
+            string baselineRoot = RequireDirectory(baselineRoots[index], "Base baseline root");
+            string nativeManifestPath = RequireFile(nativeManifestPaths[index], "Base native manifest");
+            string engineWorkflow = workflowValues[index];
+            string variant = variantValues.Length == 0 ? "default" : variantValues[index];
+            string label = labelValues.Length == 0
+                ? engineWorkflow + " Base " + (index + 1).ToString(CultureInfo.InvariantCulture)
+                : labelValues[index];
+            if (string.IsNullOrWhiteSpace(label) || label.Length > 256)
+                throw new DheException("Base registry label is empty or too long.");
+
+            string baseId = ValidateBaseRegistryArtifacts(identityPath, baselineRoot,
+                nativeManifestPath);
+
+            string? aotRoot = null;
+            if (aotValues.Length != 0 && !string.Equals(aotValues[index], "null",
+                    StringComparison.OrdinalIgnoreCase) && aotValues[index] != "-")
+                aotRoot = RequireDirectory(aotValues[index], "Base AOT metadata root");
+            AddEntry(baseId, engineWorkflow, variant, label, baselineRoot,
+                nativeManifestPath, identityPath, aotRoot);
+        }
+
+        if (entries.Count == 0)
+            throw new DheException("Base registry cannot be empty.");
+        string outputDirectory = Path.GetDirectoryName(outputPath)!;
+        Directory.CreateDirectory(outputDirectory);
+        if (File.Exists(outputPath) && !cli.Has("forceoutput") &&
+            !(!string.IsNullOrWhiteSpace(existingPath) &&
+              Path.GetFullPath(existingPath).Equals(outputPath,
+                  StringComparison.OrdinalIgnoreCase)))
+            throw new DheException("Registry output already exists; pass -ForceOutput to replace it.");
+
+        string Relative(string path)
+        {
+            string relative = Path.GetRelativePath(outputDirectory, Path.GetFullPath(path))
+                .Replace(Path.DirectorySeparatorChar, '/').Replace(Path.AltDirectorySeparatorChar, '/');
+            if (string.IsNullOrWhiteSpace(relative) || Path.IsPathRooted(relative) ||
+                relative.Contains('\0'))
+                throw new DheException("Registry path cannot be represented relative to output: " + path);
+            return relative;
+        }
+
+        var outputBases = entries.Select(entry => new
+        {
+            baseId = entry.BaseId,
+            engineWorkflow = entry.EngineWorkflow,
+            label = entry.Label,
+            payloadVariantId = entry.PayloadVariantId,
+            baselineRoot = Relative(entry.BaselineRoot),
+            nativeManifest = Relative(entry.NativeManifest),
+            buildIdentity = Relative(entry.BuildIdentity),
+            aotMetadataRoot = entry.AotMetadataRoot == null ? null : Relative(entry.AotMetadataRoot),
+        }).ToArray();
+        WriteJson(outputPath, new
+        {
+            schemaVersion = 1,
+            format = "hybridclr.dhe-base-registry.json",
+            pathSemantics = "registry-relative-v1",
+            registryId = cli.Optional("registryid") ?? Path.GetFileNameWithoutExtension(outputPath),
+            generatedAtUtc = DateTimeOffset.UtcNow,
+            bases = outputBases,
+        });
+        // Re-read through the same resolver used by resource-update so a
+        // generated registry cannot pass merely because its JSON is shaped
+        // correctly while a relative path is broken.
+        _ = ReadBaseRegistry(outputPath);
+        Console.WriteLine("DHE Base registry: " + outputPath);
+        return 0;
+    }
+
+    private static string ValidateBaseRegistryArtifacts(string identityPath, string baselineRoot,
+        string nativeManifestPath)
+    {
+        JsonElement identity = ReadJson<JsonElement>(identityPath);
+        if (GetInt(identity, "schemaVersion") != 1 ||
+            !string.Equals(GetString(identity, "format"),
+                "hybridclr.dhe-build-identity.json", StringComparison.Ordinal) ||
+            GetInt(identity, "identityVersion") != 1 ||
+            !string.Equals(GetString(identity, "state"), "staged-for-final-player",
+                StringComparison.Ordinal))
+            throw new DheException("Base build identity contract is invalid: " + identityPath);
+        string baseId = GetString(identity, "baseId") ?? string.Empty;
+        if (!IsHex(baseId, 64, 64))
+            throw new DheException("Base build identity has an invalid baseId: " + identityPath);
+        string? identityNativeManifestPath = GetString(identity, "nativeManifestPath");
+        if (!string.IsNullOrWhiteSpace(identityNativeManifestPath) &&
+            !Path.GetFullPath(identityNativeManifestPath).Equals(
+                Path.GetFullPath(nativeManifestPath), StringComparison.OrdinalIgnoreCase))
+            throw new DheException("Base identity nativeManifestPath does not match the registry input: " +
+                identityPath);
+        JsonElement native = ReadJson<JsonElement>(nativeManifestPath);
+        if (!string.Equals(GetString(identity, "nativeManifestSha256"),
+                Sha256File(nativeManifestPath), StringComparison.OrdinalIgnoreCase))
+            throw new DheException("Base identity/native manifest hash binding is invalid: " + identityPath);
+        if (!string.Equals(GetString(native, "guardMode"), "universal",
+                StringComparison.OrdinalIgnoreCase))
+            throw new DheException("Base native manifest must use universal guard mode: " + nativeManifestPath);
+
+        if (!identity.TryGetProperty("assemblies", out JsonElement assemblies) ||
+            assemblies.ValueKind != JsonValueKind.Array || assemblies.GetArrayLength() == 0)
+            throw new DheException("Base build identity has no assembly records: " + identityPath);
+        var records = new List<(string Name, string Path)>();
+        var assemblyNames = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+        foreach (JsonElement assembly in assemblies.EnumerateArray())
+        {
+            string name = NormalizeName(GetString(assembly, "assemblyName") ?? string.Empty);
+            if (string.IsNullOrWhiteSpace(name) || !assemblyNames.Add(name))
+                throw new DheException("Base build identity contains a missing or duplicate assembly: " +
+                    identityPath);
+            string path = RequireFile(Path.Combine(baselineRoot, name + ".dll"),
+                "Base assembly " + name);
+            string? identityBaselinePath = GetString(assembly, "baselinePath");
+            if (!string.IsNullOrWhiteSpace(identityBaselinePath) &&
+                !Path.GetFullPath(identityBaselinePath).Equals(Path.GetFullPath(path),
+                    StringComparison.OrdinalIgnoreCase))
+                throw new DheException("Base assembly baselinePath does not match the registry root: " +
+                    name);
+            string expectedHash = GetString(assembly, "baselineSha256") ?? string.Empty;
+            if (!IsHex(expectedHash, 64, 64) ||
+                !string.Equals(Sha256File(path), expectedHash,
+                    StringComparison.OrdinalIgnoreCase))
+                throw new DheException("Base assembly hash does not match its identity: " + name);
+            records.Add((name, path));
+        }
+        string managedSet = NamedAssemblySetHash(records);
+        if (!string.Equals(managedSet, GetString(identity, "managedAssemblySetSha256"),
+                StringComparison.OrdinalIgnoreCase))
+            throw new DheException("Base managed assembly set does not match its identity: " + identityPath);
+        return baseId;
+    }
+
+    private static string[] ReadPathList(Cli cli, string plural, string singular)
+    {
+        string? value = cli.Optional(plural) ?? cli.Optional(singular);
+        return string.IsNullOrWhiteSpace(value)
+            ? Array.Empty<string>()
+            : value.Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries)
+                .Select(Path.GetFullPath).ToArray();
     }
 
     /// <summary>
@@ -2937,7 +3175,7 @@ internal static partial class Program
         }
     }
 
-    private static void PrintHelp() => Console.WriteLine("HybridCLR DHE C# tool\nCommands: version, mv, batch, resource-update, stage-resource-update, resource-player-evidence, baseline-manifest, aot-metadata-manifest, preflight, workflow, release-gate, regression, schema-validate, schema-gate, validate, archive, doctor, verify-package, release-evidence, publish, install, new-adapter, new-config, assemble-runtime, native-tests, build-managed-cases, generate-test-manifest, generate-metadata-stress-source, reference, compare-results, check-environment, clear-unity-project-locks, wait-editor, prepare-engine-test-project, bootstrap-repos, tree-hash, file-hash\nResource update accepts -BaseRegistry <registry.json> for an authenticated multi-Base input.\nExample: dotnet run --project tool/HybridCLR.DheTool.csproj -- workflow -Config <project/dhe-workflow-config.json>");
+    private static void PrintHelp() => Console.WriteLine("HybridCLR DHE C# tool\nCommands: version, mv, batch, base-registry, resource-update, stage-resource-update, resource-player-evidence, baseline-manifest, aot-metadata-manifest, preflight, workflow, release-gate, regression, schema-validate, schema-gate, validate, archive, doctor, verify-package, release-evidence, publish, install, new-adapter, new-config, assemble-runtime, native-tests, build-managed-cases, generate-test-manifest, generate-metadata-stress-source, reference, compare-results, check-environment, clear-unity-project-locks, wait-editor, prepare-engine-test-project, bootstrap-repos, tree-hash, file-hash\nBase registry accepts -ExistingRegistry or comma-separated -BaseIdentities, -BaselineRoots, -BaseNativeManifests, -EngineWorkflows, with optional -PayloadVariantIds, -Labels, and -AotMetadataRoots.\nResource update accepts -BaseRegistry <registry.json> for an authenticated multi-Base input.\nExample: dotnet run --project tool/HybridCLR.DheTool.csproj -- workflow -Config <project/dhe-workflow-config.json>");
 
     private static string ResolveUnity(Cli cli, string project) => RequireFile(cli.Optional("unity") ?? Environment.GetEnvironmentVariable("DHE_UNITY_EXE") ?? throw new DheException("Set -Unity or DHE_UNITY_EXE."), "Unity editor");
     private static void RunUnity(string executable, string workingDirectory, IEnumerable<string> arguments, IDictionary<string, string> environment, string logPath, int timeoutSeconds)

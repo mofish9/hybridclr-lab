@@ -138,6 +138,26 @@ count、原始 registry 的精确副本 `audit/dhe-base-registry.json` 及其 SH
 缺失或篡改会整体拒绝。新增线上 Base 只需先归档并加入 registry，下一次资源构建会将它
 与所有旧 Base 一起审计。
 
+不要手工编辑 registry 的条目。先用工具从已归档的 Base identity 生成规范化文件；
+已有线上集合通过 `-ExistingRegistry` 保留，新 Base 用等长的逗号分隔列表追加：
+
+```text
+dotnet HybridCLR.DheTool.dll base-registry \
+  -ExistingRegistry C:/release/base-registry/supported-bases.json \
+  -BaseIdentities C:/release/base-120/build-identity.json \
+  -BaselineRoots C:/release/base-120/dlls \
+  -BaseNativeManifests C:/release/base-120/dhe-native-manifest.json \
+  -EngineWorkflows Unity2022Fgs \
+  -PayloadVariantIds windows \
+  -AotMetadataRoots C:/release/base-120/aot-metadata \
+  -Output C:/release/base-registry/supported-bases.next.json
+```
+
+命令会校验 identity、universal native manifest、每个程序集的 baseline hash 和完整
+managed assembly set，并在写出后重新解析路径；不会复制或覆盖 Base 归档。发布前的
+`regression` 必须验证规范化结果和重复 `baseId` 拒绝，随后把新 registry 原子地用于
+下一次 `resource-update`。
+
 每个 Base 对应的资源/catalog 构建必须显式携带该 Player 归档的完整身份，而不是仅凭内置
 MetaVersion 集合猜测 Base：
 

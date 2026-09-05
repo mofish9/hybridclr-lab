@@ -9,6 +9,7 @@ internal static partial class Program
         string BaseId,
         string EngineWorkflow,
         string PayloadVariantId,
+        string Label,
         string BaselineRoot,
         string NativeManifest,
         string BuildIdentity,
@@ -57,6 +58,9 @@ internal static partial class Program
             string payloadVariantId = GetString(item, "payloadVariantId") ?? "default";
             if (!IsPayloadVariantId(payloadVariantId))
                 throw new DheException("DHE Base registry contains an invalid payloadVariantId.");
+            string label = GetString(item, "label") ?? baseId;
+            if (string.IsNullOrWhiteSpace(label) || label.Length > 256)
+                throw new DheException("DHE Base registry contains an invalid label.");
 
             string baselineRoot = ResolveBaseRegistryPath(item, "baselineRoot", registryDirectory,
                 pathSemantics, requireDirectory: true);
@@ -78,7 +82,7 @@ internal static partial class Program
                     registryDirectory, pathSemantics, requireDirectory: true);
             }
 
-            entries.Add(new BaseRegistryEntry(baseId, engineWorkflow, payloadVariantId, baselineRoot,
+            entries.Add(new BaseRegistryEntry(baseId, engineWorkflow, payloadVariantId, label, baselineRoot,
                 nativeManifest, buildIdentity, aotMetadataRoot));
         }
 

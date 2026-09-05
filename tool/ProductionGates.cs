@@ -988,6 +988,91 @@ internal static partial class Program
         AddRegressionCheck(checks, errors, "resource-base-registry", baseRegistryPassed,
             baseRegistryDetails);
 
+        bool baseRegistryBuilderPassed = false;
+        string baseRegistryBuilderDetails =
+            "Regression requires an authenticated Base registry input.";
+        if (!string.IsNullOrWhiteSpace(resourceBaseRegistry))
+        {
+            try
+            {
+                BaseRegistryDocument sourceRegistry = ReadBaseRegistry(resourceBaseRegistry);
+                string builderRoot = Path.Combine(regressionRoot, "base-registry-builder");
+                Directory.CreateDirectory(builderRoot);
+                string normalizedPath = Path.Combine(builderRoot, "supported-bases.json");
+                int normalizedExit = BuildBaseRegistry(new Cli("base-registry",
+                    new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase)
+                    {
+                        ["existingregistry"] = resourceBaseRegistry,
+                        ["output"] = normalizedPath,
+                        ["forceoutput"] = "true",
+                        ["registryid"] = "regression-normalized"
+                    }));
+                BaseRegistryDocument normalizedRegistry = ReadBaseRegistry(normalizedPath);
+                bool normalizedEntriesMatch = sourceRegistry.Entries.Length ==
+                    normalizedRegistry.Entries.Length && sourceRegistry.Entries.Zip(
+                        normalizedRegistry.Entries).All(pair =>
+                        string.Equals(pair.First.BaseId, pair.Second.BaseId,
+                            StringComparison.OrdinalIgnoreCase) &&
+                        string.Equals(pair.First.EngineWorkflow, pair.Second.EngineWorkflow,
+                            StringComparison.Ordinal) &&
+                        string.Equals(pair.First.PayloadVariantId, pair.Second.PayloadVariantId,
+                            StringComparison.Ordinal) &&
+                        string.Equals(pair.First.Label, pair.Second.Label,
+                            StringComparison.Ordinal) &&
+                        string.Equals(pair.First.BaselineRoot, pair.Second.BaselineRoot,
+                            StringComparison.OrdinalIgnoreCase) &&
+                        string.Equals(pair.First.NativeManifest, pair.Second.NativeManifest,
+                            StringComparison.OrdinalIgnoreCase) &&
+                        string.Equals(pair.First.BuildIdentity, pair.Second.BuildIdentity,
+                            StringComparison.OrdinalIgnoreCase) &&
+                        string.Equals(pair.First.AotMetadataRoot, pair.Second.AotMetadataRoot,
+                            StringComparison.OrdinalIgnoreCase));
+
+                bool duplicateRejected = false;
+                if (sourceRegistry.Entries.Length > 0)
+                {
+                    BaseRegistryEntry first = sourceRegistry.Entries[0];
+                    string duplicateRoot = Path.Combine(builderRoot, "duplicate");
+                    Directory.CreateDirectory(duplicateRoot);
+                    string identityA = Path.Combine(duplicateRoot, "identity-a.json");
+                    string identityB = Path.Combine(duplicateRoot, "identity-b.json");
+                    File.Copy(first.BuildIdentity, identityA, true);
+                    File.Copy(first.BuildIdentity, identityB, true);
+                    string duplicateOutput = Path.Combine(duplicateRoot, "rejected.json");
+                    try
+                    {
+                        _ = BuildBaseRegistry(new Cli("base-registry",
+                            new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase)
+                            {
+                                ["baseidentities"] = identityA + "," + identityB,
+                                ["baselineroots"] = first.BaselineRoot + "," + first.BaselineRoot,
+                                ["basenativemanifests"] = first.NativeManifest + "," + first.NativeManifest,
+                                ["engineworkflows"] = first.EngineWorkflow + "," + first.EngineWorkflow,
+                                ["payloadvariantids"] = first.PayloadVariantId + "," + first.PayloadVariantId,
+                                ["output"] = duplicateOutput,
+                                ["forceoutput"] = "true"
+                            }));
+                    }
+                    catch (DheException)
+                    {
+                        duplicateRejected = true;
+                    }
+                }
+
+                baseRegistryBuilderPassed = normalizedExit == 0 && normalizedEntriesMatch &&
+                    duplicateRejected;
+                baseRegistryBuilderDetails = baseRegistryBuilderPassed
+                    ? "registry builder normalized the multi-Base input and rejected duplicate Base IDs"
+                    : "registry builder normalization or duplicate Base ID rejection failed";
+            }
+            catch (Exception exception)
+            {
+                baseRegistryBuilderDetails = exception.Message;
+            }
+        }
+        AddRegressionCheck(checks, errors, "base-registry-builder", baseRegistryBuilderPassed,
+            baseRegistryBuilderDetails);
+
         var packageRoot = cli.Optional("packageroot");
         if (!string.IsNullOrWhiteSpace(packageRoot))
         {
