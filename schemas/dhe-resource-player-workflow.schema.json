@@ -71,6 +71,8 @@
         "strategy": { "type": "string", "minLength": 1 },
         "aotAssemblies": { "type": "array", "minItems": 1, "items": { "type": "string", "minLength": 1 } },
         "loadedDheAssemblies": { "type": "array", "minItems": 1, "items": { "type": "string", "minLength": 1 } },
+        "differentialAssemblies": { "type": "array", "items": { "type": "string", "minLength": 1 } },
+        "interpreterOnlyAssemblies": { "type": "array", "items": { "type": "string", "minLength": 1 } },
         "stagedDependencies": { "type": "array", "items": { "type": "string", "minLength": 1 } },
         "stagedDependenciesLoadedAsDhe": { "type": "boolean" },
         "secondaryAssemblyChangedValidated": { "const": true },

@@ -23,8 +23,9 @@
       "items": {
         "type": "object",
         "required": ["assemblyName", "hashValidated", "loadError"],
-        "properties": {
-          "assemblyName": { "type": "string", "minLength": 1 },
+          "properties": {
+            "assemblyName": { "type": "string", "minLength": 1 },
+          "executionMode": { "enum": ["dhe-differential", "interpreter-only"] },
           "hashValidated": { "const": true },
           "loadError": { "const": "OK" }
         }

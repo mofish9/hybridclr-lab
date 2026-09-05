@@ -116,6 +116,25 @@ Base 求差；这保证老 Base 不会因为漏领中间资源或跨版本安装
 构建并发布新的 Base Player 时，才新增 registry 条目并从该 Player 归档新的 Base
 MetaVersion、native manifest 和 AOT metadata set。
 
+### Base 程序集集合演进
+
+资源包的 current 程序集集合可以比某个历史 Base 更大。对每个 Base，runtime plan 会在
+`baseSelections[].assemblyModes` 中逐程序集给出执行模式：
+
+- `dhe-differential`：该程序集存在于 Base，且有对应的 Base DLL、Base MetaVersion 和
+  universal native guard；只注册 current DLL/MV 的差分入口；
+- `interpreter-only`：该程序集是当前版本新增、Base 从未加载过的程序集，没有 Base MV，
+  由普通 HybridCLR `Assembly.Load` 加载并完全走解释器。
+
+因此一份 current payload 可以同时服务旧 Base（部分程序集差分、部分程序集解释器）和新 Base
+（全部程序集差分），不需要为每个 Base 复制一份 DLL。生成器会校验 Base 旧集合是 current
+集合的子集；如果 current 删除了 Base 已有的整个程序集则直接 fail-closed，因为运行中的
+AOT image 无法被资源包卸载，不能把删除误判成安全差分。删除场景必须收窄代码、要求升级
+主包，或发布包含新 runtime 的新 Base。
+
+新增程序集如果被其他程序集静态引用，仍需在真实 Player 上验证依赖加载顺序和反射/泛型行为；
+离线资源门禁只证明计划和哈希绑定，不替代 Android ARM64、iOS 或 CAT 真机 correctness。
+
 回归门禁可以在同一份 staging 根上验证连续资源更新。除了首个更新根外，传入
 `-ResourceUpdateRoot2 <resource-update-N+1>`；host 会先 staging `resource-update-N`，再
 用同一份 Base identity staging 第二份 payload，并要求两次选择的 Base/AOT identity、
@@ -295,8 +314,8 @@ metadata set、错误 Base、废弃 sidecar 残留和缺 capability 等负例均
 
 这证明“Base 只构建一次、后续一份资源包服务多个 Base”的架构链路成立，但不等于官方旗舰版
 DHE 的全部元数据能力。当前 Release 使用 HybridCLR commit `fe3b1ed`（tag
-`v8.13.0-opt4.2`）、package commit `7b857cb`（tree
-`B172E33014507B27FAAA46B933FAB83DD34428D04E89612379737E95F6452969`）和三条已锁定的
+`v8.13.0-opt4.2`）、package commit `f243dfb`（tree
+`0B32A6B7C4B90AD31BF8D083A2A94B7D2E639401219E315B461996B36B737078`）和三条已锁定的
 il2cpp_plus `opt4.1` 维护线。Android Player、iOS/Xcode/device、性能、内存和现有结构限制
 仍是正式发布前的独立门禁；当前结论只能是 Windows Player 与三引擎 native 有条件通过，不能
 声明全平台生产发布完成。

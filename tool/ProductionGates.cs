@@ -1994,6 +1994,66 @@ internal static partial class Program
 
         var positiveManifest = ReadJson<JsonElement>(Path.Combine(positive.Update,
             "dhe-resource-update.json"));
+        var positiveRuntimePlan = ReadJson<JsonElement>(Path.Combine(positive.Update,
+            "dhe-runtime-plan.json"));
+        string[] positivePayloadNames = SelectPayloadVariant(positiveManifest,
+                GetString(positiveManifest.GetProperty("supportedBases").EnumerateArray().First(),
+                    "payloadVariantId") ?? "default", "Regression resource manifest")
+            .GetProperty("assemblies").EnumerateArray()
+            .Select(item => NormalizeName(GetString(item, "assemblyName") ?? string.Empty))
+            .OrderBy(name => name, StringComparer.OrdinalIgnoreCase).ToArray();
+        bool assemblyModeCoverage = positiveManifest.GetProperty("supportedBases").EnumerateArray()
+            .All(baseRecord =>
+            {
+                if (!baseRecord.TryGetProperty("assemblyModes", out JsonElement modes) ||
+                    modes.ValueKind != JsonValueKind.Array)
+                    return false;
+                var modeNames = modes.EnumerateArray().Select(mode =>
+                    NormalizeName(GetString(mode, "assemblyName") ?? string.Empty)).ToArray();
+                return modeNames.Length == positivePayloadNames.Length &&
+                    modeNames.Distinct(StringComparer.OrdinalIgnoreCase).Count() == modeNames.Length &&
+                    modeNames.OrderBy(name => name, StringComparer.OrdinalIgnoreCase)
+                        .SequenceEqual(positivePayloadNames, StringComparer.OrdinalIgnoreCase) &&
+                    modes.EnumerateArray().All(mode => IsDheExecutionMode(
+                        GetString(mode, "executionMode")));
+            });
+        AddRegressionCheck(checks, errors, "resource-assembly-mode-coverage",
+            assemblyModeCoverage,
+            "every supported Base must classify every current payload assembly as DHE or interpreter-only.");
+        bool assemblyModeSelectionBound = positiveRuntimePlan.TryGetProperty("baseSelections",
+                out JsonElement planSelections) && planSelections.ValueKind == JsonValueKind.Array &&
+            planSelections.EnumerateArray().All(selection =>
+            {
+                if (!selection.TryGetProperty("assemblyModes", out JsonElement modes) ||
+                    modes.ValueKind != JsonValueKind.Array)
+                    return false;
+                var modeNames = modes.EnumerateArray().Select(mode =>
+                    NormalizeName(GetString(mode, "assemblyName") ?? string.Empty)).ToArray();
+                return modeNames.Length == positivePayloadNames.Length &&
+                    modeNames.Distinct(StringComparer.OrdinalIgnoreCase).Count() == modeNames.Length &&
+                    modeNames.OrderBy(name => name, StringComparer.OrdinalIgnoreCase)
+                        .SequenceEqual(positivePayloadNames, StringComparer.OrdinalIgnoreCase) &&
+                    modes.EnumerateArray().All(mode => IsDheExecutionMode(
+                        GetString(mode, "executionMode")));
+            });
+        AddRegressionCheck(checks, errors, "resource-assembly-mode-selection-bound",
+            assemblyModeSelectionBound,
+            "runtime plan Base selections must carry a complete authenticated assembly mode map.");
+        var assemblyModeTamper = CopyFixture("assembly-mode-tamper");
+        var assemblyModeTamperManifest = System.Text.Json.Nodes.JsonNode.Parse(
+            File.ReadAllText(Path.Combine(assemblyModeTamper.Update,
+                "dhe-resource-update.json")))!.AsObject();
+        var assemblyModeTamperModes = assemblyModeTamperManifest["supportedBases"]!
+            .AsArray()[0]!["assemblyModes"]!.AsArray();
+        if (assemblyModeTamperModes.Count != 0)
+            assemblyModeTamperModes[0]!["executionMode"] = "unsupported-mode";
+        File.WriteAllText(Path.Combine(assemblyModeTamper.Update,
+                "dhe-resource-update.json"), assemblyModeTamperManifest.ToJsonString(Json),
+            new UTF8Encoding(false));
+        AddRegressionCheck(checks, errors, "resource-assembly-mode-tamper-rejected",
+            !Stage("assembly-mode-tamper-stage", assemblyModeTamper.Update,
+                assemblyModeTamper.Assets, assemblyModeTamper.Identity),
+            "an unsupported per-Base assembly execution mode must fail closed before staging.");
 
         var directBase = CopyFixture("direct-base");
         string directManifestPath = Path.Combine(directBase.Update,

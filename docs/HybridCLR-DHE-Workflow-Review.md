@@ -48,8 +48,8 @@ runtime tree 漂移都会失败。integrated 模式只校验源码，不再应�
 
 当前 `0.1.20` Release 的锁定身份为：HybridCLR `fe3b1edb222511a1d3227f7e76e8b83b618c4d27`
 （tag `v8.13.0-opt4.2`）、HybridCLR Unity package
-`7b857cb1a714ca95fbd95d473556c47d86b68f11`（tree
-`B172E33014507B27FAAA46B933FAB83DD34428D04E89612379737E95F6452969`），以及三条
+`f243dfb906e0383eacd52a5f0cdeeee7bf6301f1`（tree
+`0B32A6B7C4B90AD31BF8D083A2A94B7D2E639401219E315B461996B36B737078`），以及三条
 `il2cpp_plus` opt4.1 维护线。runtime tag 和 package 分支均已推送；以
 `manifests/dhe-runtime-lock.json`、`dhe-package-lock.json` 和 `repo-lock.json` 中的完整
 commit/tree/hash 为准。

@@ -711,6 +711,7 @@ internal static partial class Program
                 variant.RuntimeAssemblies.Add(new
                 {
                     assemblyName = record.name,
+                    executionMode = "dhe-differential",
                     current = runtimeAssetRoot + dllAsset,
                     currentMetaVersion = runtimeAssetRoot + mvAsset,
                     baseMetaVersion = baseMetaVersionAssetRoot + record.name + ".mv.bytes",
@@ -864,7 +865,20 @@ internal static partial class Program
                 throw new DheException("Base native guard manifest contains no stable method IDs: " +
                     nativeManifestPath + ". Rebuild the Base with the current DHE package.");
 
-            var baselineRecords = names.Select(name => new
+            var identityAssemblyNames = ReadIdentityAssemblyNames(buildIdentity,
+                buildIdentityPath);
+            var currentNameSet = new HashSet<string>(names,
+                StringComparer.OrdinalIgnoreCase);
+            var baselineNameSet = new HashSet<string>(identityAssemblyNames,
+                StringComparer.OrdinalIgnoreCase);
+            var unsupported = new List<string>();
+            // A Base may be older and therefore miss assemblies that are in the
+            // current payload. The reverse direction is not safe: removing an
+            // assembly cannot unload its already registered AOT image, so the
+            // release is rejected instead of silently producing a partial plan.
+            unsupported.AddRange(identityAssemblyNames.Where(name => !currentNameSet.Contains(name))
+                .Select(name => "assembly-removed-from-current:" + name));
+            var baselineRecords = identityAssemblyNames.Select(name => new
             {
                 name,
                 path = RequireFile(Path.Combine(baselineRoot, name + ".dll"), name + " base assembly"),
@@ -875,7 +889,6 @@ internal static partial class Program
             var baseMvSet = new List<(string name, byte[] bytes)>();
             var assemblyCompatibility = new List<object>();
             var uncovered = new List<string>();
-            var unsupported = new List<string>();
             var requiredRuntimeCapabilities = new HashSet<string>(StringComparer.Ordinal)
             {
                 "resource-update-plan-integrity-v1",
@@ -897,7 +910,11 @@ internal static partial class Program
                 var baselineSnapshot = MetaVersionSnapshot.Create(baselineRecord.path);
                 var baselineMvBytes = baselineSnapshot.ToBinary();
                 baseMvSet.Add((baselineRecord.name, baselineMvBytes));
-                var currentSnapshot = currentVariant.Snapshots[baselineRecord.name];
+                if (!currentVariant.Snapshots.TryGetValue(baselineRecord.name,
+                        out MetaVersionSnapshot? currentSnapshot))
+                {
+                    continue;
+                }
                 var compatibility = ResourceUpdateCompatibility.Analyze(baselineSnapshot,
                     currentSnapshot, currentVariant.AddressTakenFields);
                 requiredRuntimeCapabilities.UnionWith(
@@ -913,6 +930,7 @@ internal static partial class Program
                 assemblyCompatibility.Add(new
                 {
                     assemblyName = baselineRecord.name,
+                    executionMode = "dhe-differential",
                     baselineAssemblySha256 = baselineSnapshot.AssemblySha256,
                     baseMetaVersionSha256 = Sha256Bytes(baselineMvBytes),
                     compatible = compatibility.Compatible && missingGuards.Length == 0,
@@ -933,6 +951,39 @@ internal static partial class Program
                     uncoveredStableMethodIds = missingGuards.Select(method => method.StableId).ToArray(),
                     unsupportedChangeCount = compatibility.UnsupportedChanges.Length,
                     unsupportedChanges = compatibility.UnsupportedChanges,
+                });
+            }
+            foreach (string currentName in names.Where(name => !baselineNameSet.Contains(name))
+                         .OrderBy(name => name, StringComparer.OrdinalIgnoreCase))
+            {
+                // There is no Base MV to compare for a newly introduced
+                // assembly. It is still part of the one current payload, but
+                // the Player must load it through ordinary HybridCLR
+                // interpreter Assembly.Load.
+                assemblyCompatibility.Add(new
+                {
+                    assemblyName = currentName,
+                    executionMode = "interpreter-only",
+                    baselineAssemblySha256 = (string?)null,
+                    baseMetaVersionSha256 = (string?)null,
+                    compatible = true,
+                    compatibilityPolicy = ResourceUpdateCompatibility.Policy,
+                    unchangedMethodCount = 0,
+                    changedMethodCount = 0,
+                    bodyOnlyChangedMethodCount = 0,
+                    dependencyChangedMethodCount = 0,
+                    removedMethodCount = 0,
+                    addedMethodCount = 0,
+                    removedFieldCount = 0,
+                    addedFieldCount = 0,
+                    changedExistingTypeCount = 0,
+                    removedTypeCount = 0,
+                    addedTypeCount = 0,
+                    guardRequiredMethodCount = 0,
+                    guardCoveredMethodCount = 0,
+                    uncoveredStableMethodIds = Array.Empty<string>(),
+                    unsupportedChangeCount = 0,
+                    unsupportedChanges = Array.Empty<string>(),
                 });
             }
             var baseMvSetHash = NamedByteSetHash(baseMvSet);
@@ -956,6 +1007,10 @@ internal static partial class Program
             if (!candidateBaseIdentityKeys.Add(baseIdentityKey))
                 unsupported.Add("duplicate-base-identity:" + baseId);
             bool baseCompatible = uncovered.Count == 0 && unsupported.Count == 0;
+            var assemblyModes = names.OrderBy(name => name, StringComparer.OrdinalIgnoreCase)
+                .Select(name => new ResourceAssemblyMode(name,
+                    baselineNameSet.Contains(name) ? "dhe-differential" : "interpreter-only"))
+                .ToArray();
             var baseRecord = new
             {
                 baseId,
@@ -983,10 +1038,12 @@ internal static partial class Program
                 unsupportedChangeCount = unsupported.Count,
                 unsupportedChanges = unsupported.OrderBy(value => value, StringComparer.Ordinal).ToArray(),
                 assemblies = assemblyCompatibility.ToArray(),
+                assemblyModes,
             };
             candidateBases.Add(baseRecord);
             resourceBaseSelections.Add(new ResourceAotMetadataBaseSelection(baseId,
-                aotMetadataSetId, payloadVariantId, currentVariant.CurrentSetHash));
+                aotMetadataSetId, payloadVariantId, currentVariant.CurrentSetHash,
+                assemblyModes));
             if (!baseCompatible)
             {
                 releaseErrors.Add("Base " + baseId + " is incompatible: " +
@@ -1175,6 +1232,21 @@ internal static partial class Program
             result.Add(NativeStableMethodKey(assemblyName, stableId));
         }
         return result;
+    }
+
+    private static string[] ReadIdentityAssemblyNames(JsonElement identity, string identityPath)
+    {
+        if (!identity.TryGetProperty("assemblies", out JsonElement assemblies) ||
+            assemblies.ValueKind != JsonValueKind.Array || assemblies.GetArrayLength() == 0)
+            throw new DheException("Base build identity has no assembly records: " + identityPath);
+        var names = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+        foreach (JsonElement assembly in assemblies.EnumerateArray())
+        {
+            string name = NormalizeName(GetString(assembly, "assemblyName") ?? string.Empty);
+            if (!names.Add(name))
+                throw new DheException("Base build identity contains a duplicate assembly: " + name);
+        }
+        return names.OrderBy(name => name, StringComparer.OrdinalIgnoreCase).ToArray();
     }
 
     private static string NativeStableMethodKey(string assemblyName, string stableId) =>
@@ -3390,6 +3462,9 @@ internal static partial class Program
         value != null && value.Length >= minimumLength && value.Length <= maximumLength &&
         value.All(character => character is >= '0' and <= '9' or >= 'a' and <= 'f' or >= 'A' and <= 'F');
     private static string NormalizeName(string value) { var trimmed = value.Trim(); var name = trimmed.EndsWith(".dll", StringComparison.OrdinalIgnoreCase) ? trimmed[..^4] : trimmed; if (name.Length == 0 || name.Contains('/') || name.Contains('\\') || Path.IsPathRooted(name) || name.Contains("..", StringComparison.Ordinal)) throw new DheException("Assembly name must be a simple file name: " + value); return name; }
+    private static bool IsDheExecutionMode(string? value) =>
+        string.Equals(value, "dhe-differential", StringComparison.Ordinal) ||
+        string.Equals(value, "interpreter-only", StringComparison.Ordinal);
     private static bool IsCSharpNamespace(string value) => value.Split('.', StringSplitOptions.None).All(part => part.Length > 0 && (char.IsLetter(part[0]) || part[0] == '_') && part.Skip(1).All(ch => char.IsLetterOrDigit(ch) || ch == '_'));
     private static bool SetEquals(IEnumerable<string> a, IEnumerable<string> b) => new HashSet<string>(a, StringComparer.OrdinalIgnoreCase).SetEquals(b);
     private static string GetString(Dictionary<string, JsonElement> d, string key) => d.TryGetValue(key, out var e) && e.ValueKind == JsonValueKind.String ? e.GetString() ?? "" : "";
@@ -3439,7 +3514,8 @@ internal static partial class Program
         ResourceAotMetadataPayload[] Assemblies);
     private sealed record ResourceAotMetadataBaseSelection(string BaseId,
         string AotMetadataSetId, string PayloadVariantId,
-        string CurrentAssemblySetSha256);
+        string CurrentAssemblySetSha256, ResourceAssemblyMode[] AssemblyModes);
+    private sealed record ResourceAssemblyMode(string AssemblyName, string ExecutionMode);
     private sealed class CurrentVariantData
     {
         public string VariantId { get; set; } = string.Empty;

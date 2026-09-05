@@ -298,6 +298,18 @@ internal static partial class Program
         string[] loadedNames = player.GetProperty("loadedDheAssemblies").EnumerateArray()
             .Select(item => item.GetString() ?? string.Empty)
             .OrderBy(name => name, StringComparer.OrdinalIgnoreCase).ToArray();
+        string[] differentialNames = player.TryGetProperty("plannedDifferentialAssemblies",
+                out JsonElement differentialAssemblyValues) &&
+            differentialAssemblyValues.ValueKind == JsonValueKind.Array
+            ? differentialAssemblyValues.EnumerateArray().Select(item => item.GetString() ?? string.Empty)
+                .OrderBy(name => name, StringComparer.OrdinalIgnoreCase).ToArray()
+            : assemblyNames;
+        string[] interpreterOnlyNames = player.TryGetProperty("plannedInterpreterOnlyAssemblies",
+                out JsonElement interpreterOnlyAssemblyValues) &&
+            interpreterOnlyAssemblyValues.ValueKind == JsonValueKind.Array
+            ? interpreterOnlyAssemblyValues.EnumerateArray().Select(item => item.GetString() ?? string.Empty)
+                .OrderBy(name => name, StringComparer.OrdinalIgnoreCase).ToArray()
+            : Array.Empty<string>();
         if (!assemblyNames.SequenceEqual(plannedNames, StringComparer.OrdinalIgnoreCase) ||
             !assemblyNames.SequenceEqual(loadedNames, StringComparer.OrdinalIgnoreCase))
             errors.Add("Resource manifest and Player assembly scopes do not agree.");
@@ -379,6 +391,8 @@ internal static partial class Program
                 strategy = "single-current-multibase-resource",
                 aotAssemblies = assemblyNames,
                 loadedDheAssemblies = loadedNames,
+                differentialAssemblies = differentialNames,
+                interpreterOnlyAssemblies = interpreterOnlyNames,
                 stagedDependencies = Array.Empty<string>(),
                 stagedDependenciesLoadedAsDhe = false,
                 secondaryAssemblyChangedValidated = GetBool(player,
@@ -545,30 +559,34 @@ internal static partial class Program
         string embeddedBaseRoot, JsonElement manifest, JsonElement identity,
         JsonElement selectedBase)
     {
-        if (!manifest.TryGetProperty("assemblies", out JsonElement assemblies) ||
-            assemblies.ValueKind != JsonValueKind.Array || assemblies.GetArrayLength() == 0)
-            throw new DheException("Resource update assembly records are missing.");
-        string[] names = assemblies.EnumerateArray().Select(assembly =>
-                NormalizeName(GetString(assembly, "assemblyName") ?? string.Empty))
-            .ToArray();
-        if (names.Distinct(StringComparer.OrdinalIgnoreCase).Count() != names.Length)
-            throw new DheException("Resource update assembly records are duplicated.");
         if (!identity.TryGetProperty("assemblies", out JsonElement identityAssemblies) ||
             identityAssemblies.ValueKind != JsonValueKind.Array ||
             !selectedBase.TryGetProperty("assemblies", out JsonElement selectedAssemblies) ||
             selectedAssemblies.ValueKind != JsonValueKind.Array)
             throw new DheException("Base Player assembly identity records are missing.");
+        if (!manifest.TryGetProperty("assemblies", out JsonElement assemblies) ||
+            assemblies.ValueKind != JsonValueKind.Array || assemblies.GetArrayLength() == 0)
+            throw new DheException("Resource update assembly records are missing.");
+        string[] names = identityAssemblies.EnumerateArray().Select(assembly =>
+                NormalizeName(GetString(assembly, "assemblyName") ?? string.Empty))
+            .ToArray();
+        string[] payloadNames = assemblies.EnumerateArray().Select(assembly =>
+                NormalizeName(GetString(assembly, "assemblyName") ?? string.Empty)).ToArray();
+        if (names.Distinct(StringComparer.OrdinalIgnoreCase).Count() != names.Length ||
+            payloadNames.Distinct(StringComparer.OrdinalIgnoreCase).Count() != payloadNames.Length ||
+            !new HashSet<string>(payloadNames, StringComparer.OrdinalIgnoreCase).IsSupersetOf(names))
+            throw new DheException("Resource update assembly records are duplicated or omit a Base assembly.");
         var identityByName = identityAssemblies.EnumerateArray().ToDictionary(record =>
                 NormalizeName(GetString(record, "assemblyName") ?? string.Empty),
             record => record, StringComparer.OrdinalIgnoreCase);
         var selectedByName = selectedAssemblies.EnumerateArray().ToDictionary(record =>
                 NormalizeName(GetString(record, "assemblyName") ?? string.Empty),
             record => record, StringComparer.OrdinalIgnoreCase);
-        if (identityByName.Count != names.Length || selectedByName.Count != names.Length ||
+        if (identityByName.Count != names.Length ||
             !new HashSet<string>(names, StringComparer.OrdinalIgnoreCase)
                 .SetEquals(identityByName.Keys) ||
             !new HashSet<string>(names, StringComparer.OrdinalIgnoreCase)
-                .SetEquals(selectedByName.Keys))
+                .IsSubsetOf(selectedByName.Keys))
             throw new DheException(
                 "Base Player assembly identity does not match the resource update set.");
         if (Directory.GetFiles(embeddedBaseRoot, "*.mv2.bytes",
@@ -664,6 +682,22 @@ internal static partial class Program
         var planByName = planAssemblies.EnumerateArray().ToDictionary(
             item => NormalizeName(GetString(item, "assemblyName") ?? string.Empty),
             item => item, StringComparer.OrdinalIgnoreCase);
+        var selectedModes = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
+        if (selectedBase.TryGetProperty("assemblyModes", out JsonElement assemblyModes) &&
+            assemblyModes.ValueKind == JsonValueKind.Array)
+        {
+            foreach (JsonElement modeRecord in assemblyModes.EnumerateArray())
+            {
+                string name = NormalizeName(GetString(modeRecord, "assemblyName") ?? string.Empty);
+                string mode = GetString(modeRecord, "executionMode") ?? string.Empty;
+                if (!IsDheExecutionMode(mode) || !selectedModes.TryAdd(name, mode))
+                    throw new DheException("Resource update Base assembly modes are invalid: " + name);
+            }
+            if (selectedModes.Count != planByName.Count ||
+                !selectedModes.Keys.ToHashSet(StringComparer.OrdinalIgnoreCase)
+                    .SetEquals(planByName.Keys))
+                throw new DheException("Resource update Base assembly modes do not match the payload.");
+        }
         var payloads = new List<ResourcePayload>();
         var paths = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
         foreach (var assembly in assemblies.EnumerateArray())
@@ -676,10 +710,18 @@ internal static partial class Program
             AddResourcePayload(updateRoot, GetString(assembly, "currentMetaVersion"),
                 GetString(assembly, "currentMetaVersionSha256"), GetString(plan, "currentMetaVersion"),
                 runtimeAssetRoot, payloads, paths);
+            string mode = selectedModes.TryGetValue(name, out string? selectedMode)
+                ? selectedMode : GetString(plan, "executionMode") ?? "dhe-differential";
+            if (!IsDheExecutionMode(mode))
+                throw new DheException("Runtime plan execution mode is invalid for " + name + ".");
             var expectedBasePath = baseMetaVersionAssetRoot + name + ".mv.bytes";
-            if (!string.Equals(GetString(plan, "baseMetaVersion"), expectedBasePath,
+            string? basePath = GetString(plan, "baseMetaVersion");
+            if (mode == "dhe-differential" && !string.Equals(basePath, expectedBasePath,
                     StringComparison.OrdinalIgnoreCase))
                 throw new DheException("Runtime plan Base MetaVersion path is invalid for " + name + ".");
+            if (mode == "interpreter-only" && !string.IsNullOrWhiteSpace(basePath) &&
+                !string.Equals(basePath, expectedBasePath, StringComparison.OrdinalIgnoreCase))
+                throw new DheException("Interpreter-only Base MetaVersion path is invalid for " + name + ".");
         }
 
         if (!runtimePlan.TryGetProperty("aotMetadata", out JsonElement legacyMetadata) ||
@@ -772,6 +814,25 @@ internal static partial class Program
                      GetString(supportedBase, "currentAssemblySetSha256"),
                      StringComparison.OrdinalIgnoreCase)))
                 throw new DheException("Resource update Base metadata selection is invalid: " + baseId);
+        }
+        string selectedBaseId = GetString(selectedBase, "baseId") ?? string.Empty;
+        if (selectedBase.TryGetProperty("assemblyModes", out JsonElement selectedModesElement) &&
+            selectedModesElement.ValueKind == JsonValueKind.Array)
+        {
+            if (!selectionsByBase.TryGetValue(selectedBaseId, out JsonElement selectedSelection) ||
+                !selectedSelection.TryGetProperty("assemblyModes", out JsonElement planModesElement) ||
+                planModesElement.ValueKind != JsonValueKind.Array)
+                throw new DheException("Resource update runtime plan is missing the selected Base assembly modes.");
+            string[] manifestModes = selectedModesElement.EnumerateArray().Select(mode =>
+                    NormalizeName(GetString(mode, "assemblyName") ?? string.Empty) + "=" +
+                    (GetString(mode, "executionMode") ?? string.Empty))
+                .OrderBy(value => value, StringComparer.OrdinalIgnoreCase).ToArray();
+            string[] planModes = planModesElement.EnumerateArray().Select(mode =>
+                    NormalizeName(GetString(mode, "assemblyName") ?? string.Empty) + "=" +
+                    (GetString(mode, "executionMode") ?? string.Empty))
+                .OrderBy(value => value, StringComparer.OrdinalIgnoreCase).ToArray();
+            if (!manifestModes.SequenceEqual(planModes, StringComparer.OrdinalIgnoreCase))
+                throw new DheException("Resource update runtime plan assembly modes do not match the selected Base.");
         }
         if (!string.Equals(GetString(selectedBase, "aotMetadataSetId"),
                 GetString(selectionsByBase[GetString(selectedBase, "baseId") ?? string.Empty],

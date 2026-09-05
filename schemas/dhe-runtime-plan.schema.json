@@ -46,11 +46,22 @@
       "items": {
         "type": "object",
         "required": ["baseId", "aotMetadataSetId"],
-        "properties": {
-          "baseId": { "type": "string", "pattern": "^[0-9a-fA-F]{64}$" },
-          "aotMetadataSetId": { "type": "string", "pattern": "^[0-9a-fA-F]{64}$" },
-          "payloadVariantId": { "type": "string", "pattern": "^[A-Za-z0-9._-]{1,64}$" },
-          "currentAssemblySetSha256": { "type": "string", "pattern": "^[0-9a-fA-F]{64}$" }
+          "properties": {
+            "baseId": { "type": "string", "pattern": "^[0-9a-fA-F]{64}$" },
+            "aotMetadataSetId": { "type": "string", "pattern": "^[0-9a-fA-F]{64}$" },
+            "payloadVariantId": { "type": "string", "pattern": "^[A-Za-z0-9._-]{1,64}$" },
+            "currentAssemblySetSha256": { "type": "string", "pattern": "^[0-9a-fA-F]{64}$" },
+            "assemblyModes": {
+              "type": "array",
+              "items": {
+                "type": "object",
+                "required": ["assemblyName", "executionMode"],
+                "properties": {
+                  "assemblyName": { "type": "string", "minLength": 1 },
+                  "executionMode": { "enum": ["dhe-differential", "interpreter-only"] }
+                }
+              }
+            }
         }
       }
     },
@@ -71,12 +82,13 @@
       "minItems": 1,
       "items": {
         "type": "object",
-        "properties": {
-          "assemblyName": { "type": "string", "minLength": 1 },
-          "current": { "type": "string", "minLength": 1 },
+          "properties": {
+            "assemblyName": { "type": "string", "minLength": 1 },
+          "executionMode": { "enum": ["dhe-differential", "interpreter-only"] },
+            "current": { "type": "string", "minLength": 1 },
           "currentSha256": { "type": "string", "pattern": "^[0-9a-fA-F]{64}$" },
           "currentMetaVersion": { "type": "string" },
-          "baseMetaVersion": { "type": "string" },
+          "baseMetaVersion": { "type": ["string", "null"] },
           "currentMetaVersionSha256": { "type": "string" }
         },
         "required": ["assemblyName", "current", "currentMetaVersion", "baseMetaVersion", "currentSha256", "currentMetaVersionSha256"]

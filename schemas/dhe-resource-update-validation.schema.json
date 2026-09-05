@@ -42,6 +42,17 @@
           "target": { "type": "string", "pattern": "^[A-Za-z0-9._-]+$" },
           "payloadVariantId": { "type": "string", "pattern": "^[A-Za-z0-9._-]{1,64}$" },
           "currentAssemblySetSha256": { "type": "string", "pattern": "^[0-9a-fA-F]{64}$" },
+          "assemblyModes": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "required": ["assemblyName", "executionMode"],
+              "properties": {
+                "assemblyName": { "type": "string", "minLength": 1 },
+                "executionMode": { "enum": ["dhe-differential", "interpreter-only"] }
+              }
+            }
+          },
           "managedAssemblySetSha256": { "type": "string", "pattern": "^[0-9a-fA-F]{64}$" },
           "aotSnapshotSha256": { "type": "string", "pattern": "^[0-9a-fA-F]{64}$" },
           "baseMetaVersionSetSha256": { "type": "string", "pattern": "^[0-9a-fA-F]{64}$" },

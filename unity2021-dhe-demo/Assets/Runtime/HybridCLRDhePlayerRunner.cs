@@ -99,6 +99,7 @@ namespace HybridCLR.Lab
             DheRuntimePayloadVariantData selectedPayloadVariant = SelectRuntimePayloadVariant(
                 runtimePlan, runtimeIdentity.BaseId);
             DheAssemblyPlanData[] selectedPlanAssemblies = selectedPayloadVariant.assemblies;
+            ApplyRuntimeAssemblyModes(runtimePlan, runtimeIdentity.BaseId, selectedPlanAssemblies);
             if (!DheRuntime.LoadAotMetadataImages(provider, HomologousImageMode.SuperSet,
                     out LoadImageErrorCode metadataError, out string metadataMessage))
             {
@@ -116,8 +117,7 @@ namespace HybridCLR.Lab
             {
                 if (assemblyPlan == null || string.IsNullOrWhiteSpace(assemblyPlan.assemblyName) ||
                     string.IsNullOrWhiteSpace(assemblyPlan.current) ||
-                    string.IsNullOrWhiteSpace(assemblyPlan.currentMetaVersion) ||
-                    string.IsNullOrWhiteSpace(assemblyPlan.baseMetaVersion))
+                    string.IsNullOrWhiteSpace(assemblyPlan.currentMetaVersion))
                 {
                     throw new InvalidDataException("DHE runtime plan contains an incomplete assembly record.");
                 }
@@ -127,19 +127,34 @@ namespace HybridCLR.Lab
                 }
                 byte[] assemblyCurrent = DheStreamingAssetReader.Read(assemblyPlan.current);
                 byte[] assemblyCurrentMv = DheStreamingAssetReader.Read(assemblyPlan.currentMetaVersion);
-                byte[] assemblyBaseMv = DheStreamingAssetReader.Read(assemblyPlan.baseMetaVersion);
+                bool interpreterOnly = string.Equals(assemblyPlan.executionMode,
+                    "interpreter-only", StringComparison.Ordinal);
+                if (!interpreterOnly && !string.Equals(assemblyPlan.executionMode,
+                        "dhe-differential", StringComparison.Ordinal) &&
+                    !string.IsNullOrWhiteSpace(assemblyPlan.executionMode))
+                {
+                    throw new InvalidDataException("DHE runtime plan contains an unknown assembly execution mode: " +
+                        assemblyPlan.executionMode);
+                }
                 MetaVersionInfo currentMv = ParseMetaVersion(assemblyCurrentMv,
                     assemblyPlan.assemblyName);
-                MetaVersionInfo baseMv = ParseMetaVersion(assemblyBaseMv,
-                    assemblyPlan.assemblyName);
+                MetaVersionInfo baseMv = null;
+                if (!interpreterOnly)
+                {
+                    if (string.IsNullOrWhiteSpace(assemblyPlan.baseMetaVersion))
+                        throw new InvalidDataException("DHE differential assembly has no Base MetaVersion: " +
+                            assemblyPlan.assemblyName);
+                    byte[] assemblyBaseMv = DheStreamingAssetReader.Read(assemblyPlan.baseMetaVersion);
+                    baseMv = ParseMetaVersion(assemblyBaseMv, assemblyPlan.assemblyName);
+                }
                 byte[] assemblyCurrentHash = Sha256(assemblyCurrent);
                 byte[] assemblyMvHash = Sha256(assemblyCurrentMv);
-                byte[] assemblyBaselineHash = baseMv.assemblyHash;
+                byte[] assemblyBaselineHash = baseMv == null ? Array.Empty<byte>() : baseMv.assemblyHash;
                 string actualCurrentHash = ToHex(assemblyCurrentHash);
                 string actualBaselineHash = ToHex(assemblyBaselineHash);
                 string actualMvHash = ToHex(assemblyMvHash);
                 string mvCurrentHash = ToHex(currentMv.assemblyHash);
-                string mvBaselineHash = ToHex(baseMv.assemblyHash);
+                string mvBaselineHash = ToHex(baseMv == null ? Array.Empty<byte>() : baseMv.assemblyHash);
                 if (!string.Equals(assemblyPlan.currentSha256, actualCurrentHash, StringComparison.OrdinalIgnoreCase) ||
                     !string.Equals(assemblyPlan.currentMetaVersionSha256, actualMvHash,
                         StringComparison.OrdinalIgnoreCase) ||
@@ -150,17 +165,20 @@ namespace HybridCLR.Lab
                         "/plan=" + assemblyPlan.currentSha256 + "/mv=" + mvCurrentHash +
                         "; baseline=" + actualBaselineHash + "/mv=" + mvBaselineHash);
                 }
-                int assemblyChangedMethodCount = CountChangedMethods(baseMv, currentMv);
+                int assemblyChangedMethodCount = baseMv == null ? 0 : CountChangedMethods(baseMv, currentMv);
                 changedMethodCount = checked(changedMethodCount + assemblyChangedMethodCount);
-                batchAssemblyNames.Add(assemblyPlan.assemblyName);
-                batchCurrentAssemblies.Add(assemblyCurrent);
+                if (!interpreterOnly)
+                {
+                    batchAssemblyNames.Add(assemblyPlan.assemblyName);
+                    batchCurrentAssemblies.Add(assemblyCurrent);
+                }
                 loadedAssemblies.Add(assemblyPlan.assemblyName, new LoadedDheAssembly
                 {
                     plan = assemblyPlan,
                     currentHash = assemblyCurrentHash,
                     baselineHash = assemblyBaselineHash,
                     mvCurrentHash = currentMv.assemblyHash,
-                    mvBaselineHash = baseMv.assemblyHash,
+                    mvBaselineHash = baseMv == null ? Array.Empty<byte>() : baseMv.assemblyHash,
                     currentMetaVersion = currentMv,
                     baseMetaVersion = baseMv,
                 });
@@ -172,7 +190,23 @@ namespace HybridCLR.Lab
                 throw new InvalidOperationException("DHE atomic batch load failed: " +
                     batchLoadError + "/" + batchLoadMessage);
             }
-            foreach (LoadedDheAssembly loaded in loadedAssemblies.Values)
+            foreach (LoadedDheAssembly loaded in loadedAssemblies.Values.Where(item =>
+                         string.Equals(item.plan.executionMode, "interpreter-only",
+                             StringComparison.Ordinal)))
+            {
+                if (!DheRuntime.LoadInterpreterAssemblyImage(loaded.plan.assemblyName,
+                        DheStreamingAssetReader.Read(loaded.plan.current),
+                        out Assembly interpreterAssembly, out LoadImageErrorCode interpreterLoadError,
+                        out string interpreterLoadMessage))
+                {
+                    throw new InvalidOperationException("Interpreter-only assembly load failed: " +
+                        loaded.plan.assemblyName + ": " + interpreterLoadError + "/" + interpreterLoadMessage);
+                }
+                loaded.assembly = interpreterAssembly;
+            }
+            foreach (LoadedDheAssembly loaded in loadedAssemblies.Values.Where(item =>
+                         !string.Equals(item.plan.executionMode, "interpreter-only",
+                             StringComparison.Ordinal)))
             {
                 loaded.assembly = AppDomain.CurrentDomain.GetAssemblies().FirstOrDefault(candidate =>
                     string.Equals(candidate.GetName().Name, loaded.plan.assemblyName,
@@ -554,6 +588,15 @@ namespace HybridCLR.Lab
 				structuralNewSignatureResult = structural.newSignatureResult,
                 plannedDheAssemblies = GetAssemblyNames(runtimePlan, runtimeIdentity.BaseId),
                 loadedDheAssemblies = GetAssemblyNames(loadedAssemblies),
+                plannedDifferentialAssemblies = selectedPlanAssemblies.Where(item =>
+                        !string.Equals(item.executionMode, "interpreter-only", StringComparison.Ordinal))
+                    .Select(item => item.assemblyName).OrderBy(name => name, StringComparer.Ordinal).ToArray(),
+                plannedInterpreterOnlyAssemblies = selectedPlanAssemblies.Where(item =>
+                        string.Equals(item.executionMode, "interpreter-only", StringComparison.Ordinal))
+                    .Select(item => item.assemblyName).OrderBy(name => name, StringComparer.Ordinal).ToArray(),
+                loadedInterpreterOnlyAssemblies = loadedAssemblies.Values.Where(item =>
+                        string.Equals(item.plan.executionMode, "interpreter-only", StringComparison.Ordinal))
+                    .Select(item => item.plan.assemblyName).OrderBy(name => name, StringComparer.Ordinal).ToArray(),
                 target = GetArgument("-labTarget"),
                 resourceUpdateManifestPresent = resourceUpdateManifestPresent,
                 resourceUpdateValidated = initialized,
@@ -578,6 +621,8 @@ namespace HybridCLR.Lab
                     .Select(item => new DheAssemblyValidation
                     {
                         assemblyName = item.plan.assemblyName,
+                        executionMode = string.Equals(item.plan.executionMode, "interpreter-only",
+                            StringComparison.Ordinal) ? "interpreter-only" : "dhe-differential",
                         currentSha256 = ToHex(item.currentHash),
                         baselineSha256 = ToHex(item.baselineHash),
                         mvCurrentSha256 = ToHex(item.mvCurrentHash),
@@ -1387,6 +1432,43 @@ namespace HybridCLR.Lab
             return variants[0];
         }
 
+        private static void ApplyRuntimeAssemblyModes(DheRuntimePlanData plan, string baseId,
+            DheAssemblyPlanData[] assemblies)
+        {
+            DheRuntimeBaseSelectionData[] selections = plan.baseSelections ??
+                Array.Empty<DheRuntimeBaseSelectionData>();
+            if (selections.Length == 0)
+            {
+                return;
+            }
+            DheRuntimeBaseSelectionData[] matches = selections.Where(item => item != null &&
+                string.Equals(item.baseId, baseId, StringComparison.OrdinalIgnoreCase)).ToArray();
+            if (matches.Length != 1)
+                throw new InvalidDataException("DHE runtime plan has no unique assembly mode selection for this Base.");
+            DheRuntimeAssemblyModeData[] modes = matches[0].assemblyModes ??
+                Array.Empty<DheRuntimeAssemblyModeData>();
+            if (modes.Length == 0)
+                return;
+            var modesByName = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
+            foreach (DheRuntimeAssemblyModeData mode in modes)
+            {
+                if (mode == null || string.IsNullOrWhiteSpace(mode.assemblyName) ||
+                    string.IsNullOrWhiteSpace(mode.executionMode) ||
+                    !modesByName.TryAdd(mode.assemblyName, mode.executionMode))
+                    throw new InvalidDataException("DHE runtime plan contains an invalid assembly mode.");
+            }
+            if (modesByName.Count != assemblies.Length)
+                throw new InvalidDataException("DHE runtime plan assembly modes do not match the payload.");
+            foreach (DheAssemblyPlanData assembly in assemblies)
+            {
+                if (assembly == null || !modesByName.TryGetValue(assembly.assemblyName,
+                        out string mode) || (mode != "dhe-differential" && mode != "interpreter-only"))
+                    throw new InvalidDataException("DHE runtime plan assembly mode is invalid: " +
+                        assembly?.assemblyName);
+                assembly.executionMode = mode;
+            }
+        }
+
         private static string[] GetAssemblyNames(Dictionary<string, LoadedDheAssembly> assemblies)
         {
             return assemblies.Keys.OrderBy(name => name, StringComparer.Ordinal).ToArray();
@@ -1583,6 +1665,14 @@ namespace HybridCLR.Lab
             public string baseId;
             public string payloadVariantId;
             public string currentAssemblySetSha256;
+            public DheRuntimeAssemblyModeData[] assemblyModes;
+        }
+
+        [Serializable]
+        private sealed class DheRuntimeAssemblyModeData
+        {
+            public string assemblyName;
+            public string executionMode;
         }
 
         [Serializable]
@@ -1601,6 +1691,7 @@ namespace HybridCLR.Lab
         private sealed class DheAssemblyPlanData
         {
             public string assemblyName;
+            public string executionMode;
             public string target;
             public string current;
             public string mv;
@@ -1637,6 +1728,7 @@ namespace HybridCLR.Lab
         private sealed class DheAssemblyValidation
         {
             public string assemblyName;
+            public string executionMode;
             public string currentSha256;
             public string baselineSha256;
             public string mvCurrentSha256;
@@ -1849,6 +1941,9 @@ namespace HybridCLR.Lab
             public string assemblyName;
             public string[] plannedDheAssemblies;
             public string[] loadedDheAssemblies;
+            public string[] plannedDifferentialAssemblies;
+            public string[] plannedInterpreterOnlyAssemblies;
+            public string[] loadedInterpreterOnlyAssemblies;
             public int changedMethodCount;
             public int expectedChangedMethodCount;
             public bool dispatchProbeValidated;
