@@ -1272,6 +1272,17 @@ internal static partial class Program
         AddRegressionCheck(checks, errors, "runtime-package-source-binding",
             runtimeSource.Contains("ValidateRepoIdentity(\"hybridclr_unity\"", StringComparison.Ordinal),
             "runtime assembly must fail closed on the locked package source identity");
+        string metadataStressSource = LabCommands.RenderMetadataStressSource(1024, 12, 8, 4);
+        int metadataStressValueWrites = System.Text.RegularExpressions.Regex.Matches(
+            metadataStressSource, @"values\[\d+\] =").Count;
+        bool boundedMetadataStressTouch = metadataStressValueWrites == 128 &&
+            metadataStressSource.Contains("long[] values = new long[128];", StringComparison.Ordinal) &&
+            metadataStressSource.Contains("index < values.Length", StringComparison.Ordinal) &&
+            !metadataStressSource.Contains(
+                "checksum = Accumulate(checksum, new StressType", StringComparison.Ordinal);
+        AddRegressionCheck(checks, errors, "metadata-stress-touch-bounded",
+            boundedMetadataStressTouch,
+            "metadata stress must preserve 128 direct type probes without an IL2CPP-foldable accumulation chain");
         var bootstrapWorkflowDoc = ReadJson<JsonElement>(Path.Combine(cli.Root, "manifests",
             "runtime-workflows.json"));
         JsonElement[] bootstrapWorkflows = LabCommands.SelectBootstrapWorkflowRecords(bootstrapWorkflowDoc, null, true);

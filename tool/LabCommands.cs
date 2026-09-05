@@ -90,6 +90,15 @@ internal static class LabCommands
         var fieldsPerType = PositiveInt(stress, "fieldsPerType");
         var propertiesPerType = PositiveInt(stress, "propertiesPerType");
         var output = Path.Combine(lab, "managed-cases", "HybridCLR.MetadataStress", "Generated", "MetadataStress.Generated.cs");
+        WriteText(output, RenderMetadataStressSource(typeCount, methodsPerType, fieldsPerType,
+            propertiesPerType));
+        Console.WriteLine("Metadata stress source: " + output);
+        return 0;
+    }
+
+    internal static string RenderMetadataStressSource(int typeCount, int methodsPerType,
+        int fieldsPerType, int propertiesPerType)
+    {
         var builder = new StringBuilder(4 * 1024 * 1024);
         builder.AppendLine("using System;");
         builder.AppendLine("namespace HybridCLR.Lab.MetadataStress");
@@ -108,12 +117,19 @@ internal static class LabCommands
         builder.AppendLine("        private static long Accumulate(long left, long right) { return left + right; }");
         builder.AppendLine("        public static long Touch()");
         builder.AppendLine("        {");
-        builder.AppendLine("            long checksum = 0;");
+        var touchedTypeCount = (typeCount + 15) / 16;
+        builder.AppendLine($"            long[] values = new long[{touchedTypeCount * 2}];");
+        var valueIndex = 0;
         for (var i = 0; i < typeCount; i += 16)
         {
-            builder.AppendLine($"            checksum = Accumulate(checksum, new StressType{i:D4}().Method00({i + 1}));");
-            builder.AppendLine($"            checksum = Accumulate(checksum, new StressType{i:D4}.Nested<int>({i}).Value);");
+            builder.AppendLine($"            values[{valueIndex++}] = new StressType{i:D4}().Method00({i + 1});");
+            builder.AppendLine($"            values[{valueIndex++}] = new StressType{i:D4}.Nested<int>({i}).Value;");
         }
+        builder.AppendLine("            long checksum = 0;");
+        builder.AppendLine("            for (int index = 0; index < values.Length; index++)");
+        builder.AppendLine("            {");
+        builder.AppendLine("                checksum = Accumulate(checksum, values[index]);");
+        builder.AppendLine("            }");
         builder.AppendLine("            return checksum;");
         builder.AppendLine("        }");
         builder.AppendLine("    }");
@@ -141,9 +157,7 @@ internal static class LabCommands
             builder.AppendLine("    }");
         }
         builder.AppendLine("}");
-        WriteText(output, builder.ToString());
-        Console.WriteLine("Metadata stress source: " + output);
-        return 0;
+        return builder.ToString();
     }
 
     private static int BuildManagedCases(Cli cli)

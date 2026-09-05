@@ -49,6 +49,7 @@ internal static partial class Program
         "source-boundary-git-root-resolution", "git-relative-root-resolution",
         "unity-stale-lock-recovery",
         "native-universal-body-filter",
+        "metadata-stress-touch-bounded",
         "integrated-source-lock-line-ending-stable",
         "integrated-source-lock-valid", "integrated-source-lock-commit-tamper",
         "integrated-source-lock-tree-tamper", "integrated-source-lock-patch-tamper",
