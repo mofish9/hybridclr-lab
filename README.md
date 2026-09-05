@@ -24,11 +24,11 @@ Its formal entry points, generated-output boundary, and complete four-assembly
 Player evidence are documented in
 `docs/HybridCLR-DHE-Toolchain.md`,
 `docs/HybridCLR-DHE-Workflow-Review.md` and
-`docs/HybridCLR-DHE-Formal-Project-Validation.md`. Toolchain `0.1.22` is the
+`docs/HybridCLR-DHE-Formal-Project-Validation.md`. Toolchain `0.1.23` is the
 current conditionally accepted source and three-engine Windows release; its exact
 evidence and remaining platform gates are recorded in
-`docs/HybridCLR-DHE-Opt4-Release-0.1.22.md`. Toolchains `0.1.18`, `0.1.20`, and
-`0.1.21` are retained as historical evidence. Projects must install an
+`docs/HybridCLR-DHE-Opt4-Release-0.1.23.md`. Toolchains `0.1.18`, `0.1.20`,
+`0.1.21`, and `0.1.22` are retained as historical evidence. Projects must install an
 authenticated package whose manifest has `releaseReady=true` and pin its exact
 package ID.
 Toolchain `0.1.20` replaces generated-function
@@ -51,12 +51,13 @@ direct successor; a reset revision, omitted Base set, stale head, or fork fails
 before a Release manifest is accepted. The final clean regression passes
 117/117 checks over five ledger-aware Windows Base reports and a four-to-five-Base
 direct-successor release. Android/iOS device and CAT project gates remain pending.
-Toolchain `0.1.23` is the active consecutive-Player-evidence candidate. It requires
+Toolchain `0.1.23` is the active consecutive-Player-evidence release. Its package
+ID is `c8b496c6a126d80997b75c39f9e0c111c5d02f844c6f3234909884e1360027ba`. It requires
 one passing Player report for every active Base and binds that complete report set
 to the exact manifest and ledger supplied as the consecutive resource release head.
-The current exploratory regression passes 118/118 checks using one ledger revision 2
-payload executed by all five Windows Base Players; clean-source release gates remain
-pending for this candidate.
+The clean regression passes 118/118 checks using one ledger revision 2 payload that
+was executed by all five Windows Base Players. Missing-Base and wrong-release-head
+report sets fail closed. Android/iOS device and CAT project gates remain pending.
 Base identity now also binds `engineWorkflow` and `il2cppCodeGeneration`.
 Unity 2021 is locked to `OptimizeSpeed`; Unity 2022 FGS and Tuanjie 2022 FGS
 are locked to `OptimizeSize`. Base evidence created before these fields existed
