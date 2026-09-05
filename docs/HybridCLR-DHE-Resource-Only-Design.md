@@ -274,9 +274,9 @@ metadata set、错误 Base、废弃 sidecar 残留和缺 capability 等负例均
 平台层缺陷仍必须通过新 Base Player 修复。
 
 这证明“Base 只构建一次、后续一份资源包服务多个 Base”的架构链路成立，但不等于官方旗舰版
-DHE 的全部元数据能力。当前候选源码使用 HybridCLR commit `fe3b1ed`、package commit
-`b288f2f`（tree `6D15EDF77405E51300E3A115FBA93B359E26366AEA985D09816A5A45E3110E64`）
-和三条已锁定的 il2cpp_plus `opt4.1` 维护线；本轮尚未创建新的 runtime tag，也未合入正式
-package 维护分支。Android Player、iOS/Xcode/device、性能、内存和现有结构限制仍是正式发布前
-的独立门禁；当前结论只能是 Windows Player 与三引擎 native 有条件通过，不能声明全平台生产
-发布完成。
+DHE 的全部元数据能力。当前 Release 使用 HybridCLR commit `fe3b1ed`（tag
+`v8.13.0-opt4.2`）、package commit `7b857cb`（tree
+`B172E33014507B27FAAA46B933FAB83DD34428D04E89612379737E95F6452969`）和三条已锁定的
+il2cpp_plus `opt4.1` 维护线。Android Player、iOS/Xcode/device、性能、内存和现有结构限制
+仍是正式发布前的独立门禁；当前结论只能是 Windows Player 与三引擎 native 有条件通过，不能
+声明全平台生产发布完成。

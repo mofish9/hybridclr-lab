@@ -6,29 +6,29 @@ workflow on top of the cumulative opt3 maintenance sources.
 ## Runtime boundary
 
 The DHE runtime is an additive capability on top of the opt3 metadata and FGS
-implementation. The formal opt4.1 source identities are:
+implementation. The formal opt4 source identities for this release are:
 
-- `hybridclr@f777ed77eafd3eaa7262115c0c135f7418f83b74`, annotated tag
-  `v8.13.0-opt4.1`;
+- `hybridclr@fe3b1edb222511a1d3227f7e76e8b83b618c4d27`, annotated tag
+  `v8.13.0-opt4.2`;
 - `il2cpp_plus@b3fdf1ef70b63758dc6598c674ffb38f3534c4e6`, annotated tag
   `v2021-8.1.0-opt4.1` for Unity 2021;
 - `il2cpp_plus@60322744721410e79203155fc455be4232c3df4b`, annotated tag
   `v2022-8.11.0-opt4.1` for Unity 2022;
 - `il2cpp_plus@52968ad6c88416f212d09d919b9a1b6afdc8a53b`, annotated tag
   `v2022-tuanjie-8.13.0-opt4.1` for Tuanjie 2022;
-- `hybridclr_unity@749eaeeaffe717845574500ff8fb76df99620ca4` on
+- `hybridclr_unity@7b857cb1a714ca95fbd95d473556c47d86b68f11` on
   `optimize/v8.13.0`. The package does not receive an opt tag.
 
 The old base commits and patches remain in the locks as replay and migration
 evidence. They are not the source identities used to build the integrated
 runtime.
 
-The active 0.1.20 candidate extends that integrated line with the locked
-HybridCLR commit `fe3b1edb222511a1d3227f7e76e8b83b618c4d27` and package commit
-`b288f2f33ad9dc25e05a3fdb10f5f405cd8ada64` (tree
-`6D15EDF77405E51300E3A115FBA93B359E26366AEA985D09816A5A45E3110E64`). These
-candidate commits are the identities used by the current runtime manifests and
-exploratory toolchain package; no new runtime tag has been created yet.
+The active 0.1.20 release uses the locked HybridCLR commit
+`fe3b1edb222511a1d3227f7e76e8b83b618c4d27` and package commit
+`7b857cb1a714ca95fbd95d473556c47d86b68f11` (tree
+`B172E33014507B27FAAA46B933FAB83DD34428D04E89612379737E95F6452969`).
+The runtime tag and package maintenance branch have both been published; the
+package itself remains untagged by policy.
 
 The native runtime keeps every hot-update assembly's baseline image in the
 player. At runtime, the strict MV loader validates the current DLL hash, the
@@ -48,7 +48,7 @@ call graph needs to cross the boundary.
   content tree hash, then refuses to apply any patch. The lock still retains
   patch paths and hashes as migration/audit references.
 
-The formal opt4.1 lock uses integrated mode. Runtime assembly and engine-test
+The formal opt4 lock uses integrated mode. Runtime assembly and engine-test
 project preparation verify each repository's integrated commit, selected
 engine record, content-tree SHA-256, and retained audit-patch SHA-256. They do
 not apply a patch. Release preflight rejects an overlay package or runtime even

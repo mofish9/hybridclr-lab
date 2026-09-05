@@ -46,12 +46,13 @@ Release preflight 会实时重算上述身份。dirty、mixed SVN revision、sur
 Editor 版本、integrated commit/tree、审计 patch hash、目标引擎不匹配、未登记 package 文件或
 runtime tree 漂移都会失败。integrated 模式只校验源码，不再应用 overlay。
 
-当前 `0.1.20` 候选的锁已经更新为：HybridCLR `fe3b1edb222511a1d3227f7e76e8b83b618c4d27`、
-HybridCLR Unity package `b288f2f33ad9dc25e05a3fdb10f5f405cd8ada64`（tree
-`6D15EDF77405E51300E3A115FBA93B359E26366AEA985D09816A5A45E3110E64`），以及同一三引擎
-`il2cpp_plus` opt4.1 维护线。候选尚未创建新的 runtime tag、尚未推送，也不能作为
-Release package 使用；以 `manifests/dhe-runtime-lock.json`、`dhe-package-lock.json` 和
-`repo-lock.json` 中的完整 commit/tree/hash 为准。
+当前 `0.1.20` Release 的锁定身份为：HybridCLR `fe3b1edb222511a1d3227f7e76e8b83b618c4d27`
+（tag `v8.13.0-opt4.2`）、HybridCLR Unity package
+`7b857cb1a714ca95fbd95d473556c47d86b68f11`（tree
+`B172E33014507B27FAAA46B933FAB83DD34428D04E89612379737E95F6452969`），以及三条
+`il2cpp_plus` opt4.1 维护线。runtime tag 和 package 分支均已推送；以
+`manifests/dhe-runtime-lock.json`、`dhe-package-lock.json` 和 `repo-lock.json` 中的完整
+commit/tree/hash 为准。
 
 ## 标准工作流
 
