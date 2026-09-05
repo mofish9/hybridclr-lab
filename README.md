@@ -6,7 +6,7 @@ HybridCLR community runtime on Tuanjie 1.10.0.
 ## Fixed baseline
 
 - Tuanjie: `1.10.0` (`2022.3.62t12`)
-- HybridCLR package: `v8.13.0` (`optimize/v8.13.0@f9d3282`, tree `72D63EB4D081EF5628AB049455FC144C43AF4484CB77776A170911522788E92F`, no package opt tag)
+- HybridCLR package: `v8.13.0` (`optimize/v8.13.0@ae5faf2`, tree `F5AE594F10272360483D6E36094B096C7715FBCD4E1FB37487D75F8C41651C23`, no package opt tag)
 - HybridCLR runtime: DHE candidate based on `v8.13.0-opt4.1` (`fe3b1ed`, no new runtime tag)
 - il2cpp_plus: `v2022-tuanjie-8.13.0-opt4.1` (`52968ad`)
 
@@ -53,6 +53,11 @@ The 0.1.20 release contract extends this proof to an arbitrary changed-Player
 evidence list and requires Unity 2021, Unity 2022, and Tuanjie 2022 coverage
 over one resource manifest. A manifest can use one shared current payload or
 multiple target-specific `payloadVariants` selected by Base identity.
+The latest exploratory registry contains four Windows and three Android Bases;
+all seven pass compatibility and staging. All four Windows Players pass runtime
+correctness. The three Android lanes rebuild their APK after native finalize
+and verify packaged `libil2cpp.so` hashes against Bee staging, but have no device
+result, so Android runtime correctness/performance and iOS remain conditional.
 `releaseReady=true` additionally requires `Mode Release`, clean
 and tracked project and tool source identities (each bound to its Git commit,
 HEAD tree, and source-boundary hash), clean locked runtime sources, and matching

@@ -56,6 +56,12 @@ embeds one Base MetaVersion for every DHE assembly, and stages a
 identity without guard drift and restore the project identity source to its
 zero template in both success and failure paths.
 
+Every external/precompiled hot-update DLL used to create the Base must come
+from the active target's current-generation compilation. In particular, an
+Android or iOS Base must not freeze a DLL produced under Windows conditional
+compilation. A target-only P/Invoke or metadata member that is missing from the
+Base cannot be repaired by weakening the later compatibility gate.
+
 Archive the Base output's `baseline/`, `build-identity.json`,
 `native/dhe-native-manifest.json`, runtime/package locks, and Player evidence.
 They are required to validate later updates, but they are never sent as part of
@@ -177,6 +183,14 @@ container; a production YooAsset/Addressables provider must provide the same
 logical asset-path behavior on Android and iOS. Windows evidence cannot be
 reported as Android/iOS evidence, and native compilation against one engine's
 headers cannot stand in for another engine.
+
+After Android Bee native finalization, the package uses the current Player
+DAG's `DestinationPath` and the Editor-owned Java/Gradle tools to rebuild the
+requested APK/AAB. The final workflow is allowed to pass only after both the
+package and host prove that every archive `libil2cpp.so` equals the corresponding
+Bee JNI staging file. `adapter/native-finalize.json` is therefore a required
+live gate, not an informational log. iOS follows the same C# Bee state machine,
+but its Xcode link/sign/device result must be produced and checked on macOS.
 
 ## Release boundary
 

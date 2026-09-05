@@ -48,8 +48,8 @@ runtime tree 漂移都会失败。integrated 模式只校验源码，不再应�
 
 当前 `0.1.20` Release 的锁定身份为：HybridCLR `fe3b1edb222511a1d3227f7e76e8b83b618c4d27`
 （tag `v8.13.0-opt4.2`）、HybridCLR Unity package
-`f9d32828fe8a3832e51aa9a2f75b5d099772df37`（tree
-`72D63EB4D081EF5628AB049455FC144C43AF4484CB77776A170911522788E92F`），以及三条
+`ae5faf21832c804418369f20e3b207c0e42dbd99`（tree
+`F5AE594F10272360483D6E36094B096C7715FBCD4E1FB37487D75F8C41651C23`），以及三条
 `il2cpp_plus` opt4.1 维护线。runtime tag 和 package 分支均已推送；以
 `manifests/dhe-runtime-lock.json`、`dhe-package-lock.json` 和 `repo-lock.json` 中的完整
 commit/tree/hash 为准。
@@ -65,6 +65,12 @@ commit/tree/hash 为准。
    不把同一 C++ 文件中由 build identity 引起的无关变化计入 guard 身份；缺失、重复或内容不符
    的块必须失败。项目 adapter 在 Player 和 smoke 完成后必须在 `finally` 中恢复临时 build
    identity 源码模板，成功和异常路径都不得污染工作区。
+   Bee 返回 4 时，package 最多在 8 次 backend 尝试内调用当前 Editor 的 PlayerBuildProgram
+   重建图，等待图稳定后重新注入 guard，再完成最终 native build；缺少重注入回调或达到上限
+   一律失败。Player DAG 必须唯一引用本次 generated-C++ root，不能按目录时间猜测；Android
+   还必须从该 DAG 的 inputdata 解析本次 Gradle root，使用 Editor
+   自带 Java/Gradle 重封装 APK/AAB，并证明每个 ABI 的 Bee staging `libil2cpp.so`、包内条目和
+   记录 hash 三者一致。host 会独立重算这些证据，不能只信任 Unity 写出的 `passed`。
 4. 后续资源发布只编译一套 current hotfix DLL。`resource-update` 为每个程序集生成一次
    current MetaVersion，并使用所有仍受支持 Base 的 DLL、BuildIdentity 和 native manifest 做离线
    兼容审计；identity 1 的复合 `baseId` 唯一绑定完整 Player 身份，按每个 Base 的真实差异
@@ -105,6 +111,9 @@ root 与 set ID 写入 workflow 报告；项目不得再从临时 Unity 目录�
 同一资源发布中声明多个 `payloadVariants`，由 registry 的 `payloadVariantId` 把每个 Base
 绑定到对应 DLL/MV 子目录。每个 variant 仍须分别通过 target 的 native/Player 门禁；
 当前已有的三引擎共享 payload 证据均为 `StandaloneWindows64`，不能外推到 Android/iOS。
+创建 Android/iOS Base 时，项目提供的外部预编译程序集也必须由对应 target 的
+current-generation 构建产生；不得把 Windows DLL 冻结进移动平台 Base 后，再把新增的
+P/Invoke/条件成员当作普通资源变化放行。
 
 ## JSON 契约
 
@@ -162,6 +171,13 @@ Windows/Android lane 已通过，不能声明 iOS 已验证。
 做单 Base resource update 和 staging 已通过，payload 不含 AOT metadata，APK 保持不变。
 由于没有 Android 设备，完整 workflow 在等待 `dhe-player-result.json` 处停止；Android
 真机 correctness、PSS/RSS、温度和弱核门禁仍未完成，iOS/Xcode/device 也仍未验证。
+
+本轮扩展验证使用正确的目标平台 current-generation 输入重新生成 Android Base，并将
+Unity 2021、Unity 2022、团结 2022 Android 与四个 Windows Base 合并为同一 registry。
+7/7 Base 均通过兼容审计和资源 staging；三种 Android APK 均完成 native finalize 后的
+Gradle 重封装及 `libil2cpp.so` hash 校验。四个 Windows Base 的 Player runtime
+correctness 已通过。由于当前没有 Android 设备，这三条 Android workflow 按设计停在缺少
+`dhe-player-result.json`，只构成构建/静态身份验证，不构成 Android runtime 或生产发布证据。
 
 ## 回滚
 

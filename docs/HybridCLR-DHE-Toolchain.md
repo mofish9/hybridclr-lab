@@ -279,6 +279,12 @@ The project provides a C# class containing these Unity execute-methods:
 - `Prepare`: call `DheBuildPipeline.PrepareProjectArtifacts` to regenerate the
   current stripped-AOT image and stage complete baseline/current assembly sets,
   then write `adapter/prepare.json`.
+  Any project-owned precompiled DLL supplied through `dheCurrentInputRoot` or
+  an equivalent callback must be compiled for the active target with
+  `HYBRIDCLR_DHE_CURRENT_GENERATION`. A Windows-compiled external DLL is not a
+  valid Android/iOS Base input even when its assembly name is identical;
+  target-specific P/Invoke and conditional metadata would otherwise be absent
+  from the immutable Base snapshot.
 - `StageRuntimePlan`: call `DheBuildPipeline.StageRuntimePlan` with an explicit
   `Target`, complete hotfix load list, AOT metadata roots, and project resource
   callbacks. `RuntimeAssetPathResolver` maps staged files to a YooAsset,
@@ -297,7 +303,17 @@ The project provides a C# class containing these Unity execute-methods:
 - `BuildFinalPlayer`: set `DhePlayerBuildOptions.NativeFinalizeOptions`. The
   package resolves the final generated-C++ root, injects all MV guards, rebuilds
   the editor-owned Bee graph, and invokes `NativeFinalizeResultCallback` before
-  temporary baseline assembly inputs are restored.
+  temporary baseline assembly inputs are restored. Bee exit code 4 triggers the
+  target Editor's `*PlayerBuildProgram.exe`, graph stabilization, guard
+  reapplication, and one final native build. This state machine is limited to
+  eight backend attempts and fails when no reapply callback is available.
+  The Player DAG must uniquely reference the finalized generated-C++ root; it
+  is never selected only by directory timestamp. For Android the package then
+  resolves the Gradle destination from that exact DAG input, invokes the
+  Editor-owned Java/Gradle distribution, rebuilds
+  the APK/AAB, and compares every packaged `libil2cpp.so` with its Bee JNI
+  staging file. The host then independently repeats the path, artifact, and
+  SHA-256 checks from `adapter/native-finalize.json`.
 
 After `StageRuntimePlan`, the C# host materializes every authenticated
 `aotMetadata` record into `<OutputRoot>/aot-metadata-root/<AssemblyName>.dll`.
@@ -385,6 +401,21 @@ invokes it through .NET; no shell executable is involved. The same C# host and
 adapter code is used on both platforms; only the explicit Unity executable,
 target, output path, and runner configuration differ. Windows cannot provide
 evidence for an iOS Xcode/device build.
+
+Android finalization is not complete when Bee has only rebuilt a staging
+`libil2cpp.so`. The package must re-run the Editor-owned Gradle launcher against
+the Gradle root named by the current Player DAG, copy the single resulting
+APK/AAB to the requested Player path, and prove all ABI entries match staging.
+`native-finalize.json` records the DAG, graph-regeneration counts, Gradle root,
+artifact hash, native source paths, archive entries, and hashes. The C# host
+rejects stale Gradle roots, more than eight attempts, graph regeneration without
+guard reapplication, array misalignment, and source/archive hash drift.
+
+iOS uses the same C# Bee graph regeneration and guard reapplication path, with
+no PowerShell dependency. This repository has no macOS/Xcode environment, so
+the generated Xcode project, final linked binary/IPA, signing, device
+correctness, memory, and tail-latency gates remain conditional rather than
+passed.
 
 ## Baseline manifest
 
