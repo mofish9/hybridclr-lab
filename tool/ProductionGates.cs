@@ -1,4 +1,5 @@
 using System.Globalization;
+using System.IO.Compression;
 using System.Security.Cryptography;
 using System.Text;
 using System.Text.Json;
@@ -1325,6 +1326,7 @@ internal static partial class Program
                 StringComparison.Ordinal);
         AddRegressionCheck(checks, errors, "native-universal-body-filter", bodyFilterPresent,
             "universal guards must exclude delegate/runtime methods without a managed IL body");
+        RunNativeFinalizeEvidenceRegressions(regressionRoot, checks, errors);
         string dheReaderPath = Path.Combine(cli.Root, "unity2021-dhe-demo", "Assets", "Runtime",
             "DheStreamingAssetReader.cs");
         string dheReaderSource = File.Exists(dheReaderPath) ? File.ReadAllText(dheReaderPath) : string.Empty;
@@ -1680,6 +1682,349 @@ internal static partial class Program
     {
         checks.Add(new { name, passed, details });
         if (!passed) errors.Add(name + ": " + details);
+    }
+
+    private static void ValidateNativeFinalizeEvidence(string reportPath,
+        string playerBuildReportPath, string expectedTarget, string projectRoot,
+        string expectedNativeManifestPath)
+    {
+        string reportFile = RequireFile(reportPath, "DHE native-finalize evidence");
+        JsonElement report = ReadJson<JsonElement>(reportFile);
+        RequireEvidenceFormat(report, "hybridclr.dhe-adapter-native-finalize.json",
+            "DHE native-finalize");
+        if (!GetBool(report, "passed") || GetInt(report, "exitCode") != 0 ||
+            !string.Equals(GetString(report, "target"), expectedTarget,
+                StringComparison.OrdinalIgnoreCase))
+            throw new DheException("DHE native-finalize result or target is invalid.");
+
+        int attempts = GetInt(report, "attempts");
+        int graphRegenerations = GetInt(report, "graphRegenerations");
+        int guardReapplications = GetInt(report, "guardReapplications");
+        if (attempts < 1 || attempts > 8 || graphRegenerations < 0 ||
+            guardReapplications < 0 ||
+            attempts != graphRegenerations + guardReapplications + 1 ||
+            (graphRegenerations == 0 && guardReapplications != 0) ||
+            (graphRegenerations > 0 && (guardReapplications < 1 ||
+                guardReapplications > graphRegenerations)))
+            throw new DheException("DHE Bee graph regeneration/reapply attempt evidence is inconsistent.");
+
+        string buildProgramPath = GetString(report, "buildProgramPath") ?? string.Empty;
+        if (graphRegenerations > 0)
+            RequireFile(buildProgramPath, "DHE Bee Player BuildProgram");
+        else if (!string.IsNullOrWhiteSpace(buildProgramPath))
+            throw new DheException("DHE native-finalize reports a BuildProgram without graph regeneration.");
+
+        string project = RequireDirectory(projectRoot, "DHE project root");
+        string beeRoot = Path.GetFullPath(Path.Combine(project, "Library", "Bee"));
+        string generatedCppRoot = RequireDirectory(GetString(report, "generatedCppRoot") ?? string.Empty,
+            "DHE finalized generated C++ root");
+        RequireContainedPath(Path.Combine(beeRoot, "artifacts"), generatedCppRoot,
+            "DHE finalized generated C++ root");
+        RequireFile(GetString(report, "beeBackendPath") ?? string.Empty,
+            "DHE Bee backend");
+        string dagPath = RequireFile(GetString(report, "dagPath") ?? string.Empty,
+            "DHE Player DAG");
+        RequireContainedPath(beeRoot, dagPath, "DHE Player DAG");
+        string dagJsonPath = RequireFile(dagPath + ".json", "DHE Player JSON DAG");
+        using (JsonDocument dagDocument = JsonDocument.Parse(File.ReadAllText(dagJsonPath)))
+        {
+            string generatedPath = Path.GetFullPath(generatedCppRoot).Replace('\\', '/');
+            if (!JsonContainsPath(dagDocument.RootElement, generatedPath))
+                throw new DheException("DHE Player DAG is not bound to the finalized generated C++ root.");
+        }
+        RequireFile(GetString(report, "logPath") ?? string.Empty,
+            "DHE Bee rebuild log");
+        string nativeManifest = RequireFile(GetString(report, "manifestPath") ?? string.Empty,
+            "DHE native manifest");
+        if (!Path.GetFullPath(nativeManifest).Equals(Path.GetFullPath(expectedNativeManifestPath),
+                StringComparison.OrdinalIgnoreCase) ||
+            !Sha256File(nativeManifest).Equals(GetString(report, "nativeManifestSha256"),
+                StringComparison.OrdinalIgnoreCase) ||
+            !IsHex(GetString(report, "nativeGuardSourceSha256"), 64, 64))
+            throw new DheException("DHE native-finalize is not bound to the finalized native manifest.");
+
+        if (!string.Equals(expectedTarget, "Android", StringComparison.OrdinalIgnoreCase)) return;
+
+        JsonElement playerBuild = ReadJson<JsonElement>(RequireFile(playerBuildReportPath,
+            "DHE final Player build evidence"));
+        RequireEvidenceFormat(playerBuild, "hybridclr.dhe-adapter-player-build.json",
+            "DHE final Player build");
+        if (!GetBool(playerBuild, "passed") || GetBool(playerBuild, "scriptsOnly"))
+            throw new DheException("DHE Android final Player build evidence is invalid.");
+
+        string artifactPath = RequireFile(GetString(report, "playerArtifactPath") ?? string.Empty,
+            "DHE Android Player artifact");
+        if (!Path.GetFullPath(artifactPath).Equals(
+                Path.GetFullPath(GetString(playerBuild, "playerPath") ?? string.Empty),
+                StringComparison.OrdinalIgnoreCase) ||
+            !Sha256File(artifactPath).Equals(GetString(report, "playerArtifactSha256"),
+                StringComparison.OrdinalIgnoreCase) || GetInt(report, "playerArtifactExitCode") != 0)
+            throw new DheException("DHE Android Player artifact identity is invalid.");
+
+        string kind = GetString(report, "playerArtifactKind") ?? string.Empty;
+        string extension = Path.GetExtension(artifactPath);
+        if ((kind == "android-apk" && !extension.Equals(".apk", StringComparison.OrdinalIgnoreCase)) ||
+            (kind == "android-aab" && !extension.Equals(".aab", StringComparison.OrdinalIgnoreCase)) ||
+            kind is not ("android-apk" or "android-aab"))
+            throw new DheException("DHE Android Player artifact kind does not match its output path.");
+
+        string gradleRoot = RequireDirectory(GetString(report, "playerArtifactGradleRoot") ?? string.Empty,
+            "DHE Android Gradle root");
+        RequireContainedPath(beeRoot, gradleRoot, "DHE Android Gradle root");
+        RequireFile(Path.Combine(gradleRoot, "settings.gradle"), "DHE Android Gradle settings");
+        string inputDataPath = RequireFile(Path.Combine(beeRoot,
+            Path.GetFileNameWithoutExtension(dagPath) + "-inputdata.json"),
+            "DHE Android Player Bee input data");
+        using (JsonDocument inputData = JsonDocument.Parse(File.ReadAllText(inputDataPath)))
+        {
+            List<string> destinations = new();
+            CollectJsonStringProperties(inputData.RootElement, "DestinationPath", destinations);
+            string[] resolvedDestinations = destinations.Select(value => Path.GetFullPath(
+                    Path.IsPathRooted(value) ? value : Path.Combine(project, value)))
+                .Distinct(StringComparer.OrdinalIgnoreCase).ToArray();
+            if (resolvedDestinations.Length != 1 ||
+                !resolvedDestinations[0].Equals(Path.GetFullPath(gradleRoot),
+                    StringComparison.OrdinalIgnoreCase))
+                throw new DheException("DHE Android Gradle root does not match the current Player DAG input data.");
+        }
+        RequireFile(GetString(report, "playerArtifactBuildToolPath") ?? string.Empty,
+            "DHE Android Java build tool");
+        RequireFile(GetString(report, "playerArtifactBuildProgramPath") ?? string.Empty,
+            "DHE Android Gradle launcher");
+        RequireFile(GetString(report, "playerArtifactBuildLogPath") ?? string.Empty,
+            "DHE Android artifact build log");
+        string task = GetString(report, "playerArtifactBuildTask") ?? string.Empty;
+        if (!task.StartsWith(kind == "android-aab" ? ":launcher:bundle" : ":launcher:assemble",
+                StringComparison.Ordinal) ||
+            !(task.EndsWith("Debug", StringComparison.Ordinal) ||
+              task.EndsWith("Release", StringComparison.Ordinal)))
+            throw new DheException("DHE Android Gradle build task is invalid.");
+
+        string[] entries = ReadRequiredStringArray(report,
+            "playerArtifactNativeLibraryEntries", "DHE Android native entries");
+        string[] sources = ReadRequiredStringArray(report,
+            "playerArtifactNativeLibrarySourcePaths", "DHE Android native source paths");
+        string[] hashes = ReadRequiredStringArray(report,
+            "playerArtifactNativeLibrarySha256", "DHE Android native hashes");
+        if (entries.Length == 0 || entries.Length != sources.Length ||
+            entries.Length != hashes.Length ||
+            entries.Distinct(StringComparer.OrdinalIgnoreCase).Count() != entries.Length ||
+            sources.Distinct(StringComparer.OrdinalIgnoreCase).Count() != sources.Length)
+            throw new DheException("DHE Android native evidence arrays are empty, duplicated, or misaligned.");
+
+        using var archive = ZipFile.OpenRead(artifactPath);
+        for (int index = 0; index < entries.Length; index++)
+        {
+            string source = RequireFile(sources[index], "DHE Android finalized libil2cpp.so");
+            RequireContainedPath(gradleRoot, source, "DHE Android finalized libil2cpp.so");
+            string abi = new DirectoryInfo(Path.GetDirectoryName(source)!).Name;
+            string entrySuffix = "/lib/" + abi + "/libil2cpp.so";
+            if (!Path.GetFileName(source).Equals("libil2cpp.so", StringComparison.OrdinalIgnoreCase) ||
+                !(entries[index].Equals("lib/" + abi + "/libil2cpp.so",
+                      StringComparison.OrdinalIgnoreCase) ||
+                  entries[index].EndsWith(entrySuffix, StringComparison.OrdinalIgnoreCase)) ||
+                !IsHex(hashes[index], 64, 64) ||
+                !Sha256File(source).Equals(hashes[index], StringComparison.OrdinalIgnoreCase))
+                throw new DheException("DHE Android native staging hash is invalid.");
+            var matches = archive.Entries.Where(item => string.Equals(item.FullName,
+                entries[index], StringComparison.OrdinalIgnoreCase)).ToArray();
+            if (matches.Length != 1)
+                throw new DheException("DHE Android native artifact entry is missing or duplicated: " +
+                    entries[index] + ".");
+            using Stream stream = matches[0].Open();
+            using SHA256 sha = SHA256.Create();
+            string archiveHash = Convert.ToHexString(sha.ComputeHash(stream));
+            if (!archiveHash.Equals(hashes[index], StringComparison.OrdinalIgnoreCase))
+                throw new DheException("DHE Android artifact native hash does not match Bee staging: " +
+                    entries[index] + ".");
+        }
+    }
+
+    private static string[] ReadRequiredStringArray(JsonElement value, string property,
+        string description)
+    {
+        if (!value.TryGetProperty(property, out JsonElement array) ||
+            array.ValueKind != JsonValueKind.Array)
+            throw new DheException(description + " is missing.");
+        return array.EnumerateArray().Select(item => item.ValueKind == JsonValueKind.String
+                ? item.GetString() ?? string.Empty : string.Empty)
+            .ToArray();
+    }
+
+    private static void RequireContainedPath(string root, string path, string description)
+    {
+        string prefix = Path.GetFullPath(root).TrimEnd(Path.DirectorySeparatorChar,
+            Path.AltDirectorySeparatorChar) + Path.DirectorySeparatorChar;
+        string resolved = Path.GetFullPath(path);
+        if (!resolved.StartsWith(prefix, StringComparison.OrdinalIgnoreCase))
+            throw new DheException(description + " is outside its owning root: " + resolved);
+    }
+
+    private static bool JsonContainsPath(JsonElement value, string expectedPath)
+    {
+        if (value.ValueKind == JsonValueKind.String)
+            return (value.GetString() ?? string.Empty).Replace('\\', '/')
+                .IndexOf(expectedPath, StringComparison.OrdinalIgnoreCase) >= 0;
+        if (value.ValueKind == JsonValueKind.Object)
+            return value.EnumerateObject().Any(property =>
+                JsonContainsPath(property.Value, expectedPath));
+        if (value.ValueKind == JsonValueKind.Array)
+            return value.EnumerateArray().Any(item => JsonContainsPath(item, expectedPath));
+        return false;
+    }
+
+    private static void CollectJsonStringProperties(JsonElement value, string propertyName,
+        List<string> results)
+    {
+        if (value.ValueKind == JsonValueKind.Object)
+        {
+            foreach (JsonProperty property in value.EnumerateObject())
+            {
+                if (property.NameEquals(propertyName) &&
+                    property.Value.ValueKind == JsonValueKind.String)
+                    results.Add(property.Value.GetString() ?? string.Empty);
+                CollectJsonStringProperties(property.Value, propertyName, results);
+            }
+        }
+        else if (value.ValueKind == JsonValueKind.Array)
+        {
+            foreach (JsonElement item in value.EnumerateArray())
+                CollectJsonStringProperties(item, propertyName, results);
+        }
+    }
+
+    private static void RunNativeFinalizeEvidenceRegressions(string regressionRoot,
+        List<object> checks, List<string> errors)
+    {
+        string root = Path.Combine(regressionRoot, "native-finalize-evidence");
+        Directory.CreateDirectory(root);
+        string project = Path.Combine(root, "project");
+        string bee = Path.Combine(project, "Library", "Bee");
+        string cpp = Path.Combine(bee, "artifacts", "Android", "cpp");
+        string gradle = Path.Combine(bee, "Android", "Prj", "IL2CPP", "Gradle");
+        string nativeRoot = Path.Combine(gradle, "unityLibrary", "src", "main", "jniLibs",
+            "arm64-v8a");
+        Directory.CreateDirectory(cpp);
+        Directory.CreateDirectory(nativeRoot);
+        Directory.CreateDirectory(Path.Combine(gradle, "launcher"));
+        string native = Path.Combine(nativeRoot, "libil2cpp.so");
+        File.WriteAllBytes(native, new byte[] { 1, 3, 5, 7 });
+        string nativeHash = Sha256File(native);
+        string artifact = Path.Combine(root, "player.apk");
+        using (ZipArchive archive = ZipFile.Open(artifact, ZipArchiveMode.Create))
+        using (Stream stream = archive.CreateEntry("lib/arm64-v8a/libil2cpp.so").Open())
+            stream.Write(File.ReadAllBytes(native));
+        string manifest = Path.Combine(root, "dhe-native-manifest.json");
+        File.WriteAllText(manifest, "{}", new UTF8Encoding(false));
+        string beeBackend = Path.Combine(root, "bee_backend.exe");
+        string dag = Path.Combine(bee, "Player123.dag");
+        string beeLog = Path.Combine(root, "bee.log");
+        string buildProgram = Path.Combine(root, "AndroidPlayerBuildProgram.exe");
+        string java = Path.Combine(root, "java.exe");
+        string launcher = Path.Combine(root, "gradle-launcher.jar");
+        string artifactLog = Path.Combine(root, "android-artifact.log");
+        string settings = Path.Combine(gradle, "settings.gradle");
+        foreach (string file in new[] { beeBackend, dag, beeLog, buildProgram, java, launcher,
+                     artifactLog, settings })
+        {
+            Directory.CreateDirectory(Path.GetDirectoryName(file)!);
+            File.WriteAllText(file, string.Empty, new UTF8Encoding(false));
+        }
+        File.WriteAllText(dag + ".json", JsonSerializer.Serialize(new { path = cpp }),
+            new UTF8Encoding(false));
+        File.WriteAllText(Path.Combine(bee, "Player123-inputdata.json"),
+            JsonSerializer.Serialize(new { player = new { DestinationPath = gradle } }),
+            new UTF8Encoding(false));
+        string reportPath = Path.Combine(root, "native-finalize.json");
+        string playerBuildPath = Path.Combine(root, "build-final-player.json");
+        WriteJson(playerBuildPath, new
+        {
+            schemaVersion = 1,
+            format = "hybridclr.dhe-adapter-player-build.json",
+            generatedAtUtc = DateTimeOffset.UtcNow,
+            passed = true,
+            scriptsOnly = false,
+            target = "Android",
+            playerPath = artifact,
+        });
+        object Evidence(int attempts, int graph, int reapply) => new
+        {
+            schemaVersion = 1,
+            format = "hybridclr.dhe-adapter-native-finalize.json",
+            generatedAtUtc = DateTimeOffset.UtcNow,
+            passed = true,
+            target = "Android",
+            generatedCppRoot = cpp,
+            manifestPath = manifest,
+            nativeGuardSourceSha256 = new string('a', 64),
+            nativeManifestSha256 = Sha256File(manifest),
+            beeBackendPath = beeBackend,
+            dagPath = dag,
+            logPath = beeLog,
+            attempts,
+            exitCode = 0,
+            graphRegenerations = graph,
+            guardReapplications = reapply,
+            buildProgramPath = graph == 0 ? "" : buildProgram,
+            playerArtifactKind = "android-apk",
+            playerArtifactPath = artifact,
+            playerArtifactSha256 = Sha256File(artifact),
+            playerArtifactGradleRoot = gradle,
+            playerArtifactBuildToolPath = java,
+            playerArtifactBuildProgramPath = launcher,
+            playerArtifactBuildTask = ":launcher:assembleRelease",
+            playerArtifactBuildLogPath = artifactLog,
+            playerArtifactExitCode = 0,
+            playerArtifactNativeLibraryEntries = new[] { "lib/arm64-v8a/libil2cpp.so" },
+            playerArtifactNativeLibrarySourcePaths = new[] { native },
+            playerArtifactNativeLibrarySha256 = new[] { nativeHash },
+        };
+
+        bool graphAccepted = false;
+        try
+        {
+            WriteJson(reportPath, Evidence(3, 1, 1));
+            ValidateNativeFinalizeEvidence(reportPath, playerBuildPath, "Android", project,
+                manifest);
+            graphAccepted = true;
+        }
+        catch { }
+        AddRegressionCheck(checks, errors, "native-finalize-bee-graph-regeneration",
+            graphAccepted, "host must accept a bounded graph regeneration followed by guard reapply and rebuild");
+
+        bool attemptLimitRejected = false;
+        try
+        {
+            WriteJson(reportPath, Evidence(9, 7, 1));
+            ValidateNativeFinalizeEvidence(reportPath, playerBuildPath, "Android", project,
+                manifest);
+        }
+        catch { attemptLimitRejected = true; }
+        AddRegressionCheck(checks, errors, "native-finalize-attempt-limit-rejected",
+            attemptLimitRejected, "host must reject Bee native-finalize evidence beyond eight attempts");
+
+        bool missingReapplyRejected = false;
+        try
+        {
+            WriteJson(reportPath, Evidence(2, 1, 0));
+            ValidateNativeFinalizeEvidence(reportPath, playerBuildPath, "Android", project,
+                manifest);
+        }
+        catch { missingReapplyRejected = true; }
+        AddRegressionCheck(checks, errors, "native-finalize-missing-reapply-rejected",
+            missingReapplyRejected, "host must reject graph regeneration without guard reapplication");
+
+        bool hashMismatchRejected = false;
+        try
+        {
+            File.WriteAllBytes(native, new byte[] { 9, 9, 9, 9 });
+            WriteJson(reportPath, Evidence(3, 1, 1));
+            ValidateNativeFinalizeEvidence(reportPath, playerBuildPath, "Android", project,
+                manifest);
+        }
+        catch { hashMismatchRejected = true; }
+        AddRegressionCheck(checks, errors, "native-finalize-android-hash-mismatch-rejected",
+            hashMismatchRejected, "host must reject Android artifacts whose native hash differs from Bee staging");
     }
 
     private static bool RunExtensiblePlayerMatrixRegression(string regressionRoot)

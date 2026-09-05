@@ -2,6 +2,8 @@ using System;
 using System.Collections.Generic;
 using System.Globalization;
 using System.IO;
+using System.IO.Compression;
+using System.Reflection;
 using System.Security.Cryptography;
 using System.Text;
 using HybridCLR.Editor.Commands;
@@ -39,6 +41,17 @@ namespace HybridCLR.Lab.Editor
                 () => ValidatePointerCountTamper(Path.Combine(outputRoot, "pointer-count-tamper")));
             RunCheck(checks, errors, "generic-native-owner-conflict-rejected",
                 () => ValidateGenericNativeOwnerConflict(Path.Combine(outputRoot, "generic-owner-conflict")));
+            RunCheck(checks, errors, "bee-graph-regeneration-reapplies-guard",
+                ValidateBeeGraphRegeneration);
+            RunCheck(checks, errors, "bee-attempt-limit-rejected",
+                ValidateBeeAttemptLimit);
+            RunCheck(checks, errors, "bee-missing-reapply-rejected",
+                ValidateBeeMissingReapply);
+            RunCheck(checks, errors, "android-gradle-root-dag-bound",
+                () => ValidateAndroidGradleRoot(Path.Combine(outputRoot, "android-gradle-root")));
+            RunCheck(checks, errors, "android-native-hash-mismatch-rejected",
+                () => ValidateAndroidNativeHashMismatch(
+                    Path.Combine(outputRoot, "android-native-hash-mismatch")));
 
             ResolverReport report = new ResolverReport
             {
@@ -191,6 +204,170 @@ namespace HybridCLR.Lab.Editor
                 Method(2, "Fixture.Type::Generic|T <!!0>(System.Int32)", "Generic", 1, '2'),
             });
             ExpectFailure(() => Inject(root, cpp, mv), "maps to multiple managed methods");
+        }
+
+        private static void ValidateBeeGraphRegeneration()
+        {
+            int[] exits = { 4, 4, 0, 0 };
+            int backendCalls = 0;
+            int graphCalls = 0;
+            int reapplyCalls = 0;
+            List<bool> jsonDagUses = new List<bool>();
+            DheBeeRebuildResult result = RunBeeStateMachine(8,
+                (attempt, useJsonDag, phase) =>
+                {
+                    jsonDagUses.Add(useJsonDag);
+                    return exits[backendCalls++];
+                },
+                regeneration =>
+                {
+                    graphCalls++;
+                    return "build-program-" + regeneration.ToString(CultureInfo.InvariantCulture);
+                },
+                () => reapplyCalls++);
+            Require(result.ExitCode == 0 && result.Attempts == 4 &&
+                result.GraphRegenerations == 2 && result.GuardReapplications == 1 &&
+                result.BuildProgramPath == "build-program-2" && backendCalls == 4 &&
+                graphCalls == 2 && reapplyCalls == 1 &&
+                jsonDagUses.Count == 4 && !jsonDagUses[0] && jsonDagUses[1] &&
+                jsonDagUses[2] && !jsonDagUses[3],
+                "Bee graph regeneration did not stabilize and rebuild reapplied guards exactly once.");
+        }
+
+        private static void ValidateBeeAttemptLimit()
+        {
+            int[] exits = { 4, 0 };
+            int backendCalls = 0;
+            DheBeeRebuildResult result = RunBeeStateMachine(2,
+                (attempt, useJsonDag, phase) => exits[backendCalls++],
+                regeneration => "build-program", () => { });
+            Require(result.ExitCode != 0 && result.Attempts == 2 &&
+                result.GraphRegenerations == 1 && result.GuardReapplications == 1 &&
+                backendCalls == 2,
+                "Bee attempt limit accepted a stabilized graph before reapplied guards were rebuilt.");
+        }
+
+        private static void ValidateBeeMissingReapply()
+        {
+            DheBeeRebuildResult result = RunBeeStateMachine(8,
+                (attempt, useJsonDag, phase) => 4,
+                regeneration => "unexpected-build-program", null);
+            Require(result.ExitCode != 0 && result.Attempts == 1 &&
+                result.GraphRegenerations == 0 && result.GuardReapplications == 0,
+                "Bee graph regeneration proceeded without a generated-C++ reapply callback.");
+        }
+
+        private static DheBeeRebuildResult RunBeeStateMachine(int maxAttempts,
+            Func<int, bool, string, int> runBackend, Func<int, string> regenerateGraph,
+            Action reapply)
+        {
+            object value = InvokePipelineMethod("RunBeeRebuildStateMachine", new object[]
+            {
+                maxAttempts, runBackend, regenerateGraph, reapply, new Action<string>(_ => { })
+            });
+            DheBeeRebuildResult result = value as DheBeeRebuildResult;
+            Require(result != null, "Bee rebuild state machine returned no result.");
+            return result;
+        }
+
+        private static void ValidateAndroidGradleRoot(string root)
+        {
+            if (Directory.Exists(root)) Directory.Delete(root, true);
+            string projectRoot = Path.Combine(root, "project");
+            string beeRoot = Path.Combine(projectRoot, "Library", "Bee");
+            Directory.CreateDirectory(beeRoot);
+            string dagPath = Path.Combine(beeRoot, "Player123.dag");
+            File.WriteAllText(dagPath, string.Empty, new UTF8Encoding(false));
+            string boundRoot = Path.Combine(beeRoot, "Android", "Prj", "IL2CPP", "Gradle");
+            string staleRoot = Path.Combine(beeRoot, "stale", "Gradle");
+            string generatedCpp = Path.Combine(beeRoot, "artifacts", "Android", "il2cppOutput", "cpp");
+            Directory.CreateDirectory(generatedCpp);
+            PrepareGradleRoot(boundRoot);
+            PrepareGradleRoot(staleRoot);
+            File.SetLastWriteTimeUtc(Path.Combine(staleRoot, "settings.gradle"),
+                DateTime.UtcNow.AddMinutes(1));
+            string input = "{\"PlayerBuildConfig\":{\"DestinationPath\":\"" +
+                EscapeJson(boundRoot) + "\"}}";
+            File.WriteAllText(Path.Combine(beeRoot, "Player123-inputdata.json"), input,
+                new UTF8Encoding(false));
+            File.WriteAllText(dagPath + ".json", "{\"Path\":\"" +
+                EscapeJson(generatedCpp.Replace('\\', '/')) + "\"}", new UTF8Encoding(false));
+            string staleDag = Path.Combine(beeRoot, "Player999.dag");
+            File.WriteAllText(staleDag, string.Empty, new UTF8Encoding(false));
+            File.WriteAllText(staleDag + ".json", "{\"Path\":\"" +
+                EscapeJson(Path.Combine(staleRoot, "cpp").Replace('\\', '/')) + "\"}",
+                new UTF8Encoding(false));
+            File.SetLastWriteTimeUtc(staleDag, DateTime.UtcNow.AddMinutes(1));
+            string selectedDag = (string)InvokePipelineMethod("ResolveBeePlayerDag",
+                new object[] { beeRoot, generatedCpp });
+            string resolved = (string)InvokePipelineMethod(
+                "ResolveAndroidGradleRootFromBeeDag",
+                new object[] { projectRoot, beeRoot, dagPath });
+            Require(Path.GetFullPath(selectedDag).Equals(Path.GetFullPath(dagPath),
+                    StringComparison.OrdinalIgnoreCase) &&
+                Path.GetFullPath(resolved).Equals(Path.GetFullPath(boundRoot),
+                    StringComparison.OrdinalIgnoreCase),
+                "Player DAG or Android Gradle root was selected by recency instead of generated-C++ identity.");
+        }
+
+        private static void PrepareGradleRoot(string root)
+        {
+            Directory.CreateDirectory(Path.Combine(root, "launcher"));
+            string library = Path.Combine(root, "unityLibrary");
+            Directory.CreateDirectory(Path.Combine(library, "src", "main", "jniLibs"));
+            File.WriteAllText(Path.Combine(root, "settings.gradle"), string.Empty,
+                new UTF8Encoding(false));
+            File.WriteAllText(Path.Combine(library, "build.gradle"), string.Empty,
+                new UTF8Encoding(false));
+        }
+
+        private static void ValidateAndroidNativeHashMismatch(string root)
+        {
+            if (Directory.Exists(root)) Directory.Delete(root, true);
+            string nativeRoot = Path.Combine(root, "jniLibs", "arm64-v8a");
+            Directory.CreateDirectory(nativeRoot);
+            string nativePath = Path.Combine(nativeRoot, "libil2cpp.so");
+            File.WriteAllBytes(nativePath, new byte[] { 1, 2, 3, 4 });
+            string artifactPath = Path.Combine(root, "player.apk");
+            using (ZipArchive archive = ZipFile.Open(artifactPath, ZipArchiveMode.Create))
+            using (Stream stream = archive.CreateEntry("lib/arm64-v8a/libil2cpp.so").Open())
+                stream.Write(new byte[] { 4, 3, 2, 1 }, 0, 4);
+            try
+            {
+                InvokePipelineMethod("ValidateAndroidPlayerNativeLibraries", new object[]
+                {
+                    artifactPath, new[] { nativePath }, new List<string>(), new List<string>()
+                });
+            }
+            catch (BuildFailedException exception)
+            {
+                Require(exception.Message.IndexOf("does not match", StringComparison.OrdinalIgnoreCase) >= 0,
+                    "Unexpected Android native hash failure: " + exception.Message);
+                return;
+            }
+            throw new InvalidOperationException(
+                "Android Player accepted a libil2cpp.so that differs from Bee staging.");
+        }
+
+        private static object InvokePipelineMethod(string name, object[] arguments)
+        {
+            MethodInfo method = typeof(DheBuildPipeline).GetMethod(name,
+                BindingFlags.Static | BindingFlags.NonPublic);
+            Require(method != null, "DHE package method is missing: " + name + ".");
+            try
+            {
+                return method.Invoke(null, arguments);
+            }
+            catch (TargetInvocationException exception)
+            {
+                if (exception.InnerException != null) throw exception.InnerException;
+                throw;
+            }
+        }
+
+        private static string EscapeJson(string value)
+        {
+            return value.Replace("\\", "\\\\").Replace("\"", "\\\"");
         }
 
         private static DheNativeGuardResult Inject(string root, string cpp, string mv)

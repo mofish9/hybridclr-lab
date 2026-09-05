@@ -49,6 +49,10 @@ internal static partial class Program
         "source-boundary-git-root-resolution", "git-relative-root-resolution",
         "unity-stale-lock-recovery",
         "native-universal-body-filter",
+        "native-finalize-bee-graph-regeneration",
+        "native-finalize-attempt-limit-rejected",
+        "native-finalize-missing-reapply-rejected",
+        "native-finalize-android-hash-mismatch-rejected",
         "metadata-stress-touch-bounded",
         "base-workflow-aot-metadata-archive",
         "integrated-source-lock-line-ending-stable",
@@ -76,7 +80,10 @@ internal static partial class Program
         "methoddef-token-overload-no-comments", "generic-method-table-overload-no-comments",
         "managed-signature-conflict-rejected", "managed-signature-complex-parameters",
         "pointer-count-tamper-rejected",
-        "generic-native-owner-conflict-rejected"
+        "generic-native-owner-conflict-rejected",
+        "bee-graph-regeneration-reapplies-guard", "bee-attempt-limit-rejected",
+        "bee-missing-reapply-rejected", "android-gradle-root-dag-bound",
+        "android-native-hash-mismatch-rejected"
     };
 
     public static int Main(string[] args)
@@ -1670,8 +1677,11 @@ internal static partial class Program
             RunUnity(unity, project, common.Append("-executeMethod").Append(adapterType + ".BuildFinalPlayer").Append("-logFile").Append(Path.Combine(output, "unity-player.log")), new Dictionary<string, string> { ["DHE_BASELINE_ROOT"] = baseline }, Path.Combine(output, "unity-player-process.log"), timeout);
         }
         var playerPath = Path.Combine(output, "dhe-player-result.json");
-        RequireFile(playerPath, "DHE Player result");
         var nativePath = Path.Combine(output, "native", "dhe-native-manifest.json");
+        ValidateNativeFinalizeEvidence(Path.Combine(output, "adapter", "native-finalize.json"),
+            Path.Combine(output, "adapter", "build-final-player.json"), target, project,
+            nativePath);
+        RequireFile(playerPath, "DHE Player result");
         var identityPath = Path.Combine(output, "build-identity.json");
         ValidateBaseAotMetadataArchive(identityPath, baseAotMetadataArchive.SetId);
         if (mode == "Release") productionEvidence = PrepareProductionEvidence(cli, mode, project, settings, baseline, target, output);

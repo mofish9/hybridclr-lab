@@ -185,6 +185,8 @@ namespace HybridCLR.Lab.Editor
                 Scenes = new[] { "Assets/Scenes/HybridCLRLab.unity" },
                 BuildPlayerCallback = options => BuildPipeline.BuildPlayer(options),
                 NativeFinalizeOptions = scriptsOnly ? null : CreateNativeFinalizeOptions(outputRoot, true),
+                AndroidArtifactLogPath = scriptsOnly ? null :
+                    Path.Combine(outputRoot, "native", "android-artifact.log"),
                 NativeFinalizeResultCallback = scriptsOnly ? null : result => nativeResult = result,
             });
             if (scriptsOnly)
@@ -227,7 +229,7 @@ namespace HybridCLR.Lab.Editor
                 // emits universal guards. Bootstrap only controls whether
                 // the baseline is created from the generated current set.
                 GuardAllMethods = true,
-                BeeMaxAttempts = 3,
+                BeeMaxAttempts = 8,
                 BeeTimeoutSeconds = 600,
             };
         }
@@ -283,47 +285,16 @@ namespace HybridCLR.Lab.Editor
         private static void WriteNativeReports(BuildTarget target, string outputRoot,
             DheNativeFinalizeResult nativeResult, bool final)
         {
-            DheNativeGuardResult result = nativeResult.GuardResult;
-            var report = new NativeGuardReport
+            DheProjectBuildSupport.WriteNativeEvidence(new DheProjectNativeOptions
             {
-                schemaVersion = 1,
-                format = "hybridclr.dhe-adapter-native-guards.json",
-                generatedAtUtc = DateTimeOffset.UtcNow.ToString("O"),
-                passed = result.UnsupportedChangedMethodCount == 0 &&
-                    (result.RequestedMethodCount == 0 || result.NativeEntryCount > 0),
-                generatedCppRoot = nativeResult.GeneratedCppRoot,
-                manifestPath = result.ManifestPath,
-                requestedMethodCount = result.RequestedMethodCount,
-                transformedMethodCount = result.TransformedMethodCount,
-                nativeEntryCount = result.NativeEntryCount,
-                unsupportedMethodCount = result.UnsupportedMethodCount,
-                guardMode = result.GuardMode,
-                guardedMethodCount = result.GuardedMethodCount,
-                supportedGuardedMethodCount = result.SupportedGuardedMethodCount,
-                unsupportedGuardedMethodCount = result.UnsupportedGuardedMethodCount,
-                interpreterOnlyMethodCount = result.InterpreterOnlyMethodCount,
-                unsupportedChangedMethodCount = result.UnsupportedChangedMethodCount,
-                target = target.ToString(),
-            };
-            WriteJson(Path.Combine(outputRoot, "adapter", "native-guards.json"), report);
-            if (!final) return;
-            DheBeeRebuildResult rebuild = nativeResult.BeeRebuildResult;
-            WriteJson(Path.Combine(outputRoot, "adapter", "native-finalize.json"),
-                new NativeFinalizeReport
-                {
-                    schemaVersion = 1,
-                    format = "hybridclr.dhe-adapter-native-finalize.json",
-                    generatedAtUtc = DateTimeOffset.UtcNow.ToString("O"),
-                    passed = rebuild != null && rebuild.ExitCode == 0 && report.passed,
-                    target = target.ToString(),
-                    generatedCppRoot = nativeResult.GeneratedCppRoot,
-                    manifestPath = result.ManifestPath,
-                    beeBackendPath = rebuild == null ? null : rebuild.BeeBackendPath,
-                    dagPath = rebuild == null ? null : rebuild.DagPath,
-                    logPath = rebuild == null ? null : rebuild.LogPath,
-                    attempts = rebuild == null ? 0 : rebuild.Attempts,
-                    exitCode = rebuild == null ? -1 : rebuild.ExitCode,
-                });
+                ProjectRoot = ProjectRoot(),
+                ProjectPlanPath = Path.GetFullPath(Argument("-dheProjectPlan")),
+                OutputRoot = outputRoot,
+                Target = target.ToString(),
+                BeeMaxAttempts = 8,
+                BeeTimeoutSeconds = 600,
+                GuardAllMethods = true,
+            }, nativeResult, final);
         }
 
         private static void ConfigurePlayerSettings(BuildTarget target)
@@ -349,6 +320,16 @@ namespace HybridCLR.Lab.Editor
             {
                 PlayerSettings.Android.targetArchitectures = AndroidArchitecture.ARM64;
                 EditorUserBuildSettings.buildAppBundle = false;
+                if (Application.unityVersion.IndexOf('t') >= 0)
+                {
+                    const string bracketDepth = "-fbracket-depth=1024";
+                    string additional = PlayerSettings.GetAdditionalIl2CppArgs() ?? string.Empty;
+                    if (additional.IndexOf("-fbracket-depth=", StringComparison.Ordinal) < 0)
+                    {
+                        PlayerSettings.SetAdditionalIl2CppArgs(
+                            (additional + " --compiler-flags=\"" + bracketDepth + "\"").Trim());
+                    }
+                }
             }
         }
 
@@ -570,45 +551,6 @@ namespace HybridCLR.Lab.Editor
             public string handoffPlanPath;
             public int assemblyCount;
             public string[] assemblyNames;
-        }
-
-        [Serializable]
-        private sealed class NativeGuardReport
-        {
-            public int schemaVersion;
-            public string format;
-            public string generatedAtUtc;
-            public bool passed;
-            public string target;
-            public string generatedCppRoot;
-            public string manifestPath;
-            public int requestedMethodCount;
-            public int transformedMethodCount;
-            public int nativeEntryCount;
-            public int unsupportedMethodCount;
-            public string guardMode;
-            public int guardedMethodCount;
-            public int supportedGuardedMethodCount;
-            public int unsupportedGuardedMethodCount;
-            public int interpreterOnlyMethodCount;
-            public int unsupportedChangedMethodCount;
-        }
-
-        [Serializable]
-        private sealed class NativeFinalizeReport
-        {
-            public int schemaVersion;
-            public string format;
-            public string generatedAtUtc;
-            public bool passed;
-            public string target;
-            public string generatedCppRoot;
-            public string manifestPath;
-            public string beeBackendPath;
-            public string dagPath;
-            public string logPath;
-            public int attempts;
-            public int exitCode;
         }
 
         [Serializable]
