@@ -345,6 +345,8 @@ internal static partial class Program
             passed = true,
             validationPassed = true,
             target,
+            engineWorkflow = GetString(selectedBase, "engineWorkflow"),
+            il2cppCodeGeneration = GetString(selectedBase, "il2cppCodeGeneration"),
             mode = GetString(baseWorkflow, "mode"),
             coverageRequired = true,
             coverageGatePassed = true,
@@ -652,6 +654,8 @@ internal static partial class Program
 
         string baseId = GetString(identity, "baseId") ?? string.Empty;
         string target = GetString(identity, "target") ?? string.Empty;
+        string engineWorkflow = GetString(identity, "engineWorkflow") ?? string.Empty;
+        string il2cppCodeGeneration = GetString(identity, "il2cppCodeGeneration") ?? string.Empty;
         string managedSet = GetString(identity, "managedAssemblySetSha256") ?? string.Empty;
         string aotAssemblySet = GetString(identity, "aotAssemblySetSha256") ?? string.Empty;
         string[] aotAssemblyNames = ReadAotAssemblyNames(identity,
@@ -672,6 +676,8 @@ internal static partial class Program
             "runtimeCapabilities");
         if (target.Length == 0 || target.Any(character => !(char.IsLetterOrDigit(character) ||
                 character is '.' or '_' or '-')) ||
+            !string.Equals(il2cppCodeGeneration,
+                ExpectedIl2CppCodeGeneration(engineWorkflow), StringComparison.Ordinal) ||
             !IsHex(baseId, 64, 64) || !IsHex(managedSet, 64, 64) ||
             !IsHex(aotAssemblySet, 64, 64) ||
             !IsHex(snapshot, 64, 64) || !IsHex(baseMetaVersionSet, 64, 64) ||
@@ -682,7 +688,8 @@ internal static partial class Program
             !IsValidCapabilitySet(runtimeCapabilities))
             throw new DheException("Base Player build identity fields are invalid.");
 
-        string computedBaseId = ComputeBaseId(target, managedSet, aotAssemblySet, snapshot,
+        string computedBaseId = ComputeBaseId(target, engineWorkflow,
+            il2cppCodeGeneration, managedSet, aotAssemblySet, snapshot,
             baseMetaVersionSet, aotMetadataSetId, guard, nativeManifest, runtimeProtocol, runtimeContract,
             runtimeCapabilities, runtimeAssetRoot, baseMetaVersionAssetRoot);
         if (!string.Equals(baseId, computedBaseId, StringComparison.OrdinalIgnoreCase))
@@ -706,6 +713,10 @@ internal static partial class Program
                 StringComparison.OrdinalIgnoreCase) ||
             !string.Equals(GetString(selected, "target"), target,
                 StringComparison.Ordinal) ||
+            !string.Equals(GetString(selected, "engineWorkflow"), engineWorkflow,
+                StringComparison.Ordinal) ||
+            !string.Equals(GetString(selected, "il2cppCodeGeneration"),
+                il2cppCodeGeneration, StringComparison.Ordinal) ||
             !string.Equals(GetString(selected, "managedAssemblySetSha256"), managedSet,
                 StringComparison.OrdinalIgnoreCase) ||
             !string.Equals(GetString(selected, "aotAssemblySetSha256"), aotAssemblySet,

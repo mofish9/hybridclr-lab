@@ -864,12 +864,14 @@ internal static partial class Program
             "a Base missing one required update capability must be rejected");
         string identityHash = new string('a', 64);
         string aotInventoryHash = AssemblyNameSetHash(new[] { "HybridCLR.ManagedCasesAot" });
-        string baseIdV1 = ComputeBaseId("StandaloneWindows64", identityHash,
+        string baseIdV1 = ComputeBaseId("StandaloneWindows64", "Unity2021Standard",
+            "OptimizeSpeed", identityHash,
             aotInventoryHash, new string('b', 64), new string('c', 64), new string('d', 64),
             new string('e', 64), new string('f', 64), ResourceUpdateCompatibility.RuntimeProtocol,
             "dhe-runtime-v1", requiredCapabilities,
             "HybridCLRLab/DheDemo/", "HybridCLRLab/DheDemo/BaseMetaVersion/");
-        string baseIdV2 = ComputeBaseId("StandaloneWindows64", identityHash,
+        string baseIdV2 = ComputeBaseId("StandaloneWindows64", "Unity2021Standard",
+            "OptimizeSpeed", identityHash,
             aotInventoryHash, new string('b', 64), new string('c', 64), new string('d', 64),
             new string('e', 64), new string('f', 64), ResourceUpdateCompatibility.RuntimeProtocol,
             "dhe-runtime-v2", requiredCapabilities,
@@ -880,7 +882,8 @@ internal static partial class Program
             "Base ID must distinguish runtime contracts even for identical managed assemblies");
         string expandedAotInventoryHash = AssemblyNameSetHash(new[]
             { "HybridCLR.ManagedCasesAot", "HybridCLR.BoundaryContracts" });
-        string baseIdExpandedInventory = ComputeBaseId("StandaloneWindows64", identityHash,
+        string baseIdExpandedInventory = ComputeBaseId("StandaloneWindows64",
+            "Unity2021Standard", "OptimizeSpeed", identityHash,
             expandedAotInventoryHash, new string('b', 64), new string('c', 64),
             new string('d', 64), new string('e', 64), new string('f', 64),
             ResourceUpdateCompatibility.RuntimeProtocol, "dhe-runtime-v1",
@@ -890,6 +893,17 @@ internal static partial class Program
             !string.Equals(baseIdV1, baseIdExpandedInventory,
                 StringComparison.OrdinalIgnoreCase),
             "Base ID must distinguish complete AOT inventories");
+        string baseIdOptimizeSize = ComputeBaseId("StandaloneWindows64",
+            "Unity2022Fgs", "OptimizeSize", identityHash, aotInventoryHash,
+            new string('b', 64), new string('c', 64), new string('d', 64),
+            new string('e', 64), new string('f', 64),
+            ResourceUpdateCompatibility.RuntimeProtocol, "dhe-runtime-v1",
+            requiredCapabilities, "HybridCLRLab/DheDemo/",
+            "HybridCLRLab/DheDemo/BaseMetaVersion/");
+        AddRegressionCheck(checks, errors, "composite-base-id-build-configuration-bound",
+            !string.Equals(baseIdV1, baseIdOptimizeSize,
+                StringComparison.OrdinalIgnoreCase),
+            "Base ID must distinguish engine workflow and IL2CPP code generation");
         var baseDheAssemblies = new HashSet<string>(
             new[] { "HybridCLR.ManagedCasesAot" }, StringComparer.OrdinalIgnoreCase);
         var baseAotAssemblies = new HashSet<string>(new[]
@@ -1051,6 +1065,7 @@ internal static partial class Program
             baseRegistryDetails);
 
         bool baseRegistryBuilderPassed = false;
+        bool baseRegistryBuildConfigurationTamperRejected = false;
         string baseRegistryBuilderDetails =
             "Regression requires an authenticated Base registry input.";
         if (!string.IsNullOrWhiteSpace(resourceBaseRegistry))
@@ -1119,6 +1134,75 @@ internal static partial class Program
                     {
                         duplicateRejected = true;
                     }
+
+                    string workflowTamperPath = Path.Combine(builderRoot,
+                        "workflow-tamper.json");
+                    var workflowTamper = System.Text.Json.Nodes.JsonNode.Parse(
+                        File.ReadAllText(normalizedPath))!.AsObject();
+                    var workflowTamperEntry = workflowTamper["bases"]!.AsArray()[0]!
+                        .AsObject();
+                    workflowTamperEntry["engineWorkflow"] =
+                        string.Equals(first.EngineWorkflow, "Unity2021Standard",
+                            StringComparison.Ordinal)
+                            ? "Unity2022Fgs"
+                            : "Unity2021Standard";
+                    File.WriteAllText(workflowTamperPath, workflowTamper.ToJsonString(
+                        new JsonSerializerOptions { WriteIndented = true }),
+                        new UTF8Encoding(false));
+                    bool workflowTamperRejected = false;
+                    try
+                    {
+                        _ = BuildBaseRegistry(new Cli("base-registry",
+                            new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase)
+                            {
+                                ["existingregistry"] = workflowTamperPath,
+                                ["output"] = Path.Combine(builderRoot,
+                                    "workflow-tamper-rejected.json"),
+                                ["forceoutput"] = "true"
+                            }));
+                    }
+                    catch (DheException)
+                    {
+                        workflowTamperRejected = true;
+                    }
+
+                    string codeGenerationTamperIdentity = Path.Combine(builderRoot,
+                        "code-generation-tamper-identity.json");
+                    var codeGenerationTamper = System.Text.Json.Nodes.JsonNode.Parse(
+                        File.ReadAllText(first.BuildIdentity))!.AsObject();
+                    string originalCodeGeneration =
+                        codeGenerationTamper["il2cppCodeGeneration"]!.GetValue<string>();
+                    codeGenerationTamper["il2cppCodeGeneration"] =
+                        string.Equals(originalCodeGeneration, "OptimizeSpeed",
+                            StringComparison.Ordinal)
+                            ? "OptimizeSize"
+                            : "OptimizeSpeed";
+                    File.WriteAllText(codeGenerationTamperIdentity,
+                        codeGenerationTamper.ToJsonString(
+                            new JsonSerializerOptions { WriteIndented = true }),
+                        new UTF8Encoding(false));
+                    bool codeGenerationTamperRejected = false;
+                    try
+                    {
+                        _ = BuildBaseRegistry(new Cli("base-registry",
+                            new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase)
+                            {
+                                ["baseidentities"] = codeGenerationTamperIdentity,
+                                ["baselineroots"] = first.BaselineRoot,
+                                ["basenativemanifests"] = first.NativeManifest,
+                                ["engineworkflows"] = first.EngineWorkflow,
+                                ["payloadvariantids"] = first.PayloadVariantId,
+                                ["output"] = Path.Combine(builderRoot,
+                                    "code-generation-tamper-rejected.json"),
+                                ["forceoutput"] = "true"
+                            }));
+                    }
+                    catch (DheException)
+                    {
+                        codeGenerationTamperRejected = true;
+                    }
+                    baseRegistryBuildConfigurationTamperRejected =
+                        workflowTamperRejected && codeGenerationTamperRejected;
                 }
 
                 baseRegistryBuilderPassed = normalizedExit == 0 && normalizedEntriesMatch &&
@@ -1134,6 +1218,10 @@ internal static partial class Program
         }
         AddRegressionCheck(checks, errors, "base-registry-builder", baseRegistryBuilderPassed,
             baseRegistryBuilderDetails);
+        AddRegressionCheck(checks, errors,
+            "base-registry-build-configuration-tamper-rejected",
+            baseRegistryBuildConfigurationTamperRejected,
+            "registry workflow and build identity code generation tampering must be rejected");
 
         var packageRoot = cli.Optional("packageroot");
         if (!string.IsNullOrWhiteSpace(packageRoot))
@@ -3331,6 +3419,19 @@ internal static partial class Program
         if (!baseMetaVersionSetSha256.Equals(GetString(identity,
                 "baseMetaVersionSetSha256"), StringComparison.OrdinalIgnoreCase))
             errors.Add("Build identity aggregate Base MetaVersion hash is invalid.");
+        string identityEngineWorkflow = GetString(identity, "engineWorkflow") ?? string.Empty;
+        string identityCodeGeneration = GetString(identity, "il2cppCodeGeneration") ?? string.Empty;
+        try
+        {
+            if (!string.Equals(identityCodeGeneration,
+                    ExpectedIl2CppCodeGeneration(identityEngineWorkflow),
+                    StringComparison.Ordinal))
+                errors.Add("Build identity IL2CPP code generation does not match its engine workflow.");
+        }
+        catch (DheException exception)
+        {
+            errors.Add("Build identity engine workflow: " + exception.Message);
+        }
         string[] identityCapabilities = StringArray(identity, "runtimeCapabilities", errors);
         if (!string.Equals(GetString(identity, "runtimeProtocol"),
                 GetString(native, "runtimeProtocol"), StringComparison.Ordinal) ||
@@ -3342,6 +3443,8 @@ internal static partial class Program
         try
         {
             string computedBaseId = ComputeBaseId(GetString(identity, "target") ?? string.Empty,
+                GetString(identity, "engineWorkflow") ?? string.Empty,
+                GetString(identity, "il2cppCodeGeneration") ?? string.Empty,
                 managedAssemblySetSha256,
                 GetString(identity, "aotAssemblySetSha256") ?? string.Empty,
                 GetString(identity, "aotSnapshotSha256") ?? string.Empty,

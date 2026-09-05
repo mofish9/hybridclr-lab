@@ -28,6 +28,7 @@ namespace HybridCLR.Lab.Editor
             string mode = OptionalArgument("-dheMode") ?? "Exploratory";
             string currentInputRoot = OptionalArgument("-dheCurrentInputRoot");
             string configuredBaseline = Environment.GetEnvironmentVariable("DHE_BASELINE_ROOT");
+            ConfigurePlayerSettings(target);
             DheProjectPrepareResult prepared = DheBuildPipeline.PrepareProjectArtifacts(
                 new DheProjectPrepareOptions
                 {
@@ -301,6 +302,8 @@ namespace HybridCLR.Lab.Editor
         {
             BuildTargetGroup group = BuildPipeline.GetBuildTargetGroup(target);
             PlayerSettings.SetScriptingBackend(group, ScriptingImplementation.IL2CPP);
+            DheProjectBuildSupport.ApplyIl2CppCodeGeneration(target,
+                Argument("-dheIl2CppCodeGeneration"));
             if (group == BuildTargetGroup.Standalone)
             {
                 // Unity 2021 can retain an interactive Visual Studio export
@@ -389,6 +392,8 @@ namespace HybridCLR.Lab.Editor
                     SettingsUtil.GetAssembliesPostIl2CppStripDir(target)),
                 ProjectPlanPath = Path.GetFullPath(Argument("-dheProjectPlan")),
                 Target = target.ToString(),
+                EngineWorkflow = Argument("-dheEngineWorkflow"),
+                Il2CppCodeGeneration = Argument("-dheIl2CppCodeGeneration"),
                 Workflow = "unity2021-dhe-demo",
                 BuildIdentityAssetPath = "Assets/Runtime/HybridCLRDheBuildIdentity.cs",
                 RuntimePlanPath = Path.Combine(ProjectRoot(), "Assets", "StreamingAssets",
@@ -585,6 +590,8 @@ namespace HybridCLR.Lab.Editor
             public string format;
             public string workflow;
             public string target;
+            public string engineWorkflow;
+            public string il2cppCodeGeneration;
             public int identityVersion;
             public string pathSemantics;
             public string aotSnapshotSha256;

@@ -28,7 +28,8 @@ internal static partial class Program
         "runtime-contract-capability-negotiation",
         "runtime-contract-schema-binding", "runtime-contract-package-binding",
         "runtime-capability-missing-rejected", "composite-base-id-runtime-bound",
-        "composite-base-id-aot-inventory-bound", "base-aot-outside-dhe-rejected",
+        "composite-base-id-aot-inventory-bound", "composite-base-id-build-configuration-bound",
+        "base-aot-outside-dhe-rejected",
         "resource-stage-plan-capability-bound",
         "resource-stage-aot-metadata-capability-bound",
         "resource-stage-base-registry-audit-bound",
@@ -36,6 +37,7 @@ internal static partial class Program
         "resource-stage-base-registry-binding-removal-rejected",
         "resource-stage-direct-base-valid",
         "resource-base-registry", "base-registry-builder",
+        "base-registry-build-configuration-tamper-rejected",
         "resource-player-evidence-binding",
         "resource-player-legacy-single-payload-compatibility",
         "resource-player-assembly-mode-binding",
@@ -393,7 +395,7 @@ internal static partial class Program
             foreach (BaseRegistryEntry entry in existing.Entries)
             {
                 string identityBaseId = ValidateBaseRegistryArtifacts(entry.BuildIdentity,
-                    entry.BaselineRoot, entry.NativeManifest);
+                    entry.BaselineRoot, entry.NativeManifest, entry.EngineWorkflow);
                 if (!string.Equals(identityBaseId, entry.BaseId,
                         StringComparison.OrdinalIgnoreCase))
                     throw new DheException("Existing registry Base ID does not match its build identity: " +
@@ -433,7 +435,7 @@ internal static partial class Program
                 throw new DheException("Base registry label is empty or too long.");
 
             string baseId = ValidateBaseRegistryArtifacts(identityPath, baselineRoot,
-                nativeManifestPath);
+                nativeManifestPath, engineWorkflow);
 
             string? aotRoot = null;
             if (aotValues.Length != 0 && !string.Equals(aotValues[index], "null",
@@ -492,7 +494,7 @@ internal static partial class Program
     }
 
     private static string ValidateBaseRegistryArtifacts(string identityPath, string baselineRoot,
-        string nativeManifestPath)
+        string nativeManifestPath, string expectedEngineWorkflow)
     {
         JsonElement identity = ReadJson<JsonElement>(identityPath);
         if (GetInt(identity, "schemaVersion") != 1 ||
@@ -505,6 +507,13 @@ internal static partial class Program
         string baseId = GetString(identity, "baseId") ?? string.Empty;
         if (!IsHex(baseId, 64, 64))
             throw new DheException("Base build identity has an invalid baseId: " + identityPath);
+        string engineWorkflow = GetString(identity, "engineWorkflow") ?? string.Empty;
+        string il2cppCodeGeneration = GetString(identity, "il2cppCodeGeneration") ?? string.Empty;
+        if (!string.Equals(engineWorkflow, expectedEngineWorkflow, StringComparison.Ordinal) ||
+            !string.Equals(il2cppCodeGeneration,
+                ExpectedIl2CppCodeGeneration(engineWorkflow), StringComparison.Ordinal))
+            throw new DheException("Base build configuration does not match its engine workflow: " +
+                identityPath);
         JsonElement native = ReadJson<JsonElement>(nativeManifestPath);
         if (!string.Equals(GetString(identity, "nativeManifestSha256"),
                 Sha256File(nativeManifestPath), StringComparison.OrdinalIgnoreCase))
@@ -542,6 +551,21 @@ internal static partial class Program
                 .IsSupersetOf(assemblyNames))
             throw new DheException(
                 "Base DHE assemblies are not a subset of its complete AOT inventory: " + identityPath);
+        string[] runtimeCapabilities = ReadStringArray(identity, "runtimeCapabilities");
+        string computedBaseId = ComputeBaseId(GetString(identity, "target") ?? string.Empty,
+            engineWorkflow, il2cppCodeGeneration, managedSet,
+            GetString(identity, "aotAssemblySetSha256") ?? string.Empty,
+            GetString(identity, "aotSnapshotSha256") ?? string.Empty,
+            GetString(identity, "baseMetaVersionSetSha256") ?? string.Empty,
+            GetString(identity, "aotMetadataSetId") ?? string.Empty,
+            GetString(identity, "nativeGuardSourceSha256") ?? string.Empty,
+            GetString(identity, "nativeManifestSha256") ?? string.Empty,
+            GetString(identity, "runtimeProtocol") ?? string.Empty,
+            GetString(identity, "runtimeContract") ?? string.Empty, runtimeCapabilities,
+            GetString(identity, "runtimeAssetRoot") ?? string.Empty,
+            GetString(identity, "baseMetaVersionAssetRoot") ?? string.Empty);
+        if (!string.Equals(baseId, computedBaseId, StringComparison.OrdinalIgnoreCase))
+            throw new DheException("Base build identity composite baseId is invalid: " + identityPath);
         return baseId;
     }
 
@@ -639,6 +663,12 @@ internal static partial class Program
                 if (!string.Equals(identityBaseId, baseRegistry.Entries[index].BaseId,
                         StringComparison.OrdinalIgnoreCase))
                     throw new DheException("DHE Base registry baseId does not match its build identity: " +
+                        baseRegistry.Entries[index].BuildIdentity);
+                string identityWorkflow = GetString(baseIdentities[index], "engineWorkflow") ??
+                    string.Empty;
+                if (!string.Equals(identityWorkflow,
+                        baseRegistry.Entries[index].EngineWorkflow, StringComparison.Ordinal))
+                    throw new DheException("DHE Base registry engineWorkflow does not match its build identity: " +
                         baseRegistry.Entries[index].BuildIdentity);
             }
         }
@@ -865,6 +895,11 @@ internal static partial class Program
                 : baseRegistry.Entries[baseIndex].PayloadVariantId;
             CurrentVariantData currentVariant = currentVariants[payloadVariantId];
             var baseTarget = GetString(buildIdentity, "target") ?? string.Empty;
+            var baseEngineWorkflow = GetString(buildIdentity, "engineWorkflow") ?? string.Empty;
+            var baseIl2CppCodeGeneration = GetString(buildIdentity,
+                "il2cppCodeGeneration") ?? string.Empty;
+            string expectedEngineWorkflow = baseRegistry == null ? baseEngineWorkflow :
+                baseRegistry.Entries[baseIndex].EngineWorkflow;
             var baseAotSnapshotSha256 = GetString(buildIdentity, "aotSnapshotSha256") ?? string.Empty;
             var baseNativeGuardSourceSha256 = GetString(buildIdentity,
                 "nativeGuardSourceSha256") ?? string.Empty;
@@ -1020,7 +1055,8 @@ internal static partial class Program
             var baseMvSetHash = NamedByteSetHash(baseMvSet);
             var identityErrors = ValidateResourceBaseIdentity(buildIdentity, buildIdentityPath,
                 nativeManifestPath, managedAssemblySetSha256, baseMvSetHash,
-                aotMetadataSetId, runtimeAssetRoot, baseMetaVersionAssetRoot);
+                aotMetadataSetId, runtimeAssetRoot, baseMetaVersionAssetRoot,
+                expectedEngineWorkflow);
             unsupported.AddRange(identityErrors);
             string[] missingRuntimeCapabilities = requiredRuntimeCapabilities
                 .Except(baseNativeRuntimeCapabilities, StringComparer.Ordinal)
@@ -1050,6 +1086,8 @@ internal static partial class Program
             {
                 baseId,
                 target = baseTarget,
+                engineWorkflow = baseEngineWorkflow,
+                il2cppCodeGeneration = baseIl2CppCodeGeneration,
                 payloadVariantId,
                 currentAssemblySetSha256 = currentVariant.CurrentSetHash,
                 managedAssemblySetSha256,
@@ -1183,7 +1221,7 @@ internal static partial class Program
     private static string[] ValidateResourceBaseIdentity(JsonElement identity, string identityPath,
         string nativeManifestPath, string managedAssemblySetSha256,
         string baseMetaVersionSetSha256, string aotMetadataSetId, string runtimeAssetRoot,
-        string baseMetaVersionAssetRoot)
+        string baseMetaVersionAssetRoot, string expectedEngineWorkflow)
     {
         var errors = new List<string>();
         JsonElement nativeManifest = ReadJson<JsonElement>(nativeManifestPath);
@@ -1199,6 +1237,19 @@ internal static partial class Program
         if (target.Length == 0 || target.Any(character => !(char.IsLetterOrDigit(character) ||
                 character is '.' or '_' or '-')))
             errors.Add("base-build-identity-target:" + identityPath);
+        string engineWorkflow = GetString(identity, "engineWorkflow") ?? string.Empty;
+        string il2cppCodeGeneration = GetString(identity, "il2cppCodeGeneration") ?? string.Empty;
+        try
+        {
+            if (!string.Equals(engineWorkflow, expectedEngineWorkflow, StringComparison.Ordinal) ||
+                !string.Equals(il2cppCodeGeneration,
+                    ExpectedIl2CppCodeGeneration(engineWorkflow), StringComparison.Ordinal))
+                errors.Add("base-build-identity-build-configuration:" + identityPath);
+        }
+        catch (DheException)
+        {
+            errors.Add("base-build-identity-build-configuration:" + identityPath);
+        }
         if (!string.Equals(GetString(identity, "managedAssemblySetSha256"),
                 managedAssemblySetSha256, StringComparison.OrdinalIgnoreCase))
             errors.Add("base-build-identity-assembly-set-mismatch:" + identityPath);
@@ -1248,7 +1299,8 @@ internal static partial class Program
                     GetString(identity, "baseMetaVersionAssetRoot") ?? ""),
                 baseMetaVersionAssetRoot, StringComparison.OrdinalIgnoreCase))
             errors.Add("base-build-identity-asset-roots:" + identityPath);
-        string computedBaseId = ComputeBaseId(target, managedAssemblySetSha256,
+        string computedBaseId = ComputeBaseId(target, engineWorkflow,
+            il2cppCodeGeneration, managedAssemblySetSha256,
             GetString(identity, "aotAssemblySetSha256") ?? string.Empty,
             GetString(identity, "aotSnapshotSha256") ?? string.Empty,
             baseMetaVersionSetSha256, aotMetadataSetId,
@@ -1381,7 +1433,8 @@ internal static partial class Program
                 " does not match the immutable supported Base identities.");
     }
 
-    private static string ComputeBaseId(string target, string managedAssemblySetSha256,
+    private static string ComputeBaseId(string target, string engineWorkflow,
+        string il2cppCodeGeneration, string managedAssemblySetSha256,
         string aotAssemblySetSha256, string aotSnapshotSha256,
         string baseMetaVersionSetSha256,
         string aotMetadataSetId,
@@ -1393,6 +1446,8 @@ internal static partial class Program
             .Distinct(StringComparer.Ordinal).OrderBy(value => value, StringComparer.Ordinal).ToArray();
         string canonical = "hybridclr.dhe-base-identity-v1\n" +
             "target=" + target + "\n" +
+            "engineWorkflow=" + engineWorkflow + "\n" +
+            "il2cppCodeGeneration=" + il2cppCodeGeneration + "\n" +
             "managedAssemblySetSha256=" + managedAssemblySetSha256.ToLowerInvariant() + "\n" +
             "aotAssemblySetSha256=" + aotAssemblySetSha256.ToLowerInvariant() + "\n" +
             "aotSnapshotSha256=" + aotSnapshotSha256.ToLowerInvariant() + "\n" +
@@ -1406,6 +1461,17 @@ internal static partial class Program
             "runtimeAssetRoot=" + NormalizeRuntimeAssetRoot(runtimeAssetRoot) + "\n" +
             "baseMetaVersionAssetRoot=" + NormalizeRuntimeAssetRoot(baseMetaVersionAssetRoot) + "\n";
         return Sha256Text(canonical);
+    }
+
+    private static string ExpectedIl2CppCodeGeneration(string engineWorkflow)
+    {
+        return engineWorkflow switch
+        {
+            "Unity2021Standard" => "OptimizeSpeed",
+            "Unity2022Fgs" => "OptimizeSize",
+            "Tuanjie2022Fgs" => "OptimizeSize",
+            _ => throw new DheException("Unsupported DHE engine workflow: " + engineWorkflow),
+        };
     }
 
     private static string NamedAssemblySetHash(IEnumerable<(string name, string path)> records)
@@ -1617,10 +1683,14 @@ internal static partial class Program
         var preflightRoot = Path.Combine(output, "project-preflight");
         Directory.CreateDirectory(output);
         var productionEvidence = PrepareProductionEvidence(cli, mode, project, settings, baseline, target, output);
+        var buildConfiguration = ResolveWorkflowBuildConfiguration(cli,
+            productionEvidence.RuntimeManifest);
 
         var prepareArguments = new List<string> { "-batchmode", "-nographics", "-quit", "-projectPath", project,
             "-executeMethod", adapterClass, "-dheTarget", target, "-dheOutputRoot", output,
             "-dheBaselineRoot", baselineCopy, "-dheCurrentRoot", current, "-dheMode", mode,
+            "-dheEngineWorkflow", buildConfiguration.EngineWorkflow,
+            "-dheIl2CppCodeGeneration", buildConfiguration.Il2CppCodeGeneration,
             "-extraScriptingDefines=HYBRIDCLR_DHE_CURRENT_GENERATION",
             "-logFile", Path.Combine(output, "unity-prepare.log") };
         if (bootstrap) prepareArguments.AddRange(new[] { "-dheBootstrap", "true" });
@@ -1657,7 +1727,9 @@ internal static partial class Program
         var adapterType = adapterClass.EndsWith(".Prepare", StringComparison.Ordinal) ? adapterClass[..^".Prepare".Length] : adapterClass;
         var common = new List<string> { "-batchmode", "-nographics", "-quit", "-projectPath", project,
             "-dheTarget", target, "-dheOutputRoot", output, "-dheBaselineRoot", baselineCopy,
-            "-dheCurrentRoot", current, "-dheMode", mode, "-dheProjectPlan", planPath };
+            "-dheCurrentRoot", current, "-dheMode", mode, "-dheProjectPlan", planPath,
+            "-dheEngineWorkflow", buildConfiguration.EngineWorkflow,
+            "-dheIl2CppCodeGeneration", buildConfiguration.Il2CppCodeGeneration };
         if (cli.Has("bootstrap")) common.AddRange(new[] { "-dheBootstrap", "true" });
         AppendUnityArguments(common, cli);
         RunUnity(unity, project, common.Append("-executeMethod").Append(adapterType + ".StageRuntimePlan").Append("-logFile").Append(Path.Combine(output, "unity-stage.log")), new Dictionary<string, string> { ["DHE_BASELINE_ROOT"] = baseline }, Path.Combine(output, "unity-stage-process.log"), timeout);
@@ -1733,6 +1805,37 @@ internal static partial class Program
         {
             throw new DheException("DHE workflow schema gate failed: " + schemaGatePath);
         }
+    }
+
+    private static (string EngineWorkflow, string Il2CppCodeGeneration)
+        ResolveWorkflowBuildConfiguration(Cli cli, string? runtimeManifestPath)
+    {
+        if (string.IsNullOrWhiteSpace(runtimeManifestPath))
+        {
+            return (cli.Optional("engineworkflow") ?? "Exploratory",
+                cli.Optional("il2cppcodegeneration") ?? "OptimizeSpeed");
+        }
+
+        JsonElement runtime = ReadJson<JsonElement>(RequireFile(runtimeManifestPath,
+            "DHE workflow runtime manifest"));
+        string engineWorkflow = GetString(runtime, "engineWorkflow") ?? string.Empty;
+        string sourceRoot = Path.GetFullPath(cli.Optional("validationsourceroot") ??
+            cli.Optional("toolchainroot") ?? cli.Root);
+        JsonElement workflowLock = ReadJson<JsonElement>(RequireFile(Path.Combine(sourceRoot,
+            "manifests", "runtime-workflows.json"), "DHE runtime workflow lock"));
+        JsonElement workflow = workflowLock.GetProperty("workflows").EnumerateArray()
+            .SingleOrDefault(item => string.Equals(GetString(item, "id"), engineWorkflow,
+                StringComparison.Ordinal));
+        if (workflow.ValueKind == JsonValueKind.Undefined)
+            throw new DheException("Runtime manifest engine workflow is not locked: " +
+                engineWorkflow);
+        string il2cppCodeGeneration = GetString(workflow.GetProperty("productionWorkflow"),
+            "il2cppCodeGeneration") ?? string.Empty;
+        if (!string.Equals(il2cppCodeGeneration,
+                ExpectedIl2CppCodeGeneration(engineWorkflow), StringComparison.Ordinal))
+            throw new DheException("Locked IL2CPP code generation is invalid for " +
+                engineWorkflow + ".");
+        return (engineWorkflow, il2cppCodeGeneration);
     }
 
     internal static (string? Root, string SetId) MaterializeBaseAotMetadataRoot(
@@ -1862,6 +1965,8 @@ internal static partial class Program
         {
             schemaVersion = 1, format = "hybridclr.dhe-project-player-workflow.json", generatedAtUtc = DateTimeOffset.UtcNow,
             passed = GetBool(player, "passed"), validationPassed = GetBool(player, "passed"), target, mode,
+            engineWorkflow = GetString(identity, "engineWorkflow"),
+            il2cppCodeGeneration = GetString(identity, "il2cppCodeGeneration"),
             coverageRequired = true, coverageGatePassed = GetBool(plan, "dheEqualsHotUpdate"),
             releaseReady = mode == "Release" && evidence.Passed && GetBool(player, "passed"), artifactValidationPassed = true,
             buildIdentityReady = true, identityVersion = GetInt(identity, "identityVersion"),
@@ -2345,6 +2450,20 @@ internal static partial class Program
             if (!liveTree.Equals(GetString(actual, "treeSha256"), StringComparison.OrdinalIgnoreCase))
                 throw new DheException("Managed Player runtime source tree has changed: " + repository);
         }
+
+        string identityPath = ResolveEvidencePath(GetString(report, "buildIdentity"), reportRoot,
+            "Managed Player build identity");
+        JsonElement identity = ReadJson<JsonElement>(identityPath);
+        string expectedCodeGeneration = GetString(workflow.GetProperty("productionWorkflow"),
+            "il2cppCodeGeneration") ?? string.Empty;
+        if (!string.Equals(GetString(identity, "engineWorkflow"), workflowId,
+                StringComparison.Ordinal) ||
+            !string.Equals(GetString(identity, "il2cppCodeGeneration"),
+                expectedCodeGeneration, StringComparison.Ordinal) ||
+            !string.Equals(expectedCodeGeneration,
+                ExpectedIl2CppCodeGeneration(workflowId), StringComparison.Ordinal))
+            throw new DheException(
+                "Managed Player build configuration does not match its locked engine workflow.");
 
         if (GetString(report, "format") == "hybridclr.dhe-resource-player-workflow.json")
         {

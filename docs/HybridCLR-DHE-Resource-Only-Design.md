@@ -332,8 +332,8 @@ Unity 2021 correctness 证据。
 
 这证明“Base 只构建一次、后续一份资源包服务多个 Base”的架构链路成立，但不等于官方旗舰版
 DHE 的全部元数据能力。当前 Release 使用 HybridCLR commit `fe3b1ed`（tag
-`v8.13.0-opt4.2`）、package commit `ae5faf2`（tree
-`F5AE594F10272360483D6E36094B096C7715FBCD4E1FB37487D75F8C41651C23`）和三条已锁定的
+`v8.13.0-opt4.2`）、package candidate `22fb364`（tree
+`89C676E9CF77083776DA66F9F05A02F0E8CA981824970165556B93079862C23A`）和三条已锁定的
 il2cpp_plus `opt4.1` 维护线。Android Player、iOS/Xcode/device、性能、内存和现有结构限制
 仍是正式发布前的独立门禁；当前结论只能是 Windows Player 与三引擎 native 有条件通过，不能
 声明全平台生产发布完成。

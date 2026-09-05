@@ -357,6 +357,10 @@ namespace HybridCLR.Lab
             bool buildIdentityValidated = buildIdentity != null && buildIdentity.identityVersion == 1 &&
                 string.Equals(buildIdentity.aotSnapshotKind, "managed-assembly-plus-generated-cpp-v1", StringComparison.Ordinal) &&
                 string.Equals(buildIdentity.target, expectedTarget, StringComparison.OrdinalIgnoreCase) &&
+                string.Equals(buildIdentity.engineWorkflow,
+                    HybridCLRDheBuildIdentity.EngineWorkflow, StringComparison.Ordinal) &&
+                string.Equals(buildIdentity.il2cppCodeGeneration,
+                    HybridCLRDheBuildIdentity.Il2CppCodeGeneration, StringComparison.Ordinal) &&
                 string.Equals(buildIdentity.baseId, HybridCLRDheBuildIdentity.BaseId,
                     StringComparison.OrdinalIgnoreCase) &&
                 string.Equals(buildIdentity.runtimeProtocol,
@@ -682,6 +686,9 @@ namespace HybridCLR.Lab
                 embeddedSnapshotHashValidated = embeddedSnapshotHashValidated,
                 buildIdentityValidated = buildIdentityValidated,
                 identityVersion = buildIdentity == null ? 0 : buildIdentity.identityVersion,
+                engineWorkflow = buildIdentity == null ? string.Empty : buildIdentity.engineWorkflow,
+                il2cppCodeGeneration = buildIdentity == null ? string.Empty :
+                    buildIdentity.il2cppCodeGeneration,
                 aotSnapshotKind = buildIdentity == null ? string.Empty : buildIdentity.aotSnapshotKind,
                 nativeGuardSourceSha256 = buildIdentity == null ? string.Empty : buildIdentity.nativeGuardSourceSha256,
                 nativeManifestSha256 = buildIdentity == null ? string.Empty : buildIdentity.nativeManifestSha256,
@@ -1929,6 +1936,8 @@ namespace HybridCLR.Lab
         {
             public int identityVersion;
             public string target;
+            public string engineWorkflow;
+            public string il2cppCodeGeneration;
             public string baseId;
             public string managedAssemblySetSha256;
             public string aotAssemblySetSha256;
@@ -2151,6 +2160,8 @@ namespace HybridCLR.Lab
             public bool embeddedSnapshotHashValidated;
             public bool buildIdentityValidated;
             public int identityVersion;
+            public string engineWorkflow;
+            public string il2cppCodeGeneration;
             public string aotSnapshotKind;
             public string nativeGuardSourceSha256;
             public string nativeManifestSha256;

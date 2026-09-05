@@ -6,7 +6,7 @@ HybridCLR community runtime on Tuanjie 1.10.0.
 ## Fixed baseline
 
 - Tuanjie: `1.10.0` (`2022.3.62t12`)
-- HybridCLR package: `v8.13.0` (`optimize/v8.13.0@ae5faf2`, tree `F5AE594F10272360483D6E36094B096C7715FBCD4E1FB37487D75F8C41651C23`, no package opt tag)
+- HybridCLR package candidate: `v8.13.0` (`22fb364`, tree `89C676E9CF77083776DA66F9F05A02F0E8CA981824970165556B93079862C23A`, no package opt tag). The published `optimize/v8.13.0` branch remains at `ae5faf2` until the candidate gates complete.
 - HybridCLR runtime: DHE candidate based on `v8.13.0-opt4.1` (`fe3b1ed`, no new runtime tag)
 - il2cpp_plus: `v2022-tuanjie-8.13.0-opt4.1` (`52968ad`)
 
@@ -32,6 +32,10 @@ Toolchain `0.1.20` is the active candidate. It replaces generated-function
 name guessing with IL2CPP MethodDef/MethodSpec table resolution and requires a
 source-bound resolver regression report from each of the three locked Editors
 before it can be published as Release.
+Base identity now also binds `engineWorkflow` and `il2cppCodeGeneration`.
+Unity 2021 is locked to `OptimizeSpeed`; Unity 2022 FGS and Tuanjie 2022 FGS
+are locked to `OptimizeSize`. Base evidence created before these fields existed
+is historical only and must not enter a current supported-Base registry.
 The workflow also emits MetaVersion/native/workflow schemas and an independent
 artifact validator; it verifies the exact supported+unsupported changed-token set,
 and the versioned `il2cpp-generated-cpp-signature-v2` ABI adapter contract.

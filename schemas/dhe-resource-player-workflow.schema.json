@@ -6,7 +6,7 @@
   "additionalProperties": true,
   "required": [
     "schemaVersion", "format", "generatedAtUtc", "passed", "validationPassed",
-    "target", "mode", "coverageRequired", "coverageGatePassed", "releaseReady",
+    "target", "engineWorkflow", "il2cppCodeGeneration", "mode", "coverageRequired", "coverageGatePassed", "releaseReady",
     "artifactValidationPassed", "buildIdentityReady", "identityVersion",
     "aotSnapshotKind", "nativeGuardSourceSha256", "nativeManifestSha256",
     "pathSemantics", "projectPlan", "projectPlanValidation", "batchReport",
@@ -28,6 +28,8 @@
     "passed": { "const": true },
     "validationPassed": { "const": true },
     "target": { "type": "string", "pattern": "^[A-Za-z0-9._-]+$" },
+    "engineWorkflow": { "enum": ["Unity2021Standard", "Unity2022Fgs", "Tuanjie2022Fgs"] },
+    "il2cppCodeGeneration": { "enum": ["OptimizeSpeed", "OptimizeSize"] },
     "mode": { "enum": ["Exploratory", "Release"] },
     "coverageRequired": { "const": true },
     "coverageGatePassed": { "const": true },

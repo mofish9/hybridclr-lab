@@ -16,8 +16,10 @@ implementation. The formal opt4 source identities for this release are:
   `v2022-8.11.0-opt4.1` for Unity 2022;
 - `il2cpp_plus@52968ad6c88416f212d09d919b9a1b6afdc8a53b`, annotated tag
   `v2022-tuanjie-8.13.0-opt4.1` for Tuanjie 2022;
-- `hybridclr_unity@ae5faf21832c804418369f20e3b207c0e42dbd99` on
-  `optimize/v8.13.0`. The package does not receive an opt tag.
+- `hybridclr_unity@22fb364b2e87e74602c903fd155731abd6899270` on the
+  `optimize/dhe-build-configuration-identity-v8.13.0` candidate. After the
+  gates complete this commit is intended to fast-forward `optimize/v8.13.0`.
+  The package does not receive an opt tag.
 
 The old base commits and patches remain in the locks as replay and migration
 evidence. They are not the source identities used to build the integrated
@@ -25,10 +27,11 @@ runtime.
 
 The active 0.1.20 release uses the locked HybridCLR commit
 `fe3b1edb222511a1d3227f7e76e8b83b618c4d27` and package commit
-`ae5faf21832c804418369f20e3b207c0e42dbd99` (tree
-`F5AE594F10272360483D6E36094B096C7715FBCD4E1FB37487D75F8C41651C23`).
-The runtime tag and package maintenance branch have both been published; the
-package itself remains untagged by policy.
+`22fb364b2e87e74602c903fd155731abd6899270` (tree
+`89C676E9CF77083776DA66F9F05A02F0E8CA981824970165556B93079862C23A`).
+The runtime tag is published. The package candidate is not published to its
+maintenance branch until the multi-Base gates complete, and remains untagged
+by policy.
 
 The native runtime keeps every hot-update assembly's baseline image in the
 player. At runtime, the strict MV loader validates the current DLL hash, the

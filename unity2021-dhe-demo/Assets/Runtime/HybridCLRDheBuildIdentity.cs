@@ -5,6 +5,8 @@ namespace HybridCLR.Lab
     {
         public const int IdentityVersion = 1;
         public const string Target = "";
+        public const string EngineWorkflow = "";
+        public const string Il2CppCodeGeneration = "";
         public const string AotSnapshotKind = "uninitialized-template";
         public const string BaseId = "0000000000000000000000000000000000000000000000000000000000000000";
         public const string ManagedAssemblySetSha256 = "0000000000000000000000000000000000000000000000000000000000000000";
@@ -28,6 +30,8 @@ namespace HybridCLR.Lab
             {
                 IdentityVersion = IdentityVersion,
                 Target = Target,
+                EngineWorkflow = EngineWorkflow,
+                Il2CppCodeGeneration = Il2CppCodeGeneration,
                 AotSnapshotKind = AotSnapshotKind,
                 BaseId = BaseId,
                 ManagedAssemblySetSha256 = ManagedAssemblySetSha256,

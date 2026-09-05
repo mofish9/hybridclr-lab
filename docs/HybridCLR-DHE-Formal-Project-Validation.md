@@ -55,6 +55,10 @@ embeds one Base MetaVersion for every DHE assembly, and stages a
 `state=staged-for-final-player` BuildIdentity. The final pass must compile that
 identity without guard drift and restore the project identity source to its
 zero template in both success and failure paths.
+The identity and composite `baseId` bind the engine workflow and actual IL2CPP
+code-generation mode. The locked mappings are `Unity2021Standard/OptimizeSpeed`,
+`Unity2022Fgs/OptimizeSize`, and `Tuanjie2022Fgs/OptimizeSize`; a missing or
+mismatched pair fails before the Player or registry can be published.
 
 Every external/precompiled hot-update DLL used to create the Base must come
 from the active target's current-generation compilation. In particular, an

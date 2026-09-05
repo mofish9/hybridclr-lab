@@ -85,10 +85,12 @@
       "minItems": 1,
       "items": {
         "type": "object",
-          "required": ["baseId", "target", "managedAssemblySetSha256", "aotAssemblySetSha256", "aotAssemblyNames", "aotSnapshotSha256", "baseMetaVersionSetSha256", "aotMetadataSetId", "nativeGuardSourceSha256", "nativeManifestSha256", "runtimeProtocol", "nativeRuntimeContract", "runtimeCapabilities", "requiredRuntimeCapabilities", "runtimeAssetRoot", "baseMetaVersionAssetRoot", "buildIdentitySha256", "compatibilityPolicy", "compatible", "guardCoverageValidated", "unsupportedChangeCount", "unsupportedChanges", "assemblies"],
+          "required": ["baseId", "target", "engineWorkflow", "il2cppCodeGeneration", "managedAssemblySetSha256", "aotAssemblySetSha256", "aotAssemblyNames", "aotSnapshotSha256", "baseMetaVersionSetSha256", "aotMetadataSetId", "nativeGuardSourceSha256", "nativeManifestSha256", "runtimeProtocol", "nativeRuntimeContract", "runtimeCapabilities", "requiredRuntimeCapabilities", "runtimeAssetRoot", "baseMetaVersionAssetRoot", "buildIdentitySha256", "compatibilityPolicy", "compatible", "guardCoverageValidated", "unsupportedChangeCount", "unsupportedChanges", "assemblies"],
           "properties": {
           "baseId": { "type": "string", "pattern": "^[0-9a-fA-F]{64}$" },
           "target": { "type": "string", "pattern": "^[A-Za-z0-9._-]+$" },
+          "engineWorkflow": { "enum": ["Unity2021Standard", "Unity2022Fgs", "Tuanjie2022Fgs"] },
+          "il2cppCodeGeneration": { "enum": ["OptimizeSpeed", "OptimizeSize"] },
           "payloadVariantId": { "type": "string", "pattern": "^[A-Za-z0-9._-]{1,64}$" },
           "currentAssemblySetSha256": { "type": "string", "pattern": "^[0-9a-fA-F]{64}$" },
           "assemblyModes": {

@@ -4,7 +4,7 @@
   "title": "HybridCLR DHE Workflow Report",
   "type": "object",
   "additionalProperties": true,
-  "required": ["schemaVersion", "format", "passed", "validationPassed", "target", "mode", "coverageRequired", "coverageGatePassed", "releaseReady", "artifactValidationPassed", "buildIdentityReady", "identityVersion", "aotSnapshotKind", "nativeGuardSourceSha256", "nativeManifestSha256", "pathSemantics", "projectPlan", "projectPlanValidation", "batchReport", "runtimePlan", "runtimePlanProjectPath", "sourcePreflight", "cleanCheckoutGate", "resourceEvidence", "resourceBuildPolicy", "transaction", "assemblyScope", "capability", "nativeGuardCoverage", "player"],
+  "required": ["schemaVersion", "format", "passed", "validationPassed", "target", "engineWorkflow", "il2cppCodeGeneration", "mode", "coverageRequired", "coverageGatePassed", "releaseReady", "artifactValidationPassed", "buildIdentityReady", "identityVersion", "aotSnapshotKind", "nativeGuardSourceSha256", "nativeManifestSha256", "pathSemantics", "projectPlan", "projectPlanValidation", "batchReport", "runtimePlan", "runtimePlanProjectPath", "sourcePreflight", "cleanCheckoutGate", "resourceEvidence", "resourceBuildPolicy", "transaction", "assemblyScope", "capability", "nativeGuardCoverage", "player"],
   "properties": {
     "schemaVersion": { "const": 1 },
     "format": { "pattern": "^hybridclr\\.dhe-[A-Za-z0-9._-]+-workflow\\.json$" },
@@ -12,6 +12,8 @@
     "passed": { "type": "boolean" },
     "validationPassed": { "type": "boolean" },
     "target": { "type": "string", "pattern": "^[A-Za-z0-9._-]+$" },
+    "engineWorkflow": { "enum": ["Unity2021Standard", "Unity2022Fgs", "Tuanjie2022Fgs"] },
+    "il2cppCodeGeneration": { "enum": ["OptimizeSpeed", "OptimizeSize"] },
     "mode": { "enum": ["Release", "Exploratory"] },
     "coverageRequired": { "type": "boolean" },
     "coverageGatePassed": { "type": "boolean" },
