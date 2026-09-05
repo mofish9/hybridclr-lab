@@ -1080,6 +1080,11 @@ internal static partial class Program
         bool baseRegistryInPlaceOverwriteRejected = false;
         bool baseRegistryImplicitRemovalRejected = false;
         bool baseRegistryExplicitRetirementPassed = false;
+        bool releaseLedgerInitialized = false;
+        bool releaseLedgerContinuation = false;
+        bool releaseLedgerResetRejected = false;
+        bool releaseLedgerStaleHeadRejected = false;
+        bool registryEmptyAotMetadataSetPassed = false;
         string baseRegistryBuilderDetails =
             "Regression requires an authenticated Base registry input.";
         if (!string.IsNullOrWhiteSpace(resourceBaseRegistry))
@@ -1089,6 +1094,137 @@ internal static partial class Program
                 BaseRegistryDocument sourceRegistry = ReadBaseRegistry(resourceBaseRegistry);
                 string builderRoot = Path.Combine(regressionRoot, "base-registry-builder");
                 Directory.CreateDirectory(builderRoot);
+
+                if (!string.IsNullOrWhiteSpace(resourceUpdateRoot))
+                {
+                    string releaseRoot = RequireDirectory(resourceUpdateRoot,
+                        "Release ledger regression resource update");
+                    string ledgerPath = RequireFile(Path.Combine(releaseRoot,
+                        ReleaseLedgerFileName), "Release ledger regression head");
+                    ReleaseLedgerDocument ledger = ReadReleaseLedger(ledgerPath);
+                    ResourceReleaseContext initialized = PrepareResourceReleaseContext(
+                        new Cli("resource-update", new Dictionary<string, string>(
+                            StringComparer.OrdinalIgnoreCase)
+                        {
+                            ["mode"] = "Release",
+                            ["initializereleaseledger"] = "true",
+                            ["releasechannelid"] = ledger.ChannelId,
+                        }), sourceRegistry, null);
+                    releaseLedgerInitialized = ledger.Revision == 1 &&
+                        initialized.ReleaseReady && initialized.Revision == 1 &&
+                        string.Equals(initialized.ChannelId, ledger.ChannelId,
+                            StringComparison.Ordinal) &&
+                        string.Equals(ledger.BaseRegistrySha256, sourceRegistry.Sha256,
+                            StringComparison.OrdinalIgnoreCase) &&
+                        ledger.ActiveBaseCount == sourceRegistry.Entries.Length;
+
+                    var continuationArguments = new Dictionary<string, string>(
+                        StringComparer.OrdinalIgnoreCase)
+                    {
+                        ["mode"] = "Release",
+                        ["previousreleaseledger"] = ledgerPath,
+                        ["expectedpreviousreleaseledgersha256"] = ledger.Sha256,
+                    };
+                    ResourceReleaseContext continuation = PrepareResourceReleaseContext(
+                        new Cli("resource-update", continuationArguments), sourceRegistry, null);
+                    releaseLedgerContinuation = continuation.ReleaseReady &&
+                        continuation.Revision == ledger.Revision + 1 &&
+                        string.Equals(continuation.ChannelId, ledger.ChannelId,
+                            StringComparison.Ordinal) &&
+                        string.Equals(continuation.ParentLedgerSha256, ledger.Sha256,
+                            StringComparison.OrdinalIgnoreCase);
+
+                    BaseRegistryDocument resetRegistry = new(sourceRegistry.SourcePath,
+                        sourceRegistry.PathSemantics, new string('0', 64),
+                        sourceRegistry.RegistryId, 1, null,
+                        new[] { sourceRegistry.Entries[0] },
+                        Array.Empty<BaseRegistryRetirement>());
+                    try
+                    {
+                        _ = PrepareResourceReleaseContext(new Cli("resource-update",
+                            continuationArguments), resetRegistry, null);
+                    }
+                    catch (DheException)
+                    {
+                        releaseLedgerResetRejected = true;
+                    }
+
+                    try
+                    {
+                        var staleArguments = new Dictionary<string, string>(
+                            continuationArguments, StringComparer.OrdinalIgnoreCase)
+                        {
+                            ["expectedpreviousreleaseledgersha256"] = new string('f', 64),
+                        };
+                        _ = PrepareResourceReleaseContext(new Cli("resource-update",
+                            staleArguments), sourceRegistry, null);
+                    }
+                    catch (DheException)
+                    {
+                        releaseLedgerStaleHeadRejected = true;
+                    }
+
+                    string? settingsFile = cli.Optional("settingsfile");
+                    BaseRegistryEntry? fgsEntry = sourceRegistry.Entries.FirstOrDefault(entry =>
+                        (entry.EngineWorkflow is "Unity2022Fgs" or "Tuanjie2022Fgs") &&
+                        entry.AotMetadataRoot == null);
+                    if (!string.IsNullOrWhiteSpace(settingsFile) && fgsEntry != null)
+                    {
+                        string fgsRegistryPath = Path.Combine(builderRoot,
+                            "fgs-empty-aot-registry.json");
+                        _ = BuildBaseRegistry(new Cli("base-registry",
+                            new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase)
+                            {
+                                ["baseidentities"] = fgsEntry.BuildIdentity,
+                                ["baselineroots"] = fgsEntry.BaselineRoot,
+                                ["basenativemanifests"] = fgsEntry.NativeManifest,
+                                ["engineworkflows"] = fgsEntry.EngineWorkflow,
+                                ["payloadvariantids"] = fgsEntry.PayloadVariantId,
+                                ["labels"] = "FGS empty AOT metadata regression",
+                                ["registryid"] = sourceRegistry.RegistryId + "-fgs-empty",
+                                ["output"] = fgsRegistryPath,
+                                ["forceoutput"] = "true",
+                            }));
+                        string fgsCurrentRoot = Path.Combine(builderRoot, "fgs-current");
+                        Directory.CreateDirectory(fgsCurrentRoot);
+                        JsonElement releaseManifest = ReadJson<JsonElement>(Path.Combine(
+                            releaseRoot, "dhe-resource-update.json"));
+                        JsonElement defaultVariant = SelectPayloadVariant(releaseManifest,
+                            fgsEntry.PayloadVariantId, "FGS empty metadata regression manifest");
+                        foreach (JsonElement assembly in defaultVariant.GetProperty("assemblies")
+                                     .EnumerateArray())
+                        {
+                            string name = NormalizeName(GetString(assembly, "assemblyName") ??
+                                string.Empty);
+                            string source = RequireFile(ResolveContainedPath(releaseRoot,
+                                GetString(assembly, "dll") ?? string.Empty,
+                                "FGS regression current assembly"),
+                                "FGS regression current assembly");
+                            File.Copy(source, Path.Combine(fgsCurrentRoot, name + ".dll"), true);
+                        }
+                        string fgsOutput = Path.Combine(builderRoot,
+                            "fgs-empty-aot-resource-update");
+                        int fgsExit = ResourceUpdate(new Cli("resource-update",
+                            new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase)
+                            {
+                                ["mode"] = "Exploratory",
+                                ["currentroot"] = fgsCurrentRoot,
+                                ["baseregistry"] = fgsRegistryPath,
+                                ["settingsfile"] = RequireFile(settingsFile,
+                                    "FGS empty metadata regression settings"),
+                                ["outputroot"] = fgsOutput,
+                                ["forceoutput"] = "true",
+                            }));
+                        JsonElement fgsValidation = ReadJson<JsonElement>(Path.Combine(fgsOutput,
+                            "dhe-resource-update-validation.json"));
+                        JsonElement fgsPlan = ReadJson<JsonElement>(Path.Combine(fgsOutput,
+                            "dhe-runtime-plan.json"));
+                        registryEmptyAotMetadataSetPassed = fgsExit == 0 &&
+                            GetBool(fgsValidation, "passed") &&
+                            fgsPlan.GetProperty("aotMetadataSets").EnumerateArray().Single()
+                                .GetProperty("assemblies").GetArrayLength() == 0;
+                    }
+                }
                 string normalizedPath = Path.Combine(builderRoot, "supported-bases.json");
                 int normalizedExit = BuildBaseRegistry(new Cli("base-registry",
                     new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase)
@@ -1317,6 +1453,21 @@ internal static partial class Program
         AddRegressionCheck(checks, errors, "base-registry-explicit-retirement",
             baseRegistryExplicitRetirementPassed,
             "an explicit retirement must preserve the parent chain, Base identity, and reason");
+        AddRegressionCheck(checks, errors, "resource-release-ledger-initialized",
+            releaseLedgerInitialized,
+            "a Release channel genesis must bind the complete active Base registry head");
+        AddRegressionCheck(checks, errors, "resource-release-ledger-continuation",
+            releaseLedgerContinuation,
+            "a continuation must derive its channel, revision, and parent from the published ledger");
+        AddRegressionCheck(checks, errors, "resource-release-ledger-reset-rejected",
+            releaseLedgerResetRejected,
+            "a one-Base revision-1 registry reset must not continue a published multi-Base channel");
+        AddRegressionCheck(checks, errors, "resource-release-ledger-stale-head-rejected",
+            releaseLedgerStaleHeadRejected,
+            "a previous ledger that differs from the release-system head hash must be rejected");
+        AddRegressionCheck(checks, errors, "registry-empty-aot-metadata-set",
+            registryEmptyAotMetadataSetPassed,
+            "an FGS registry with explicit null metadata roots must produce the authenticated empty set");
 
         var packageRoot = cli.Optional("packageroot");
         if (!string.IsNullOrWhiteSpace(packageRoot))
@@ -1766,6 +1917,41 @@ internal static partial class Program
         AddRegressionCheck(checks, errors, "schema-additional-type-rejected", additionalErrors.Count > 0,
             "additional property schema must reject an invalid value type");
 
+        bool resourceReleaseModeContractPassed = false;
+        if (!string.IsNullOrWhiteSpace(resourceUpdateRoot))
+        {
+            JsonElement resourceSchema = ReadJson<JsonElement>(Path.Combine(schemasRoot,
+                "dhe-resource-update.schema.json"));
+            JsonElement resourceDocument = ReadJson<JsonElement>(Path.Combine(resourceUpdateRoot,
+                "dhe-resource-update.json"));
+            var validResourceErrors = new List<string>();
+            ValidateJsonSchema(resourceSchema, resourceDocument, resourceSchema, "$",
+                validResourceErrors);
+
+            var missingLedgerNode = System.Text.Json.Nodes.JsonNode.Parse(
+                resourceDocument.GetRawText())!.AsObject();
+            missingLedgerNode.Remove("releaseLedger");
+            using var missingLedgerDocument = JsonDocument.Parse(
+                missingLedgerNode.ToJsonString());
+            var missingLedgerErrors = new List<string>();
+            ValidateJsonSchema(resourceSchema, missingLedgerDocument.RootElement,
+                resourceSchema, "$", missingLedgerErrors);
+
+            var inconsistentModeNode = System.Text.Json.Nodes.JsonNode.Parse(
+                resourceDocument.GetRawText())!.AsObject();
+            inconsistentModeNode["mode"] = "Exploratory";
+            using var inconsistentModeDocument = JsonDocument.Parse(
+                inconsistentModeNode.ToJsonString());
+            var inconsistentModeErrors = new List<string>();
+            ValidateJsonSchema(resourceSchema, inconsistentModeDocument.RootElement,
+                resourceSchema, "$", inconsistentModeErrors);
+            resourceReleaseModeContractPassed = validResourceErrors.Count == 0 &&
+                missingLedgerErrors.Count > 0 && inconsistentModeErrors.Count > 0;
+        }
+        AddRegressionCheck(checks, errors, "schema-resource-release-mode-contract",
+            resourceReleaseModeContractPassed,
+            "resource schemas must reject missing ledger fields and inconsistent Release modes");
+
         using var unsupportedSchemaDocument = JsonDocument.Parse("{\"type\":\"object\",\"oneOf\":[]}");
         var unsupportedErrors = new List<string>();
         ValidateSchemaVocabulary(unsupportedSchemaDocument.RootElement, "$", unsupportedErrors);
@@ -1796,6 +1982,7 @@ internal static partial class Program
         var workflowSchemaPassed = false;
         var realWorkflowOutputsValidated = false;
         var resourcePlayerEvidenceBindingPassed = false;
+        var resourcePlayerReleaseLedgerBindingPassed = false;
         var workflowOutputs = new List<object>();
         var changedWorkflowRoots = cli.GetList("workflowchangedroots");
         if (changedWorkflowRoots.Count == 0)
@@ -1882,6 +2069,20 @@ internal static partial class Program
                     }).ToArray();
                 ValidateMultiBaseChangedEvidence(changedReports, true);
                 resourcePlayerEvidenceBindingPassed = true;
+                var tamperedReport = System.Text.Json.Nodes.JsonNode.Parse(
+                    changedReports[0].Report.GetRawText())!.AsObject();
+                tamperedReport["releaseRevision"] =
+                    GetInt(changedReports[0].Report, "releaseRevision") + 1;
+                try
+                {
+                    using var tamperedDocument = JsonDocument.Parse(tamperedReport.ToJsonString());
+                    ValidateResourcePlayerEvidenceBindings(tamperedDocument.RootElement,
+                        changedReports[0].Path);
+                }
+                catch (DheException)
+                {
+                    resourcePlayerReleaseLedgerBindingPassed = true;
+                }
             }
         }
         else if (!anyWorkflowInput && !string.IsNullOrWhiteSpace(packageRoot) && Directory.Exists(packageRoot))
@@ -1898,7 +2099,11 @@ internal static partial class Program
                 "schemas", name)));
             resourcePlayerEvidenceBindingPassed = File.ReadAllText(Path.Combine(packageRoot,
                 "tool", "ResourceUpdateStaging.cs")).Contains(
-                    "private static int ResourcePlayerEvidence", StringComparison.Ordinal);
+                "private static int ResourcePlayerEvidence", StringComparison.Ordinal);
+            resourcePlayerReleaseLedgerBindingPassed = File.ReadAllText(Path.Combine(packageRoot,
+                "tool", "Program.cs")).Contains(
+                "Resource Player stage does not match its release ledger.",
+                StringComparison.Ordinal);
         }
         AddRegressionCheck(checks, errors, "schema-workflow-output-contract", workflowSchemaPassed,
             realWorkflowOutputsValidated
@@ -1909,6 +2114,9 @@ internal static partial class Program
             realWorkflowOutputsValidated
                 ? "all three-engine resource-only changed Base results share one revalidated current payload"
                 : "the distributed package contains the resource Player evidence implementation");
+        AddRegressionCheck(checks, errors, "resource-player-release-ledger-binding",
+            resourcePlayerReleaseLedgerBindingPassed,
+            "resource Player evidence must revalidate and reject a tampered release ledger identity");
         using var releaseResourceBase = JsonDocument.Parse("{\"mode\":\"Release\",\"releaseReady\":true}");
         using var incompleteResourceBase = JsonDocument.Parse("{\"mode\":\"Release\",\"releaseReady\":false}");
         using var exploratoryResourceBase = JsonDocument.Parse("{\"mode\":\"Exploratory\",\"releaseReady\":true}");
@@ -2761,8 +2969,41 @@ internal static partial class Program
             }
         }
 
+        void ConvertFixtureToExploratory(string update)
+        {
+            string manifestPath = Path.Combine(update, "dhe-resource-update.json");
+            var manifest = System.Text.Json.Nodes.JsonNode.Parse(
+                File.ReadAllText(manifestPath))!.AsObject();
+            string validationPath = ResolveContainedPath(update,
+                manifest["validation"]!.GetValue<string>(), "Fixture resource validation");
+            string planPath = ResolveContainedPath(update,
+                manifest["runtimePlan"]!.GetValue<string>(), "Fixture runtime plan");
+            var validation = System.Text.Json.Nodes.JsonNode.Parse(
+                File.ReadAllText(validationPath))!.AsObject();
+            var plan = System.Text.Json.Nodes.JsonNode.Parse(
+                File.ReadAllText(planPath))!.AsObject();
+            foreach (var document in new[] { manifest, validation, plan })
+            {
+                document["mode"] = "Exploratory";
+                document["releaseReady"] = false;
+                document["releaseChannelId"] = null;
+                document["releaseRevision"] = null;
+                document["parentReleaseLedgerSha256"] = null;
+            }
+            manifest["releaseLedger"] = null;
+            validation["releaseLedger"] = null;
+            File.WriteAllText(validationPath, validation.ToJsonString(Json),
+                new UTF8Encoding(false));
+            File.WriteAllText(planPath, plan.ToJsonString(Json),
+                new UTF8Encoding(false));
+            manifest["validationSha256"] = Sha256File(validationPath);
+            manifest["runtimePlanSha256"] = Sha256File(planPath);
+            File.WriteAllText(manifestPath, manifest.ToJsonString(Json),
+                new UTF8Encoding(false));
+        }
+
         (string Update, string Assets, string Identity) CopyFixture(string name,
-            string? sourceUpdateRoot = null)
+            string? sourceUpdateRoot = null, bool preserveRelease = false)
         {
             string update = Path.Combine(root, name + "-update");
             string assets = Path.Combine(root, name + "-assets");
@@ -2770,10 +3011,11 @@ internal static partial class Program
             CopyDirectory(sourceUpdateRoot ?? updateRoot, update);
             CopyDirectory(assetRoot, assets);
             File.Copy(baseBuildIdentityPath, identity, true);
+            if (!preserveRelease) ConvertFixtureToExploratory(update);
             return (update, assets, identity);
         }
 
-        var positive = CopyFixture("positive");
+        var positive = CopyFixture("positive", preserveRelease: true);
         bool positiveStaged = Stage("positive-stage", positive.Update, positive.Assets,
             positive.Identity);
         AddRegressionCheck(checks, errors, "resource-stage-valid", positiveStaged,
@@ -2781,7 +3023,7 @@ internal static partial class Program
 
         if (!string.IsNullOrWhiteSpace(consecutiveUpdateRoot))
         {
-            var consecutive = CopyFixture("consecutive");
+            var consecutive = CopyFixture("consecutive", preserveRelease: true);
             bool firstStaged = Stage("consecutive-n-stage", consecutive.Update,
                 consecutive.Assets, consecutive.Identity);
             string secondUpdate = RequireDirectory(consecutiveUpdateRoot,
@@ -2791,25 +3033,59 @@ internal static partial class Program
             string firstReportPath = Path.Combine(root, "consecutive-n-stage.json");
             string secondReportPath = Path.Combine(root, "consecutive-n-plus-one-stage.json");
             bool consecutiveStable = false;
+            bool releaseLedgerBaseAddition = false;
             if (firstStaged && secondStaged && File.Exists(firstReportPath) &&
                 File.Exists(secondReportPath))
             {
                 JsonElement firstReport = ReadJson<JsonElement>(firstReportPath);
                 JsonElement secondReport = ReadJson<JsonElement>(secondReportPath);
+                JsonElement firstManifest = ReadJson<JsonElement>(Path.Combine(updateRoot,
+                    "dhe-resource-update.json"));
+                JsonElement secondManifest = ReadJson<JsonElement>(Path.Combine(secondUpdate,
+                    "dhe-resource-update.json"));
                 string firstCurrent = GetString(firstReport, "currentAssemblySetSha256") ?? string.Empty;
                 string secondCurrent = GetString(secondReport, "currentAssemblySetSha256") ?? string.Empty;
+                string firstRegistrySha256 = GetString(firstReport,
+                    "baseRegistrySha256") ?? string.Empty;
+                string secondRegistrySha256 = GetString(secondReport,
+                    "baseRegistrySha256") ?? string.Empty;
+                int firstRegistryRevision = GetInt(firstReport, "baseRegistryRevision");
+                int secondRegistryRevision = GetInt(secondReport, "baseRegistryRevision");
+                bool sameRegistry = string.Equals(firstRegistrySha256,
+                        secondRegistrySha256, StringComparison.OrdinalIgnoreCase) &&
+                    firstRegistryRevision == secondRegistryRevision;
+                bool directSuccessorRegistry = !string.Equals(firstRegistrySha256,
+                        secondRegistrySha256, StringComparison.OrdinalIgnoreCase) &&
+                    secondRegistryRevision == firstRegistryRevision + 1 &&
+                    string.Equals(GetString(secondReport, "baseRegistryParentSha256"),
+                        firstRegistrySha256, StringComparison.OrdinalIgnoreCase);
+                string[] firstBaseIds = firstManifest.GetProperty("supportedBases")
+                    .EnumerateArray().Select(item => GetString(item, "baseId") ?? string.Empty)
+                    .OrderBy(value => value, StringComparer.OrdinalIgnoreCase).ToArray();
+                string[] secondBaseIds = secondManifest.GetProperty("supportedBases")
+                    .EnumerateArray().Select(item => GetString(item, "baseId") ?? string.Empty)
+                    .OrderBy(value => value, StringComparer.OrdinalIgnoreCase).ToArray();
+                int firstBaseCount = GetInt(firstManifest, "baseRegistryEntryCount");
+                int secondBaseCount = GetInt(secondManifest, "baseRegistryEntryCount");
                 consecutiveStable = !string.IsNullOrWhiteSpace(firstCurrent) &&
                     !string.Equals(firstCurrent, secondCurrent, StringComparison.OrdinalIgnoreCase) &&
                     string.Equals(GetString(firstReport, "selectedBaseId"),
                         GetString(secondReport, "selectedBaseId"), StringComparison.OrdinalIgnoreCase) &&
                     string.Equals(GetString(firstReport, "selectedAotMetadataSetId"),
                         GetString(secondReport, "selectedAotMetadataSetId"), StringComparison.OrdinalIgnoreCase) &&
-                    string.Equals(GetString(firstReport, "baseRegistrySha256"),
-                        GetString(secondReport, "baseRegistrySha256"), StringComparison.OrdinalIgnoreCase) &&
+                    (sameRegistry || directSuccessorRegistry) &&
                     string.Equals(GetString(firstReport, "baseRegistryId"),
                         GetString(secondReport, "baseRegistryId"), StringComparison.Ordinal) &&
-                    GetInt(firstReport, "baseRegistryRevision") ==
-                        GetInt(secondReport, "baseRegistryRevision") &&
+                    string.Equals(GetString(firstReport, "releaseChannelId"),
+                        GetString(secondReport, "releaseChannelId"), StringComparison.Ordinal) &&
+                    GetInt(secondReport, "releaseRevision") ==
+                        GetInt(firstReport, "releaseRevision") + 1 &&
+                    string.Equals(GetString(secondReport, "parentReleaseLedgerSha256"),
+                        GetString(firstReport, "releaseLedgerSha256"),
+                        StringComparison.OrdinalIgnoreCase) &&
+                    !string.Equals(GetString(firstReport, "releaseLedgerSha256"),
+                        GetString(secondReport, "releaseLedgerSha256"),
+                        StringComparison.OrdinalIgnoreCase) &&
                     GetBool(firstReport, "baseRegistryLineageValidated") &&
                     GetBool(secondReport, "baseRegistryLineageValidated") &&
                     string.Equals(GetString(firstReport, "baseMetaVersionSetSha256"),
@@ -2822,17 +3098,70 @@ internal static partial class Program
                         GetString(firstReport, "baseMetaVersionTreeSha256After"), StringComparison.OrdinalIgnoreCase) &&
                     string.Equals(GetString(secondReport, "baseMetaVersionTreeSha256Before"),
                         GetString(secondReport, "baseMetaVersionTreeSha256After"), StringComparison.OrdinalIgnoreCase);
+                releaseLedgerBaseAddition = directSuccessorRegistry &&
+                    firstBaseCount == 4 && secondBaseCount == 5 &&
+                    firstBaseCount == firstBaseIds.Length &&
+                    secondBaseCount == secondBaseIds.Length &&
+                    secondBaseCount == firstBaseCount + 1 &&
+                    firstBaseIds.All(firstBaseId => secondBaseIds.Contains(firstBaseId,
+                        StringComparer.OrdinalIgnoreCase)) &&
+                    secondBaseIds.Except(firstBaseIds,
+                        StringComparer.OrdinalIgnoreCase).Count() == 1 &&
+                    firstBaseIds.Contains(GetString(firstReport, "selectedBaseId") ?? string.Empty,
+                        StringComparer.OrdinalIgnoreCase) &&
+                    secondBaseIds.Contains(GetString(secondReport, "selectedBaseId") ?? string.Empty,
+                        StringComparer.OrdinalIgnoreCase);
             }
             AddRegressionCheck(checks, errors, "resource-stage-consecutive-base-stable",
                 consecutiveStable,
-                "consecutive updates must reuse the same validated Base registry and immutable " +
-                "Base MetaVersion while selecting the same Base/AOT identity.");
+                "consecutive updates must use the same or direct-successor Base registry and " +
+                "preserve the selected Base/AOT identity and immutable Base MetaVersion.");
+            AddRegressionCheck(checks, errors, "resource-release-ledger-base-addition",
+                releaseLedgerBaseAddition,
+                "the direct-successor release must retain four active Bases and add exactly " +
+                "one new Base while preserving an old Base through consecutive staging.");
         }
 
         var positiveManifest = ReadJson<JsonElement>(Path.Combine(positive.Update,
             "dhe-resource-update.json"));
         var positiveRuntimePlan = ReadJson<JsonElement>(Path.Combine(positive.Update,
             "dhe-runtime-plan.json"));
+        bool releaseLedgerBound = false;
+        try
+        {
+            ReleaseLedgerDocument? ledger = ValidateReleaseLedgerForStaging(positive.Update,
+                positiveManifest);
+            JsonElement stageReport = ReadJson<JsonElement>(Path.Combine(root,
+                "positive-stage.json"));
+            releaseLedgerBound = ledger != null &&
+                string.Equals(GetString(stageReport, "releaseChannelId"), ledger.ChannelId,
+                    StringComparison.Ordinal) &&
+                GetInt(stageReport, "releaseRevision") == ledger.Revision &&
+                string.Equals(GetString(stageReport, "releaseLedgerSha256"), ledger.Sha256,
+                    StringComparison.OrdinalIgnoreCase) &&
+                GetBool(stageReport, "releaseReady");
+        }
+        catch
+        {
+            releaseLedgerBound = false;
+        }
+        AddRegressionCheck(checks, errors, "resource-stage-release-ledger-bound",
+            releaseLedgerBound,
+            "Release staging must bind and copy the manifest-authenticated release ledger");
+
+        var ledgerTamper = CopyFixture("release-ledger-tamper", preserveRelease: true);
+        string ledgerTamperPath = Path.Combine(ledgerTamper.Update,
+            ReleaseLedgerFileName);
+        var ledgerTamperDocument = System.Text.Json.Nodes.JsonNode.Parse(
+            File.ReadAllText(ledgerTamperPath))!.AsObject();
+        ledgerTamperDocument["channelId"] = "tampered-release-channel";
+        File.WriteAllText(ledgerTamperPath, ledgerTamperDocument.ToJsonString(
+            new JsonSerializerOptions { WriteIndented = true }), new UTF8Encoding(false));
+        bool releaseLedgerTamperRejected = !Stage("release-ledger-tamper-stage",
+            ledgerTamper.Update, ledgerTamper.Assets, ledgerTamper.Identity);
+        AddRegressionCheck(checks, errors, "resource-stage-release-ledger-tamper-rejected",
+            releaseLedgerTamperRejected,
+            "staging must reject a release ledger whose identity differs from its manifest");
         string[] positivePayloadNames = SelectPayloadVariant(positiveManifest,
                 GetString(positiveManifest.GetProperty("supportedBases").EnumerateArray().First(),
                     "payloadVariantId") ?? "default", "Regression resource manifest")

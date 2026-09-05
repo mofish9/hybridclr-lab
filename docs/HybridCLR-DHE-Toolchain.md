@@ -194,6 +194,48 @@ toolchain that authorized the workflow to the current release source. This permi
 an already shipped Base to be revalidated without rebuilding it while rejecting
 divergent branches, missing commits, or forged tree identities.
 
+Registry lineage alone cannot identify the head used by the last published hotfix:
+without an external head, another revision 1 could omit old Bases. Release mode
+therefore also maintains `dhe-release-ledger.json`. Initialize a channel exactly
+once (including migration from 0.1.21), only after auditing that the selected
+registry contains every live Base:
+
+```text
+dotnet HybridCLR.DheTool.dll resource-update \
+  -Mode Release \
+  -InitializeReleaseLedger \
+  -ReleaseChannelId production \
+  -CurrentRoot C:/build/current-hotfix \
+  -BaseRegistry C:/release/base-registry/supported-bases.json \
+  -PreviousBaseRegistry C:/release/base-registry/parent.json \
+  -SettingsFile C:/project/ProjectSettings/HybridCLRSettings.asset \
+  -OutputRoot C:/build/resource-update
+```
+
+For every later hotfix, keep the complete previous release directory and pin its
+ledger SHA-256 in the release service or CI protected state:
+
+```text
+dotnet HybridCLR.DheTool.dll resource-update \
+  -Mode Release \
+  -PreviousReleaseLedger C:/published/update-N/dhe-release-ledger.json \
+  -ExpectedPreviousReleaseLedgerSha256 <published-ledger-sha256> \
+  -CurrentRoot C:/build/current-hotfix \
+  -BaseRegistry C:/release/base-registry/supported-bases.json \
+  -PreviousBaseRegistry C:/release/base-registry/parent.json \
+  -SettingsFile C:/project/ProjectSettings/HybridCLRSettings.asset \
+  -OutputRoot C:/build/update-N-plus-1
+```
+
+The current registry may be byte-identical to the ledger head (ordinary code-only
+hotfix) or exactly one direct successor (new/retired Base). The command derives the
+channel and next release revision from the previous ledger; it never accepts them
+from candidate output. Publish the manifest, validation, runtime plan, ledger, and
+payload as one signed/catalogued directory, then atomically replace the protected
+head hash only after all Player gates pass. Once that protected head exists, CI
+must reject any later use of `-InitializeReleaseLedger`; a local CLI cannot infer
+global publication history.
+
 The output contains one copy of each current DLL and current MetaVersion. Base inputs
 are compatibility evidence only and are never copied into `payload/`. At
 runtime each Player compares the remote current MetaVersion with its own embedded Base

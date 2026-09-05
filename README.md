@@ -42,6 +42,14 @@ authenticated registry revision chain so every online Base is retained by
 default and retirement requires an explicit Base ID and reason. Historical Base
 evidence remains admissible only when its clean tool commit is on the verified
 Git ancestry chain from its authenticated Release authority to the current source.
+Toolchain `0.1.22` is the active release-ledger candidate. It binds every Release
+resource update to a stable channel, a monotonic release revision, the exact
+previous ledger hash held by the release system, and the Base registry head used
+by the last published hotfix. A continuation may keep that registry or use its
+direct successor; a reset revision, omitted Base set, stale head, or fork fails
+before a Release manifest is accepted. The current exploratory regression passes
+117/117 checks over five ledger-aware Windows Base reports and a four-to-five-Base
+direct-successor release; clean-source and platform release gates are still pending.
 Base identity now also binds `engineWorkflow` and `il2cppCodeGeneration`.
 Unity 2021 is locked to `OptimizeSpeed`; Unity 2022 FGS and Tuanjie 2022 FGS
 are locked to `OptimizeSize`. Base evidence created before these fields existed

@@ -5,10 +5,29 @@
   "type": "object",
   "additionalProperties": true,
   "required": ["schemaVersion", "format", "selection", "currentAssemblySetSha256", "runtimeAssetRoot", "baseMetaVersionAssetRoot", "aotMetadataSetId", "aotMetadata", "assemblies"],
+  "allOf": [
+    {
+      "if": { "required": ["mode"] },
+      "then": { "required": ["mode", "releaseReady", "releaseChannelId", "releaseRevision", "parentReleaseLedgerSha256"] }
+    },
+    {
+      "if": { "properties": { "mode": { "const": "Release" } }, "required": ["mode"] },
+      "then": { "properties": { "releaseReady": { "const": true }, "releaseChannelId": { "type": "string" }, "releaseRevision": { "type": "integer", "minimum": 1 } } }
+    },
+    {
+      "if": { "properties": { "mode": { "const": "Exploratory" } }, "required": ["mode"] },
+      "then": { "properties": { "releaseReady": { "const": false }, "releaseChannelId": { "type": "null" }, "releaseRevision": { "type": "null" }, "parentReleaseLedgerSha256": { "type": "null" } } }
+    }
+  ],
   "properties": {
     "schemaVersion": { "const": 1 },
     "format": { "const": "hybridclr.dhe-runtime-asset-plan.json" },
     "selection": { "enum": ["embedded-base-metaversion", "embedded-base-metaversion-and-aot-metadata-set"] },
+    "mode": { "enum": ["Exploratory", "Release"] },
+    "releaseReady": { "type": "boolean" },
+    "releaseChannelId": { "type": ["string", "null"], "pattern": "^[A-Za-z0-9._-]{1,128}$" },
+    "releaseRevision": { "type": ["integer", "null"], "minimum": 1 },
+    "parentReleaseLedgerSha256": { "type": ["string", "null"], "pattern": "^[0-9a-fA-F]{64}$" },
     "currentAssemblySetSha256": { "type": "string", "pattern": "^[0-9a-fA-F]{64}$" },
     "payloadVariantSetSha256": { "type": "string", "pattern": "^[0-9a-fA-F]{64}$" },
     "runtimeAssetRoot": { "type": "string", "minLength": 1 },

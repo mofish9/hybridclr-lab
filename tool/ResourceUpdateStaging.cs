@@ -29,6 +29,8 @@ internal static partial class Program
             GetBool(manifest, "playerUpdateRequired"))
             throw new DheException("Resource update must be a schema v1 single-current-payload release.");
 
+        ReleaseLedgerDocument? releaseLedger = ValidateReleaseLedgerForStaging(updateRoot,
+            manifest);
         var validationSource = ValidateResourceUpdateCompatibility(updateRoot, manifest);
         var selectedBase = ValidateStagingBuildIdentity(baseBuildIdentityPath,
             baseBuildIdentity, manifest);
@@ -74,6 +76,12 @@ internal static partial class Program
                 selectedCurrentSetHash, StringComparison.OrdinalIgnoreCase) ||
             !string.Equals(GetString(runtimePlan, "payloadVariantSetSha256"),
                 GetString(manifest, "payloadVariantSetSha256"), StringComparison.OrdinalIgnoreCase) ||
+            !OptionalJsonPropertiesEqual(runtimePlan, manifest, "mode") ||
+            !OptionalJsonPropertiesEqual(runtimePlan, manifest, "releaseReady") ||
+            !OptionalJsonPropertiesEqual(runtimePlan, manifest, "releaseChannelId") ||
+            !OptionalJsonPropertiesEqual(runtimePlan, manifest, "releaseRevision") ||
+            !OptionalJsonPropertiesEqual(runtimePlan, manifest,
+                "parentReleaseLedgerSha256") ||
             (!string.IsNullOrWhiteSpace(GetString(selectedBase, "currentAssemblySetSha256")) &&
              !string.Equals(GetString(selectedBase, "currentAssemblySetSha256"),
                  selectedCurrentSetHash, StringComparison.OrdinalIgnoreCase)) ||
@@ -129,6 +137,17 @@ internal static partial class Program
                 GetString(manifest, "validationSha256"), StringComparison.OrdinalIgnoreCase))
             throw new DheException("Staged DHE resource compatibility validation hash mismatch.");
 
+        string? stagedReleaseLedgerPath = null;
+        if (releaseLedger != null)
+        {
+            stagedReleaseLedgerPath = ResolveContainedPath(assetRoot, ReleaseLedgerFileName,
+                "Staged DHE release ledger");
+            File.Copy(releaseLedger.SourcePath, stagedReleaseLedgerPath, true);
+            if (!string.Equals(Sha256File(stagedReleaseLedgerPath), releaseLedger.Sha256,
+                    StringComparison.OrdinalIgnoreCase))
+                throw new DheException("Staged DHE release ledger hash mismatch.");
+        }
+
         var baseTreeAfter = TreeHashForRelease(embeddedBaseRoot, Array.Empty<string>());
         if (!baseTreeAfter.Equals(baseTreeBefore, StringComparison.OrdinalIgnoreCase))
             throw new DheException("Resource staging modified the embedded Base MetaVersion tree.");
@@ -147,6 +166,13 @@ internal static partial class Program
             format = "hybridclr.dhe-resource-stage.json",
             generatedAtUtc = DateTimeOffset.UtcNow,
             passed = true,
+            mode = GetString(manifest, "mode") ?? "Exploratory",
+            releaseReady = releaseLedger != null,
+            releaseChannelId = releaseLedger?.ChannelId,
+            releaseRevision = releaseLedger?.Revision,
+            parentReleaseLedgerSha256 = releaseLedger?.ParentLedgerSha256,
+            releaseLedgerSha256 = releaseLedger?.Sha256,
+            stagedReleaseLedgerPath,
             updateRoot,
             assetRoot,
             payloadModel = GetString(manifest, "payloadModel") ?? "single-current-payload",
@@ -161,10 +187,20 @@ internal static partial class Program
             selectedBaseId = embeddedBase.BaseId,
             selectedAotMetadataSetId = GetString(selectedBase, "aotMetadataSetId"),
             baseRegistrySha256 = GetString(manifest, "baseRegistrySha256"),
+            baseRegistryEntryCount = manifest.TryGetProperty("baseRegistryEntryCount",
+                out JsonElement registryEntryCount) && registryEntryCount.ValueKind == JsonValueKind.Number
+                ? registryEntryCount.GetInt32()
+                : (int?)null,
             baseRegistryId = GetString(manifest, "baseRegistryId"),
             baseRegistryRevision = manifest.TryGetProperty("baseRegistryRevision",
                 out JsonElement registryRevision) && registryRevision.ValueKind == JsonValueKind.Number
                 ? registryRevision.GetInt32()
+                : (int?)null,
+            baseRegistryParentSha256 = GetString(manifest, "baseRegistryParentSha256"),
+            baseRegistryRetiredBaseCount = manifest.TryGetProperty("baseRegistryRetiredBaseCount",
+                out JsonElement registryRetiredBaseCount) &&
+                registryRetiredBaseCount.ValueKind == JsonValueKind.Number
+                ? registryRetiredBaseCount.GetInt32()
                 : (int?)null,
             baseRegistryLineageValidated = GetBool(manifest,
                 "baseRegistryLineageValidated"),
@@ -195,6 +231,8 @@ internal static partial class Program
         JsonElement manifest = ReadJson<JsonElement>(manifestPath);
         RequireEvidenceFormat(manifest, "hybridclr.dhe-resource-update.json",
             "Resource update manifest");
+        ReleaseLedgerDocument? releaseLedger = ValidateReleaseLedgerForStaging(updateRoot,
+            manifest);
         string validationPath = ValidateResourceUpdateCompatibility(updateRoot, manifest);
         JsonElement validation = ReadJson<JsonElement>(validationPath);
         string runtimePlanPath = RequireFile(ResolveContainedPath(updateRoot,
@@ -217,6 +255,9 @@ internal static partial class Program
         if (!GetBool(validation, "passed") || !GetBool(stage, "passed") ||
             !GetBool(baseWorkflow, "passed") || !GetBool(player, "passed"))
             errors.Add("Resource update, stage, Base workflow, and Player must all pass.");
+        if (string.Equals(GetString(baseWorkflow, "mode"), "Release",
+                StringComparison.Ordinal) && releaseLedger == null)
+            errors.Add("Release Base evidence requires a Release-ready resource ledger.");
         try { ValidateNoOpPlayerEvidence(baseWorkflow.GetProperty("player")); }
         catch (Exception ex) { errors.Add("Base workflow is not a complete no-op proof: " + ex.Message); }
 
@@ -256,10 +297,20 @@ internal static partial class Program
             !string.Equals(GetString(player, "selectedBaseId"), selectedBaseId,
                 StringComparison.OrdinalIgnoreCase) ||
             !OptionalJsonPropertiesEqual(stage, manifest, "baseRegistrySha256") ||
+            !OptionalJsonPropertiesEqual(stage, manifest, "baseRegistryEntryCount") ||
             !OptionalJsonPropertiesEqual(stage, manifest, "baseRegistryId") ||
             !OptionalJsonPropertiesEqual(stage, manifest, "baseRegistryRevision") ||
+            !OptionalJsonPropertiesEqual(stage, manifest, "baseRegistryParentSha256") ||
+            !OptionalJsonPropertiesEqual(stage, manifest,
+                "baseRegistryRetiredBaseCount") ||
             !OptionalJsonPropertiesEqual(stage, manifest,
                 "baseRegistryLineageValidated") ||
+            !OptionalJsonPropertiesEqual(stage, manifest, "mode") ||
+            !OptionalJsonPropertiesEqual(stage, manifest, "releaseReady") ||
+            !OptionalJsonPropertiesEqual(stage, manifest, "releaseChannelId") ||
+            !OptionalJsonPropertiesEqual(stage, manifest, "releaseRevision") ||
+            !OptionalJsonPropertiesEqual(stage, manifest,
+                "parentReleaseLedgerSha256") ||
             payloadSelectionError is not null)
             errors.Add(payloadSelectionError ??
                 "Resource, stage, Base, and Player selection identities do not agree.");
@@ -281,6 +332,18 @@ internal static partial class Program
             !Sha256File(runtimePlanPath).Equals(GetString(manifest, "runtimePlanSha256"),
                 StringComparison.OrdinalIgnoreCase))
             errors.Add("Staged resource manifest, validation, or runtime plan bytes drifted.");
+
+        string? stagedReleaseLedger = null;
+        if (releaseLedger != null)
+        {
+            stagedReleaseLedger = RequireFile(GetString(stage,
+                "stagedReleaseLedgerPath") ?? string.Empty, "Staged release ledger");
+            if (!Sha256File(stagedReleaseLedger).Equals(releaseLedger.Sha256,
+                    StringComparison.OrdinalIgnoreCase) ||
+                !releaseLedger.Sha256.Equals(GetString(stage,
+                    "releaseLedgerSha256"), StringComparison.OrdinalIgnoreCase))
+                errors.Add("Staged release ledger bytes drifted.");
+        }
 
         string buildIdentityPath = RequireFile(GetString(stage, "baseBuildIdentityPath") ?? string.Empty,
             "Staged Base build identity");
@@ -345,11 +408,13 @@ internal static partial class Program
             GetInt(item, "removedTypeCount"));
         int guardedMethodCount = selectedBase.GetProperty("assemblies").EnumerateArray()
             .Sum(item => GetInt(item, "guardCoveredMethodCount"));
-        var output = SafeReportPath(cli.Require("output"), new[]
+        var evidenceInputs = new List<string>
         {
             manifestPath, validationPath, runtimePlanPath, stagePath, playerPath, baseWorkflowPath,
             buildIdentityPath, nativeManifestPath,
-        });
+        };
+        if (releaseLedger != null) evidenceInputs.Add(releaseLedger.SourcePath);
+        var output = SafeReportPath(cli.Require("output"), evidenceInputs);
         WriteJson(output, new
         {
             schemaVersion = 1,
@@ -357,13 +422,21 @@ internal static partial class Program
             generatedAtUtc = DateTimeOffset.UtcNow,
             passed = true,
             validationPassed = true,
+            resourceReleaseMode = GetString(manifest, "mode") ?? "Exploratory",
+            resourceReleaseReady = releaseLedger != null,
+            releaseChannelId = releaseLedger?.ChannelId,
+            releaseRevision = releaseLedger?.Revision,
+            parentReleaseLedgerSha256 = releaseLedger?.ParentLedgerSha256,
+            releaseLedger = releaseLedger?.SourcePath,
+            releaseLedgerSha256 = releaseLedger?.Sha256,
+            stagedReleaseLedger,
             target,
             engineWorkflow = GetString(selectedBase, "engineWorkflow"),
             il2cppCodeGeneration = GetString(selectedBase, "il2cppCodeGeneration"),
             mode = GetString(baseWorkflow, "mode"),
             coverageRequired = true,
             coverageGatePassed = true,
-            releaseReady = ResourcePlayerReleaseReady(baseWorkflow),
+            releaseReady = ResourcePlayerReleaseReady(baseWorkflow) && releaseLedger != null,
             artifactValidationPassed = true,
             buildIdentityReady = true,
             identityVersion = 1,
@@ -1026,9 +1099,17 @@ internal static partial class Program
         {
             string baseId = GetString(supportedBase, "baseId") ?? string.Empty;
             string setId = GetString(supportedBase, "aotMetadataSetId") ?? string.Empty;
+            string baseVariantId = GetString(supportedBase, "payloadVariantId") ?? "default";
+            JsonElement variant = SelectPayloadVariant(manifest, baseVariantId,
+                "Resource update manifest");
+            string[] supportedModes = CanonicalResourceAssemblyModes(supportedBase,
+                variant, "Resource supported Base " + baseId);
             if (!IsHex(baseId, 64, 64) || !IsHex(setId, 64, 64) ||
                 !validSetIds.Contains(setId) ||
                 !selectionsByBase.TryGetValue(baseId, out JsonElement selection) ||
+                !supportedModes.SequenceEqual(CanonicalResourceAssemblyModes(selection,
+                    variant, "Runtime plan Base selection " + baseId),
+                    StringComparer.OrdinalIgnoreCase) ||
                 !string.Equals(GetString(selection, "aotMetadataSetId"), setId,
                     StringComparison.OrdinalIgnoreCase) ||
                 !string.Equals(GetString(selection, "payloadVariantId") ?? "default",
@@ -1161,6 +1242,8 @@ internal static partial class Program
 
         foreach (string property in new[]
         {
+            "mode", "releaseReady", "releaseChannelId", "releaseRevision",
+            "parentReleaseLedgerSha256", "releaseLedger",
             "baseRegistrySha256", "baseRegistryEntryCount", "baseRegistryAuditPath",
             "baseRegistryAuditSha256", "baseRegistryId", "baseRegistryRevision",
             "baseRegistryParentSha256", "baseRegistryParentAuditPath",
@@ -1170,7 +1253,7 @@ internal static partial class Program
         {
             if (!OptionalJsonPropertiesEqual(validation, manifest, property))
                 throw new DheException(
-                    "DHE resource registry binding differs between manifest and validation: " +
+                    "DHE resource release or registry binding differs between manifest and validation: " +
                     property);
         }
 
@@ -1189,6 +1272,11 @@ internal static partial class Program
         foreach (JsonElement supportedBase in supportedBases.EnumerateArray())
         {
             string baseId = GetString(supportedBase, "baseId") ?? string.Empty;
+            string variantId = GetString(supportedBase, "payloadVariantId") ?? "default";
+            JsonElement variant = SelectPayloadVariant(manifest, variantId,
+                "Resource update manifest");
+            string[] supportedModes = CanonicalResourceAssemblyModes(supportedBase,
+                variant, "DHE resource supported Base " + baseId);
             string identityKey = ResourceBaseIdentityKey(supportedBase);
             string[] runtimeCapabilities = ReadRuntimeCapabilities(supportedBase,
                 "runtimeCapabilities");
@@ -1208,6 +1296,9 @@ internal static partial class Program
                     .IsSupersetOf(requiredRuntimeCapabilities) ||
                 !IsHex(GetString(supportedBase, "buildIdentitySha256"), 64, 64) ||
                 !validatedById.TryGetValue(identityKey, out JsonElement validatedBase) ||
+                !supportedModes.SequenceEqual(CanonicalResourceAssemblyModes(validatedBase,
+                    variant, "DHE resource validated Base " + baseId),
+                    StringComparer.OrdinalIgnoreCase) ||
                 !GetBool(validatedBase, "compatible") ||
                 !GetBool(validatedBase, "guardCoverageValidated") ||
                 GetInt(validatedBase, "unsupportedChangeCount") != 0 ||
@@ -1233,6 +1324,32 @@ internal static partial class Program
                 throw new DheException("DHE resource update contains an unvalidated Base: " + baseId);
         }
         return validationPath;
+    }
+
+    private static string[] CanonicalResourceAssemblyModes(JsonElement record,
+        JsonElement payloadVariant, string description)
+    {
+        if (!record.TryGetProperty("assemblyModes", out JsonElement modes) ||
+            modes.ValueKind != JsonValueKind.Array)
+            throw new DheException(description + " has no assembly mode table.");
+        string[] expectedNames = payloadVariant.GetProperty("assemblies").EnumerateArray()
+            .Select(item => NormalizeName(GetString(item, "assemblyName") ?? string.Empty))
+            .OrderBy(value => value, StringComparer.OrdinalIgnoreCase).ToArray();
+        var names = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+        var values = new List<string>();
+        foreach (JsonElement mode in modes.EnumerateArray())
+        {
+            string name = NormalizeName(GetString(mode, "assemblyName") ?? string.Empty);
+            string executionMode = GetString(mode, "executionMode") ?? string.Empty;
+            if (string.IsNullOrWhiteSpace(name) || !names.Add(name) ||
+                !IsDheExecutionMode(executionMode))
+                throw new DheException(description + " contains an invalid assembly mode.");
+            values.Add(name + "=" + executionMode);
+        }
+        if (!names.OrderBy(value => value, StringComparer.OrdinalIgnoreCase)
+                .SequenceEqual(expectedNames, StringComparer.OrdinalIgnoreCase))
+            throw new DheException(description + " assembly mode table is incomplete.");
+        return values.OrderBy(value => value, StringComparer.OrdinalIgnoreCase).ToArray();
     }
 
     private static void ValidatePayloadVariantSet(JsonElement manifest, JsonElement validation)

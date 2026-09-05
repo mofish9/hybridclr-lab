@@ -6,6 +6,9 @@
   "additionalProperties": true,
   "required": [
     "schemaVersion", "format", "generatedAtUtc", "passed", "validationPassed",
+    "resourceReleaseMode", "resourceReleaseReady", "releaseChannelId",
+    "releaseRevision", "parentReleaseLedgerSha256", "releaseLedger",
+    "releaseLedgerSha256", "stagedReleaseLedger",
     "target", "engineWorkflow", "il2cppCodeGeneration", "mode", "coverageRequired", "coverageGatePassed", "releaseReady",
     "artifactValidationPassed", "buildIdentityReady", "identityVersion",
     "aotSnapshotKind", "nativeGuardSourceSha256", "nativeManifestSha256",
@@ -23,12 +26,30 @@
     "baseRegistryLineageValidated",
     "artifactValidation", "runtimeSource"
   ],
+  "allOf": [
+    {
+      "if": { "properties": { "resourceReleaseMode": { "const": "Release" } }, "required": ["resourceReleaseMode"] },
+      "then": { "properties": { "resourceReleaseReady": { "const": true }, "releaseChannelId": { "type": "string" }, "releaseRevision": { "type": "integer", "minimum": 1 }, "releaseLedger": { "type": "string", "minLength": 1 }, "releaseLedgerSha256": { "type": "string" }, "stagedReleaseLedger": { "type": "string", "minLength": 1 } } }
+    },
+    {
+      "if": { "properties": { "resourceReleaseMode": { "const": "Exploratory" } }, "required": ["resourceReleaseMode"] },
+      "then": { "properties": { "resourceReleaseReady": { "const": false }, "releaseChannelId": { "type": "null" }, "releaseRevision": { "type": "null" }, "parentReleaseLedgerSha256": { "type": "null" }, "releaseLedger": { "type": "null" }, "releaseLedgerSha256": { "type": "null" }, "stagedReleaseLedger": { "type": "null" } } }
+    }
+  ],
   "properties": {
     "schemaVersion": { "const": 1 },
     "format": { "const": "hybridclr.dhe-resource-player-workflow.json" },
     "generatedAtUtc": { "type": "string", "format": "date-time" },
     "passed": { "const": true },
     "validationPassed": { "const": true },
+    "resourceReleaseMode": { "enum": ["Exploratory", "Release"] },
+    "resourceReleaseReady": { "type": "boolean" },
+    "releaseChannelId": { "type": ["string", "null"], "pattern": "^[A-Za-z0-9._-]{1,128}$" },
+    "releaseRevision": { "type": ["integer", "null"], "minimum": 1 },
+    "parentReleaseLedgerSha256": { "type": ["string", "null"], "pattern": "^[0-9a-fA-F]{64}$" },
+    "releaseLedger": { "type": ["string", "null"] },
+    "releaseLedgerSha256": { "type": ["string", "null"], "pattern": "^[0-9a-fA-F]{64}$" },
+    "stagedReleaseLedger": { "type": ["string", "null"] },
     "target": { "type": "string", "pattern": "^[A-Za-z0-9._-]+$" },
     "engineWorkflow": { "enum": ["Unity2021Standard", "Unity2022Fgs", "Tuanjie2022Fgs"] },
     "il2cppCodeGeneration": { "enum": ["OptimizeSpeed", "OptimizeSize"] },

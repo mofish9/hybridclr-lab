@@ -162,12 +162,22 @@ the current release commit, and every recorded commit resolves to the recorded t
 A divergent commit or tree mismatch fails closed.
 
 For consecutive hotfix releases, keep the same archived Base registry and run
-`resource-update` again with the new current DLL set. Stage the resulting
+`resource-update` again with the new current DLL set. Release mode must also pass
+the exact previous `dhe-release-ledger.json` and its SHA-256 from protected release
+state. The next ledger inherits the channel, increments the release revision, and
+pins that exact parent. Stage the resulting
 manifest/payload over the same Player resource root after the previous smoke;
 the Player's embedded Base MetaVersion and immutable native files must remain
 byte-identical across both stages. Do not use the previous current payload as
 the new baseline unless a new Base Player is intentionally being shipped and
 archived as a new registry entry.
+
+When a new Base app version is shipped, first append its immutable archive using
+`base-registry -ExistingRegistry`. The next resource release must receive both the
+new registry and its exact parent, plus the previous release ledger. The ledger
+gate accepts only this direct transition and then checks the new current payload
+against every old and new active Base in one invocation. Do not initialize another
+release channel to bypass an incompatible historical Base.
 
 ## Runtime proof
 

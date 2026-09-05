@@ -79,8 +79,12 @@ commit/tree/hash 为准。
    兼容审计；identity 1 的复合 `baseId` 唯一绑定完整 Player 身份，按每个 Base 的真实差异
    推导 `requiredRuntimeCapabilities`。Base 专属二进制不进入 payload，任一 Base 不兼容时不
    生成可发布 manifest。
+   正式模式首次显式初始化 `dhe-release-ledger.json`；此后必须使用发布系统保存的上一 ledger
+   及其精确 SHA-256。current registry 只能保持为该 ledger 绑定的 head，或成为它的直接后继。
+   ledger reset、旧 head、分叉和遗漏在线 Base 都必须在 manifest 发布前失败。
 5. `stage-resource-update` 只替换 current DLL/MetaVersion、可选补充 AOT metadata、manifest、
-   validation 和 runtime plan；manifest 使用 `runtimePlanSha256` 绑定 plan，并逐文件校验所有
+   validation、runtime plan 和 release ledger；manifest 使用 `runtimePlanSha256` 绑定 plan，
+   ledger 反向绑定 manifest/validation，并逐文件校验所有
    payload hash 后才复制，
    强制接收当前 Player 归档的 `build-identity.json`，校验 identity schema、复合 `baseId` 和
    文件 SHA 后精确命中一个 `supportedBases` 记录，再证明 Player、GameAssembly 及 Player

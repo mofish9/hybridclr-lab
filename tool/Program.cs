@@ -42,13 +42,23 @@ internal static partial class Program
         "base-registry-build-configuration-tamper-rejected",
         "base-registry-lineage", "base-registry-implicit-removal-rejected",
         "base-registry-explicit-retirement",
+        "resource-release-ledger-initialized",
+        "resource-release-ledger-continuation",
+        "resource-release-ledger-base-addition",
+        "resource-release-ledger-reset-rejected",
+        "resource-release-ledger-stale-head-rejected",
+        "registry-empty-aot-metadata-set",
         "resource-player-evidence-binding",
+        "resource-player-release-ledger-binding",
         "resource-player-legacy-single-payload-compatibility",
         "resource-player-assembly-mode-binding",
         "resource-player-interpreter-only-update",
         "resource-player-release-readiness",
         "resource-stage-aot-inventory-missing-rejected",
         "resource-stage-aot-inventory-hash-tamper-rejected",
+        "resource-stage-release-ledger-bound",
+        "resource-stage-release-ledger-tamper-rejected",
+        "resource-stage-consecutive-base-stable",
         "evidence-managed-release-binding", "evidence-multibase-current-binding",
         "evidence-extensible-player-engine-matrix",
         "bootstrap-engine-workflow-matrix",
@@ -67,6 +77,7 @@ internal static partial class Program
         "generated-cpp-resolver-engine-matrix", "generated-cpp-resolver-identity-tamper",
         "layout-release-role-schemas",
         "schema-valid-document", "schema-maximum-rejected", "schema-additional-type-rejected",
+        "schema-resource-release-mode-contract",
         "schema-unsupported-keyword-rejected", "schema-gate-contract",
         "schema-workflow-output-contract"
     };
@@ -647,8 +658,10 @@ internal static partial class Program
         var currentVariantRoots = ReadCurrentVariantRoots(cli, currentRoot);
         string? baseRegistryPath = cli.Optional("baseregistry");
         string? previousBaseRegistryPath = cli.Optional("previousbaseregistry");
+        string? previousReleaseLedgerPath = cli.Optional("previousreleaseledger");
         var outputInputs = currentVariantRoots.Values.Append(settingsPath)
-            .Concat(new[] { baseRegistryPath, previousBaseRegistryPath }.OfType<string>())
+            .Concat(new[] { baseRegistryPath, previousBaseRegistryPath,
+                previousReleaseLedgerPath }.OfType<string>())
             .ToArray();
         var outputRoot = SafeOutputRoot(cli.Require("outputroot"), outputInputs);
         BaseRegistryDocument? baseRegistry = null;
@@ -706,6 +719,8 @@ internal static partial class Program
                 .Select(path => RequireFile(path, "Base Player build identity"))
                 .ToArray();
         }
+        ResourceReleaseContext resourceRelease = PrepareResourceReleaseContext(cli,
+            baseRegistry, previousBaseRegistry);
         if (baselineRoots.Length == 0) throw new DheException("At least one base snapshot root is required.");
         if (baselineRoots.Distinct(StringComparer.OrdinalIgnoreCase).Count() != baselineRoots.Length)
             throw new DheException("BaseRoots must not contain duplicate Base snapshot roots.");
@@ -754,10 +769,12 @@ internal static partial class Program
         var manifestPath = Path.Combine(outputRoot, "dhe-resource-update.json");
         var runtimePlanPath = Path.Combine(outputRoot, "dhe-runtime-plan.json");
         var validationPath = Path.Combine(outputRoot, "dhe-resource-update-validation.json");
+        var releaseLedgerPath = Path.Combine(outputRoot, ReleaseLedgerFileName);
         Directory.CreateDirectory(outputRoot);
         File.Delete(manifestPath);
         File.Delete(runtimePlanPath);
         File.Delete(validationPath);
+        File.Delete(releaseLedgerPath);
         if (Directory.Exists(payloadRoot)) Directory.Delete(payloadRoot, true);
         if (Directory.Exists(auditRoot)) Directory.Delete(auditRoot, true);
         Directory.CreateDirectory(payloadRoot);
@@ -865,7 +882,7 @@ internal static partial class Program
         }
         if (aotMetadataRoots.Length != 0 && aotMetadataRoots.Length != baselineRoots.Length)
             throw new DheException("AotMetadataRoots must contain one entry per BaseRoot.");
-        if (aotMetadataRoots.Length == 0 && settings.Patch.Length != 0)
+        if (baseRegistry == null && aotMetadataRoots.Length == 0 && settings.Patch.Length != 0)
             throw new DheException(
                 "AotMetadataRoots is required when patchAOTAssemblies is non-empty; " +
                 "pass one metadata root per BaseRoot.");
@@ -1209,6 +1226,12 @@ internal static partial class Program
             format = "hybridclr.dhe-resource-update-validation.json",
             generatedAtUtc = DateTimeOffset.UtcNow,
             passed = releaseErrors.Count == 0,
+            mode = resourceRelease.Mode,
+            releaseReady = resourceRelease.ReleaseReady,
+            releaseChannelId = resourceRelease.ChannelId,
+            releaseRevision = resourceRelease.Revision,
+            parentReleaseLedgerSha256 = resourceRelease.ParentLedgerSha256,
+            releaseLedger = resourceRelease.ReleaseReady ? ReleaseLedgerFileName : null,
             compatibilityPolicy = ResourceUpdateCompatibility.Policy,
             runtimeProtocol = ResourceUpdateCompatibility.RuntimeProtocol,
             currentAssemblySetSha256 = currentSetHash,
@@ -1244,6 +1267,11 @@ internal static partial class Program
             schemaVersion = 1,
             format = "hybridclr.dhe-runtime-asset-plan.json",
             selection = "embedded-base-metaversion-and-aot-metadata-set",
+            mode = resourceRelease.Mode,
+            releaseReady = resourceRelease.ReleaseReady,
+            releaseChannelId = resourceRelease.ChannelId,
+            releaseRevision = resourceRelease.Revision,
+            parentReleaseLedgerSha256 = resourceRelease.ParentLedgerSha256,
             currentAssemblySetSha256 = currentSetHash,
             payloadVariantSetSha256 = payloadVariantSetHash,
             runtimeAssetRoot,
@@ -1266,6 +1294,12 @@ internal static partial class Program
             schemaVersion = 1,
             format = "hybridclr.dhe-resource-update.json",
             generatedAtUtc = DateTimeOffset.UtcNow,
+            mode = resourceRelease.Mode,
+            releaseReady = resourceRelease.ReleaseReady,
+            releaseChannelId = resourceRelease.ChannelId,
+            releaseRevision = resourceRelease.Revision,
+            parentReleaseLedgerSha256 = resourceRelease.ParentLedgerSha256,
+            releaseLedger = resourceRelease.ReleaseReady ? ReleaseLedgerFileName : null,
             payloadModel,
             payloadVariantSetSha256 = payloadVariantSetHash,
             metaVersionSchema = 1,
@@ -1304,6 +1338,20 @@ internal static partial class Program
             assemblies = payloadFiles.ToArray(),
             supportedBases = candidateBases.ToArray(),
         });
+        if (resourceRelease.ReleaseReady)
+        {
+            try
+            {
+                _ = WriteReleaseLedger(outputRoot, resourceRelease, baseRegistry!,
+                    currentSetHash, payloadVariantSetHash, manifestPath, validationPath);
+            }
+            catch
+            {
+                File.Delete(manifestPath);
+                File.Delete(releaseLedgerPath);
+                throw;
+            }
+        }
         Console.WriteLine("DHE " + payloadModel + " resource update: " + manifestPath);
         return 0;
     }
@@ -2582,6 +2630,25 @@ internal static partial class Program
                     Path.GetDirectoryName(baseWorkflowPath)!, "Base workflow runtime manifest"))
                     .Equals(Path.GetFullPath(runtimePath), StringComparison.OrdinalIgnoreCase))
                 throw new DheException("Resource Player evidence is not bound to a Release-ready Base workflow.");
+            if (GetString(report, "resourceReleaseMode") != "Release" ||
+                !GetBool(report, "resourceReleaseReady") ||
+                !IsRegistryId(GetString(report, "releaseChannelId") ?? string.Empty) ||
+                GetInt(report, "releaseRevision") < 1 ||
+                !IsHex(GetString(report, "releaseLedgerSha256"), 64, 64))
+                throw new DheException(
+                    "Resource Player evidence is not bound to a Release ledger.");
+            string ledgerPath = ResolveEvidencePath(GetString(report, "releaseLedger"),
+                reportRoot, "Resource release ledger");
+            ReleaseLedgerDocument ledger = ReadReleaseLedger(ledgerPath,
+                GetString(report, "releaseLedgerSha256"));
+            if (!string.Equals(ledger.ChannelId, GetString(report, "releaseChannelId"),
+                    StringComparison.Ordinal) ||
+                ledger.Revision != GetInt(report, "releaseRevision") ||
+                !string.Equals(ledger.ParentLedgerSha256,
+                    GetString(report, "parentReleaseLedgerSha256"),
+                    StringComparison.OrdinalIgnoreCase))
+                throw new DheException(
+                    "Resource Player evidence release identity does not match its ledger.");
         }
     }
 
@@ -2653,7 +2720,8 @@ internal static partial class Program
         // Compare the document identities globally and validate the selected
         // variant independently for every Base below.
         foreach (string property in new[] { "resourceUpdateManifestSha256",
-                     "resourceUpdateValidationSha256", "payloadVariantSetSha256" })
+                     "resourceUpdateValidationSha256", "payloadVariantSetSha256",
+                     "releaseLedgerSha256" })
             if (identities.Skip(1).Any(item => !string.Equals(GetString(first.Report, property),
                     GetString(item.Item.Report, property), StringComparison.OrdinalIgnoreCase)))
                 throw new DheException("Multi-Base changed evidence does not share one resource release document: " +
@@ -2721,6 +2789,8 @@ internal static partial class Program
 
         string manifestPath = Bound("resourceUpdateManifest", "resourceUpdateManifestSha256",
             "Resource update manifest");
+        string ledgerPath = Bound("releaseLedger", "releaseLedgerSha256",
+            "Resource release ledger");
         string validationPath = Bound("resourceUpdateValidation", "resourceUpdateValidationSha256",
             "Resource update validation");
         string stagePath = Bound("resourceStage", "resourceStageSha256", "Resource stage");
@@ -2740,6 +2810,12 @@ internal static partial class Program
         JsonElement stage = ReadJson<JsonElement>(stagePath);
         JsonElement player = ReadJson<JsonElement>(playerPath);
         JsonElement baseWorkflow = ReadJson<JsonElement>(baseWorkflowPath);
+        ReleaseLedgerDocument ledger = ReadReleaseLedger(ledgerPath,
+            GetString(report, "releaseLedgerSha256"));
+        string updateRoot = Path.GetDirectoryName(manifestPath)!;
+        ReleaseLedgerDocument? liveLedger = ValidateReleaseLedgerForStaging(updateRoot,
+            manifest);
+        string liveValidationPath = ValidateResourceUpdateCompatibility(updateRoot, manifest);
         RequireEvidenceFormat(manifest, "hybridclr.dhe-resource-update.json", "Resource update manifest");
         RequireEvidenceFormat(validation, "hybridclr.dhe-resource-update-validation.json",
             "Resource update validation");
@@ -2747,6 +2823,48 @@ internal static partial class Program
         RequireEvidenceFormat(player, "hybridclr.dhe-player-result.json", "Resource Player result");
         RequireEvidenceFormat(baseWorkflow, "hybridclr.dhe-project-player-workflow.json",
             "Base workflow report");
+        if (!Path.GetFullPath(ledger.ResourceUpdateManifestPath).Equals(
+                Path.GetFullPath(manifestPath), StringComparison.OrdinalIgnoreCase) ||
+            !Path.GetFullPath(ledger.ResourceUpdateValidationPath).Equals(
+                Path.GetFullPath(validationPath), StringComparison.OrdinalIgnoreCase) ||
+            liveLedger == null ||
+            !string.Equals(liveLedger.Sha256, ledger.Sha256,
+                StringComparison.OrdinalIgnoreCase) ||
+            !Path.GetFullPath(liveValidationPath).Equals(Path.GetFullPath(validationPath),
+                StringComparison.OrdinalIgnoreCase) ||
+            !string.Equals(GetString(report, "resourceReleaseMode"), "Release",
+                StringComparison.Ordinal) || !GetBool(report, "resourceReleaseReady") ||
+            !string.Equals(ledger.ChannelId, GetString(report, "releaseChannelId"),
+                StringComparison.Ordinal) || ledger.Revision != GetInt(report, "releaseRevision") ||
+            !string.Equals(ledger.ParentLedgerSha256,
+                GetString(report, "parentReleaseLedgerSha256"),
+                StringComparison.OrdinalIgnoreCase))
+            throw new DheException("Resource Player evidence release ledger binding is invalid.");
+        string stagedLedgerPath = ResolveEvidencePath(GetString(report, "stagedReleaseLedger"),
+            root, "Staged resource release ledger");
+        string stagedLedgerFromStage = ResolveEvidencePath(GetString(stage,
+            "stagedReleaseLedgerPath"), Path.GetDirectoryName(stagePath)!,
+            "Stage report release ledger");
+        if (!string.Equals(GetString(stage, "mode"), "Release", StringComparison.Ordinal) ||
+            !GetBool(stage, "releaseReady") ||
+            !string.Equals(GetString(stage, "releaseChannelId"), ledger.ChannelId,
+                StringComparison.Ordinal) || GetInt(stage, "releaseRevision") != ledger.Revision ||
+            !string.Equals(GetString(stage, "parentReleaseLedgerSha256"),
+                ledger.ParentLedgerSha256, StringComparison.OrdinalIgnoreCase) ||
+            !string.Equals(GetString(stage, "releaseLedgerSha256"), ledger.Sha256,
+                StringComparison.OrdinalIgnoreCase) ||
+            !Path.GetFullPath(stagedLedgerPath).Equals(Path.GetFullPath(stagedLedgerFromStage),
+                StringComparison.OrdinalIgnoreCase) ||
+            !Sha256File(stagedLedgerPath).Equals(ledger.Sha256,
+                StringComparison.OrdinalIgnoreCase) ||
+            !OptionalJsonPropertiesEqual(validation, manifest, "mode") ||
+            !OptionalJsonPropertiesEqual(validation, manifest, "releaseReady") ||
+            !OptionalJsonPropertiesEqual(validation, manifest, "releaseChannelId") ||
+            !OptionalJsonPropertiesEqual(validation, manifest, "releaseRevision") ||
+            !OptionalJsonPropertiesEqual(validation, manifest,
+                "parentReleaseLedgerSha256") ||
+            !OptionalJsonPropertiesEqual(validation, manifest, "releaseLedger"))
+            throw new DheException("Resource Player stage does not match its release ledger.");
         JsonElement[] selectedManifestBases = manifest.GetProperty("supportedBases")
             .EnumerateArray().Where(item => string.Equals(GetString(item, "baseId"),
                 GetString(report, "selectedBaseId"), StringComparison.OrdinalIgnoreCase)).ToArray();
@@ -3723,7 +3841,7 @@ internal static partial class Program
         }
     }
 
-    private static void PrintHelp() => Console.WriteLine("HybridCLR DHE C# tool\nCommands: version, mv, batch, base-registry, resource-update, stage-resource-update, resource-player-evidence, baseline-manifest, aot-metadata-manifest, preflight, workflow, release-gate, regression, schema-validate, schema-gate, validate, archive, doctor, verify-package, release-evidence, publish, install, new-adapter, new-config, assemble-runtime, native-tests, build-managed-cases, generate-test-manifest, generate-metadata-stress-source, reference, compare-results, check-environment, clear-unity-project-locks, wait-editor, prepare-engine-test-project, bootstrap-repos, tree-hash, file-hash\nBase registry accepts -ExistingRegistry or comma-separated -BaseIdentities, -BaselineRoots, -BaseNativeManifests, -EngineWorkflows, with optional -PayloadVariantIds, -Labels, and -AotMetadataRoots. Retiring an online Base requires -RetireBaseIds and -RetirementReason.\nResource update accepts -BaseRegistry <registry.json>; revision 2 or later also requires -PreviousBaseRegistry <parent.json>.\nExample: dotnet run --project tool/HybridCLR.DheTool.csproj -- workflow -Config <project/dhe-workflow-config.json>");
+    private static void PrintHelp() => Console.WriteLine("HybridCLR DHE C# tool\nCommands: version, mv, batch, base-registry, resource-update, stage-resource-update, resource-player-evidence, baseline-manifest, aot-metadata-manifest, preflight, workflow, release-gate, regression, schema-validate, schema-gate, validate, archive, doctor, verify-package, release-evidence, publish, install, new-adapter, new-config, assemble-runtime, native-tests, build-managed-cases, generate-test-manifest, generate-metadata-stress-source, reference, compare-results, check-environment, clear-unity-project-locks, wait-editor, prepare-engine-test-project, bootstrap-repos, tree-hash, file-hash\nBase registry accepts -ExistingRegistry or comma-separated -BaseIdentities, -BaselineRoots, -BaseNativeManifests, -EngineWorkflows, with optional -PayloadVariantIds, -Labels, and -AotMetadataRoots. Retiring an online Base requires -RetireBaseIds and -RetirementReason.\nRelease resource update requires -Mode Release and either -InitializeReleaseLedger -ReleaseChannelId <id>, or -PreviousReleaseLedger <ledger.json> -ExpectedPreviousReleaseLedgerSha256 <sha256>. Registry revision 2 or later also requires -PreviousBaseRegistry <parent.json>.\nExample: dotnet run --project tool/HybridCLR.DheTool.csproj -- workflow -Config <project/dhe-workflow-config.json>");
 
     private static string ResolveUnity(Cli cli, string project) => RequireFile(cli.Optional("unity") ?? Environment.GetEnvironmentVariable("DHE_UNITY_EXE") ?? throw new DheException("Set -Unity or DHE_UNITY_EXE."), "Unity editor");
     private static void RunUnity(string executable, string workingDirectory, IEnumerable<string> arguments, IDictionary<string, string> environment, string logPath, int timeoutSeconds)

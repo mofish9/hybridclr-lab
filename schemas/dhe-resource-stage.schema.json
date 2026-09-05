@@ -5,11 +5,32 @@
   "type": "object",
   "additionalProperties": true,
   "required": ["schemaVersion", "format", "generatedAtUtc", "passed", "updateRoot", "assetRoot", "payloadModel", "currentAssemblySetSha256", "stagedPlanPath", "stagedPlanSha256", "stagedManifestPath", "stagedValidationPath", "embeddedBaseRoot", "selectedBaseId", "selectedAotMetadataSetId", "baseRegistrySha256", "baseRegistryId", "baseRegistryRevision", "baseRegistryLineageValidated", "baseBuildIdentityPath", "baseBuildIdentitySha256", "baseMetaVersionSetSha256", "baseMetaVersionTreeSha256Before", "baseMetaVersionTreeSha256After", "baseMetaVersionUnchanged", "stagedFiles", "immutableFiles"],
+  "allOf": [
+    {
+      "if": { "required": ["mode"] },
+      "then": { "required": ["mode", "releaseReady", "releaseChannelId", "releaseRevision", "parentReleaseLedgerSha256", "releaseLedgerSha256", "stagedReleaseLedgerPath", "baseRegistryEntryCount", "baseRegistryParentSha256", "baseRegistryRetiredBaseCount"] }
+    },
+    {
+      "if": { "properties": { "mode": { "const": "Release" } }, "required": ["mode"] },
+      "then": { "properties": { "releaseReady": { "const": true }, "releaseChannelId": { "type": "string" }, "releaseRevision": { "type": "integer", "minimum": 1 }, "releaseLedgerSha256": { "type": "string" }, "stagedReleaseLedgerPath": { "type": "string", "minLength": 1 } } }
+    },
+    {
+      "if": { "properties": { "mode": { "const": "Exploratory" } }, "required": ["mode"] },
+      "then": { "properties": { "releaseReady": { "const": false }, "releaseChannelId": { "type": "null" }, "releaseRevision": { "type": "null" }, "parentReleaseLedgerSha256": { "type": "null" }, "releaseLedgerSha256": { "type": "null" }, "stagedReleaseLedgerPath": { "type": "null" } } }
+    }
+  ],
   "properties": {
     "schemaVersion": { "const": 1 },
     "format": { "const": "hybridclr.dhe-resource-stage.json" },
     "generatedAtUtc": { "type": "string", "format": "date-time" },
     "passed": { "const": true },
+    "mode": { "enum": ["Exploratory", "Release"] },
+    "releaseReady": { "type": "boolean" },
+    "releaseChannelId": { "type": ["string", "null"], "pattern": "^[A-Za-z0-9._-]{1,128}$" },
+    "releaseRevision": { "type": ["integer", "null"], "minimum": 1 },
+    "parentReleaseLedgerSha256": { "type": ["string", "null"], "pattern": "^[0-9a-fA-F]{64}$" },
+    "releaseLedgerSha256": { "type": ["string", "null"], "pattern": "^[0-9a-fA-F]{64}$" },
+    "stagedReleaseLedgerPath": { "type": ["string", "null"] },
     "updateRoot": { "type": "string", "minLength": 1 },
     "assetRoot": { "type": "string", "minLength": 1 },
     "payloadModel": { "enum": ["single-current-payload", "variant-current-payload"] },
@@ -24,8 +45,11 @@
     "selectedBaseId": { "type": "string", "pattern": "^[0-9a-fA-F]{64}$" },
     "selectedAotMetadataSetId": { "type": "string", "pattern": "^[0-9a-fA-F]{64}$" },
     "baseRegistrySha256": { "type": ["string", "null"], "pattern": "^[0-9a-fA-F]{64}$" },
+    "baseRegistryEntryCount": { "type": ["integer", "null"], "minimum": 1 },
     "baseRegistryId": { "type": ["string", "null"], "pattern": "^[A-Za-z0-9._-]{1,128}$" },
     "baseRegistryRevision": { "type": ["integer", "null"], "minimum": 1 },
+    "baseRegistryParentSha256": { "type": ["string", "null"], "pattern": "^[0-9a-fA-F]{64}$" },
+    "baseRegistryRetiredBaseCount": { "type": ["integer", "null"], "minimum": 0 },
     "baseRegistryLineageValidated": { "type": "boolean" },
     "baseBuildIdentityPath": { "type": "string", "minLength": 1 },
     "baseBuildIdentitySha256": { "type": "string", "pattern": "^[0-9a-fA-F]{64}$" },

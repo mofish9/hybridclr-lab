@@ -176,6 +176,25 @@ BaseId 不得重新激活。revision 2 及以后执行 `resource-update` 时必�
 显式退役，并把当前/父 registry 原始字节都写入 `audit/`。因此误用一个遗漏旧 Base 的新
 registry 会在生成资源包之前失败，而不是绕过该 Base 的兼容性检查。
 
+但 registry 父链本身不能证明“上一份已发布热更使用的是哪一个 registry head”。正式模式额外
+维护 `dhe-release-ledger.json`：首次迁移使用 `-Mode Release -InitializeReleaseLedger
+-ReleaseChannelId <channel>`；之后每次必须传上一份完整资源目录中的
+`-PreviousReleaseLedger`，以及由发布系统保护的
+`-ExpectedPreviousReleaseLedgerSha256`。ledger 绑定稳定 channel、递增的热更 revision、直接父
+ledger SHA、registry ID/revision/SHA、active/retired Base 数量、current assembly set、payload
+variant set、manifest 和 validation hash。
+
+后续热更的 registry 只能与上一 ledger 完全相同，或者是它的直接下一 revision；另起 revision
+1、跳过 registry revision、改变 registry ID、传入旧 ledger 或遗漏上一 head 的 Base 都会在
+写出可接受的 Release manifest 前失败。新增 Base 的正常顺序是：完成新 Player 归档，以
+`-ExistingRegistry` 追加得到下一 registry，再以旧 ledger 和旧 registry 作为父输入生成一次新
+资源发布。纯代码热更则直接复用同一个 registry。资源门禁全部通过后，项目发布系统必须把
+整份目录原子发布并将新 ledger SHA 更新为下一轮唯一 head；不能从候选目录反推“期望 hash”。
+
+这仍然是一份热更包。跨平台 managed DLL 相同时只有一个 default payload；确因 target 条件
+编译导致字节/metadata 不同时，可以在同一目录内携带多个 `payloadVariants`，按 Base identity
+选择，不能拆成绕过统一门禁的独立发布。
+
 不要手工编辑 registry 的条目。先用工具从已归档的 Base identity 生成规范化文件；
 已有线上集合通过 `-ExistingRegistry` 保留，新 Base 用等长的逗号分隔列表追加：
 
