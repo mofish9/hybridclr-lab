@@ -82,6 +82,11 @@ commit/tree/hash 为准。
    正式模式首次显式初始化 `dhe-release-ledger.json`；此后必须使用发布系统保存的上一 ledger
    及其精确 SHA-256。current registry 只能保持为该 ledger 绑定的 head，或成为它的直接后继。
    ledger reset、旧 head、分叉和遗漏在线 Base 都必须在 manifest 发布前失败。
+   正式证据必须让每个 active Base 各执行一次同一个连续 release head；只覆盖三种引擎但漏掉
+   某个旧 Base 或新 Base 仍然失败。回归报告绑定该 head 的 manifest/ledger SHA，release
+   evidence 会再次逐字段核对，不能拼接另一轮热更的 Player 报告。
+   普通连续热更可以保持 registry 不变；只有 active Base 集合变化时才要求 registry 是直接后继，
+   新增和显式退役由 registry 生命周期门禁验证，不把 demo 的 4 -> 5 Base 数量写死为产品条件。
 5. `stage-resource-update` 只替换 current DLL/MetaVersion、可选补充 AOT metadata、manifest、
    validation、runtime plan 和 release ledger；manifest 使用 `runtimePlanSha256` 绑定 plan，
    ledger 反向绑定 manifest/validation，并逐文件校验所有

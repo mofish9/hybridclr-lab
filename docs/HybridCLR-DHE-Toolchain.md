@@ -236,6 +236,16 @@ head hash only after all Player gates pass. Once that protected head exists, CI
 must reject any later use of `-InitializeReleaseLedger`; a local CLI cannot infer
 global publication history.
 
+Release qualification must execute that exact continuation on every active Base.
+`regression -ResourceUpdateRoot <previous> -ResourceUpdateRoot2 <candidate>` binds
+the complete `-WorkflowChangedRoots` Player set to the candidate manifest and
+ledger. Every active `supportedBases` ID must appear exactly once; three-engine
+coverage alone cannot hide an untested old or newly added Base. The regression
+records this head identity and `release-evidence` revalidates it against the copied
+Player reports. Consecutive releases may use the same registry; a changed Base set
+must use its authenticated direct successor. The qualification gate has no fixed
+four-to-five-Base assumption.
+
 The output contains one copy of each current DLL and current MetaVersion. Base inputs
 are compatibility evidence only and are never copied into `payload/`. At
 runtime each Player compares the remote current MetaVersion with its own embedded Base

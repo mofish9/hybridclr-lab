@@ -4,7 +4,7 @@
   "title": "HybridCLR DHE CSharp Regression Report",
   "type": "object",
   "additionalProperties": false,
-  "required": ["schemaVersion", "format", "generatedAtUtc", "sourceHead", "sourceTree", "sourceClean", "passed", "realWorkflowOutputsValidated", "workflowOutputs", "realResolverOutputsValidated", "resolverOutputs", "checks", "errors", "warnings"],
+  "required": ["schemaVersion", "format", "generatedAtUtc", "sourceHead", "sourceTree", "sourceClean", "passed", "realWorkflowOutputsValidated", "workflowOutputs", "validatedResourceRelease", "realResolverOutputsValidated", "resolverOutputs", "checks", "errors", "warnings"],
   "properties": {
     "schemaVersion": { "const": 1 },
     "format": { "const": "hybridclr.dhe-regression.json" },
@@ -28,6 +28,22 @@
           "path": { "type": "string", "minLength": 1 },
           "sha256": { "type": "string", "pattern": "^[0-9a-fA-F]{64}$" }
         }
+      }
+    },
+    "validatedResourceRelease": {
+      "type": ["object", "null"],
+      "additionalProperties": false,
+      "required": ["resourceUpdateManifestSha256", "releaseLedgerSha256", "parentReleaseLedgerSha256", "releaseChannelId", "releaseRevision", "baseRegistrySha256", "activeBaseCount", "currentAssemblySetSha256", "payloadVariantSetSha256"],
+      "properties": {
+        "resourceUpdateManifestSha256": { "type": "string", "pattern": "^[0-9a-fA-F]{64}$" },
+        "releaseLedgerSha256": { "type": "string", "pattern": "^[0-9a-fA-F]{64}$" },
+        "parentReleaseLedgerSha256": { "type": "string", "pattern": "^[0-9a-fA-F]{64}$" },
+        "releaseChannelId": { "type": "string", "pattern": "^[A-Za-z0-9._-]{1,128}$" },
+        "releaseRevision": { "type": "integer", "minimum": 2 },
+        "baseRegistrySha256": { "type": "string", "pattern": "^[0-9a-fA-F]{64}$" },
+        "activeBaseCount": { "type": "integer", "minimum": 2 },
+        "currentAssemblySetSha256": { "type": "string", "pattern": "^[0-9a-fA-F]{64}$" },
+        "payloadVariantSetSha256": { "type": "string", "pattern": "^[0-9a-fA-F]{64}$" }
       }
     },
     "realResolverOutputsValidated": { "type": "boolean" },
@@ -65,8 +81,8 @@
   "allOf": [
     {
       "if": { "properties": { "realWorkflowOutputsValidated": { "const": true } }, "required": ["realWorkflowOutputsValidated"] },
-      "then": { "properties": { "workflowOutputs": { "minItems": 4, "maxItems": 1025 } } },
-      "else": { "properties": { "workflowOutputs": { "maxItems": 0 } } }
+      "then": { "properties": { "workflowOutputs": { "minItems": 4, "maxItems": 1025 }, "validatedResourceRelease": { "type": "object" } } },
+      "else": { "properties": { "workflowOutputs": { "maxItems": 0 }, "validatedResourceRelease": { "type": "null" } } }
     },
     {
       "if": { "properties": { "realResolverOutputsValidated": { "const": true } }, "required": ["realResolverOutputsValidated"] },

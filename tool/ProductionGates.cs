@@ -1983,6 +1983,8 @@ internal static partial class Program
         var realWorkflowOutputsValidated = false;
         var resourcePlayerEvidenceBindingPassed = false;
         var resourcePlayerReleaseLedgerBindingPassed = false;
+        var resourcePlayerConsecutiveReleaseHeadPassed = false;
+        object? validatedResourceRelease = null;
         var workflowOutputs = new List<object>();
         var changedWorkflowRoots = cli.GetList("workflowchangedroots");
         if (changedWorkflowRoots.Count == 0)
@@ -2067,8 +2069,42 @@ internal static partial class Program
                         string path = Path.Combine(item.Root, "resource-player-workflow-report.json");
                         return (Report: ReadJson<JsonElement>(path), Path: path);
                     }).ToArray();
-                ValidateMultiBaseChangedEvidence(changedReports, true);
+                MultiBaseResourceReleaseProof releaseProof =
+                    ReadMultiBaseResourceReleaseProof(changedReports, true);
                 resourcePlayerEvidenceBindingPassed = true;
+                if (!string.IsNullOrWhiteSpace(resourceUpdateRoot) &&
+                    !string.IsNullOrWhiteSpace(resourceUpdateRoot2))
+                {
+                    ValidateChangedPlayerReleaseHead(releaseProof, resourceUpdateRoot2);
+                    bool previousHeadRejected = false;
+                    try
+                    {
+                        ValidateChangedPlayerReleaseHead(releaseProof, resourceUpdateRoot);
+                    }
+                    catch (DheException)
+                    {
+                        previousHeadRejected = true;
+                    }
+                    resourcePlayerConsecutiveReleaseHeadPassed = previousHeadRejected;
+                    if (resourcePlayerConsecutiveReleaseHeadPassed)
+                    {
+                        validatedResourceRelease = new
+                        {
+                            resourceUpdateManifestSha256 =
+                                releaseProof.ResourceUpdateManifestSha256,
+                            releaseLedgerSha256 = releaseProof.ReleaseLedgerSha256,
+                            parentReleaseLedgerSha256 =
+                                releaseProof.ParentReleaseLedgerSha256,
+                            releaseChannelId = releaseProof.ReleaseChannelId,
+                            releaseRevision = releaseProof.ReleaseRevision,
+                            baseRegistrySha256 = releaseProof.BaseRegistrySha256,
+                            activeBaseCount = releaseProof.ActiveBaseCount,
+                            currentAssemblySetSha256 =
+                                releaseProof.CurrentAssemblySetSha256,
+                            payloadVariantSetSha256 = releaseProof.PayloadVariantSetSha256,
+                        };
+                    }
+                }
                 var tamperedReport = System.Text.Json.Nodes.JsonNode.Parse(
                     changedReports[0].Report.GetRawText())!.AsObject();
                 tamperedReport["releaseRevision"] =
@@ -2104,6 +2140,10 @@ internal static partial class Program
                 "tool", "Program.cs")).Contains(
                 "Resource Player stage does not match its release ledger.",
                 StringComparison.Ordinal);
+            resourcePlayerConsecutiveReleaseHeadPassed = File.ReadAllText(Path.Combine(packageRoot,
+                "tool", "Program.cs")).Contains(
+                "Changed Player evidence does not match the consecutive resource release head.",
+                StringComparison.Ordinal);
         }
         AddRegressionCheck(checks, errors, "schema-workflow-output-contract", workflowSchemaPassed,
             realWorkflowOutputsValidated
@@ -2117,6 +2157,9 @@ internal static partial class Program
         AddRegressionCheck(checks, errors, "resource-player-release-ledger-binding",
             resourcePlayerReleaseLedgerBindingPassed,
             "resource Player evidence must revalidate and reject a tampered release ledger identity");
+        AddRegressionCheck(checks, errors, "resource-player-consecutive-release-head",
+            resourcePlayerConsecutiveReleaseHeadPassed,
+            "every active Base Player must execute the exact consecutive resource release head");
         using var releaseResourceBase = JsonDocument.Parse("{\"mode\":\"Release\",\"releaseReady\":true}");
         using var incompleteResourceBase = JsonDocument.Parse("{\"mode\":\"Release\",\"releaseReady\":false}");
         using var exploratoryResourceBase = JsonDocument.Parse("{\"mode\":\"Exploratory\",\"releaseReady\":true}");
@@ -2129,7 +2172,7 @@ internal static partial class Program
         var sourceTree = GitValue(cli.Root, "rev-parse", "HEAD^{tree}");
         var sourceClean = !string.IsNullOrWhiteSpace(sourceHead) && string.IsNullOrWhiteSpace(GitValue(cli.Root, "status", "--porcelain"));
         var passed = errors.Count == 0;
-        WriteJson(output, new { schemaVersion = 1, format = "hybridclr.dhe-regression.json", generatedAtUtc = DateTimeOffset.UtcNow, sourceHead, sourceTree, sourceClean, passed, realWorkflowOutputsValidated, workflowOutputs, realResolverOutputsValidated, resolverOutputs, checks, errors, warnings = Array.Empty<string>() });
+        WriteJson(output, new { schemaVersion = 1, format = "hybridclr.dhe-regression.json", generatedAtUtc = DateTimeOffset.UtcNow, sourceHead, sourceTree, sourceClean, passed, realWorkflowOutputsValidated, workflowOutputs, validatedResourceRelease, realResolverOutputsValidated, resolverOutputs, checks, errors, warnings = Array.Empty<string>() });
         Console.WriteLine("DHE regression " + (passed ? "passed: " : "failed: ") + output);
         return passed ? 0 : 1;
     }
@@ -2529,7 +2572,15 @@ internal static partial class Program
             reports.Add((ReadJson<JsonElement>(reportPath), reportPath));
         }
 
-        ValidateMultiBaseChangedEvidence(reports.Take(3).ToArray(), true);
+        bool partialBaseSetRejected = false;
+        try
+        {
+            ValidateMultiBaseChangedEvidence(reports.Take(3).ToArray(), true);
+        }
+        catch (DheException)
+        {
+            partialBaseSetRejected = true;
+        }
         ValidateMultiBaseChangedEvidence(reports, true);
         string variantMismatchPath = Path.Combine(root, "player-variant-mismatch.json");
         var variantMismatch = System.Text.Json.Nodes.JsonNode.Parse(
@@ -2542,8 +2593,9 @@ internal static partial class Program
         {
             ValidateMultiBaseChangedEvidence(new[]
             {
-                reports[0], reports[2],
+                reports[0],
                 (ReadJson<JsonElement>(variantMismatchPath), variantMismatchPath),
+                reports[2], reports[3],
             }, true);
         }
         catch (DheException)
@@ -2639,7 +2691,8 @@ internal static partial class Program
         }
         catch (DheException)
         {
-            return variantMismatchRejected && variantMatrixAccepted && variantSelectionRejected;
+            return partialBaseSetRejected && variantMismatchRejected &&
+                variantMatrixAccepted && variantSelectionRejected;
         }
     }
 
@@ -3033,7 +3086,7 @@ internal static partial class Program
             string firstReportPath = Path.Combine(root, "consecutive-n-stage.json");
             string secondReportPath = Path.Combine(root, "consecutive-n-plus-one-stage.json");
             bool consecutiveStable = false;
-            bool releaseLedgerBaseAddition = false;
+            bool releaseLedgerBaseTransition = false;
             if (firstStaged && secondStaged && File.Exists(firstReportPath) &&
                 File.Exists(secondReportPath))
             {
@@ -3098,28 +3151,37 @@ internal static partial class Program
                         GetString(firstReport, "baseMetaVersionTreeSha256After"), StringComparison.OrdinalIgnoreCase) &&
                     string.Equals(GetString(secondReport, "baseMetaVersionTreeSha256Before"),
                         GetString(secondReport, "baseMetaVersionTreeSha256After"), StringComparison.OrdinalIgnoreCase);
-                releaseLedgerBaseAddition = directSuccessorRegistry &&
-                    firstBaseCount == 4 && secondBaseCount == 5 &&
-                    firstBaseCount == firstBaseIds.Length &&
-                    secondBaseCount == secondBaseIds.Length &&
-                    secondBaseCount == firstBaseCount + 1 &&
-                    firstBaseIds.All(firstBaseId => secondBaseIds.Contains(firstBaseId,
-                        StringComparer.OrdinalIgnoreCase)) &&
-                    secondBaseIds.Except(firstBaseIds,
-                        StringComparer.OrdinalIgnoreCase).Count() == 1 &&
-                    firstBaseIds.Contains(GetString(firstReport, "selectedBaseId") ?? string.Empty,
-                        StringComparer.OrdinalIgnoreCase) &&
-                    secondBaseIds.Contains(GetString(secondReport, "selectedBaseId") ?? string.Empty,
-                        StringComparer.OrdinalIgnoreCase);
+                bool ValidBaseTransition(bool unchangedRegistry, bool successorRegistry,
+                    int previousCount, string[] previousIds, int currentCount,
+                    string[] currentIds, string previousSelectedId,
+                    string currentSelectedId) =>
+                    previousCount == previousIds.Length && currentCount == currentIds.Length &&
+                    ((unchangedRegistry && previousIds.SequenceEqual(currentIds,
+                         StringComparer.OrdinalIgnoreCase)) || successorRegistry) &&
+                    previousIds.Contains(previousSelectedId, StringComparer.OrdinalIgnoreCase) &&
+                    currentIds.Contains(currentSelectedId, StringComparer.OrdinalIgnoreCase);
+
+                string firstSelectedId = GetString(firstReport, "selectedBaseId") ?? string.Empty;
+                string secondSelectedId = GetString(secondReport, "selectedBaseId") ?? string.Empty;
+                string[] stableFiveBaseFixture = firstBaseIds.Append(new string('f', 64))
+                    .OrderBy(value => value, StringComparer.OrdinalIgnoreCase).ToArray();
+                bool stableFiveBaseAccepted = ValidBaseTransition(true, false,
+                    stableFiveBaseFixture.Length, stableFiveBaseFixture,
+                    stableFiveBaseFixture.Length, stableFiveBaseFixture,
+                    stableFiveBaseFixture[0], stableFiveBaseFixture[0]);
+                releaseLedgerBaseTransition = stableFiveBaseAccepted &&
+                    ValidBaseTransition(sameRegistry, directSuccessorRegistry,
+                        firstBaseCount, firstBaseIds, secondBaseCount, secondBaseIds,
+                        firstSelectedId, secondSelectedId);
             }
             AddRegressionCheck(checks, errors, "resource-stage-consecutive-base-stable",
                 consecutiveStable,
                 "consecutive updates must use the same or direct-successor Base registry and " +
                 "preserve the selected Base/AOT identity and immutable Base MetaVersion.");
-            AddRegressionCheck(checks, errors, "resource-release-ledger-base-addition",
-                releaseLedgerBaseAddition,
-                "the direct-successor release must retain four active Bases and add exactly " +
-                "one new Base while preserving an old Base through consecutive staging.");
+            AddRegressionCheck(checks, errors, "resource-release-ledger-base-transition",
+                releaseLedgerBaseTransition,
+                "consecutive releases must use the same complete active Base set or an " +
+                "authenticated direct-successor registry while preserving the selected Base.");
         }
 
         var positiveManifest = ReadJson<JsonElement>(Path.Combine(positive.Update,

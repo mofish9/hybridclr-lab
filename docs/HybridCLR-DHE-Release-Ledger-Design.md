@@ -39,6 +39,15 @@ The evidence matrix must cover Unity 2021 Standard, Unity 2022 FGS, and Tuanjie
 one resource release. Data from one engine cannot substitute for another
 engine's Player correctness gate.
 
+Formal evidence must contain exactly one passing changed-Player report for every
+active Base in the release manifest. A subset is not sufficient even when it
+covers all three engine workflows. The regression binds that complete set to the
+exact consecutive `ResourceUpdateRoot2` manifest and ledger, records the validated
+head identity, and release-evidence independently compares the same identity.
+The next hotfix may keep the registry unchanged. If its active Base set changes,
+the registry must be the authenticated direct successor; the workflow does not
+assume a fixed number of Bases or require every hotfix to add a Base.
+
 ## Contract
 
 `resource-update -Mode Release` requires registry mode and exactly one of:

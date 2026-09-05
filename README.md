@@ -51,6 +51,12 @@ direct successor; a reset revision, omitted Base set, stale head, or fork fails
 before a Release manifest is accepted. The final clean regression passes
 117/117 checks over five ledger-aware Windows Base reports and a four-to-five-Base
 direct-successor release. Android/iOS device and CAT project gates remain pending.
+Toolchain `0.1.23` is the active consecutive-Player-evidence candidate. It requires
+one passing Player report for every active Base and binds that complete report set
+to the exact manifest and ledger supplied as the consecutive resource release head.
+The current exploratory regression passes 118/118 checks using one ledger revision 2
+payload executed by all five Windows Base Players; clean-source release gates remain
+pending for this candidate.
 Base identity now also binds `engineWorkflow` and `il2cppCodeGeneration`.
 Unity 2021 is locked to `OptimizeSpeed`; Unity 2022 FGS and Tuanjie 2022 FGS
 are locked to `OptimizeSize`. Base evidence created before these fields existed

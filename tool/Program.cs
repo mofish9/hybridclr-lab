@@ -44,12 +44,13 @@ internal static partial class Program
         "base-registry-explicit-retirement",
         "resource-release-ledger-initialized",
         "resource-release-ledger-continuation",
-        "resource-release-ledger-base-addition",
+        "resource-release-ledger-base-transition",
         "resource-release-ledger-reset-rejected",
         "resource-release-ledger-stale-head-rejected",
         "registry-empty-aot-metadata-set",
         "resource-player-evidence-binding",
         "resource-player-release-ledger-binding",
+        "resource-player-consecutive-release-head",
         "resource-player-legacy-single-payload-compatibility",
         "resource-player-assembly-mode-binding",
         "resource-player-interpreter-only-update",
@@ -2325,7 +2326,9 @@ internal static partial class Program
                 !string.Equals(evidenceHash, GetString(resolver, "sha256"), StringComparison.OrdinalIgnoreCase))
                 throw new DheException("Regression resolver output hash does not match release evidence: " + role);
         }
-        ValidateMultiBaseChangedEvidence(changedReports, true);
+        MultiBaseResourceReleaseProof releaseProof =
+            ReadMultiBaseResourceReleaseProof(changedReports, true);
+        ValidateRegressionResourceReleaseBinding(regressionReport.Value, releaseProof);
     }
 
     private static void ValidateEvidenceRole(string role, JsonElement report, string reportPath,
@@ -2377,7 +2380,9 @@ internal static partial class Program
                 if (noOpWorkflowCount != 1 ||
                     regressionChangedReports.Count < RequiredPlayerEngineWorkflows.Length)
                     throw new DheException("Regression workflow output roles are incomplete.");
-                ValidateMultiBaseChangedEvidence(regressionChangedReports, true);
+                MultiBaseResourceReleaseProof regressionReleaseProof =
+                    ReadMultiBaseResourceReleaseProof(regressionChangedReports, true);
+                ValidateRegressionResourceReleaseBinding(report, regressionReleaseProof);
                 if (!GetBool(report, "realResolverOutputsValidated") ||
                     !report.TryGetProperty("resolverOutputs", out var resolverOutputs) ||
                     resolverOutputs.ValueKind != JsonValueKind.Array || resolverOutputs.GetArrayLength() != 3)
@@ -2734,9 +2739,10 @@ internal static partial class Program
         var supported = supportedRecords
             .Select(item => GetString(item, "baseId") ?? string.Empty)
             .ToHashSet(StringComparer.OrdinalIgnoreCase);
-        if (supported.Count < identities.Length ||
-            identities.Any(item => !supported.Contains(item.Identity.BaseId)))
-            throw new DheException("The shared current payload does not declare every proven Base identity.");
+        if (supported.Count != identities.Length ||
+            !supported.SetEquals(identities.Select(item => item.Identity.BaseId)))
+            throw new DheException(
+                "Changed Player evidence must cover every active Base in the shared resource release.");
 
         foreach (var item in identities)
         {
@@ -2773,6 +2779,93 @@ internal static partial class Program
                 !string.Equals(baseTarget, reportTarget, StringComparison.OrdinalIgnoreCase))
                 throw new DheException("Multi-Base changed evidence target does not match its Base record.");
         }
+
+    }
+
+    private static MultiBaseResourceReleaseProof ReadMultiBaseResourceReleaseProof(
+        IReadOnlyCollection<(JsonElement Report, string Path)> reports, bool requireEngineMatrix)
+    {
+        ValidateMultiBaseChangedEvidence(reports, requireEngineMatrix);
+        var first = reports.First();
+        string manifestPath = ResolveEvidencePath(GetString(first.Report,
+            "resourceUpdateManifest"), Path.GetDirectoryName(first.Path)!,
+            "Multi-Base resource update manifest");
+        string manifestSha256 = Sha256File(manifestPath);
+        if (!string.Equals(manifestSha256,
+            GetString(first.Report, "resourceUpdateManifestSha256"),
+                StringComparison.OrdinalIgnoreCase))
+            throw new DheException("Multi-Base resource manifest hash is invalid.");
+        string ledgerPath = ResolveEvidencePath(GetString(first.Report, "releaseLedger"),
+            Path.GetDirectoryName(first.Path)!, "Multi-Base resource release ledger");
+        ReleaseLedgerDocument ledger = ReadReleaseLedger(ledgerPath,
+            GetString(first.Report, "releaseLedgerSha256"));
+        if (!Path.GetFullPath(ledger.ResourceUpdateManifestPath).Equals(
+                Path.GetFullPath(manifestPath), StringComparison.OrdinalIgnoreCase) ||
+            ledger.ActiveBaseCount != reports.Count)
+            throw new DheException(
+                "Multi-Base Player evidence does not match its release ledger Base set.");
+        return new MultiBaseResourceReleaseProof(manifestSha256, ledger.Sha256,
+            ledger.ParentLedgerSha256 ?? string.Empty, ledger.ChannelId,
+            ledger.Revision, ledger.BaseRegistrySha256,
+            ledger.ActiveBaseCount, ledger.CurrentAssemblySetSha256,
+            ledger.PayloadVariantSetSha256);
+    }
+
+    private static void ValidateChangedPlayerReleaseHead(
+        MultiBaseResourceReleaseProof proof, string expectedUpdateRoot)
+    {
+        string root = RequireDirectory(expectedUpdateRoot,
+            "Expected consecutive resource release");
+        string manifestPath = RequireFile(Path.Combine(root, "dhe-resource-update.json"),
+            "Expected consecutive resource manifest");
+        JsonElement manifest = ReadJson<JsonElement>(manifestPath);
+        ReleaseLedgerDocument? ledger = ValidateReleaseLedgerForStaging(root, manifest);
+        _ = ValidateResourceUpdateCompatibility(root, manifest);
+        if (ledger == null ||
+            !string.Equals(Sha256File(manifestPath), proof.ResourceUpdateManifestSha256,
+                StringComparison.OrdinalIgnoreCase) ||
+            !string.Equals(ledger.Sha256, proof.ReleaseLedgerSha256,
+                StringComparison.OrdinalIgnoreCase) ||
+            proof.ReleaseRevision < 2 ||
+            !IsHex(proof.ParentReleaseLedgerSha256, 64, 64) ||
+            !string.Equals(ledger.ParentLedgerSha256,
+                proof.ParentReleaseLedgerSha256, StringComparison.OrdinalIgnoreCase) ||
+            !string.Equals(ledger.ChannelId, proof.ReleaseChannelId,
+                StringComparison.Ordinal) || ledger.Revision != proof.ReleaseRevision ||
+            !string.Equals(ledger.BaseRegistrySha256, proof.BaseRegistrySha256,
+                StringComparison.OrdinalIgnoreCase) ||
+            ledger.ActiveBaseCount != proof.ActiveBaseCount ||
+            !string.Equals(ledger.CurrentAssemblySetSha256,
+                proof.CurrentAssemblySetSha256, StringComparison.OrdinalIgnoreCase) ||
+            !string.Equals(ledger.PayloadVariantSetSha256,
+                proof.PayloadVariantSetSha256, StringComparison.OrdinalIgnoreCase))
+            throw new DheException(
+                "Changed Player evidence does not match the consecutive resource release head.");
+    }
+
+    private static void ValidateRegressionResourceReleaseBinding(JsonElement regression,
+        MultiBaseResourceReleaseProof proof)
+    {
+        if (!regression.TryGetProperty("validatedResourceRelease", out JsonElement binding) ||
+            binding.ValueKind != JsonValueKind.Object ||
+            !string.Equals(GetString(binding, "resourceUpdateManifestSha256"),
+                proof.ResourceUpdateManifestSha256, StringComparison.OrdinalIgnoreCase) ||
+            !string.Equals(GetString(binding, "releaseLedgerSha256"),
+                proof.ReleaseLedgerSha256, StringComparison.OrdinalIgnoreCase) ||
+            !string.Equals(GetString(binding, "parentReleaseLedgerSha256"),
+                proof.ParentReleaseLedgerSha256, StringComparison.OrdinalIgnoreCase) ||
+            !string.Equals(GetString(binding, "releaseChannelId"), proof.ReleaseChannelId,
+                StringComparison.Ordinal) ||
+            GetInt(binding, "releaseRevision") != proof.ReleaseRevision ||
+            !string.Equals(GetString(binding, "baseRegistrySha256"),
+                proof.BaseRegistrySha256, StringComparison.OrdinalIgnoreCase) ||
+            GetInt(binding, "activeBaseCount") != proof.ActiveBaseCount ||
+            !string.Equals(GetString(binding, "currentAssemblySetSha256"),
+                proof.CurrentAssemblySetSha256, StringComparison.OrdinalIgnoreCase) ||
+            !string.Equals(GetString(binding, "payloadVariantSetSha256"),
+                proof.PayloadVariantSetSha256, StringComparison.OrdinalIgnoreCase))
+            throw new DheException(
+                "Regression evidence does not bind the proven consecutive resource release.");
     }
 
     private static void ValidateResourcePlayerEvidenceBindings(JsonElement report, string reportPath)
@@ -4119,6 +4212,16 @@ internal static partial class Program
         string AotMetadataSetId, string PayloadVariantId,
         string CurrentAssemblySetSha256, ResourceAssemblyMode[] AssemblyModes);
     private sealed record ResourceAssemblyMode(string AssemblyName, string ExecutionMode);
+    private sealed record MultiBaseResourceReleaseProof(
+        string ResourceUpdateManifestSha256,
+        string ReleaseLedgerSha256,
+        string ParentReleaseLedgerSha256,
+        string ReleaseChannelId,
+        int ReleaseRevision,
+        string BaseRegistrySha256,
+        int ActiveBaseCount,
+        string CurrentAssemblySetSha256,
+        string PayloadVariantSetSha256);
     private sealed class CurrentVariantData
     {
         public string VariantId { get; set; } = string.Empty;

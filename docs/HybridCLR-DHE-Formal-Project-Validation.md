@@ -179,6 +179,16 @@ gate accepts only this direct transition and then checks the new current payload
 against every old and new active Base in one invocation. Do not initialize another
 release channel to bypass an incompatible historical Base.
 
+For formal qualification, pass the preceding release as `-ResourceUpdateRoot`
+and the candidate continuation as `-ResourceUpdateRoot2`. Supply one
+`-WorkflowChangedRoots` report directory for every active Base in the candidate
+manifest. The gate rejects a report subset, a report from another release channel
+or revision, and a complete Player matrix whose manifest/ledger hash differs from
+`ResourceUpdateRoot2`. Ordinary hotfix revisions may retain the same registry and
+active Base set. A changed Base set must use an authenticated direct-successor
+registry; additions and explicit retirements are validated by the registry
+lifecycle gates rather than by a fixed Base count.
+
 ## Runtime proof
 
 Every Player downloads the selected current payload variant and compares current
