@@ -649,6 +649,10 @@ internal static partial class Program
         var plannedNames = StringArray(player, "plannedDheAssemblies", errors).OrderBy(x => x, StringComparer.OrdinalIgnoreCase).ToArray();
         if (!planNames.SequenceEqual(loadedNames, StringComparer.OrdinalIgnoreCase) || !planNames.SequenceEqual(plannedNames, StringComparer.OrdinalIgnoreCase))
             errors.Add("Player planned/loaded assembly sets do not match the project plan.");
+        if (plannedNames.Contains("HybridCLR.NewHotfix", StringComparer.OrdinalIgnoreCase) &&
+            (!GetBool(player, "newHotfixPlanned") || !GetBool(player, "newHotfixLoaded") ||
+             !GetBool(player, "newHotfixExecuted") || GetInt(player, "newHotfixResult") != 3705))
+            errors.Add("Player did not execute the interpreter-only new hotfix assembly.");
         if (GetInt(player, "changedMethodCount") != changedMethodCount) errors.Add("Player changed method count does not match the revalidated MV set.");
         if (GetInt(player, "expectedChangedMethodCount") != changedMethodCount) errors.Add("Player expected changed method count does not match the revalidated MV set.");
         ValidatePlayerAssemblies(player, planNames, errors);
@@ -820,6 +824,36 @@ internal static partial class Program
         AddRegressionCheck(checks, errors,
             "runtime-contract-capability-negotiation", v1Compatible && v2Compatible,
             "different runtime build contracts under protocol v1 must be accepted by capability subset");
+        using var buildIdentitySchema = JsonDocument.Parse(File.ReadAllText(Path.Combine(
+            cli.Root, "schemas", "dhe-build-identity.schema.json")));
+        using var nativeManifestSchema = JsonDocument.Parse(File.ReadAllText(Path.Combine(
+            cli.Root, "schemas", "dhe-native-manifest.schema.json")));
+        string buildIdentityContractPattern = GetString(buildIdentitySchema.RootElement
+            .GetProperty("properties").GetProperty("runtimeContract"), "pattern") ?? string.Empty;
+        string nativeManifestContractPattern = GetString(nativeManifestSchema.RootElement
+            .GetProperty("properties").GetProperty("runtimeContract"), "pattern") ?? string.Empty;
+        AddRegressionCheck(checks, errors, "runtime-contract-schema-binding",
+            buildIdentityContractPattern == nativeManifestContractPattern &&
+            System.Text.RegularExpressions.Regex.IsMatch("dhe-runtime-v1",
+                buildIdentityContractPattern) &&
+            System.Text.RegularExpressions.Regex.IsMatch(
+                ResourceUpdateCompatibility.CurrentNativeRuntimeContract,
+                buildIdentityContractPattern),
+            "BuildIdentity and native manifest schemas must accept archived and current versioned contracts");
+        string embeddedPackageRoot = Path.Combine(cli.Root, "unity2021-dhe-demo", "Packages",
+            "com.code-philosophy.hybridclr");
+        string buildPipelineSource = File.ReadAllText(Path.Combine(embeddedPackageRoot,
+            "Editor", "Commands", "DheBuildPipeline.cs"));
+        string managedRuntimeSource = File.ReadAllText(Path.Combine(embeddedPackageRoot,
+            "Runtime", "DheRuntime.cs"));
+        string expectedContractDeclaration = "NativeRuntimeContract = \"" +
+            ResourceUpdateCompatibility.CurrentNativeRuntimeContract + "\"";
+        AddRegressionCheck(checks, errors, "runtime-contract-package-binding",
+            buildPipelineSource.Contains(expectedContractDeclaration,
+                StringComparison.Ordinal) &&
+            managedRuntimeSource.Contains(expectedContractDeclaration,
+                StringComparison.Ordinal),
+            "package build/runtime constants must match the current runtime contract");
         string[] missingCapability = ResourceUpdateCompatibility.KnownRuntimeCapabilities
             .Where(value => value != "stable-method-identity-v1").ToArray();
         AddRegressionCheck(checks, errors, "runtime-capability-missing-rejected",
@@ -828,13 +862,14 @@ internal static partial class Program
                 missingCapability, requiredCapabilities),
             "a Base missing one required update capability must be rejected");
         string identityHash = new string('a', 64);
+        string aotInventoryHash = AssemblyNameSetHash(new[] { "HybridCLR.ManagedCasesAot" });
         string baseIdV1 = ComputeBaseId("StandaloneWindows64", identityHash,
-            new string('b', 64), new string('c', 64), new string('d', 64),
+            aotInventoryHash, new string('b', 64), new string('c', 64), new string('d', 64),
             new string('e', 64), new string('f', 64), ResourceUpdateCompatibility.RuntimeProtocol,
             "dhe-runtime-v1", requiredCapabilities,
             "HybridCLRLab/DheDemo/", "HybridCLRLab/DheDemo/BaseMetaVersion/");
         string baseIdV2 = ComputeBaseId("StandaloneWindows64", identityHash,
-            new string('b', 64), new string('c', 64), new string('d', 64),
+            aotInventoryHash, new string('b', 64), new string('c', 64), new string('d', 64),
             new string('e', 64), new string('f', 64), ResourceUpdateCompatibility.RuntimeProtocol,
             "dhe-runtime-v2", requiredCapabilities,
             "HybridCLRLab/DheDemo/", "HybridCLRLab/DheDemo/BaseMetaVersion/");
@@ -842,6 +877,32 @@ internal static partial class Program
             IsHex(baseIdV1, 64, 64) && IsHex(baseIdV2, 64, 64) &&
             !string.Equals(baseIdV1, baseIdV2, StringComparison.OrdinalIgnoreCase),
             "Base ID must distinguish runtime contracts even for identical managed assemblies");
+        string expandedAotInventoryHash = AssemblyNameSetHash(new[]
+            { "HybridCLR.ManagedCasesAot", "HybridCLR.BoundaryContracts" });
+        string baseIdExpandedInventory = ComputeBaseId("StandaloneWindows64", identityHash,
+            expandedAotInventoryHash, new string('b', 64), new string('c', 64),
+            new string('d', 64), new string('e', 64), new string('f', 64),
+            ResourceUpdateCompatibility.RuntimeProtocol, "dhe-runtime-v1",
+            requiredCapabilities, "HybridCLRLab/DheDemo/",
+            "HybridCLRLab/DheDemo/BaseMetaVersion/");
+        AddRegressionCheck(checks, errors, "composite-base-id-aot-inventory-bound",
+            !string.Equals(baseIdV1, baseIdExpandedInventory,
+                StringComparison.OrdinalIgnoreCase),
+            "Base ID must distinguish complete AOT inventories");
+        var baseDheAssemblies = new HashSet<string>(
+            new[] { "HybridCLR.ManagedCasesAot" }, StringComparer.OrdinalIgnoreCase);
+        var baseAotAssemblies = new HashSet<string>(new[]
+            { "HybridCLR.ManagedCasesAot", "HybridCLR.BoundaryContracts" },
+            StringComparer.OrdinalIgnoreCase);
+        bool ordinaryAotRejected = !TryClassifyAssemblyExecutionMode(
+            "HybridCLR.BoundaryContracts", baseDheAssemblies, baseAotAssemblies,
+            out string ordinaryAotExecutionMode, out string ordinaryAotRejection) &&
+            ordinaryAotExecutionMode == "rejected" &&
+            ordinaryAotRejection ==
+                "assembly-present-in-base-aot-outside-dhe:HybridCLR.BoundaryContracts";
+        AddRegressionCheck(checks, errors, "base-aot-outside-dhe-rejected",
+            ordinaryAotRejected,
+            "an assembly already compiled into the Base outside DHE must not become interpreter-only");
 
         var metadataOne = Encoding.UTF8.GetBytes("metadata-one");
         var metadataTwo = Encoding.UTF8.GetBytes("metadata-two");
@@ -1201,6 +1262,12 @@ internal static partial class Program
             "resource-player-legacy-single-payload-compatibility",
             legacyPayloadSelectionPassed,
             "legacy Player results may omit both payload selection fields only for a single implicit default payload");
+        AddRegressionCheck(checks, errors, "resource-player-assembly-mode-binding",
+            RunResourcePlayerAssemblyModeRegression(),
+            "Player differential/interpreter-only plans and loaded interpreter assemblies must match the selected Base mode map");
+        AddRegressionCheck(checks, errors, "resource-player-interpreter-only-update",
+            RunInterpreterOnlyResourceUpdateRegression(),
+            "a resource update containing only a new interpreter assembly must retain no-op AOT proof without requiring a DHE transaction");
         var runtimeSource = File.ReadAllText(Path.Combine(cli.Root, "tool", "LabCommands.cs"));
         AddRegressionCheck(checks, errors, "runtime-package-source-binding",
             runtimeSource.Contains("ValidateRepoIdentity(\"hybridclr_unity\"", StringComparison.Ordinal),
@@ -1788,6 +1855,99 @@ internal static partial class Program
         return legacyAccepted && partialRejected && variantLegacyRejected && modernAccepted && wrongRejected;
     }
 
+    private static bool RunResourcePlayerAssemblyModeRegression()
+    {
+        using var selectedBase = JsonDocument.Parse("{\"assemblyModes\":[" +
+            "{\"assemblyName\":\"Game.Aot\",\"executionMode\":\"dhe-differential\"}," +
+            "{\"assemblyName\":\"Game.New\",\"executionMode\":\"interpreter-only\"}]}");
+        using var payloadVariant = JsonDocument.Parse("{\"assemblies\":[" +
+            "{\"assemblyName\":\"Game.Aot\"},{\"assemblyName\":\"Game.New\"}]}");
+        using var validPlayer = JsonDocument.Parse("{" +
+            "\"plannedDheAssemblies\":[\"Game.Aot\",\"Game.New\"]," +
+            "\"loadedDheAssemblies\":[\"Game.Aot\",\"Game.New\"]," +
+            "\"plannedDifferentialAssemblies\":[\"Game.Aot\"]," +
+            "\"plannedInterpreterOnlyAssemblies\":[\"Game.New\"]," +
+            "\"loadedInterpreterOnlyAssemblies\":[\"Game.New\"]," +
+            "\"secondaryAssemblyChangedValidated\":true," +
+            "\"secondaryAssemblyDirectValidated\":true}");
+        using var validReport = JsonDocument.Parse("{\"assemblyScope\":{" +
+            "\"strategy\":\"single-current-multibase-resource\"," +
+            "\"aotAssemblies\":[\"Game.Aot\",\"Game.New\"]," +
+            "\"loadedDheAssemblies\":[\"Game.Aot\",\"Game.New\"]," +
+            "\"differentialAssemblies\":[\"Game.Aot\"]," +
+            "\"interpreterOnlyAssemblies\":[\"Game.New\"]," +
+            "\"loadedInterpreterOnlyAssemblies\":[\"Game.New\"]," +
+            "\"stagedDependencies\":[],\"stagedDependenciesLoadedAsDhe\":false," +
+            "\"secondaryAssemblyChangedValidated\":true," +
+            "\"secondaryAssemblyDirectValidated\":true}}");
+        var validErrors = new List<string>();
+        string[] validDifferential = ReadPlayerAssemblyNameArray(validPlayer.RootElement,
+            "plannedDifferentialAssemblies", validErrors);
+        string[] validInterpreterOnly = ReadPlayerAssemblyNameArray(validPlayer.RootElement,
+            "plannedInterpreterOnlyAssemblies", validErrors);
+        string[] validLoadedInterpreterOnly = ReadPlayerAssemblyNameArray(validPlayer.RootElement,
+            "loadedInterpreterOnlyAssemblies", validErrors);
+        ValidatePlayerAssemblyModes(selectedBase.RootElement, payloadVariant.RootElement,
+            validDifferential, validInterpreterOnly, validLoadedInterpreterOnly, validErrors);
+        ValidateResourcePlayerAssemblyScope(validReport.RootElement,
+            new[] { "Game.Aot", "Game.New" },
+            ReadPlayerAssemblyNameArray(validPlayer.RootElement,
+                "plannedDheAssemblies", validErrors),
+            ReadPlayerAssemblyNameArray(validPlayer.RootElement,
+                "loadedDheAssemblies", validErrors), validDifferential,
+            validInterpreterOnly, validLoadedInterpreterOnly,
+            validPlayer.RootElement, validErrors);
+
+        using var missingLoadPlayer = JsonDocument.Parse("{" +
+            "\"plannedDifferentialAssemblies\":[\"Game.Aot\"]," +
+            "\"plannedInterpreterOnlyAssemblies\":[\"Game.New\"]," +
+            "\"loadedInterpreterOnlyAssemblies\":[]}");
+        var missingLoadErrors = new List<string>();
+        ValidatePlayerAssemblyModes(selectedBase.RootElement, payloadVariant.RootElement,
+            ReadPlayerAssemblyNameArray(missingLoadPlayer.RootElement,
+                "plannedDifferentialAssemblies", missingLoadErrors),
+            ReadPlayerAssemblyNameArray(missingLoadPlayer.RootElement,
+                "plannedInterpreterOnlyAssemblies", missingLoadErrors),
+            ReadPlayerAssemblyNameArray(missingLoadPlayer.RootElement,
+                "loadedInterpreterOnlyAssemblies", missingLoadErrors), missingLoadErrors);
+        using var tamperedReport = JsonDocument.Parse("{\"assemblyScope\":{" +
+            "\"strategy\":\"single-current-multibase-resource\"," +
+            "\"aotAssemblies\":[\"Game.Aot\",\"Game.New\"]," +
+            "\"loadedDheAssemblies\":[\"Game.Aot\"]," +
+            "\"differentialAssemblies\":[\"Game.Aot\"]," +
+            "\"interpreterOnlyAssemblies\":[\"Game.New\"]," +
+            "\"loadedInterpreterOnlyAssemblies\":[\"Game.New\"]," +
+            "\"stagedDependencies\":[],\"stagedDependenciesLoadedAsDhe\":false," +
+            "\"secondaryAssemblyChangedValidated\":true," +
+            "\"secondaryAssemblyDirectValidated\":true}}");
+        var tamperedScopeErrors = new List<string>();
+        ValidateResourcePlayerAssemblyScope(tamperedReport.RootElement,
+            new[] { "Game.Aot", "Game.New" },
+            new[] { "Game.Aot", "Game.New" }, new[] { "Game.Aot", "Game.New" },
+            validDifferential, validInterpreterOnly, validLoadedInterpreterOnly,
+            validPlayer.RootElement, tamperedScopeErrors);
+        return validErrors.Count == 0 && missingLoadErrors.Count != 0 &&
+            tamperedScopeErrors.Count != 0;
+    }
+
+    private static bool RunInterpreterOnlyResourceUpdateRegression()
+    {
+        using var player = JsonDocument.Parse("{" +
+            "\"changedMethodCount\":0,\"expectedChangedMethodCount\":0," +
+            "\"interpreterEntryCount\":0,\"aotEntryCount\":1," +
+            "\"resourceUpdateManifestPresent\":true,\"resourceUpdateValidated\":true," +
+            "\"dispatchProbeValidated\":true,\"multiAssemblyValidated\":true," +
+            "\"changedProbeChanged\":false,\"unchangedProbeChanged\":false," +
+            "\"transactionStatus\":\"notApplicable\",\"retryValidated\":false," +
+            "\"noOpAotBehaviorValidated\":true,\"capabilityDirectPassed\":true," +
+            "\"capabilityPassed\":true,\"secondaryAssemblyDirectValidated\":true}");
+        var interpreterOnlyErrors = new List<string>();
+        ValidateResourcePlayerExecution(player.RootElement, 0, 1, interpreterOnlyErrors);
+        var emptyUpdateErrors = new List<string>();
+        ValidateResourcePlayerExecution(player.RootElement, 0, 0, emptyUpdateErrors);
+        return interpreterOnlyErrors.Count == 0 && emptyUpdateErrors.Count != 0;
+    }
+
     private static void RunIntegratedSourceLockRegressions(string regressionRoot,
         List<object> checks, List<string> errors)
     {
@@ -2304,6 +2464,32 @@ internal static partial class Program
                 identityBaseIdTamper.Assets, identityBaseIdTamper.Identity),
             "a BuildIdentity with an invalid composite baseId must be rejected.");
 
+        var identityAotInventoryMissing = CopyFixture("identity-aot-inventory-missing");
+        var missingAotInventoryIdentity = System.Text.Json.Nodes.JsonNode.Parse(
+            File.ReadAllText(identityAotInventoryMissing.Identity))!.AsObject();
+        missingAotInventoryIdentity.Remove("aotAssemblyNames");
+        File.WriteAllText(identityAotInventoryMissing.Identity,
+            missingAotInventoryIdentity.ToJsonString(Json), new UTF8Encoding(false));
+        AddRegressionCheck(checks, errors,
+            "resource-stage-aot-inventory-missing-rejected",
+            !Stage("identity-aot-inventory-missing-stage", identityAotInventoryMissing.Update,
+                identityAotInventoryMissing.Assets, identityAotInventoryMissing.Identity),
+            "a BuildIdentity without the complete Base AOT inventory must be rejected.");
+
+        var identityAotInventoryHashTamper = CopyFixture("identity-aot-inventory-hash-tamper");
+        var tamperedAotInventoryIdentity = System.Text.Json.Nodes.JsonNode.Parse(
+            File.ReadAllText(identityAotInventoryHashTamper.Identity))!.AsObject();
+        tamperedAotInventoryIdentity["aotAssemblySetSha256"] = new string('f', 64);
+        File.WriteAllText(identityAotInventoryHashTamper.Identity,
+            tamperedAotInventoryIdentity.ToJsonString(Json), new UTF8Encoding(false));
+        AddRegressionCheck(checks, errors,
+            "resource-stage-aot-inventory-hash-tamper-rejected",
+            !Stage("identity-aot-inventory-hash-tamper-stage",
+                identityAotInventoryHashTamper.Update,
+                identityAotInventoryHashTamper.Assets,
+                identityAotInventoryHashTamper.Identity),
+            "a BuildIdentity with a tampered Base AOT inventory hash must be rejected.");
+
         var tampered = CopyFixture("payload-tamper");
         var tamperedManifest = ReadJson<JsonElement>(Path.Combine(tampered.Update,
             "dhe-resource-update.json"));
@@ -2705,6 +2891,18 @@ internal static partial class Program
         }
         if (!new HashSet<string>(diffs.Keys, StringComparer.OrdinalIgnoreCase).SetEquals(names))
             errors.Add("Build identity assembly set does not match the project plan.");
+        string[] aotAssemblyNames = Array.Empty<string>();
+        try
+        {
+            aotAssemblyNames = ReadIdentityAotAssemblyNames(identity, identityPath);
+            if (!new HashSet<string>(aotAssemblyNames, StringComparer.OrdinalIgnoreCase)
+                    .IsSupersetOf(names))
+                errors.Add("Build identity DHE set is not a subset of its complete AOT inventory.");
+        }
+        catch (Exception exception)
+        {
+            errors.Add("Build identity complete AOT inventory: " + exception.Message);
+        }
         string managedAssemblySetSha256 = NamedByteSetHash(baselineRecords);
         string baseMetaVersionSetSha256 = NamedByteSetHash(baseMetaVersionRecords);
         if (!managedAssemblySetSha256.Equals(GetString(identity, "managedAssemblySetSha256"),
@@ -2725,7 +2923,9 @@ internal static partial class Program
         try
         {
             string computedBaseId = ComputeBaseId(GetString(identity, "target") ?? string.Empty,
-                managedAssemblySetSha256, GetString(identity, "aotSnapshotSha256") ?? string.Empty,
+                managedAssemblySetSha256,
+                GetString(identity, "aotAssemblySetSha256") ?? string.Empty,
+                GetString(identity, "aotSnapshotSha256") ?? string.Empty,
                 baseMetaVersionSetSha256, GetString(identity, "aotMetadataSetId") ?? string.Empty,
                 GetString(identity, "nativeGuardSourceSha256") ?? string.Empty,
                 GetString(identity, "nativeManifestSha256") ?? string.Empty,

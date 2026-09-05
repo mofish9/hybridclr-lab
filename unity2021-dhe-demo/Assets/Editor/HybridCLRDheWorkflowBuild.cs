@@ -148,6 +148,8 @@ namespace HybridCLR.Lab.Editor
             try
             {
                 BuildPlayer(false);
+                DheProjectBuildSupport.ValidateStagedBuildIdentity(
+                    CreateIdentityOptions(target, baselineRoot, outputRoot));
             }
             finally
             {
@@ -402,6 +404,8 @@ namespace HybridCLR.Lab.Editor
                 ProjectRoot = ProjectRoot(),
                 OutputRoot = outputRoot,
                 BaselineRoot = baselineRoot,
+                AotAssemblyRoot = Path.GetFullPath(
+                    SettingsUtil.GetAssembliesPostIl2CppStripDir(target)),
                 ProjectPlanPath = Path.GetFullPath(Argument("-dheProjectPlan")),
                 Target = target.ToString(),
                 Workflow = "unity2021-dhe-demo",

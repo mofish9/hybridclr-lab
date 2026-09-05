@@ -11,7 +11,7 @@
     "abiContract": { "const": "il2cpp-generated-cpp-signature-v2" },
     "guardHashContract": { "const": "guard-block-set-v1" },
     "runtimeProtocol": { "const": "dhe-runtime-protocol-v1" },
-    "runtimeContract": { "const": "dhe-runtime-v1" },
+    "runtimeContract": { "type": "string", "pattern": "^dhe-runtime-v[1-9][0-9]*$" },
     "runtimeCapabilities": {
       "type": "array",
       "minItems": 2,

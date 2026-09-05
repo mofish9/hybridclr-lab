@@ -26,7 +26,9 @@ internal static partial class Program
         "native-guard-duplicate-marker", "native-guard-missing-end-marker",
         "reference-field-and-type-removal", "value-field-removal-rejected",
         "runtime-contract-capability-negotiation",
+        "runtime-contract-schema-binding", "runtime-contract-package-binding",
         "runtime-capability-missing-rejected", "composite-base-id-runtime-bound",
+        "composite-base-id-aot-inventory-bound", "base-aot-outside-dhe-rejected",
         "resource-stage-plan-capability-bound",
         "resource-stage-aot-metadata-capability-bound",
         "resource-stage-base-registry-audit-bound",
@@ -36,7 +38,11 @@ internal static partial class Program
         "resource-base-registry", "base-registry-builder",
         "resource-player-evidence-binding",
         "resource-player-legacy-single-payload-compatibility",
+        "resource-player-assembly-mode-binding",
+        "resource-player-interpreter-only-update",
         "resource-player-release-readiness",
+        "resource-stage-aot-inventory-missing-rejected",
+        "resource-stage-aot-inventory-hash-tamper-rejected",
         "evidence-managed-release-binding", "evidence-multibase-current-binding",
         "evidence-extensible-player-engine-matrix",
         "bootstrap-engine-workflow-matrix",
@@ -522,6 +528,11 @@ internal static partial class Program
         if (!string.Equals(managedSet, GetString(identity, "managedAssemblySetSha256"),
                 StringComparison.OrdinalIgnoreCase))
             throw new DheException("Base managed assembly set does not match its identity: " + identityPath);
+        string[] aotAssemblyNames = ReadIdentityAotAssemblyNames(identity, identityPath);
+        if (!new HashSet<string>(aotAssemblyNames, StringComparer.OrdinalIgnoreCase)
+                .IsSupersetOf(assemblyNames))
+            throw new DheException(
+                "Base DHE assemblies are not a subset of its complete AOT inventory: " + identityPath);
         return baseId;
     }
 
@@ -867,11 +878,19 @@ internal static partial class Program
 
             var identityAssemblyNames = ReadIdentityAssemblyNames(buildIdentity,
                 buildIdentityPath);
+            var baseAotAssemblyNames = ReadIdentityAotAssemblyNames(buildIdentity,
+                buildIdentityPath);
             var currentNameSet = new HashSet<string>(names,
                 StringComparer.OrdinalIgnoreCase);
             var baselineNameSet = new HashSet<string>(identityAssemblyNames,
                 StringComparer.OrdinalIgnoreCase);
+            var baseAotNameSet = new HashSet<string>(baseAotAssemblyNames,
+                StringComparer.OrdinalIgnoreCase);
             var unsupported = new List<string>();
+            if (!baseAotNameSet.IsSupersetOf(baselineNameSet))
+                throw new DheException(
+                    "Base DHE assembly set is not a subset of the complete AOT inventory: " +
+                    buildIdentityPath);
             // A Base may be older and therefore miss assemblies that are in the
             // current payload. The reverse direction is not safe: removing an
             // assembly cannot unload its already registered AOT image, so the
@@ -956,17 +975,20 @@ internal static partial class Program
             foreach (string currentName in names.Where(name => !baselineNameSet.Contains(name))
                          .OrderBy(name => name, StringComparer.OrdinalIgnoreCase))
             {
+                bool classified = TryClassifyAssemblyExecutionMode(currentName, baselineNameSet,
+                    baseAotNameSet, out string executionMode, out string conflict);
+                if (!classified) unsupported.Add(conflict);
                 // There is no Base MV to compare for a newly introduced
-                // assembly. It is still part of the one current payload, but
-                // the Player must load it through ordinary HybridCLR
-                // interpreter Assembly.Load.
+                // assembly. Interpreter-only loading is valid only when the
+                // assembly is also absent from the Base Player's complete AOT
+                // inventory.
                 assemblyCompatibility.Add(new
                 {
                     assemblyName = currentName,
-                    executionMode = "interpreter-only",
+                    executionMode,
                     baselineAssemblySha256 = (string?)null,
                     baseMetaVersionSha256 = (string?)null,
-                    compatible = true,
+                    compatible = classified,
                     compatibilityPolicy = ResourceUpdateCompatibility.Policy,
                     unchangedMethodCount = 0,
                     changedMethodCount = 0,
@@ -982,8 +1004,8 @@ internal static partial class Program
                     guardRequiredMethodCount = 0,
                     guardCoveredMethodCount = 0,
                     uncoveredStableMethodIds = Array.Empty<string>(),
-                    unsupportedChangeCount = 0,
-                    unsupportedChanges = Array.Empty<string>(),
+                    unsupportedChangeCount = classified ? 0 : 1,
+                    unsupportedChanges = classified ? Array.Empty<string>() : new[] { conflict },
                 });
             }
             var baseMvSetHash = NamedByteSetHash(baseMvSet);
@@ -1007,10 +1029,14 @@ internal static partial class Program
             if (!candidateBaseIdentityKeys.Add(baseIdentityKey))
                 unsupported.Add("duplicate-base-identity:" + baseId);
             bool baseCompatible = uncovered.Count == 0 && unsupported.Count == 0;
-            var assemblyModes = names.OrderBy(name => name, StringComparer.OrdinalIgnoreCase)
-                .Select(name => new ResourceAssemblyMode(name,
-                    baselineNameSet.Contains(name) ? "dhe-differential" : "interpreter-only"))
-                .ToArray();
+            var assemblyModes = new List<ResourceAssemblyMode>();
+            foreach (string name in names.OrderBy(value => value,
+                         StringComparer.OrdinalIgnoreCase))
+            {
+                if (TryClassifyAssemblyExecutionMode(name, baselineNameSet, baseAotNameSet,
+                        out string executionMode, out _))
+                    assemblyModes.Add(new ResourceAssemblyMode(name, executionMode));
+            }
             var baseRecord = new
             {
                 baseId,
@@ -1018,6 +1044,8 @@ internal static partial class Program
                 payloadVariantId,
                 currentAssemblySetSha256 = currentVariant.CurrentSetHash,
                 managedAssemblySetSha256,
+                aotAssemblySetSha256 = GetString(buildIdentity, "aotAssemblySetSha256"),
+                aotAssemblyNames = baseAotAssemblyNames,
                 aotSnapshotSha256 = baseAotSnapshotSha256,
                 baseMetaVersionSetSha256 = baseMvSetHash,
                 aotMetadataSetId,
@@ -1038,12 +1066,12 @@ internal static partial class Program
                 unsupportedChangeCount = unsupported.Count,
                 unsupportedChanges = unsupported.OrderBy(value => value, StringComparer.Ordinal).ToArray(),
                 assemblies = assemblyCompatibility.ToArray(),
-                assemblyModes,
+                assemblyModes = assemblyModes.ToArray(),
             };
             candidateBases.Add(baseRecord);
             resourceBaseSelections.Add(new ResourceAotMetadataBaseSelection(baseId,
                 aotMetadataSetId, payloadVariantId, currentVariant.CurrentSetHash,
-                assemblyModes));
+                assemblyModes.ToArray()));
             if (!baseCompatible)
             {
                 releaseErrors.Add("Base " + baseId + " is incompatible: " +
@@ -1165,6 +1193,16 @@ internal static partial class Program
         if (!string.Equals(GetString(identity, "managedAssemblySetSha256"),
                 managedAssemblySetSha256, StringComparison.OrdinalIgnoreCase))
             errors.Add("base-build-identity-assembly-set-mismatch:" + identityPath);
+        string[] aotAssemblyNames;
+        try
+        {
+            aotAssemblyNames = ReadIdentityAotAssemblyNames(identity, identityPath);
+        }
+        catch (Exception exception)
+        {
+            errors.Add("base-build-identity-aot-inventory:" + exception.Message);
+            aotAssemblyNames = Array.Empty<string>();
+        }
         if (!IsHex(GetString(identity, "aotSnapshotSha256"), 64, 64))
             errors.Add("base-build-identity-aot-snapshot:" + identityPath);
         if (!IsHex(GetString(identity, "nativeGuardSourceSha256"), 64, 64))
@@ -1202,6 +1240,7 @@ internal static partial class Program
                 baseMetaVersionAssetRoot, StringComparison.OrdinalIgnoreCase))
             errors.Add("base-build-identity-asset-roots:" + identityPath);
         string computedBaseId = ComputeBaseId(target, managedAssemblySetSha256,
+            GetString(identity, "aotAssemblySetSha256") ?? string.Empty,
             GetString(identity, "aotSnapshotSha256") ?? string.Empty,
             baseMetaVersionSetSha256, aotMetadataSetId,
             GetString(identity, "nativeGuardSourceSha256") ?? string.Empty,
@@ -1249,8 +1288,59 @@ internal static partial class Program
         return names.OrderBy(name => name, StringComparer.OrdinalIgnoreCase).ToArray();
     }
 
+    private static string[] ReadIdentityAotAssemblyNames(JsonElement identity, string identityPath)
+        => ReadAotAssemblyNames(identity, "Base build identity " + identityPath);
+
+    private static string[] ReadAotAssemblyNames(JsonElement value, string description)
+    {
+        if (!value.TryGetProperty("aotAssemblyNames", out JsonElement assemblies) ||
+            assemblies.ValueKind != JsonValueKind.Array || assemblies.GetArrayLength() == 0)
+            throw new DheException(description + " has no complete AOT inventory.");
+        var names = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+        foreach (JsonElement assembly in assemblies.EnumerateArray())
+        {
+            if (assembly.ValueKind != JsonValueKind.String)
+                throw new DheException(description + " AOT inventory contains a non-string entry.");
+            string rawName = assembly.GetString() ?? string.Empty;
+            string name = NormalizeName(rawName);
+            if (!string.Equals(rawName, name, StringComparison.Ordinal) || !names.Add(name))
+                throw new DheException(
+                    description + " AOT inventory contains a non-canonical or duplicate assembly: " +
+                    rawName);
+        }
+        string[] result = names.OrderBy(name => name, StringComparer.Ordinal).ToArray();
+        string expectedHash = GetString(value, "aotAssemblySetSha256") ?? string.Empty;
+        if (!IsHex(expectedHash, 64, 64) ||
+            !string.Equals(AssemblyNameSetHash(result), expectedHash,
+                StringComparison.OrdinalIgnoreCase))
+            throw new DheException(description + " AOT inventory hash is invalid.");
+        return result;
+    }
+
     private static string NativeStableMethodKey(string assemblyName, string stableId) =>
         NormalizeName(assemblyName) + ":" + stableId.ToLowerInvariant();
+
+    private static bool TryClassifyAssemblyExecutionMode(string assemblyName,
+        ISet<string> baseDheAssemblies, ISet<string> baseAotAssemblies,
+        out string executionMode, out string rejection)
+    {
+        string name = NormalizeName(assemblyName);
+        if (baseDheAssemblies.Contains(name))
+        {
+            executionMode = "dhe-differential";
+            rejection = string.Empty;
+            return true;
+        }
+        if (baseAotAssemblies.Contains(name))
+        {
+            executionMode = "rejected";
+            rejection = "assembly-present-in-base-aot-outside-dhe:" + name;
+            return false;
+        }
+        executionMode = "interpreter-only";
+        rejection = string.Empty;
+        return true;
+    }
 
     private static string[] ReadStringArray(JsonElement value, string property)
     {
@@ -1283,7 +1373,8 @@ internal static partial class Program
     }
 
     private static string ComputeBaseId(string target, string managedAssemblySetSha256,
-        string aotSnapshotSha256, string baseMetaVersionSetSha256,
+        string aotAssemblySetSha256, string aotSnapshotSha256,
+        string baseMetaVersionSetSha256,
         string aotMetadataSetId,
         string nativeGuardSourceSha256, string nativeManifestSha256,
         string runtimeProtocol, string runtimeContract, IEnumerable<string> runtimeCapabilities,
@@ -1294,6 +1385,7 @@ internal static partial class Program
         string canonical = "hybridclr.dhe-base-identity-v1\n" +
             "target=" + target + "\n" +
             "managedAssemblySetSha256=" + managedAssemblySetSha256.ToLowerInvariant() + "\n" +
+            "aotAssemblySetSha256=" + aotAssemblySetSha256.ToLowerInvariant() + "\n" +
             "aotSnapshotSha256=" + aotSnapshotSha256.ToLowerInvariant() + "\n" +
             "baseMetaVersionSetSha256=" + baseMetaVersionSetSha256.ToLowerInvariant() + "\n" +
             "aotMetadataSetId=" + aotMetadataSetId.ToLowerInvariant() + "\n" +
@@ -1322,6 +1414,10 @@ internal static partial class Program
         sha.TransformFinalBlock(Array.Empty<byte>(), 0, 0);
         return Convert.ToHexString(sha.Hash!).ToLowerInvariant();
     }
+
+    private static string AssemblyNameSetHash(IEnumerable<string> assemblyNames) =>
+        Sha256Text(string.Concat(assemblyNames.Select(NormalizeName)
+            .OrderBy(name => name, StringComparer.Ordinal).Select(name => name + "\n")));
 
     private static string NamedByteSetHash(IEnumerable<(string name, byte[] bytes)> records)
     {
@@ -2360,6 +2456,28 @@ internal static partial class Program
             !string.Equals(GetString(selectedManifestBases[0], "currentAssemblySetSha256"),
                 selectedCurrentSet, StringComparison.OrdinalIgnoreCase))
             throw new DheException("Resource Player evidence selects a Base with the wrong AOT metadata set.");
+        var modeErrors = new List<string>();
+        string[] differentialNames = ReadPlayerAssemblyNameArray(player,
+            "plannedDifferentialAssemblies", modeErrors);
+        string[] interpreterOnlyNames = ReadPlayerAssemblyNameArray(player,
+            "plannedInterpreterOnlyAssemblies", modeErrors);
+        string[] loadedInterpreterOnlyNames = ReadPlayerAssemblyNameArray(player,
+            "loadedInterpreterOnlyAssemblies", modeErrors);
+        ValidatePlayerAssemblyModes(selectedManifestBases[0], selectedManifestVariant,
+            differentialNames, interpreterOnlyNames, loadedInterpreterOnlyNames, modeErrors);
+        string[] manifestAssemblyNames = selectedManifestVariant.GetProperty("assemblies")
+            .EnumerateArray().Select(item => NormalizeName(
+                GetString(item, "assemblyName") ?? string.Empty))
+            .OrderBy(name => name, StringComparer.OrdinalIgnoreCase).ToArray();
+        string[] playerPlannedNames = ReadPlayerAssemblyNameArray(player,
+            "plannedDheAssemblies", modeErrors);
+        string[] playerLoadedNames = ReadPlayerAssemblyNameArray(player,
+            "loadedDheAssemblies", modeErrors);
+        ValidateResourcePlayerAssemblyScope(report, manifestAssemblyNames,
+            playerPlannedNames, playerLoadedNames, differentialNames,
+            interpreterOnlyNames, loadedInterpreterOnlyNames, player, modeErrors);
+        if (modeErrors.Count != 0)
+            throw new DheException(string.Join(" ", modeErrors));
         JsonElement selectedValidationVariant = SelectPayloadVariant(validation, selectedVariantId,
             "Resource update validation");
         string payloadVariantSetHash = GetString(manifest, "payloadVariantSetSha256") ?? string.Empty;

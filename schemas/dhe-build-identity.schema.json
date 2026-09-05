@@ -11,6 +11,8 @@
     "target",
     "baseId",
     "managedAssemblySetSha256",
+    "aotAssemblySetSha256",
+    "aotAssemblyNames",
     "aotSnapshotSha256",
     "aotSnapshotKind",
     "identityVersion",
@@ -39,6 +41,11 @@
     "target": { "type": "string", "pattern": "^[A-Za-z0-9._-]+$" },
     "baseId": { "type": "string", "pattern": "^[0-9a-fA-F]{64}$" },
     "managedAssemblySetSha256": { "type": "string", "pattern": "^[0-9a-fA-F]{64}$" },
+    "aotAssemblySetSha256": { "type": "string", "pattern": "^[0-9a-fA-F]{64}$" },
+    "aotAssemblyNames": {
+      "type": "array", "minItems": 1, "uniqueItems": true,
+      "items": { "type": "string", "pattern": "^[^/\\\\]+$", "minLength": 1 }
+    },
     "aotSnapshotAssembly": { "type": "string", "minLength": 1 },
     "aotSnapshotSha256": { "type": "string", "pattern": "^[0-9a-fA-F]{64}$" },
     "aotSnapshotKind": { "const": "managed-assembly-plus-generated-cpp-v1" },
@@ -52,7 +59,7 @@
     "baseMetaVersionSetSha256": { "type": "string", "pattern": "^[0-9a-fA-F]{64}$" },
     "aotMetadataSetId": { "type": "string", "pattern": "^[0-9a-fA-F]{64}$" },
     "runtimeProtocol": { "const": "dhe-runtime-protocol-v1" },
-    "runtimeContract": { "const": "dhe-runtime-v1" },
+    "runtimeContract": { "type": "string", "pattern": "^dhe-runtime-v[1-9][0-9]*$" },
     "runtimeCapabilities": {
       "type": "array", "minItems": 2, "uniqueItems": true,
       "items": { "type": "string", "minLength": 1 }

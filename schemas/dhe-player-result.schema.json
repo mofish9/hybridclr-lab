@@ -13,6 +13,13 @@
     "loadError": { "type": ["string", "null"] },
     "plannedDheAssemblies": { "type": ["array", "null"], "items": { "type": "string", "minLength": 1 } },
     "loadedDheAssemblies": { "type": ["array", "null"], "items": { "type": "string", "minLength": 1 } },
+    "plannedDifferentialAssemblies": { "type": ["array", "null"], "items": { "type": "string", "minLength": 1 } },
+    "plannedInterpreterOnlyAssemblies": { "type": ["array", "null"], "items": { "type": "string", "minLength": 1 } },
+    "loadedInterpreterOnlyAssemblies": { "type": ["array", "null"], "items": { "type": "string", "minLength": 1 } },
+    "newHotfixPlanned": { "type": "boolean" },
+    "newHotfixLoaded": { "type": "boolean" },
+    "newHotfixExecuted": { "type": "boolean" },
+    "newHotfixResult": { "type": "integer" },
     "changedMethodCount": { "type": "integer", "minimum": 0 },
         "retryValidated": { "type": "boolean" },
         "retryAssemblyName": { "type": ["string", "null"] },
@@ -112,7 +119,7 @@
     {
       "if": { "properties": { "passed": { "const": true } }, "required": ["passed"] },
       "then": {
-        "required": ["loadError", "target", "plannedDheAssemblies", "loadedDheAssemblies", "changedMethodCount", "retryValidated", "retryAssemblyName", "retryFailure", "transactionStatus", "assemblyValidations", "multiAssemblyValidated", "buildIdentityValidated", "identityVersion", "aotSnapshotKind", "nativeGuardSourceSha256", "nativeManifestSha256", "selectedBaseId", "selectedAotMetadataSetId", "selectedPayloadVariantId", "selectedPayloadCurrentAssemblySetSha256", "expectedChangedMethodCount", "dispatchProbeValidated", "noOpAotBehaviorValidated", "changedProbeChanged", "unchangedProbeChanged", "interpreterEntryCount", "aotEntryCount"],
+        "required": ["loadError", "target", "plannedDheAssemblies", "loadedDheAssemblies", "plannedDifferentialAssemblies", "plannedInterpreterOnlyAssemblies", "loadedInterpreterOnlyAssemblies", "changedMethodCount", "retryValidated", "retryAssemblyName", "retryFailure", "transactionStatus", "assemblyValidations", "multiAssemblyValidated", "buildIdentityValidated", "identityVersion", "aotSnapshotKind", "nativeGuardSourceSha256", "nativeManifestSha256", "selectedBaseId", "selectedAotMetadataSetId", "selectedPayloadVariantId", "selectedPayloadCurrentAssemblySetSha256", "expectedChangedMethodCount", "dispatchProbeValidated", "noOpAotBehaviorValidated", "changedProbeChanged", "unchangedProbeChanged", "interpreterEntryCount", "aotEntryCount"],
         "properties": {
           "loadError": { "const": "OK" },
           "plannedDheAssemblies": { "type": "array", "minItems": 1, "uniqueItems": true },

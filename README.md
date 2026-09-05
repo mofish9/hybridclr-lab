@@ -6,7 +6,7 @@ HybridCLR community runtime on Tuanjie 1.10.0.
 ## Fixed baseline
 
 - Tuanjie: `1.10.0` (`2022.3.62t12`)
-- HybridCLR package: `v8.13.0` (`optimize/v8.13.0@f243dfb`, tree `0B32A6B7C4B90AD31BF8D083A2A94B7D2E639401219E315B461996B36B737078`, no package opt tag)
+- HybridCLR package: `v8.13.0` (`optimize/v8.13.0@f9d3282`, tree `72D63EB4D081EF5628AB049455FC144C43AF4484CB77776A170911522788E92F`, no package opt tag)
 - HybridCLR runtime: DHE candidate based on `v8.13.0-opt4.1` (`fe3b1ed`, no new runtime tag)
 - il2cpp_plus: `v2022-tuanjie-8.13.0-opt4.1` (`52968ad`)
 
@@ -43,6 +43,12 @@ structural current payload while computing 71 changed methods (72 for the older 
 2022 Base). This is a Windows multi-engine result;
 it is not Android/iOS evidence, and target-specific managed metadata differences remain
 fail-closed for a shared payload.
+The latest Unity 2021 fixed-Base regression also binds the complete 43-assembly
+stripped AOT inventory. Without rebuilding the Player, it loaded and executed a
+genuinely new fifth hot-update assembly through `interpreter-only` while the
+four Base DHE assemblies retained differential execution. A control assembly
+already present in the Base AOT inventory but outside DHE was rejected instead
+of being misclassified as new.
 The 0.1.20 release contract extends this proof to an arbitrary changed-Player
 evidence list and requires Unity 2021, Unity 2022, and Tuanjie 2022 coverage
 over one resource manifest. A manifest can use one shared current payload or

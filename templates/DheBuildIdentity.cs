@@ -8,6 +8,7 @@ namespace __DHE_IDENTITY_NAMESPACE__
         public const string AotSnapshotKind = "uninitialized-template";
         public const string BaseId = "0000000000000000000000000000000000000000000000000000000000000000";
         public const string ManagedAssemblySetSha256 = "0000000000000000000000000000000000000000000000000000000000000000";
+        public const string AotAssemblySetSha256 = "0000000000000000000000000000000000000000000000000000000000000000";
         public const string AotSnapshotSha256 = "0000000000000000000000000000000000000000000000000000000000000000";
         public const string NativeGuardSourceSha256 = "0000000000000000000000000000000000000000000000000000000000000000";
         public const string NativeManifestSha256 = "0000000000000000000000000000000000000000000000000000000000000000";
@@ -18,6 +19,7 @@ namespace __DHE_IDENTITY_NAMESPACE__
         public const string RuntimeAssetRoot = "";
         public const string BaseMetaVersionAssetRoot = "";
         public static readonly string[] RuntimeCapabilities = new string[0];
+        public static readonly string[] AotAssemblyNames = new string[0];
         public static readonly string[] AssemblyNames = new string[0];
         public static readonly string[] BaseMetaVersionHashes = new string[0];
 
@@ -30,6 +32,7 @@ namespace __DHE_IDENTITY_NAMESPACE__
                 AotSnapshotKind = AotSnapshotKind,
                 BaseId = BaseId,
                 ManagedAssemblySetSha256 = ManagedAssemblySetSha256,
+                AotAssemblySetSha256 = AotAssemblySetSha256,
                 AotSnapshotSha256 = AotSnapshotSha256,
                 NativeGuardSourceSha256 = NativeGuardSourceSha256,
                 NativeManifestSha256 = NativeManifestSha256,
@@ -38,6 +41,7 @@ namespace __DHE_IDENTITY_NAMESPACE__
                 RuntimeProtocol = RuntimeProtocol,
                 RuntimeContract = RuntimeContract,
                 RuntimeCapabilities = RuntimeCapabilities,
+                AotAssemblyNames = AotAssemblyNames,
                 RuntimeAssetRoot = RuntimeAssetRoot,
                 BaseMetaVersionAssetRoot = BaseMetaVersionAssetRoot,
                 AssemblyNames = AssemblyNames,

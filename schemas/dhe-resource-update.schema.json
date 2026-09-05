@@ -85,7 +85,7 @@
       "minItems": 1,
       "items": {
         "type": "object",
-          "required": ["baseId", "target", "managedAssemblySetSha256", "aotSnapshotSha256", "baseMetaVersionSetSha256", "aotMetadataSetId", "nativeGuardSourceSha256", "nativeManifestSha256", "runtimeProtocol", "nativeRuntimeContract", "runtimeCapabilities", "requiredRuntimeCapabilities", "runtimeAssetRoot", "baseMetaVersionAssetRoot", "buildIdentitySha256", "compatibilityPolicy", "compatible", "guardCoverageValidated", "unsupportedChangeCount", "unsupportedChanges", "assemblies"],
+          "required": ["baseId", "target", "managedAssemblySetSha256", "aotAssemblySetSha256", "aotAssemblyNames", "aotSnapshotSha256", "baseMetaVersionSetSha256", "aotMetadataSetId", "nativeGuardSourceSha256", "nativeManifestSha256", "runtimeProtocol", "nativeRuntimeContract", "runtimeCapabilities", "requiredRuntimeCapabilities", "runtimeAssetRoot", "baseMetaVersionAssetRoot", "buildIdentitySha256", "compatibilityPolicy", "compatible", "guardCoverageValidated", "unsupportedChangeCount", "unsupportedChanges", "assemblies"],
           "properties": {
           "baseId": { "type": "string", "pattern": "^[0-9a-fA-F]{64}$" },
           "target": { "type": "string", "pattern": "^[A-Za-z0-9._-]+$" },
@@ -103,6 +103,11 @@
             }
           },
           "managedAssemblySetSha256": { "type": "string", "pattern": "^[0-9a-fA-F]{64}$" },
+          "aotAssemblySetSha256": { "type": "string", "pattern": "^[0-9a-fA-F]{64}$" },
+          "aotAssemblyNames": {
+            "type": "array", "minItems": 1, "uniqueItems": true,
+            "items": { "type": "string", "pattern": "^[^/\\\\]+$", "minLength": 1 }
+          },
           "aotSnapshotSha256": { "type": "string", "pattern": "^[0-9a-fA-F]{64}$" },
           "baseMetaVersionSetSha256": { "type": "string", "pattern": "^[0-9a-fA-F]{64}$" },
           "aotMetadataSetId": { "type": "string", "pattern": "^[0-9a-fA-F]{64}$" },
@@ -133,7 +138,7 @@
             "minItems": 1,
             "items": {
               "type": "object",
-              "required": ["assemblyName", "baselineAssemblySha256", "baseMetaVersionSha256", "compatible", "compatibilityPolicy", "unchangedMethodCount", "changedMethodCount", "bodyOnlyChangedMethodCount", "dependencyChangedMethodCount", "removedMethodCount", "addedMethodCount", "removedFieldCount", "addedFieldCount", "changedExistingTypeCount", "removedTypeCount", "addedTypeCount", "guardRequiredMethodCount", "guardCoveredMethodCount", "uncoveredStableMethodIds", "unsupportedChangeCount", "unsupportedChanges"],
+              "required": ["assemblyName", "executionMode", "baselineAssemblySha256", "baseMetaVersionSha256", "compatible", "compatibilityPolicy", "unchangedMethodCount", "changedMethodCount", "bodyOnlyChangedMethodCount", "dependencyChangedMethodCount", "removedMethodCount", "addedMethodCount", "removedFieldCount", "addedFieldCount", "changedExistingTypeCount", "removedTypeCount", "addedTypeCount", "guardRequiredMethodCount", "guardCoveredMethodCount", "uncoveredStableMethodIds", "unsupportedChangeCount", "unsupportedChanges"],
                 "properties": {
                   "assemblyName": { "type": "string", "minLength": 1 },
                 "executionMode": { "enum": ["dhe-differential", "interpreter-only"] },

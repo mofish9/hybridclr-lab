@@ -298,38 +298,24 @@ internal static partial class Program
         string[] loadedNames = player.GetProperty("loadedDheAssemblies").EnumerateArray()
             .Select(item => item.GetString() ?? string.Empty)
             .OrderBy(name => name, StringComparer.OrdinalIgnoreCase).ToArray();
-        string[] differentialNames = player.TryGetProperty("plannedDifferentialAssemblies",
-                out JsonElement differentialAssemblyValues) &&
-            differentialAssemblyValues.ValueKind == JsonValueKind.Array
-            ? differentialAssemblyValues.EnumerateArray().Select(item => item.GetString() ?? string.Empty)
-                .OrderBy(name => name, StringComparer.OrdinalIgnoreCase).ToArray()
-            : assemblyNames;
-        string[] interpreterOnlyNames = player.TryGetProperty("plannedInterpreterOnlyAssemblies",
-                out JsonElement interpreterOnlyAssemblyValues) &&
-            interpreterOnlyAssemblyValues.ValueKind == JsonValueKind.Array
-            ? interpreterOnlyAssemblyValues.EnumerateArray().Select(item => item.GetString() ?? string.Empty)
-                .OrderBy(name => name, StringComparer.OrdinalIgnoreCase).ToArray()
-            : Array.Empty<string>();
+        string[] differentialNames = ReadPlayerAssemblyNameArray(player,
+            "plannedDifferentialAssemblies", errors);
+        string[] interpreterOnlyNames = ReadPlayerAssemblyNameArray(player,
+            "plannedInterpreterOnlyAssemblies", errors);
+        string[] loadedInterpreterOnlyNames = ReadPlayerAssemblyNameArray(player,
+            "loadedInterpreterOnlyAssemblies", errors);
         if (!assemblyNames.SequenceEqual(plannedNames, StringComparer.OrdinalIgnoreCase) ||
             !assemblyNames.SequenceEqual(loadedNames, StringComparer.OrdinalIgnoreCase))
             errors.Add("Resource manifest and Player assembly scopes do not agree.");
+        ValidatePlayerAssemblyModes(selectedBase, selectedManifestVariant,
+            differentialNames, interpreterOnlyNames, loadedInterpreterOnlyNames, errors);
         ValidatePlayerAssemblies(player, assemblyNames, errors);
 
         int expectedChanged = selectedBase.ValueKind == JsonValueKind.Undefined ? 0 :
             selectedBase.GetProperty("assemblies").EnumerateArray().Sum(item =>
                 GetInt(item, "guardRequiredMethodCount") + GetInt(item, "addedMethodCount"));
-        if (expectedChanged <= 0 || GetInt(player, "changedMethodCount") != expectedChanged ||
-            GetInt(player, "expectedChangedMethodCount") != expectedChanged ||
-            GetInt(player, "interpreterEntryCount") <= 0 || GetInt(player, "aotEntryCount") <= 0 ||
-            !GetBool(player, "resourceUpdateManifestPresent") ||
-            !GetBool(player, "resourceUpdateValidated") || !GetBool(player, "dispatchProbeValidated") ||
-            !GetBool(player, "changedProbeChanged") ||
-            !GetBool(player, "multiAssemblyValidated") || !GetBool(player, "capabilityPassed") ||
-            !GetBool(player, "secondaryAssemblyChangedValidated") ||
-            !GetBool(player, "structuralPassed") || !GetBool(player, "retryValidated") ||
-            GetString(player, "transactionStatus") != "validated" ||
-            GetString(player, "retryFailure") != "DHE_MV_REGISTRATION_FAILED")
-            errors.Add("Resource Player did not prove changed interpreter/AOT dispatch, structure, and rollback.");
+        ValidateResourcePlayerExecution(player, expectedChanged,
+            interpreterOnlyNames.Length, errors);
 
         if (!GetBool(stage, "baseMetaVersionUnchanged") ||
             stage.GetProperty("immutableFiles").EnumerateArray().Any(item =>
@@ -393,6 +379,7 @@ internal static partial class Program
                 loadedDheAssemblies = loadedNames,
                 differentialAssemblies = differentialNames,
                 interpreterOnlyAssemblies = interpreterOnlyNames,
+                loadedInterpreterOnlyAssemblies = loadedInterpreterOnlyNames,
                 stagedDependencies = Array.Empty<string>(),
                 stagedDependenciesLoadedAsDhe = false,
                 secondaryAssemblyChangedValidated = GetBool(player,
@@ -449,6 +436,203 @@ internal static partial class Program
         return 0;
     }
 
+    private static string[] ReadPlayerAssemblyNameArray(JsonElement player, string property,
+        List<string> errors)
+    {
+        if (!player.TryGetProperty(property, out JsonElement values) ||
+            values.ValueKind != JsonValueKind.Array)
+        {
+            errors.Add("Resource Player " + property + " must be an array.");
+            return Array.Empty<string>();
+        }
+
+        var names = new List<string>();
+        foreach (JsonElement value in values.EnumerateArray())
+        {
+            if (value.ValueKind != JsonValueKind.String ||
+                string.IsNullOrWhiteSpace(value.GetString()))
+            {
+                errors.Add("Resource Player " + property +
+                    " contains a non-string or empty assembly name.");
+                continue;
+            }
+            try
+            {
+                string rawName = value.GetString() ?? string.Empty;
+                string name = NormalizeName(rawName);
+                if (!string.Equals(rawName, name, StringComparison.Ordinal))
+                    errors.Add("Resource Player " + property +
+                        " contains a non-canonical assembly name: " + rawName);
+                else
+                    names.Add(name);
+            }
+            catch (Exception exception)
+            {
+                errors.Add("Resource Player " + property + ": " + exception.Message);
+            }
+        }
+        if (names.Distinct(StringComparer.OrdinalIgnoreCase).Count() != names.Count)
+            errors.Add("Resource Player " + property + " contains duplicate assembly names.");
+        return names.Distinct(StringComparer.OrdinalIgnoreCase)
+            .OrderBy(name => name, StringComparer.OrdinalIgnoreCase).ToArray();
+    }
+
+    private static void ValidatePlayerAssemblyModes(JsonElement selectedBase,
+        JsonElement selectedManifestVariant, string[] differentialNames,
+        string[] interpreterOnlyNames, string[] loadedInterpreterOnlyNames,
+        List<string> errors)
+    {
+        if (selectedBase.ValueKind == JsonValueKind.Undefined ||
+            !selectedBase.TryGetProperty("assemblyModes", out JsonElement modeValues) ||
+            modeValues.ValueKind != JsonValueKind.Array)
+        {
+            errors.Add("Selected resource Base has no assembly execution mode map.");
+            return;
+        }
+
+        var expectedModes = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
+        foreach (JsonElement value in modeValues.EnumerateArray())
+        {
+            string name;
+            try
+            {
+                string rawName = GetString(value, "assemblyName") ?? string.Empty;
+                name = NormalizeName(rawName);
+                if (!string.Equals(rawName, name, StringComparison.Ordinal))
+                    throw new DheException("non-canonical assembly name: " + rawName);
+            }
+            catch (Exception exception)
+            {
+                errors.Add("Selected resource Base assembly mode: " + exception.Message);
+                continue;
+            }
+            string mode = GetString(value, "executionMode") ?? string.Empty;
+            if (!IsDheExecutionMode(mode) || !expectedModes.TryAdd(name, mode))
+                errors.Add("Selected resource Base has an invalid or duplicate assembly mode: " +
+                    name + "/" + mode);
+        }
+
+        string[] payloadNames = selectedManifestVariant.GetProperty("assemblies")
+            .EnumerateArray().Select(item => NormalizeName(
+                GetString(item, "assemblyName") ?? string.Empty))
+            .OrderBy(name => name, StringComparer.OrdinalIgnoreCase).ToArray();
+        if (payloadNames.Distinct(StringComparer.OrdinalIgnoreCase).Count() != payloadNames.Length ||
+            !new HashSet<string>(payloadNames, StringComparer.OrdinalIgnoreCase)
+                .SetEquals(expectedModes.Keys))
+            errors.Add("Selected resource Base mode map does not cover the payload assembly set.");
+
+        string[] expectedDifferential = expectedModes.Where(pair =>
+                string.Equals(pair.Value, "dhe-differential", StringComparison.Ordinal))
+            .Select(pair => pair.Key).OrderBy(name => name, StringComparer.OrdinalIgnoreCase).ToArray();
+        string[] expectedInterpreterOnly = expectedModes.Where(pair =>
+                string.Equals(pair.Value, "interpreter-only", StringComparison.Ordinal))
+            .Select(pair => pair.Key).OrderBy(name => name, StringComparer.OrdinalIgnoreCase).ToArray();
+        if (!expectedDifferential.SequenceEqual(differentialNames,
+                StringComparer.OrdinalIgnoreCase) ||
+            !expectedInterpreterOnly.SequenceEqual(interpreterOnlyNames,
+                StringComparer.OrdinalIgnoreCase))
+            errors.Add("Resource Player planned assembly execution modes do not match the selected Base.");
+        if (!expectedInterpreterOnly.SequenceEqual(loadedInterpreterOnlyNames,
+                StringComparer.OrdinalIgnoreCase))
+            errors.Add("Resource Player did not load the complete interpreter-only assembly set.");
+    }
+
+    private static void ValidateResourcePlayerAssemblyScope(JsonElement report,
+        string[] manifestAssemblyNames, string[] playerPlannedNames,
+        string[] playerLoadedNames, string[] differentialNames,
+        string[] interpreterOnlyNames, string[] loadedInterpreterOnlyNames,
+        JsonElement player, List<string> errors)
+    {
+        if (!report.TryGetProperty("assemblyScope", out JsonElement scope) ||
+            scope.ValueKind != JsonValueKind.Object)
+        {
+            errors.Add("Resource Player workflow assembly scope is missing.");
+            return;
+        }
+
+        string[] reportedAssemblies = ReadPlayerAssemblyNameArray(scope,
+            "aotAssemblies", errors);
+        string[] reportedLoaded = ReadPlayerAssemblyNameArray(scope,
+            "loadedDheAssemblies", errors);
+        string[] reportedDifferential = ReadPlayerAssemblyNameArray(scope,
+            "differentialAssemblies", errors);
+        string[] reportedInterpreterOnly = ReadPlayerAssemblyNameArray(scope,
+            "interpreterOnlyAssemblies", errors);
+        string[] reportedLoadedInterpreterOnly = ReadPlayerAssemblyNameArray(scope,
+            "loadedInterpreterOnlyAssemblies", errors);
+        bool dependenciesEmpty = scope.TryGetProperty("stagedDependencies",
+            out JsonElement dependencies) && dependencies.ValueKind == JsonValueKind.Array &&
+            dependencies.GetArrayLength() == 0;
+        if (!string.Equals(GetString(scope, "strategy"),
+                "single-current-multibase-resource", StringComparison.Ordinal) ||
+            !manifestAssemblyNames.SequenceEqual(playerPlannedNames,
+                StringComparer.OrdinalIgnoreCase) ||
+            !manifestAssemblyNames.SequenceEqual(playerLoadedNames,
+                StringComparer.OrdinalIgnoreCase) ||
+            !manifestAssemblyNames.SequenceEqual(reportedAssemblies,
+                StringComparer.OrdinalIgnoreCase) ||
+            !playerLoadedNames.SequenceEqual(reportedLoaded,
+                StringComparer.OrdinalIgnoreCase) ||
+            !differentialNames.SequenceEqual(reportedDifferential,
+                StringComparer.OrdinalIgnoreCase) ||
+            !interpreterOnlyNames.SequenceEqual(reportedInterpreterOnly,
+                StringComparer.OrdinalIgnoreCase) ||
+            !loadedInterpreterOnlyNames.SequenceEqual(reportedLoadedInterpreterOnly,
+                StringComparer.OrdinalIgnoreCase) ||
+            !dependenciesEmpty || GetBool(scope, "stagedDependenciesLoadedAsDhe") ||
+            !GetBool(scope, "secondaryAssemblyChangedValidated") ||
+            !GetBool(player, "secondaryAssemblyChangedValidated") ||
+            !GetBool(scope, "secondaryAssemblyDirectValidated") ||
+            !GetBool(player, "secondaryAssemblyDirectValidated"))
+            errors.Add("Resource Player workflow assembly scope differs from its manifest or Player result.");
+    }
+
+    private static void ValidateResourcePlayerExecution(JsonElement player, int expectedChanged,
+        int interpreterOnlyAssemblyCount, List<string> errors)
+    {
+        if (expectedChanged < 0 || interpreterOnlyAssemblyCount < 0 ||
+            (expectedChanged == 0 && interpreterOnlyAssemblyCount == 0))
+        {
+            errors.Add("Resource Player evidence contains no differential change or new assembly.");
+            return;
+        }
+        if (GetInt(player, "changedMethodCount") != expectedChanged ||
+            GetInt(player, "expectedChangedMethodCount") != expectedChanged ||
+            GetInt(player, "aotEntryCount") <= 0 ||
+            !GetBool(player, "resourceUpdateManifestPresent") ||
+            !GetBool(player, "resourceUpdateValidated") ||
+            !GetBool(player, "dispatchProbeValidated") ||
+            !GetBool(player, "multiAssemblyValidated"))
+        {
+            errors.Add("Resource Player did not prove its selected update and unchanged AOT path.");
+            return;
+        }
+
+        if (expectedChanged > 0)
+        {
+            if (GetInt(player, "interpreterEntryCount") <= 0 ||
+                !GetBool(player, "changedProbeChanged") ||
+                !GetBool(player, "capabilityPassed") ||
+                !GetBool(player, "secondaryAssemblyChangedValidated") ||
+                !GetBool(player, "structuralPassed") || !GetBool(player, "retryValidated") ||
+                GetString(player, "transactionStatus") != "validated" ||
+                GetString(player, "retryFailure") != "DHE_MV_REGISTRATION_FAILED")
+                errors.Add("Resource Player did not prove changed interpreter/AOT dispatch, " +
+                    "structure, and rollback.");
+            return;
+        }
+
+        try
+        {
+            ValidateNoOpPlayerEvidence(player);
+        }
+        catch (Exception exception)
+        {
+            errors.Add("Interpreter-only resource update did not preserve Base AOT behavior: " +
+                exception.Message);
+        }
+    }
+
     private static bool ResourcePlayerReleaseReady(JsonElement baseWorkflow) =>
         string.Equals(GetString(baseWorkflow, "mode"), "Release", StringComparison.Ordinal) &&
         GetBool(baseWorkflow, "releaseReady");
@@ -469,6 +653,9 @@ internal static partial class Program
         string baseId = GetString(identity, "baseId") ?? string.Empty;
         string target = GetString(identity, "target") ?? string.Empty;
         string managedSet = GetString(identity, "managedAssemblySetSha256") ?? string.Empty;
+        string aotAssemblySet = GetString(identity, "aotAssemblySetSha256") ?? string.Empty;
+        string[] aotAssemblyNames = ReadAotAssemblyNames(identity,
+            "Base Player build identity");
         string snapshot = GetString(identity, "aotSnapshotSha256") ?? string.Empty;
         string baseMetaVersionSet = GetString(identity, "baseMetaVersionSetSha256") ?? string.Empty;
         string aotMetadataSetId = GetString(identity, "aotMetadataSetId") ?? string.Empty;
@@ -486,6 +673,7 @@ internal static partial class Program
         if (target.Length == 0 || target.Any(character => !(char.IsLetterOrDigit(character) ||
                 character is '.' or '_' or '-')) ||
             !IsHex(baseId, 64, 64) || !IsHex(managedSet, 64, 64) ||
+            !IsHex(aotAssemblySet, 64, 64) ||
             !IsHex(snapshot, 64, 64) || !IsHex(baseMetaVersionSet, 64, 64) ||
             !IsHex(aotMetadataSetId, 64, 64) ||
             !IsHex(guard, 64, 64) || !IsHex(nativeManifest, 64, 64) ||
@@ -494,7 +682,7 @@ internal static partial class Program
             !IsValidCapabilitySet(runtimeCapabilities))
             throw new DheException("Base Player build identity fields are invalid.");
 
-        string computedBaseId = ComputeBaseId(target, managedSet, snapshot,
+        string computedBaseId = ComputeBaseId(target, managedSet, aotAssemblySet, snapshot,
             baseMetaVersionSet, aotMetadataSetId, guard, nativeManifest, runtimeProtocol, runtimeContract,
             runtimeCapabilities, runtimeAssetRoot, baseMetaVersionAssetRoot);
         if (!string.Equals(baseId, computedBaseId, StringComparison.OrdinalIgnoreCase))
@@ -520,6 +708,11 @@ internal static partial class Program
                 StringComparison.Ordinal) ||
             !string.Equals(GetString(selected, "managedAssemblySetSha256"), managedSet,
                 StringComparison.OrdinalIgnoreCase) ||
+            !string.Equals(GetString(selected, "aotAssemblySetSha256"), aotAssemblySet,
+                StringComparison.OrdinalIgnoreCase) ||
+            !new HashSet<string>(ReadAotAssemblyNames(selected,
+                    "Selected resource update Base"), StringComparer.OrdinalIgnoreCase)
+                .SetEquals(aotAssemblyNames) ||
             !string.Equals(GetString(selected, "aotSnapshotSha256"), snapshot,
                 StringComparison.OrdinalIgnoreCase) ||
             !string.Equals(GetString(selected, "baseMetaVersionSetSha256"),
@@ -966,6 +1159,8 @@ internal static partial class Program
                 "runtimeCapabilities");
             string[] requiredRuntimeCapabilities = ReadRuntimeCapabilities(supportedBase,
                 "requiredRuntimeCapabilities");
+            string[] supportedAotAssemblies = ReadAotAssemblyNames(supportedBase,
+                "DHE resource supported Base " + baseId);
             if (!IsHex(baseId, 64, 64) || !GetBool(supportedBase, "compatible") ||
                 !GetBool(supportedBase, "guardCoverageValidated") ||
                 GetInt(supportedBase, "unsupportedChangeCount") != 0 ||
@@ -981,6 +1176,9 @@ internal static partial class Program
                 !GetBool(validatedBase, "compatible") ||
                 !GetBool(validatedBase, "guardCoverageValidated") ||
                 GetInt(validatedBase, "unsupportedChangeCount") != 0 ||
+                !new HashSet<string>(ReadAotAssemblyNames(validatedBase,
+                        "DHE resource validated Base " + baseId),
+                    StringComparer.OrdinalIgnoreCase).SetEquals(supportedAotAssemblies) ||
                 !string.Equals(GetString(validatedBase, "nativeRuntimeContract"),
                     GetString(supportedBase, "nativeRuntimeContract"), StringComparison.Ordinal) ||
                 !string.Equals(GetString(validatedBase, "aotMetadataSetId"),
@@ -1142,18 +1340,20 @@ internal static partial class Program
         var target = GetString(value, "target") ?? string.Empty;
         var baseId = GetString(value, "baseId") ?? string.Empty;
         var managed = GetString(value, "managedAssemblySetSha256") ?? string.Empty;
+        var aotAssemblySet = GetString(value, "aotAssemblySetSha256") ?? string.Empty;
         var snapshot = GetString(value, "aotSnapshotSha256") ?? string.Empty;
         var baseMetaVersion = GetString(value, "baseMetaVersionSetSha256") ?? string.Empty;
         var aotMetadataSetId = GetString(value, "aotMetadataSetId") ?? string.Empty;
         var guard = GetString(value, "nativeGuardSourceSha256") ?? string.Empty;
         var nativeManifest = GetString(value, "nativeManifestSha256") ?? string.Empty;
         if (target.Length == 0 || !IsHex(baseId, 64, 64) || !IsHex(managed, 64, 64) ||
+            !IsHex(aotAssemblySet, 64, 64) ||
             !IsHex(snapshot, 64, 64) ||
             !IsHex(baseMetaVersion, 64, 64) || !IsHex(aotMetadataSetId, 64, 64) ||
             !IsHex(guard, 64, 64) ||
             !IsHex(nativeManifest, 64, 64))
             throw new DheException("DHE resource update contains an incomplete Player Base identity.");
-        return string.Join("|", target, baseId, managed, snapshot, baseMetaVersion,
+        return string.Join("|", target, baseId, managed, aotAssemblySet, snapshot, baseMetaVersion,
             aotMetadataSetId, guard,
             nativeManifest);
     }

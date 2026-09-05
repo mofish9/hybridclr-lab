@@ -199,6 +199,17 @@ internal static class LabCommands
                 args.Add("-p:DefineConstants=" + dependencyDefine.Replace(";", "%3B", StringComparison.Ordinal));
             RunProcess("dotnet", args, lab);
         }
+        if (isCurrent)
+        {
+            RunProcess("dotnet", new[]
+            {
+                "build",
+                Path.Combine(lab,
+                    "managed-cases/HybridCLR.NewHotfix/HybridCLR.NewHotfix.csproj"),
+                "--configuration", configuration, "--output", output, "--nologo",
+                "--no-incremental", "-v:minimal"
+            }, lab);
+        }
         var aotProject = Path.Combine(lab, "managed-cases/HybridCLR.ManagedCasesAot/HybridCLR.ManagedCasesAot.csproj");
 		var aotArgs = new List<string> { "build", aotProject, "--configuration", configuration,
 			"--output", aotOutput, "--nologo", "--no-incremental", "-v:minimal" };

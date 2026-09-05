@@ -16,7 +16,7 @@ implementation. The formal opt4 source identities for this release are:
   `v2022-8.11.0-opt4.1` for Unity 2022;
 - `il2cpp_plus@52968ad6c88416f212d09d919b9a1b6afdc8a53b`, annotated tag
   `v2022-tuanjie-8.13.0-opt4.1` for Tuanjie 2022;
-- `hybridclr_unity@f243dfb906e0383eacd52a5f0cdeeee7bf6301f1` on
+- `hybridclr_unity@f9d32828fe8a3832e51aa9a2f75b5d099772df37` on
   `optimize/v8.13.0`. The package does not receive an opt tag.
 
 The old base commits and patches remain in the locks as replay and migration
@@ -25,8 +25,8 @@ runtime.
 
 The active 0.1.20 release uses the locked HybridCLR commit
 `fe3b1edb222511a1d3227f7e76e8b83b618c4d27` and package commit
-`f243dfb906e0383eacd52a5f0cdeeee7bf6301f1` (tree
-`0B32A6B7C4B90AD31BF8D083A2A94B7D2E639401219E315B461996B36B737078`).
+`f9d32828fe8a3832e51aa9a2f75b5d099772df37` (tree
+`72D63EB4D081EF5628AB049455FC144C43AF4484CB77776A170911522788E92F`).
 The runtime tag and package maintenance branch have both been published; the
 package itself remains untagged by policy.
 

@@ -1,0 +1,17 @@
+hotUpdateAssemblies:
+- HybridCLR.ManagedCasesAot
+- HybridCLR.ManagedCases
+- HybridCLR.MetadataStress
+- HybridCLR.CrossAssemblyDerived
+- HybridCLR.NewHotfix
+dheAotAssemblies:
+- HybridCLR.ManagedCasesAot
+- HybridCLR.ManagedCases
+- HybridCLR.MetadataStress
+- HybridCLR.CrossAssemblyDerived
+- HybridCLR.NewHotfix
+patchAOTAssemblies:
+- mscorlib
+- System
+- System.Core
+- HybridCLR.BoundaryContracts

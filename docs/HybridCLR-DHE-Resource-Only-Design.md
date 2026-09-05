@@ -9,7 +9,7 @@ Base Player（每个平台、每个商店版本各构建一次）
   hotUpdateAssemblies 全量进入 IL2CPP AOT
   Base MetaVersion 内置到 Player，不上传到热更包
   universal guard 覆盖既有可变 AOT 方法入口
-  BuildIdentity 1 固化 Base DLL/MetaVersion/native guard/runtime 身份
+  BuildIdentity 1 固化 Base DHE 集合、完整 AOT inventory、MetaVersion/native guard/runtime 身份
 
 同一份资源更新（每次代码发布只生成一次）
   payload/<assembly>.dll.bytes
@@ -36,8 +36,10 @@ MetaVersion 是 current 程序集的完整稳定身份表，不是针对某个 B
 - `dheAotAssemblies` 与 `hotUpdateAssemblies` 完全相等，所有热更程序集进入 AOT；
 - 为全部既有、可支持的方法生成 `universal` native guard；
 - 每个 DHE 程序集的 Base MetaVersion 被写入 Player 的只读资源目录；
-- `build-identity.json` 把 Base 程序集集合、Base MetaVersion 集合和 native manifest 绑定到最终
-  Player；
+- `build-identity.json` 把 Base DHE 程序集集合、`AssembliesPostIl2CppStrip` 的完整 AOT
+  inventory、Base MetaVersion 集合和 native manifest 绑定到最终 Player；
+- final build 前后重新枚举完整 AOT inventory，要求名称集合、集合 SHA-256 及补充 AOT
+  metadata 内容都与 staged identity 一致；
 - scripts-only 到 final 之间的临时 identity 源码在成功或失败后都恢复成零模板。
 
 每个已上线的 Base 必须归档以下发布材料，供后续资源发布离线验证：完整 Base DLL 根目录、
@@ -45,12 +47,16 @@ MetaVersion 是 current 程序集的完整稳定身份表，不是针对某个 B
 材料会失去为该 Base 证明后续更新兼容性的能力。
 
 `baseId` 不是版本号或 Base DLL 集合 hash。identity 1 对 target、managed assembly set、
-AOT snapshot、Base MetaVersion set、native guard/manifest、runtime protocol/contract/capabilities 和
-两个资源根做规范化 SHA-256。两个 Player 即使 managed DLL 相同，只要 runtime 或 native
-guard 不同，`baseId` 就不同。`managedAssemblySetSha256` 作为独立字段保留。
+完整 `aotAssemblySetSha256`、AOT snapshot、Base MetaVersion set、native guard/manifest、
+runtime protocol/contract/capabilities 和两个资源根做规范化 SHA-256。两个 Player 即使
+managed DLL 相同，只要完整 AOT inventory、runtime 或 native guard 不同，`baseId` 就不同。
+`managedAssemblySetSha256` 和规范化的 `aotAssemblyNames` 作为独立审计字段保留；Base DHE
+集合必须是完整 AOT inventory 的子集。
 `runtimeContract` 是不可复用的 runtime 实现发布号；managed/native runtime 源码发生变化就
 必须分配新值。不同 contract 能否接收同一更新由稳定 protocol 和 capability 子集决定，而不是
 把两个实现版本伪装成同一个 Base。
+当前包含完整 AOT inventory 校验的新 Base 使用 `dhe-runtime-v2`；历史 `v1` Base 只能以各自
+已归档的 BuildIdentity 进入 registry，不能重写为 `v2`。
 
 ## 单 current 包生成
 
@@ -125,6 +131,11 @@ MetaVersion、native manifest 和 AOT metadata set。
   universal native guard；只注册 current DLL/MV 的差分入口；
 - `interpreter-only`：该程序集是当前版本新增、Base 从未加载过的程序集，没有 Base MV，
   由普通 HybridCLR `Assembly.Load` 加载并完全走解释器。
+
+这里的“Base 从未加载过”以 Base Player 的完整 stripped AOT inventory 为准，不只看 Base
+DHE 集合。若某程序集不在 Base DHE 集合、但已存在于完整 AOT inventory，生成器会记录
+`rejected` 诊断并以 `assembly-present-in-base-aot-outside-dhe:<name>` fail-closed，不能把已注册
+的 AOT image 当成真正新增程序集走 `interpreter-only`。
 
 因此一份 current payload 可以同时服务旧 Base（部分程序集差分、部分程序集解释器）和新 Base
 （全部程序集差分），不需要为每个 Base 复制一份 DLL。生成器会校验 Base 旧集合是 current
@@ -223,8 +234,8 @@ runtime 在多 variant 资源中猜测 payload；新 runner 仍应始终写出�
 
 客户端不下载 Base MetaVersion，也不按版本号选择远端差分文件：
 
-1. 从编译进 Player 的 `DheRuntimeIdentity` 读取 Base 程序集集合、Base MetaVersion 集合和 native
-   manifest 身份；
+1. 从编译进 Player 的 `DheRuntimeIdentity` 读取 Base DHE 集合、完整 AOT inventory、Base
+   MetaVersion 集合和 native manifest 身份；
 2. 校验 manifest 与 validation 的 hash、current 程序集集合和 runtime protocol；
 3. 在 `supportedBases` 中要求当前 Base 身份唯一匹配且 `unsupportedChangeCount == 0`；
 4. 要求该记录的 `requiredRuntimeCapabilities` 是自身内置 capability 集合的子集；
@@ -312,10 +323,17 @@ metadata set、错误 Base、废弃 sidecar 残留和缺 capability 等负例均
 不会因下载资源而获得新的 DHE runtime 能力；runtime 自身、IL2CPP ABI、native plugin 或
 平台层缺陷仍必须通过新 Base Player 修复。
 
+最新 Unity 2021 固定 Base 验证额外覆盖了集合演进：Base 的完整 AOT inventory 为 43 个程序集、
+DHE 集合为 4 个程序集，current 新增 `HybridCLR.NewHotfix` 后资源计划生成 4 个
+`dhe-differential` 和 1 个 `interpreter-only` 记录。未重建 Player 的 smoke 成功加载并通过反射
+执行新程序集（结果 `3705`）；把已在完整 AOT inventory、但不在 DHE 集合中的
+`HybridCLR.BoundaryContracts` 伪装成新增程序集则被 host 拒绝。该结果仍只属于 Windows
+Unity 2021 correctness 证据。
+
 这证明“Base 只构建一次、后续一份资源包服务多个 Base”的架构链路成立，但不等于官方旗舰版
 DHE 的全部元数据能力。当前 Release 使用 HybridCLR commit `fe3b1ed`（tag
-`v8.13.0-opt4.2`）、package commit `f243dfb`（tree
-`0B32A6B7C4B90AD31BF8D083A2A94B7D2E639401219E315B461996B36B737078`）和三条已锁定的
+`v8.13.0-opt4.2`）、package commit `f9d3282`（tree
+`72D63EB4D081EF5628AB049455FC144C43AF4484CB77776A170911522788E92F`）和三条已锁定的
 il2cpp_plus `opt4.1` 维护线。Android Player、iOS/Xcode/device、性能、内存和现有结构限制
 仍是正式发布前的独立门禁；当前结论只能是 Windows Player 与三引擎 native 有条件通过，不能
 声明全平台生产发布完成。

@@ -21,6 +21,8 @@ namespace HybridCLR.Lab
         private const string RuntimeAssetRoot = "HybridCLRLab/DheDemo/";
         private const string MainAssemblyName = "HybridCLR.ManagedCasesAot";
         private const string BuildIdentityFile = "HybridCLRLab/build-identity.json";
+        private const string NewHotfixAssemblyName = "HybridCLR.NewHotfix";
+        private const int NewHotfixExpectedResult = 3705;
         private const string DefaultResultFile = "hybridclr-lab-dhe-result.json";
 
         [RuntimeInitializeOnLoadMethod(RuntimeInitializeLoadType.AfterSceneLoad)]
@@ -325,6 +327,14 @@ namespace HybridCLR.Lab
             int metadataSecondaryReflectionResult = ExecuteSecondaryChanged(
                 loadedAssemblies, "HybridCLR.MetadataStress", "HybridCLR.Lab.MetadataStress.DheSecondaryCases");
             string crossAssemblyResult = ExecuteCrossAssembly(loadedAssemblies);
+            bool newHotfixPlanned = selectedPlanAssemblies.Any(item => string.Equals(
+                item.assemblyName, NewHotfixAssemblyName, StringComparison.OrdinalIgnoreCase));
+            bool newHotfixLoaded = loadedAssemblies.TryGetValue(NewHotfixAssemblyName,
+                out LoadedDheAssembly newHotfixAssembly) && newHotfixAssembly.assembly != null;
+            int newHotfixResult = newHotfixLoaded ? ExecuteNewHotfix(newHotfixAssembly.assembly) : 0;
+            bool newHotfixExecuted = newHotfixLoaded &&
+                newHotfixResult == NewHotfixExpectedResult;
+            bool newHotfixValidated = !newHotfixPlanned || newHotfixExecuted;
             int crossSecondaryReflectionResult = ExecuteSecondaryChanged(
                 loadedAssemblies, "HybridCLR.CrossAssemblyDerived", "HybridCLR.Lab.CrossAssemblyDerived.CrossAssemblyLazyVTableProbe");
             bool currentHashValidated = ByteArraysEqual(currentHash, expectedCurrentHash);
@@ -336,6 +346,9 @@ namespace HybridCLR.Lab
                     StringComparison.OrdinalIgnoreCase) &&
                 string.Equals(buildIdentity.managedAssemblySetSha256,
                     HybridCLRDheBuildIdentity.ManagedAssemblySetSha256,
+                    StringComparison.OrdinalIgnoreCase) &&
+                string.Equals(buildIdentity.aotAssemblySetSha256,
+                    HybridCLRDheBuildIdentity.AotAssemblySetSha256,
                     StringComparison.OrdinalIgnoreCase);
             bool snapshotHashValidated = ByteArraysEqual(snapshot, expectedBaselineHash) && embeddedSnapshotHashValidated;
             string expectedTarget = GetArgument("-labTarget");
@@ -358,6 +371,9 @@ namespace HybridCLR.Lab
                 new HashSet<string>(buildIdentity.runtimeCapabilities ?? Array.Empty<string>(),
                     StringComparer.Ordinal).SetEquals(
                     HybridCLRDheBuildIdentity.RuntimeCapabilities ?? Array.Empty<string>()) &&
+                new HashSet<string>(buildIdentity.aotAssemblyNames ?? Array.Empty<string>(),
+                    StringComparer.OrdinalIgnoreCase).SetEquals(
+                    HybridCLRDheBuildIdentity.AotAssemblyNames ?? Array.Empty<string>()) &&
                 mainIdentity != null &&
                 string.Equals(mainIdentity.baselineSha256, ToHex(baselineHash), StringComparison.OrdinalIgnoreCase) &&
                 IsSha256(buildIdentity.baseMetaVersionSetSha256) &&
@@ -392,7 +408,7 @@ namespace HybridCLR.Lab
 				? stableChanged && instanceStableChanged
 				: !stableChanged && !instanceStableChanged;
             bool changedBehaviorValidated = changedMethodCount == 0
-                ? noOpAotBehaviorValidated
+                ? noOpAotBehaviorValidated && newHotfixValidated
                 : (addResult == 101 && stableResult == 4 &&
                     addViaStableResult == 104 && addPairResult == 107 && wideResult == 1005L &&
                     touchValue == 705 && instanceAddResult == 201 && instanceStableResult == 6 &&
@@ -406,7 +422,8 @@ namespace HybridCLR.Lab
                     metadataSecondaryDirectResult == 103 && crossSecondaryDirectResult == 103 &&
                     metadataSecondaryReflectionResult == 103 && crossSecondaryReflectionResult == 103 &&
                     loadedAssemblies.Count >= 4 && metadataStressResult > 0 &&
-                    string.Equals(crossAssemblyResult, "derived:26:34", StringComparison.Ordinal));
+                    string.Equals(crossAssemblyResult, "derived:26:34", StringComparison.Ordinal) &&
+                    newHotfixValidated);
             bool transactionEvidenceValid = changedMethodCount == 0 || retryValidated;
             string transactionStatus = changedMethodCount == 0
                 ? "notApplicable"
@@ -597,6 +614,10 @@ namespace HybridCLR.Lab
                 loadedInterpreterOnlyAssemblies = loadedAssemblies.Values.Where(item =>
                         string.Equals(item.plan.executionMode, "interpreter-only", StringComparison.Ordinal))
                     .Select(item => item.plan.assemblyName).OrderBy(name => name, StringComparer.Ordinal).ToArray(),
+                newHotfixPlanned = newHotfixPlanned,
+                newHotfixLoaded = newHotfixLoaded,
+                newHotfixExecuted = newHotfixExecuted,
+                newHotfixResult = newHotfixResult,
                 target = GetArgument("-labTarget"),
                 resourceUpdateManifestPresent = resourceUpdateManifestPresent,
                 resourceUpdateValidated = initialized,
@@ -1387,6 +1408,16 @@ namespace HybridCLR.Lab
             return (string)run.Invoke(null, null);
         }
 
+        private static int ExecuteNewHotfix(Assembly assembly)
+        {
+            Type entryType = assembly.GetType(
+                "HybridCLR.Lab.NewHotfix.NewHotfixEntry", true);
+            MethodInfo execute = entryType.GetMethod("Execute",
+                BindingFlags.Public | BindingFlags.Static);
+            if (execute == null) throw new MissingMethodException(entryType.FullName, "Execute");
+            return Convert.ToInt32(execute.Invoke(null, null));
+        }
+
         private static string[] GetAssemblyNames(DheRuntimePlanData plan, string baseId)
         {
             return SelectRuntimeAssemblies(plan, baseId)
@@ -1900,6 +1931,8 @@ namespace HybridCLR.Lab
             public string target;
             public string baseId;
             public string managedAssemblySetSha256;
+            public string aotAssemblySetSha256;
+            public string[] aotAssemblyNames;
             public string aotSnapshotSha256;
             public string aotSnapshotKind;
             public string nativeGuardSourceSha256;
@@ -1944,6 +1977,10 @@ namespace HybridCLR.Lab
             public string[] plannedDifferentialAssemblies;
             public string[] plannedInterpreterOnlyAssemblies;
             public string[] loadedInterpreterOnlyAssemblies;
+            public bool newHotfixPlanned;
+            public bool newHotfixLoaded;
+            public bool newHotfixExecuted;
+            public int newHotfixResult;
             public int changedMethodCount;
             public int expectedChangedMethodCount;
             public bool dispatchProbeValidated;

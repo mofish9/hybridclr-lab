@@ -756,6 +756,7 @@ namespace HybridCLR.Lab.Editor
 
             DheBuildIdentityData identity = JsonUtility.FromJson<DheBuildIdentityData>(File.ReadAllText(sourcePath));
             if (identity == null || identity.identityVersion != 1 ||
+                identity.aotAssemblyNames == null || identity.aotAssemblyNames.Length == 0 ||
                 string.IsNullOrWhiteSpace(identity.aotSnapshotSha256) ||
                 !string.Equals(identity.aotSnapshotKind, "managed-assembly-plus-generated-cpp-v1", StringComparison.Ordinal) ||
                 string.IsNullOrWhiteSpace(identity.nativeGuardSourceSha256) ||
@@ -764,6 +765,7 @@ namespace HybridCLR.Lab.Editor
                 throw new InvalidDataException("DHE build identity is incomplete; native guard identity must be generated before Player build.");
             }
             NormalizeSha256(identity.aotSnapshotSha256, "aotSnapshotSha256");
+            NormalizeSha256(identity.aotAssemblySetSha256, "aotAssemblySetSha256");
             NormalizeSha256(identity.nativeGuardSourceSha256, "nativeGuardSourceSha256");
             NormalizeSha256(identity.nativeManifestSha256, "nativeManifestSha256");
             string streamingDirectory = Path.Combine(ProjectRoot(), "Assets", "StreamingAssets", "HybridCLRLab");
@@ -785,6 +787,8 @@ namespace HybridCLR.Lab.Editor
         private sealed class DheBuildIdentityData
         {
             public int identityVersion;
+            public string aotAssemblySetSha256;
+            public string[] aotAssemblyNames;
             public string aotSnapshotSha256;
             public string aotSnapshotKind;
             public string nativeGuardSourceSha256;

@@ -109,6 +109,13 @@ the final Player is compiled. Archive the Base DLL root,
 `build-identity.json`, and `dhe-native-manifest.json` for every Player version
 that remains online.
 
+The build identity also records the normalized, complete DLL-name inventory
+from `AssembliesPostIl2CppStrip/<target>` and its SHA-256. The configured DHE
+set must be a subset of that inventory. The package re-enumerates the stripped
+output before and after the final build, compares it with the staged identity,
+and verifies that every supplemental AOT metadata input still matches the
+stripped DLL bytes. A stale or partial inventory aborts the Base build.
+
 For later releases, compile one current hot-update DLL set and validate it
 against all supported Base Players in one command:
 
@@ -210,6 +217,13 @@ and runtime plan retain top-level default records for compatibility and add
 that variant's DLL/MV files. This is still one resource package. Every variant must
 independently pass its target's guard and Player gates; if all targets share a compatible
 metadata shape, keep using one default variant.
+
+Assembly execution mode is classified against both Base sets. A name in the
+Base DHE set is `dhe-differential`; a name absent from the complete Base AOT
+inventory is `interpreter-only`. A name already present in the Base AOT
+inventory but outside the DHE set is rejected with
+`assembly-present-in-base-aot-outside-dhe:<name>` because its registered AOT
+image cannot be treated as a newly loaded interpreter assembly.
 
 Use `stage-resource-update` from the resource/catalog build to copy this one
 payload. Supply the exact archived Base identity with `-BaseBuildIdentity`; the
