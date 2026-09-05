@@ -49,13 +49,13 @@ the registry must be the authenticated direct successor; the workflow does not
 assume a fixed number of Bases or require every hotfix to add a Base.
 
 Project publication uses `resource-release-gate` after every active Base has run.
-The command consumes the protected expected channel/revision/current candidate
-ledger and, for revision 2+, the protected previous ledger SHA. It emits one
+The command consumes one protected channel snapshot plus the expected current
+candidate ledger. It emits one
 schema-validated approval report only when the candidate resource directory and
 all Base Player reports resolve to those exact identities. Revision 1 requires an
 explicit initialization flag; a continuation cannot reuse it. The protected
-release service remains responsible for atomically promoting the approved ledger
-head after upload.
+`channel-state` backend revalidates that state-bound approval and compare-and-swaps
+the approved ledger head.
 
 ## Contract
 
@@ -87,6 +87,36 @@ or a previous registry that differs from the published ledger is rejected.
 Exploratory mode remains available for diagnostics and compatibility with 0.1.21
 artifacts, but it is not Release-ready and cannot create or advance a ledger.
 
+## Protected channel state
+
+`channel-state` implements the `filesystem-cas-v1` backend. `snapshot` reads the
+live head while holding the channel lock. `adopt-existing` is a one-time,
+explicitly acknowledged migration for an already published ledger head.
+`promote` regenerates the aggregate gate, checks every non-time output field,
+copies resource and approval bytes to content-addressed paths, then compares the
+snapshot-bound head SHA and atomically replaces `head.json` under an exclusive
+lock. State history is immutable and stale replay or concurrent promotion cannot
+advance the revision twice.
+
+The store layout is:
+
+```text
+<StateRoot>/
+  channels/<channelId>/.channel.lock
+  channels/<channelId>/head.json
+  channels/<channelId>/states/<head-sha256>.json
+  artifacts/<ledger-sha256>/<tree-sha256>/...
+  approvals/<gate-sha256>.json
+```
+
+A crash can leave an unreferenced `.staging-*` directory or immutable object; it
+cannot make that object the head. If `head.json` was replaced but the requested
+external snapshot report could not be written, query `snapshot` and continue from
+the returned revision; replaying the old gate must fail. Exclusive file handles
+and same-directory atomic rename are backend requirements. Object storage and
+network filesystems without those guarantees need an adapter implementing the same
+immutable-object and conditional-write semantics.
+
 ## Scope and rollback
 
 This candidate changes only the cross-platform C# host, JSON schemas, staging
@@ -99,7 +129,7 @@ the authenticated empty metadata set even if the shared project settings retain 
 non-empty `patchAOTAssemblies` list. Legacy parallel arguments still require
 explicit metadata roots.
 
-Rollback is the independent release-ledger commit boundary. Projects can pin the
-authenticated 0.1.21 package and use its exploratory resource command, but a
-production channel that has adopted a ledger must never discard or reinitialize
-its published head.
+Rollback serves a previously retained content-addressed artifact but does not move
+or reinitialize the ledger/channel history. Stop new promotion, diagnose the active
+head, and build the next forward revision from it. A production channel that has
+been adopted must never discard or recreate its published head.

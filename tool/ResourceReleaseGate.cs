@@ -15,19 +15,36 @@ internal static partial class Program
         string validationSourceRoot = string.IsNullOrWhiteSpace(validationSourceOption)
             ? toolchainRoot
             : Path.GetFullPath(validationSourceOption);
+        string? channelSnapshotOption = cli.Optional("channelsnapshot");
+        string? channelSnapshotPath = string.IsNullOrWhiteSpace(channelSnapshotOption)
+            ? null
+            : Path.GetFullPath(channelSnapshotOption);
         List<string> playerPaths = cli.GetList("changedplayers")
             .Select(Path.GetFullPath).Distinct(StringComparer.OrdinalIgnoreCase).ToList();
         if (playerPaths.Count == 0 || playerPaths.Count > MaxChangedPlayerEvidenceCount)
             throw new DheException("Resource release gate requires between one and " +
                 MaxChangedPlayerEvidenceCount + " distinct Player reports.");
 
-        string output = SafeReportPath(cli.Require("output"), playerPaths);
+        string output = SafeReportPath(cli.Require("output"), channelSnapshotPath == null
+            ? playerPaths
+            : playerPaths.Append(channelSnapshotPath));
         foreach (string protectedRoot in new[]
                  {
                      updateRoot, toolchainRoot, validationSourceRoot, schemaRoot,
                  }.Concat(playerPaths.Select(path => Path.GetDirectoryName(path)!))
                  .Distinct(StringComparer.OrdinalIgnoreCase))
             EnsureOutputOutsideRoot(output, protectedRoot);
+        ChannelSnapshotDocument? channelSnapshot = null;
+        if (channelSnapshotPath != null)
+        {
+            channelSnapshot = ReadChannelSnapshot(channelSnapshotPath,
+                cli.Require("expectedchannelsnapshotsha256"));
+            EnsureOutputOutsideRoot(output, channelSnapshot.StateRoot);
+        }
+        else if (!string.IsNullOrWhiteSpace(cli.Optional("expectedchannelsnapshotsha256")))
+        {
+            throw new DheException("ExpectedChannelSnapshotSha256 requires ChannelSnapshot.");
+        }
         if (File.Exists(output)) File.Delete(output);
 
         updateRoot = RequireDirectory(updateRoot, "DHE resource release candidate");
@@ -35,6 +52,12 @@ internal static partial class Program
         schemaRoot = RequireDirectory(schemaRoot, "DHE resource release schema root");
         validationSourceRoot = RequireDirectory(validationSourceRoot,
             "DHE validation source root");
+        RejectReparseTree(updateRoot, "DHE resource release candidate");
+        foreach (string playerPath in playerPaths)
+        {
+            RequireFile(playerPath, "Changed Player report");
+            RejectReparsePoint(playerPath, "Changed Player report");
+        }
         PackageInspection authority = InspectPackage(toolchainRoot, expectedPackageId, true);
         if (!authority.Passed)
             throw new DheException("Resource release gate requires the exact authenticated " +
@@ -120,23 +143,43 @@ internal static partial class Program
                 proof.PayloadVariantSetSha256, StringComparison.OrdinalIgnoreCase))
             throw new DheException("Player evidence does not match the resource release candidate.");
 
-        string expectedChannelId = cli.Require("expectedreleasechannelid");
         string expectedLedgerSha256 = cli.Require("expectedreleaseledgersha256");
-        string expectedRevisionText = cli.Require("expectedreleaserevision");
+        bool initialize = cli.Has("initializereleaseledger");
+        string expectedChannelId;
+        int expectedRevision;
+        string? expectedPrevious;
+        if (channelSnapshot != null)
+        {
+            if (!string.IsNullOrWhiteSpace(cli.Optional("expectedreleasechannelid")) ||
+                !string.IsNullOrWhiteSpace(cli.Optional("expectedreleaserevision")) ||
+                !string.IsNullOrWhiteSpace(cli.Optional("expectedpreviousreleaseledgersha256")))
+                throw new DheException("ChannelSnapshot cannot be combined with explicit channel, " +
+                    "revision, or previous-ledger expectations.");
+            expectedChannelId = channelSnapshot.ChannelId;
+            expectedRevision = channelSnapshot.NextRevision;
+            expectedPrevious = channelSnapshot.PreviousReleaseLedgerSha256;
+            if (initialize != channelSnapshot.InitializationRequired)
+                throw new DheException(channelSnapshot.InitializationRequired
+                    ? "An uninitialized channel snapshot requires explicit ledger initialization."
+                    : "An initialized channel snapshot cannot reinitialize its ledger.");
+        }
+        else
+        {
+            expectedChannelId = cli.Require("expectedreleasechannelid");
+            string expectedRevisionText = cli.Require("expectedreleaserevision");
+            if (!int.TryParse(expectedRevisionText, NumberStyles.None,
+                    CultureInfo.InvariantCulture, out expectedRevision) || expectedRevision < 1)
+                throw new DheException("ExpectedReleaseRevision must be a positive integer.");
+            expectedPrevious = NormalizeOptionalHash(
+                cli.Optional("expectedpreviousreleaseledgersha256"));
+        }
         if (!IsRegistryId(expectedChannelId) || !IsHex(expectedLedgerSha256, 64, 64) ||
-            !int.TryParse(expectedRevisionText, NumberStyles.None,
-                CultureInfo.InvariantCulture, out int expectedRevision) || expectedRevision < 1 ||
             !string.Equals(expectedChannelId, releaseLedger.ChannelId,
                 StringComparison.Ordinal) || expectedRevision != releaseLedger.Revision ||
             !string.Equals(expectedLedgerSha256, releaseLedger.Sha256,
                 StringComparison.OrdinalIgnoreCase))
             throw new DheException("Resource release candidate does not match the protected expected head.");
 
-        bool initialize = cli.Has("initializereleaseledger");
-        string? expectedPreviousOption = cli.Optional("expectedpreviousreleaseledgersha256");
-        string? expectedPrevious = string.IsNullOrWhiteSpace(expectedPreviousOption)
-            ? null
-            : expectedPreviousOption;
         if (releaseLedger.Revision == 1)
         {
             if (!initialize || !string.IsNullOrWhiteSpace(expectedPrevious) ||
@@ -211,6 +254,11 @@ internal static partial class Program
             expectedReleaseRevision = expectedRevision,
             expectedReleaseLedgerSha256 = expectedLedgerSha256.ToLowerInvariant(),
             expectedPreviousReleaseLedgerSha256 = expectedPrevious?.ToLowerInvariant(),
+            channelStateBound = channelSnapshot != null,
+            channelStateRoot = channelSnapshot?.StateRoot,
+            channelSnapshot = channelSnapshot?.SourcePath,
+            channelSnapshotSha256 = channelSnapshot?.Sha256,
+            expectedChannelHeadSha256 = channelSnapshot?.ChannelHeadSha256,
             baseRegistryId = releaseLedger.BaseRegistryId,
             baseRegistryRevision = releaseLedger.BaseRegistryRevision,
             baseRegistrySha256 = releaseLedger.BaseRegistrySha256,

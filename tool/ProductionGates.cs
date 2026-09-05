@@ -1985,6 +1985,9 @@ internal static partial class Program
         var resourcePlayerReleaseLedgerBindingPassed = false;
         var resourcePlayerConsecutiveReleaseHeadPassed = false;
         var resourceReleaseAggregateGatePassed = false;
+        var channelStateCasWorkflowPassed = false;
+        var channelStateCasWorkflowDetails =
+            "the distributed package contains the protected channel-state implementation and schemas";
         object? validatedResourceRelease = null;
         var workflowOutputs = new List<object>();
         var changedWorkflowRoots = cli.GetList("workflowchangedroots");
@@ -2267,6 +2270,11 @@ internal static partial class Program
                         revisionRejected && previousHeadRejectedByAggregate &&
                         reinitializationRejected && protectedOutputRejected &&
                         executionTamperRejected;
+                    channelStateCasWorkflowPassed = RunChannelStateRegression(
+                        regressionRoot, resourceUpdateRoot, resourceUpdateRoot2,
+                        changedReports, authorityRoot, authorityPackageId, cli.Root,
+                        packageRoot, resourceBaseRegistry,
+                        out channelStateCasWorkflowDetails);
                 }
                 var tamperedReport = System.Text.Json.Nodes.JsonNode.Parse(
                     changedReports[0].Report.GetRawText())!.AsObject();
@@ -2312,6 +2320,12 @@ internal static partial class Program
                 File.ReadAllText(Path.Combine(packageRoot, "tool",
                     "ResourceReleaseGate.cs")).Contains(
                     "private static int ResourceReleaseGate", StringComparison.Ordinal);
+            channelStateCasWorkflowPassed = File.Exists(Path.Combine(packageRoot,
+                    "schemas", "dhe-channel-state.schema.json")) &&
+                File.Exists(Path.Combine(packageRoot, "schemas",
+                    "dhe-channel-snapshot.schema.json")) &&
+                File.ReadAllText(Path.Combine(packageRoot, "tool", "ChannelState.cs"))
+                    .Contains("private static int ChannelState", StringComparison.Ordinal);
         }
         AddRegressionCheck(checks, errors, "schema-workflow-output-contract", workflowSchemaPassed,
             realWorkflowOutputsValidated
@@ -2332,6 +2346,8 @@ internal static partial class Program
             resourceReleaseAggregateGatePassed,
             "the project-facing aggregate gate must authenticate every active Base and reject " +
             "incomplete, stale, forked, reinitialized, or input-mutating release evidence");
+        AddRegressionCheck(checks, errors, "channel-state-cas-workflow",
+            channelStateCasWorkflowPassed, channelStateCasWorkflowDetails);
         using var releaseResourceBase = JsonDocument.Parse("{\"mode\":\"Release\",\"releaseReady\":true}");
         using var incompleteResourceBase = JsonDocument.Parse("{\"mode\":\"Release\",\"releaseReady\":false}");
         using var exploratoryResourceBase = JsonDocument.Parse("{\"mode\":\"Exploratory\",\"releaseReady\":true}");

@@ -14,6 +14,8 @@
     "parentReleaseLedgerSha256", "releaseChannelId", "releaseRevision",
     "initializationAuthorized", "expectedReleaseChannelId", "expectedReleaseRevision",
     "expectedReleaseLedgerSha256", "expectedPreviousReleaseLedgerSha256",
+    "channelStateBound", "channelStateRoot", "channelSnapshot",
+    "channelSnapshotSha256", "expectedChannelHeadSha256",
     "baseRegistryId", "baseRegistryRevision", "baseRegistrySha256", "activeBaseCount",
     "retiredBaseCount", "currentAssemblySetSha256", "payloadVariantSetSha256",
     "requireEngineMatrix", "engineMatrixCovered", "engineWorkflows",
@@ -48,6 +50,11 @@
     "expectedReleaseRevision": { "type": "integer", "minimum": 1 },
     "expectedReleaseLedgerSha256": { "type": "string", "pattern": "^[0-9a-fA-F]{64}$" },
     "expectedPreviousReleaseLedgerSha256": { "type": ["string", "null"], "pattern": "^[0-9a-fA-F]{64}$" },
+    "channelStateBound": { "type": "boolean" },
+    "channelStateRoot": { "type": ["string", "null"] },
+    "channelSnapshot": { "type": ["string", "null"] },
+    "channelSnapshotSha256": { "type": ["string", "null"], "pattern": "^[0-9a-fA-F]{64}$" },
+    "expectedChannelHeadSha256": { "type": ["string", "null"], "pattern": "^[0-9a-fA-F]{64}$" },
     "baseRegistryId": { "type": "string", "pattern": "^[A-Za-z0-9._-]{1,128}$" },
     "baseRegistryRevision": { "type": "integer", "minimum": 1 },
     "baseRegistrySha256": { "type": "string", "pattern": "^[0-9a-fA-F]{64}$" },
@@ -116,6 +123,24 @@
     {
       "if": { "properties": { "requireEngineMatrix": { "const": true } }, "required": ["requireEngineMatrix"] },
       "then": { "properties": { "engineMatrixCovered": { "const": true }, "engineWorkflows": { "minItems": 3 } } }
+    },
+    {
+      "if": { "properties": { "channelStateBound": { "const": true } }, "required": ["channelStateBound"] },
+      "then": {
+        "properties": {
+          "channelStateRoot": { "type": "string", "minLength": 1 },
+          "channelSnapshot": { "type": "string", "minLength": 1 },
+          "channelSnapshotSha256": { "type": "string" }
+        }
+      },
+      "else": {
+        "properties": {
+          "channelStateRoot": { "type": "null" },
+          "channelSnapshot": { "type": "null" },
+          "channelSnapshotSha256": { "type": "null" },
+          "expectedChannelHeadSha256": { "type": "null" }
+        }
+      }
     }
   ]
 }

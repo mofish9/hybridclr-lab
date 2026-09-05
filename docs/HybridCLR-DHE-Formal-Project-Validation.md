@@ -147,19 +147,31 @@ is extensible, so additional representative Base reports can be bound as the
 matrix grows. Every online Base remains a mandatory input to `resource-update`.
 
 For a project resource release, aggregate all active Base reports with
-`resource-release-gate` before upload or pointer promotion. Pass the candidate
-ledger SHA from the build output, but obtain the expected channel, next revision,
-and previous ledger SHA from protected release state rather than from the
-candidate directory. A successful report proves exact active-Base coverage and binds each
+`resource-release-gate` before head promotion. First obtain one SHA-256-pinned
+snapshot with `channel-state -Operation snapshot`, then pass that exact snapshot
+to both `resource-update` and `resource-release-gate`. Pass the candidate ledger
+SHA from the build output. A successful report proves exact active-Base coverage and binds each
 Base's target, payload variant, metadata set, changed/interpreter/AOT counts, and
 report SHA-256. Missing, duplicate, foreign-release, stale-parent, or reinitialized
 continuation inputs fail without producing a passing gate report.
 
 The first resource release explicitly passes `-InitializeReleaseLedger`; every
-later release supplies `-ExpectedPreviousReleaseLedgerSha256`. This command does
-not make a local file globally authoritative: CI or the release service must still
-compare-and-swap its protected head only after the aggregate gate and upload have
-succeeded.
+later release derives its parent from the initialized snapshot. Promote the
+state-bound aggregate gate with `channel-state -Operation promote` and the exact
+snapshot head SHA. Genesis instead requires `-InitializeChannel`. Resource bytes
+and approval are written under content-addressed paths before the channel lock
+compares and atomically replaces `head.json`; stale or concurrent candidates fail.
+An existing ledger channel is migrated once with `adopt-existing` plus the
+explicit `-AcknowledgeExistingPublishedHead` authorization.
+
+The built-in state backend is `filesystem-cas-v1`. The state root must be protected
+from uncoordinated writers and reside on a filesystem with process-wide exclusive
+handles and atomic same-directory rename. For an object store or a network
+filesystem that cannot guarantee those semantics, the project must supply an
+equivalent C# adapter using immutable object keys and a conditional head write;
+a local head plus a separately promoted CDN pointer is not one transaction.
+If promotion commits the head but its external snapshot output cannot be written,
+recover with `channel-state -Operation snapshot` rather than replaying the gate.
 
 Treat the Base registry as an append-only online-support ledger. Creating a new
 Base app version appends its archived identity with `-ExistingRegistry`; the
@@ -178,9 +190,10 @@ A divergent commit or tree mismatch fails closed.
 
 For consecutive hotfix releases, keep the same archived Base registry and run
 `resource-update` again with the new current DLL set. Release mode must also pass
-the exact previous `dhe-release-ledger.json` and its SHA-256 from protected release
-state. The next ledger inherits the channel, increments the release revision, and
-pins that exact parent. Stage the resulting
+the protected channel snapshot and its SHA-256. The next ledger inherits the
+channel, increments the release revision, and pins the snapshot's exact parent.
+The explicit previous-ledger arguments remain a compatibility interface, not the
+preferred protected workflow. Stage the resulting
 manifest/payload over the same Player resource root after the previous smoke;
 the Player's embedded Base MetaVersion and immutable native files must remain
 byte-identical across both stages. Do not use the previous current payload as

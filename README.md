@@ -24,11 +24,11 @@ Its formal entry points, generated-output boundary, and complete four-assembly
 Player evidence are documented in
 `docs/HybridCLR-DHE-Toolchain.md`,
 `docs/HybridCLR-DHE-Workflow-Review.md` and
-`docs/HybridCLR-DHE-Formal-Project-Validation.md`. Toolchain `0.1.23` is the
+`docs/HybridCLR-DHE-Formal-Project-Validation.md`. Toolchain `0.1.24` is the
 current conditionally accepted source and three-engine Windows release; its exact
 evidence and remaining platform gates are recorded in
-`docs/HybridCLR-DHE-Opt4-Release-0.1.23.md`. Toolchains `0.1.18`, `0.1.20`,
-`0.1.21`, and `0.1.22` are retained as historical evidence. Projects must install an
+`docs/HybridCLR-DHE-Opt4-Release-0.1.24.md`. Toolchains `0.1.18`, `0.1.20`,
+`0.1.21`, `0.1.22`, and `0.1.23` are retained as historical evidence. Projects must install an
 authenticated package whose manifest has `releaseReady=true` and pin its exact
 package ID.
 Toolchain `0.1.20` replaces generated-function
@@ -42,7 +42,7 @@ authenticated registry revision chain so every online Base is retained by
 default and retirement requires an explicit Base ID and reason. Historical Base
 evidence remains admissible only when its clean tool commit is on the verified
 Git ancestry chain from its authenticated Release authority to the current source.
-Toolchain `0.1.22` is the active release-ledger version. Its package ID is
+Toolchain `0.1.22` introduced the release-ledger workflow. Its package ID is
 `78299b3850296103114f866c46b681fcdcc8ef771a430e58a6a92e002e68887f`. It binds
 every Release resource update to a stable channel, a monotonic release revision, the exact
 previous ledger hash held by the release system, and the Base registry head used
@@ -51,7 +51,7 @@ direct successor; a reset revision, omitted Base set, stale head, or fork fails
 before a Release manifest is accepted. The final clean regression passes
 117/117 checks over five ledger-aware Windows Base reports and a four-to-five-Base
 direct-successor release. Android/iOS device and CAT project gates remain pending.
-Toolchain `0.1.23` is the active consecutive-Player-evidence release. Its package
+Toolchain `0.1.23` introduced consecutive Player evidence. Its package
 ID is `c8b496c6a126d80997b75c39f9e0c111c5d02f844c6f3234909884e1360027ba`. It requires
 one passing Player report for every active Base and binds that complete report set
 to the exact manifest and ledger supplied as the consecutive resource release head.
@@ -65,6 +65,15 @@ per active Base, the exact candidate and parent ledger heads, genesis versus
 continuation policy, payload variants, runtime identity, and Player dispatch
 before emitting a release-ready resource approval report. Its clean regression
 passes 119/119 checks.
+Toolchain `0.1.25` adds the protected `channel-state` workflow. A single
+SHA-256-pinned snapshot now drives resource construction and aggregate Player
+qualification, while promotion stores the resource and approval by content hash
+and compare-and-swaps `head.json` under an exclusive channel lock. The candidate
+regression contains 120 checks, including historical-head adoption, stale replay,
+two concurrent promoters, gate/snapshot tampering, orphan staging recovery, and
+post-commit snapshot-output recovery. Its `filesystem-cas-v1` guarantee requires
+filesystem support for exclusive handles and same-directory atomic rename;
+object stores require an equivalent conditional-write adapter.
 Base identity now also binds `engineWorkflow` and `il2cppCodeGeneration`.
 Unity 2021 is locked to `OptimizeSpeed`; Unity 2022 FGS and Tuanjie 2022 FGS
 are locked to `OptimizeSize`. Base evidence created before these fields existed

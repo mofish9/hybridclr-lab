@@ -236,6 +236,56 @@ head hash only after all Player gates pass. Once that protected head exists, CI
 must reject any later use of `-InitializeReleaseLedger`; a local CLI cannot infer
 global publication history.
 
+The recommended Release path uses `channel-state` as that protected state instead
+of copying ledger values into CI variables. For a new channel, create a snapshot
+before building the first resource:
+
+```text
+dotnet HybridCLR.DheTool.dll channel-state \
+  -Operation snapshot \
+  -StateRoot C:/release-state \
+  -ChannelId production \
+  -ToolchainRoot C:/tools/HybridCLRDhe \
+  -ExpectedToolchainPackageId <pinned-release-package-id> \
+  -Output C:/build/snapshots/production.json
+```
+
+For a channel that already published ledger-backed updates before adopting this
+store, perform the privileged migration exactly once:
+
+```text
+dotnet HybridCLR.DheTool.dll channel-state \
+  -Operation adopt-existing \
+  -StateRoot C:/release-state \
+  -ChannelId production \
+  -ResourceUpdateRoot C:/published/update-N \
+  -ExpectedReleaseLedgerSha256 <published-ledger-sha256> \
+  -AcknowledgeExistingPublishedHead \
+  -ToolchainRoot C:/tools/HybridCLRDhe \
+  -ExpectedToolchainPackageId <pinned-release-package-id> \
+  -Output C:/build/snapshots/production.json
+```
+
+Pin the snapshot bytes by SHA-256 and pass both values to the next resource build:
+
+```text
+dotnet HybridCLR.DheTool.dll resource-update \
+  -Mode Release \
+  -ChannelSnapshot C:/build/snapshots/production.json \
+  -ExpectedChannelSnapshotSha256 <snapshot-sha256> \
+  -CurrentRoot C:/build/current-hotfix \
+  -BaseRegistry C:/release/base-registry/supported-bases.json \
+  -PreviousBaseRegistry C:/release/base-registry/parent.json \
+  -SettingsFile C:/project/ProjectSettings/HybridCLRSettings.asset \
+  -OutputRoot C:/build/update-N-plus-1
+```
+
+Add `-InitializeReleaseLedger` only when the snapshot says
+`initializationRequired=true`. An initialized snapshot supplies the previous
+ledger path/hash, channel ID, and next revision; it cannot be combined with the
+legacy explicit head arguments. A stale snapshot is rejected by both qualification
+and promotion.
+
 Release qualification must execute that exact continuation on every active Base.
 `regression -ResourceUpdateRoot <previous> -ResourceUpdateRoot2 <candidate>` binds
 the complete `-WorkflowChangedRoots` Player set to the candidate manifest and
@@ -325,10 +375,9 @@ dotnet HybridCLR.DheTool.dll resource-release-gate \
   -ExpectedToolchainPackageId <pinned-release-package-id> \
   -ResourceUpdateRoot C:/build/resource-205 \
   -ChangedPlayers C:/evidence/base-100.json,C:/evidence/base-101.json \
-  -ExpectedReleaseChannelId production \
-  -ExpectedReleaseRevision 8 \
+  -ChannelSnapshot C:/build/snapshots/production.json \
+  -ExpectedChannelSnapshotSha256 <snapshot-sha256> \
   -ExpectedReleaseLedgerSha256 <candidate-ledger-sha256> \
-  -ExpectedPreviousReleaseLedgerSha256 <protected-revision-7-ledger-sha256> \
   -Output C:/release-gates/resource-205.json
 ```
 
@@ -350,6 +399,36 @@ approval input for publishing the already-built single resource directory. Put
 the output in a separate release-gate directory; the command rejects output
 inside the resource candidate, authenticated toolchain, validation/schema source,
 or any Player evidence directory so qualification cannot mutate its own inputs.
+
+Promote only that state-bound gate:
+
+```text
+dotnet HybridCLR.DheTool.dll channel-state \
+  -Operation promote \
+  -StateRoot C:/release-state \
+  -ChannelId production \
+  -ResourceReleaseGate C:/release-gates/resource-205.json \
+  -ExpectedChannelHeadSha256 <snapshot-channel-head-sha256> \
+  -ToolchainRoot C:/tools/HybridCLRDhe \
+  -ExpectedToolchainPackageId <pinned-release-package-id> \
+  -Output C:/build/snapshots/production-promoted.json
+```
+
+For genesis, replace `-ExpectedChannelHeadSha256` with `-InitializeChannel`.
+Promotion fully regenerates the aggregate gate, requires every non-time field to
+match, publishes the resource tree and gate into content-addressed directories,
+then replaces `channels/<channel>/head.json` while holding the exclusive lock.
+Exactly one contender can advance a head. If the head replacement succeeds but
+writing the external output snapshot fails, do not retry promotion; run
+`channel-state -Operation snapshot` and use the recovered current head.
+
+`filesystem-cas-v1` is valid only on a protected filesystem whose exclusive file
+handles coordinate every publisher and whose same-directory rename/replace is
+atomic. Orphan `.staging-*` directories are unreferenced and harmless. A network
+filesystem with weaker semantics, or S3/OSS/CDN object storage, requires a C#
+adapter that preserves the same immutable-object and conditional-head-write
+contract. Do not advance a local file head and later treat a separate CDN pointer
+as the same atomic transaction.
 
 ## JSON contract gates
 

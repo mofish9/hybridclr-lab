@@ -29,10 +29,11 @@ internal static partial class Program
         bool ReleaseReady,
         string? ChannelId,
         int? Revision,
-        string? ParentLedgerSha256)
+        string? ParentLedgerSha256,
+        string? ChannelStateRoot)
     {
         public static ResourceReleaseContext Exploratory { get; } =
-            new("Exploratory", false, null, null, null);
+            new("Exploratory", false, null, null, null, null);
     }
 
     private static ResourceReleaseContext PrepareResourceReleaseContext(Cli cli,
@@ -46,9 +47,14 @@ internal static partial class Program
         string? previousPath = cli.Optional("previousreleaseledger");
         string? expectedPreviousSha256 = cli.Optional("expectedpreviousreleaseledgersha256");
         string? requestedChannelId = cli.Optional("releasechannelid")?.Trim();
+        string? snapshotPath = cli.Optional("channelsnapshot");
+        string? expectedSnapshotSha256 = cli.Optional("expectedchannelsnapshotsha256");
+        string? channelStateRoot = null;
         bool hasLedgerArguments = initialize || !string.IsNullOrWhiteSpace(previousPath) ||
             !string.IsNullOrWhiteSpace(expectedPreviousSha256) ||
-            !string.IsNullOrWhiteSpace(requestedChannelId);
+            !string.IsNullOrWhiteSpace(requestedChannelId) ||
+            !string.IsNullOrWhiteSpace(snapshotPath) ||
+            !string.IsNullOrWhiteSpace(expectedSnapshotSha256);
 
         if (mode == "Exploratory")
         {
@@ -60,6 +66,34 @@ internal static partial class Program
 
         if (registry == null)
             throw new DheException("Release resource updates require -BaseRegistry.");
+        if (!string.IsNullOrWhiteSpace(snapshotPath))
+        {
+            if (!string.IsNullOrWhiteSpace(previousPath) ||
+                !string.IsNullOrWhiteSpace(expectedPreviousSha256) ||
+                !string.IsNullOrWhiteSpace(requestedChannelId))
+                throw new DheException("ChannelSnapshot cannot be combined with explicit previous " +
+                    "ledger or ReleaseChannelId arguments.");
+            ChannelSnapshotDocument snapshot = ReadChannelSnapshot(snapshotPath,
+                expectedSnapshotSha256);
+            channelStateRoot = snapshot.StateRoot;
+            requestedChannelId = snapshot.ChannelId;
+            if (snapshot.Initialized)
+            {
+                if (initialize)
+                    throw new DheException("An initialized channel snapshot cannot initialize a new ledger.");
+                previousPath = snapshot.PreviousReleaseLedger;
+                expectedPreviousSha256 = snapshot.PreviousReleaseLedgerSha256;
+            }
+            else if (!initialize)
+            {
+                throw new DheException("An uninitialized channel snapshot requires " +
+                    "InitializeReleaseLedger authorization.");
+            }
+        }
+        else if (!string.IsNullOrWhiteSpace(expectedSnapshotSha256))
+        {
+            throw new DheException("ExpectedChannelSnapshotSha256 requires ChannelSnapshot.");
+        }
         if (initialize == !string.IsNullOrWhiteSpace(previousPath))
             throw new DheException(
                 "Release resource updates require exactly one of InitializeReleaseLedger or PreviousReleaseLedger.");
@@ -73,7 +107,7 @@ internal static partial class Program
                 throw new DheException(
                     "ReleaseChannelId must contain only letters, digits, '.', '_' or '-'.");
             return new ResourceReleaseContext("Release", true, requestedChannelId, 1,
-                null);
+                null, channelStateRoot);
         }
 
         if (!IsHex(expectedPreviousSha256, 64, 64))
@@ -112,7 +146,7 @@ internal static partial class Program
         }
 
         return new ResourceReleaseContext("Release", true, previous.ChannelId,
-            checked(previous.Revision + 1), previous.Sha256);
+            checked(previous.Revision + 1), previous.Sha256, channelStateRoot);
     }
 
     private static ReleaseLedgerDocument WriteReleaseLedger(string outputRoot,

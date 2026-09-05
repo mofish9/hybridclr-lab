@@ -46,7 +46,7 @@ Release preflight 会实时重算上述身份。dirty、mixed SVN revision、sur
 Editor 版本、integrated commit/tree、审计 patch hash、目标引擎不匹配、未登记 package 文件或
 runtime tree 漂移都会失败。integrated 模式只校验源码，不再应用 overlay。
 
-当前 `0.1.21` Release 的锁定身份为：HybridCLR `fe3b1edb222511a1d3227f7e76e8b83b618c4d27`
+`0.1.21` Release 的历史锁定身份为：HybridCLR `fe3b1edb222511a1d3227f7e76e8b83b618c4d27`
 （tag `v8.13.0-opt4.2`）、HybridCLR Unity package
 `22fb364b2e87e74602c903fd155731abd6899270`（tree
 `89C676E9CF77083776DA66F9F05A02F0E8CA981824970165556B93079862C23A`），以及三条
@@ -87,6 +87,8 @@ commit/tree/hash 为准。
    evidence 会再次逐字段核对，不能拼接另一轮热更的 Player 报告。
    普通连续热更可以保持 registry 不变；只有 active Base 集合变化时才要求 registry 是直接后继，
    新增和显式退役由 registry 生命周期门禁验证，不把 demo 的 4 -> 5 Base 数量写死为产品条件。
+   正式流程先由 `channel-state snapshot` 在独占锁内读取受保护 head；`resource-update` 和后续
+   aggregate gate 必须消费同一份 snapshot 及其 SHA-256，不能从 candidate 目录反推 parent。
 5. `stage-resource-update` 只替换 current DLL/MetaVersion、可选补充 AOT metadata、manifest、
    validation、runtime plan 和 release ledger；manifest 使用 `runtimePlanSha256` 绑定 plan，
    ledger 反向绑定 manifest/validation，并逐文件校验所有
@@ -109,8 +111,16 @@ commit/tree/hash 为准。
    资源报告实时重算结果，要求 Base 集合与 candidate 完全相等，并将受保护的 channel、revision、
    candidate ledger 和 parent ledger 期望值逐项绑定；不能只信任报告中的 `passed`。
    revision 1 必须显式授权初始化，后续 revision 必须提供精确 parent 且禁止重新初始化。
-8. archive gate 生成无绝对路径的可移植证据，保留 immutable native manifest 原始字节并在
+8. `channel-state promote` 重新执行 aggregate gate，把资源与审批写入内容寻址目录，随后在
+   channel 独占锁内比较 snapshot 绑定的 head SHA 并原子替换 `head.json`。两个并发 candidate
+   只能一个成功，stale gate 不能重放；已有线上 ledger 首次接管必须显式执行
+   `adopt-existing`。若 head 已提交但外部 snapshot 输出失败，只能重新查询 snapshot，不能重放。
+9. archive gate 生成无绝对路径的可移植证据，保留 immutable native manifest 原始字节并在
    归档目录离线重跑 release 校验。
+
+内置后端是 `filesystem-cas-v1`：所有发布者必须共享同一个支持独占文件句柄和同目录原子
+rename 的受保护文件系统。对象存储、CDN 或语义较弱的网络盘必须由项目实现等价的 C# adapter，
+使用 immutable key 与 conditional head write；本地 head 与远端 CDN pointer 不能冒充一次原子事务。
 
 ## 跨 target 与 metadata set
 
@@ -143,7 +153,8 @@ DHE format、未支持的 schema 断言关键字、额外属性、错误类型�
 的 release evidence。证据由八个固定角色和可扩展的 changed Player 列表组成，所有文件 hash
 必须正确且报告格式匹配：
 
-- `regression`：全部生产负例和 package/schema 认证通过；
+- `regression`：全部生产负例和 package/schema 认证通过，包括 channel snapshot 篡改、gate
+  重算字段篡改、stale replay、并发 CAS、孤立 staging 和提交后 snapshot 恢复；
 - `player-changed`：至少三份真实资源更新 Player 结果，Base ID 必须互不相同，覆盖 Unity 2021、
   Unity 2022、团结 2022，并由 `hybridclr.dhe-resource-player-workflow.json` 绑定回 immutable Base；
   可以继续增加其他在线 Base；同 target 可共用 default payload，metadata shape 不同的

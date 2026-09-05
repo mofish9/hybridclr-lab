@@ -52,6 +52,7 @@ internal static partial class Program
         "resource-player-release-ledger-binding",
         "resource-player-consecutive-release-head",
         "resource-release-aggregate-gate",
+        "channel-state-cas-workflow",
         "resource-player-legacy-single-payload-compatibility",
         "resource-player-assembly-mode-binding",
         "resource-player-interpreter-only-update",
@@ -121,6 +122,7 @@ internal static partial class Program
                 "stage-resource-update" => StageResourceUpdate(cli),
                 "resource-player-evidence" => ResourcePlayerEvidence(cli),
                 "resource-release-gate" => ResourceReleaseGate(cli),
+                "channel-state" => ChannelState(cli),
                 "baseline-manifest" => BaselineManifest(cli),
                 "aot-metadata-manifest" => AotMetadataManifest(cli),
                 "preflight" => Preflight(cli),
@@ -662,11 +664,14 @@ internal static partial class Program
         string? baseRegistryPath = cli.Optional("baseregistry");
         string? previousBaseRegistryPath = cli.Optional("previousbaseregistry");
         string? previousReleaseLedgerPath = cli.Optional("previousreleaseledger");
+        string? channelSnapshotPath = cli.Optional("channelsnapshot");
         var outputInputs = currentVariantRoots.Values.Append(settingsPath)
             .Concat(new[] { baseRegistryPath, previousBaseRegistryPath,
-                previousReleaseLedgerPath }.OfType<string>())
+                previousReleaseLedgerPath, channelSnapshotPath }.OfType<string>())
             .ToArray();
         var outputRoot = SafeOutputRoot(cli.Require("outputroot"), outputInputs);
+        foreach (string input in outputInputs)
+            EnsureOutputNotAncestor(outputRoot, input);
         BaseRegistryDocument? baseRegistry = null;
         BaseRegistryDocument? previousBaseRegistry = null;
         string[] baselineRoots;
@@ -724,6 +729,11 @@ internal static partial class Program
         }
         ResourceReleaseContext resourceRelease = PrepareResourceReleaseContext(cli,
             baseRegistry, previousBaseRegistry);
+        foreach (string inputRoot in currentVariantRoots.Values.Concat(baselineRoots)
+                     .Distinct(StringComparer.OrdinalIgnoreCase))
+            EnsureOutputOutsideRoot(outputRoot, inputRoot);
+        if (!string.IsNullOrWhiteSpace(resourceRelease.ChannelStateRoot))
+            EnsureOutputOutsideRoot(outputRoot, resourceRelease.ChannelStateRoot);
         if (baselineRoots.Length == 0) throw new DheException("At least one base snapshot root is required.");
         if (baselineRoots.Distinct(StringComparer.OrdinalIgnoreCase).Count() != baselineRoots.Length)
             throw new DheException("BaseRoots must not contain duplicate Base snapshot roots.");
@@ -3941,7 +3951,7 @@ internal static partial class Program
         }
     }
 
-    private static void PrintHelp() => Console.WriteLine("HybridCLR DHE C# tool\nCommands: version, mv, batch, base-registry, resource-update, stage-resource-update, resource-player-evidence, resource-release-gate, baseline-manifest, aot-metadata-manifest, preflight, workflow, release-gate, regression, schema-validate, schema-gate, validate, archive, doctor, verify-package, release-evidence, publish, install, new-adapter, new-config, assemble-runtime, native-tests, build-managed-cases, generate-test-manifest, generate-metadata-stress-source, reference, compare-results, check-environment, clear-unity-project-locks, wait-editor, prepare-engine-test-project, bootstrap-repos, tree-hash, file-hash\nBase registry accepts -ExistingRegistry or comma-separated -BaseIdentities, -BaselineRoots, -BaseNativeManifests, -EngineWorkflows, with optional -PayloadVariantIds, -Labels, and -AotMetadataRoots. Retiring an online Base requires -RetireBaseIds and -RetirementReason.\nRelease resource update requires -Mode Release and either -InitializeReleaseLedger -ReleaseChannelId <id>, or -PreviousReleaseLedger <ledger.json> -ExpectedPreviousReleaseLedgerSha256 <sha256>. Registry revision 2 or later also requires -PreviousBaseRegistry <parent.json>.\nResource release qualification uses resource-release-gate with the exact expected channel, revision, ledger head, and one Player report per active Base.\nExample: dotnet run --project tool/HybridCLR.DheTool.csproj -- workflow -Config <project/dhe-workflow-config.json>");
+    private static void PrintHelp() => Console.WriteLine("HybridCLR DHE C# tool\nCommands: version, mv, batch, base-registry, resource-update, stage-resource-update, resource-player-evidence, resource-release-gate, channel-state, baseline-manifest, aot-metadata-manifest, preflight, workflow, release-gate, regression, schema-validate, schema-gate, validate, archive, doctor, verify-package, release-evidence, publish, install, new-adapter, new-config, assemble-runtime, native-tests, build-managed-cases, generate-test-manifest, generate-metadata-stress-source, reference, compare-results, check-environment, clear-unity-project-locks, wait-editor, prepare-engine-test-project, bootstrap-repos, tree-hash, file-hash\nBase registry accepts -ExistingRegistry or comma-separated -BaseIdentities, -BaselineRoots, -BaseNativeManifests, -EngineWorkflows, with optional -PayloadVariantIds, -Labels, and -AotMetadataRoots. Retiring an online Base requires -RetireBaseIds and -RetirementReason.\nRelease resource update accepts a protected -ChannelSnapshot, or the legacy explicit ledger arguments. Registry revision 2 or later also requires -PreviousBaseRegistry when its Base set changes.\nResource release qualification uses resource-release-gate with the same channel snapshot and one Player report per active Base. channel-state atomically promotes only a state-bound passing gate.\nExample: dotnet run --project tool/HybridCLR.DheTool.csproj -- workflow -Config <project/dhe-workflow-config.json>");
 
     private static string ResolveUnity(Cli cli, string project) => RequireFile(cli.Optional("unity") ?? Environment.GetEnvironmentVariable("DHE_UNITY_EXE") ?? throw new DheException("Set -Unity or DHE_UNITY_EXE."), "Unity editor");
     private static void RunUnity(string executable, string workingDirectory, IEnumerable<string> arguments, IDictionary<string, string> environment, string logPath, int timeoutSeconds)
