@@ -58,6 +58,12 @@ to the exact manifest and ledger supplied as the consecutive resource release he
 The clean regression passes 118/118 checks using one ledger revision 2 payload that
 was executed by all five Windows Base Players. Missing-Base and wrong-release-head
 report sets fail closed. Android/iOS device and CAT project gates remain pending.
+Toolchain `0.1.24` is the active project-facing resource release gate candidate.
+It promotes the multi-Base aggregation logic from the lab-only regression into a
+standalone C# `resource-release-gate` command. The command validates one report
+per active Base, the exact candidate and parent ledger heads, genesis versus
+continuation policy, payload variants, runtime identity, and Player dispatch
+before emitting a release-ready resource approval report.
 Base identity now also binds `engineWorkflow` and `il2cppCodeGeneration`.
 Unity 2021 is locked to `OptimizeSpeed`; Unity 2022 FGS and Tuanjie 2022 FGS
 are locked to `OptimizeSize`. Base evidence created before these fields existed

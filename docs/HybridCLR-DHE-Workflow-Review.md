@@ -104,8 +104,11 @@ commit/tree/hash 为准。
    changed smoke 完成后必须运行 `resource-player-evidence`，将资源 manifest、stage、Base
    identity/native manifest 和 Player result 绑定为发布证据；不得为了生成证据重新构建一个
    非 universal-guard 的 changed Player。
-7. release gate 从原始 DLL、MV、runtime plan、native manifest、Player 和资源报告实时重算
-   结果，不能只信任报告中的 `passed`。
+7. 每个 active Base 都生成资源 Player 证据后，发布系统调用一次 `resource-release-gate`。
+   它从原始 manifest、validation、ledger、runtime plan、native manifest、stage、Player 和
+   资源报告实时重算结果，要求 Base 集合与 candidate 完全相等，并将受保护的 channel、revision、
+   candidate ledger 和 parent ledger 期望值逐项绑定；不能只信任报告中的 `passed`。
+   revision 1 必须显式授权初始化，后续 revision 必须提供精确 parent 且禁止重新初始化。
 8. archive gate 生成无绝对路径的可移植证据，保留 immutable native manifest 原始字节并在
    归档目录离线重跑 release 校验。
 

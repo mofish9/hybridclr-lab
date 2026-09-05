@@ -316,6 +316,41 @@ authenticated manifest and validation contain one implicit `default` payload. A
 partial pair or any variant release remains fail-closed; generated evidence
 always records the inferred or selected variant and current assembly-set hash.
 
+After every active Base has produced that report, run the project-facing aggregate
+gate once for the resource release:
+
+```text
+dotnet HybridCLR.DheTool.dll resource-release-gate \
+  -ToolchainRoot C:/tools/HybridCLRDhe \
+  -ExpectedToolchainPackageId <pinned-release-package-id> \
+  -ResourceUpdateRoot C:/build/resource-205 \
+  -ChangedPlayers C:/evidence/base-100.json,C:/evidence/base-101.json \
+  -ExpectedReleaseChannelId production \
+  -ExpectedReleaseRevision 8 \
+  -ExpectedReleaseLedgerSha256 <candidate-ledger-sha256> \
+  -ExpectedPreviousReleaseLedgerSha256 <protected-revision-7-ledger-sha256> \
+  -Output C:/release-gates/resource-205.json
+```
+
+The command revalidates every referenced artifact instead of trusting report
+booleans. The Player Base IDs must exactly equal the candidate manifest's active
+Base set, and every report must resolve to that manifest, validation, ledger, and
+selected payload variant. Revision 1 replaces `ExpectedPreviousReleaseLedgerSha256`
+with `-InitializeReleaseLedger`; revision 2 and later reject that flag and require
+the exact protected parent hash. `-RequireEngineMatrix` is an optional lab or
+cross-engine-channel policy. A normal project channel needs reports for all of its
+active Bases, not artificial Bases from engines it has never shipped.
+
+`ValidationSourceRoot` is only needed while qualifying a newer tool against
+historical reports produced by an earlier authenticated Release package. Normal
+project releases omit it and require every report to name the currently pinned
+package ID. The successful output uses
+`hybridclr.dhe-resource-release-gate.json`; it is the project release system's
+approval input for publishing the already-built single resource directory. Put
+the output in a separate release-gate directory; the command rejects output
+inside the resource candidate, authenticated toolchain, validation/schema source,
+or any Player evidence directory so qualification cannot mutate its own inputs.
+
 ## JSON contract gates
 
 Validate one document or every registered DHE report below an output root with

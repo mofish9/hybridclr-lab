@@ -51,6 +51,7 @@ internal static partial class Program
         "resource-player-evidence-binding",
         "resource-player-release-ledger-binding",
         "resource-player-consecutive-release-head",
+        "resource-release-aggregate-gate",
         "resource-player-legacy-single-payload-compatibility",
         "resource-player-assembly-mode-binding",
         "resource-player-interpreter-only-update",
@@ -119,6 +120,7 @@ internal static partial class Program
                 "resource-update" => ResourceUpdate(cli),
                 "stage-resource-update" => StageResourceUpdate(cli),
                 "resource-player-evidence" => ResourcePlayerEvidence(cli),
+                "resource-release-gate" => ResourceReleaseGate(cli),
                 "baseline-manifest" => BaselineManifest(cli),
                 "aot-metadata-manifest" => AotMetadataManifest(cli),
                 "preflight" => Preflight(cli),
@@ -2698,8 +2700,13 @@ internal static partial class Program
     private static void ValidateMultiBaseChangedEvidence(
         IReadOnlyCollection<(JsonElement Report, string Path)> reports, bool requireEngineMatrix)
     {
-        if (reports.Count < 2)
-            throw new DheException("Multi-Base changed evidence requires at least two Base Players.");
+        int minimumReportCount = requireEngineMatrix
+            ? RequiredPlayerEngineWorkflows.Length
+            : 1;
+        if (reports.Count < minimumReportCount)
+            throw new DheException(requireEngineMatrix
+                ? "Changed Player evidence requires all three engine workflows."
+                : "Resource release evidence requires at least one active Base Player.");
         string[] baseIds = reports.Select(item =>
             GetString(item.Report, "selectedBaseId") ?? string.Empty).ToArray();
         if (baseIds.Any(baseId => !IsHex(baseId, 64, 64)) ||
@@ -2805,7 +2812,7 @@ internal static partial class Program
             throw new DheException(
                 "Multi-Base Player evidence does not match its release ledger Base set.");
         return new MultiBaseResourceReleaseProof(manifestSha256, ledger.Sha256,
-            ledger.ParentLedgerSha256 ?? string.Empty, ledger.ChannelId,
+            ledger.ParentLedgerSha256, ledger.ChannelId,
             ledger.Revision, ledger.BaseRegistrySha256,
             ledger.ActiveBaseCount, ledger.CurrentAssemblySetSha256,
             ledger.PayloadVariantSetSha256);
@@ -3934,7 +3941,7 @@ internal static partial class Program
         }
     }
 
-    private static void PrintHelp() => Console.WriteLine("HybridCLR DHE C# tool\nCommands: version, mv, batch, base-registry, resource-update, stage-resource-update, resource-player-evidence, baseline-manifest, aot-metadata-manifest, preflight, workflow, release-gate, regression, schema-validate, schema-gate, validate, archive, doctor, verify-package, release-evidence, publish, install, new-adapter, new-config, assemble-runtime, native-tests, build-managed-cases, generate-test-manifest, generate-metadata-stress-source, reference, compare-results, check-environment, clear-unity-project-locks, wait-editor, prepare-engine-test-project, bootstrap-repos, tree-hash, file-hash\nBase registry accepts -ExistingRegistry or comma-separated -BaseIdentities, -BaselineRoots, -BaseNativeManifests, -EngineWorkflows, with optional -PayloadVariantIds, -Labels, and -AotMetadataRoots. Retiring an online Base requires -RetireBaseIds and -RetirementReason.\nRelease resource update requires -Mode Release and either -InitializeReleaseLedger -ReleaseChannelId <id>, or -PreviousReleaseLedger <ledger.json> -ExpectedPreviousReleaseLedgerSha256 <sha256>. Registry revision 2 or later also requires -PreviousBaseRegistry <parent.json>.\nExample: dotnet run --project tool/HybridCLR.DheTool.csproj -- workflow -Config <project/dhe-workflow-config.json>");
+    private static void PrintHelp() => Console.WriteLine("HybridCLR DHE C# tool\nCommands: version, mv, batch, base-registry, resource-update, stage-resource-update, resource-player-evidence, resource-release-gate, baseline-manifest, aot-metadata-manifest, preflight, workflow, release-gate, regression, schema-validate, schema-gate, validate, archive, doctor, verify-package, release-evidence, publish, install, new-adapter, new-config, assemble-runtime, native-tests, build-managed-cases, generate-test-manifest, generate-metadata-stress-source, reference, compare-results, check-environment, clear-unity-project-locks, wait-editor, prepare-engine-test-project, bootstrap-repos, tree-hash, file-hash\nBase registry accepts -ExistingRegistry or comma-separated -BaseIdentities, -BaselineRoots, -BaseNativeManifests, -EngineWorkflows, with optional -PayloadVariantIds, -Labels, and -AotMetadataRoots. Retiring an online Base requires -RetireBaseIds and -RetirementReason.\nRelease resource update requires -Mode Release and either -InitializeReleaseLedger -ReleaseChannelId <id>, or -PreviousReleaseLedger <ledger.json> -ExpectedPreviousReleaseLedgerSha256 <sha256>. Registry revision 2 or later also requires -PreviousBaseRegistry <parent.json>.\nResource release qualification uses resource-release-gate with the exact expected channel, revision, ledger head, and one Player report per active Base.\nExample: dotnet run --project tool/HybridCLR.DheTool.csproj -- workflow -Config <project/dhe-workflow-config.json>");
 
     private static string ResolveUnity(Cli cli, string project) => RequireFile(cli.Optional("unity") ?? Environment.GetEnvironmentVariable("DHE_UNITY_EXE") ?? throw new DheException("Set -Unity or DHE_UNITY_EXE."), "Unity editor");
     private static void RunUnity(string executable, string workingDirectory, IEnumerable<string> arguments, IDictionary<string, string> environment, string logPath, int timeoutSeconds)
@@ -4215,7 +4222,7 @@ internal static partial class Program
     private sealed record MultiBaseResourceReleaseProof(
         string ResourceUpdateManifestSha256,
         string ReleaseLedgerSha256,
-        string ParentReleaseLedgerSha256,
+        string? ParentReleaseLedgerSha256,
         string ReleaseChannelId,
         int ReleaseRevision,
         string BaseRegistrySha256,

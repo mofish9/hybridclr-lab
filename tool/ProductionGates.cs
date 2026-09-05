@@ -1984,6 +1984,7 @@ internal static partial class Program
         var resourcePlayerEvidenceBindingPassed = false;
         var resourcePlayerReleaseLedgerBindingPassed = false;
         var resourcePlayerConsecutiveReleaseHeadPassed = false;
+        var resourceReleaseAggregateGatePassed = false;
         object? validatedResourceRelease = null;
         var workflowOutputs = new List<object>();
         var changedWorkflowRoots = cli.GetList("workflowchangedroots");
@@ -2104,6 +2105,168 @@ internal static partial class Program
                             payloadVariantSetSha256 = releaseProof.PayloadVariantSetSha256,
                         };
                     }
+
+                    string authorityGatePath = ResolveEvidencePath(GetString(
+                            changedReports[0].Report, "toolchainGate"),
+                        Path.GetDirectoryName(changedReports[0].Path)!,
+                        "Resource release aggregate authority gate");
+                    JsonElement authorityGate = ReadJson<JsonElement>(authorityGatePath);
+                    string authorityRoot = RequireDirectory(GetString(authorityGate,
+                            "packageRoot") ?? string.Empty,
+                        "Resource release aggregate authority package");
+                    string authorityPackageId = GetString(changedReports[0].Report,
+                        "expectedToolchainPackageId") ?? string.Empty;
+                    Dictionary<string, string> AggregateArguments(
+                        IEnumerable<(JsonElement Report, string Path)> inputs,
+                        string aggregateOutput) => new(StringComparer.OrdinalIgnoreCase)
+                    {
+                        ["toolchainroot"] = authorityRoot,
+                        ["expectedtoolchainpackageid"] = authorityPackageId,
+                        ["validationsourceroot"] = cli.Root,
+                        ["schemaroot"] = packageRoot,
+                        ["resourceupdateroot"] = resourceUpdateRoot2,
+                        ["expectedreleasechannelid"] = releaseProof.ReleaseChannelId,
+                        ["expectedreleaserevision"] = releaseProof.ReleaseRevision.ToString(
+                            CultureInfo.InvariantCulture),
+                        ["expectedreleaseledgersha256"] = releaseProof.ReleaseLedgerSha256,
+                        ["expectedpreviousreleaseledgersha256"] =
+                            releaseProof.ParentReleaseLedgerSha256 ?? string.Empty,
+                        ["requireenginematrix"] = "true",
+                        ["changedplayers"] = string.Join(',', inputs.Select(item => item.Path)),
+                        ["output"] = aggregateOutput,
+                    };
+
+                    string aggregatePath = Path.Combine(regressionRoot,
+                        "resource-release-gate.json");
+                    bool aggregateAccepted = ResourceReleaseGate(new Cli(
+                        "resource-release-gate", AggregateArguments(changedReports,
+                            aggregatePath))) == 0;
+                    bool incompleteRejected = false;
+                    try
+                    {
+                        _ = ResourceReleaseGate(new Cli("resource-release-gate",
+                            AggregateArguments(changedReports.Take(changedReports.Length - 1),
+                                Path.Combine(regressionRoot,
+                                    "resource-release-gate-incomplete.json"))));
+                    }
+                    catch (DheException)
+                    {
+                        incompleteRejected = true;
+                    }
+                    bool candidateHeadRejected = false;
+                    try
+                    {
+                        Dictionary<string, string> values = AggregateArguments(changedReports,
+                            Path.Combine(regressionRoot,
+                                "resource-release-gate-wrong-candidate.json"));
+                        values["expectedreleaseledgersha256"] = new string('f', 64);
+                        _ = ResourceReleaseGate(new Cli("resource-release-gate", values));
+                    }
+                    catch (DheException)
+                    {
+                        candidateHeadRejected = true;
+                    }
+                    bool channelRejected = false;
+                    try
+                    {
+                        Dictionary<string, string> values = AggregateArguments(changedReports,
+                            Path.Combine(regressionRoot,
+                                "resource-release-gate-wrong-channel.json"));
+                        values["expectedreleasechannelid"] = releaseProof.ReleaseChannelId + "-wrong";
+                        _ = ResourceReleaseGate(new Cli("resource-release-gate", values));
+                    }
+                    catch (DheException)
+                    {
+                        channelRejected = true;
+                    }
+                    bool revisionRejected = false;
+                    string staleRevisionOutput = Path.Combine(regressionRoot,
+                        "resource-release-gate-wrong-revision.json");
+                    File.WriteAllText(staleRevisionOutput, "stale", new UTF8Encoding(false));
+                    try
+                    {
+                        Dictionary<string, string> values = AggregateArguments(changedReports,
+                            staleRevisionOutput);
+                        values["expectedreleaserevision"] = (releaseProof.ReleaseRevision + 1)
+                            .ToString(CultureInfo.InvariantCulture);
+                        _ = ResourceReleaseGate(new Cli("resource-release-gate", values));
+                    }
+                    catch (DheException)
+                    {
+                        revisionRejected = !File.Exists(staleRevisionOutput);
+                    }
+                    bool previousHeadRejectedByAggregate = false;
+                    try
+                    {
+                        Dictionary<string, string> values = AggregateArguments(changedReports,
+                            Path.Combine(regressionRoot,
+                                "resource-release-gate-wrong-parent.json"));
+                        values["expectedpreviousreleaseledgersha256"] = new string('f', 64);
+                        _ = ResourceReleaseGate(new Cli("resource-release-gate", values));
+                    }
+                    catch (DheException)
+                    {
+                        previousHeadRejectedByAggregate = true;
+                    }
+                    bool reinitializationRejected = false;
+                    try
+                    {
+                        Dictionary<string, string> values = AggregateArguments(changedReports,
+                            Path.Combine(regressionRoot,
+                                "resource-release-gate-reinitialize.json"));
+                        values.Remove("expectedpreviousreleaseledgersha256");
+                        values["initializereleaseledger"] = "true";
+                        _ = ResourceReleaseGate(new Cli("resource-release-gate", values));
+                    }
+                    catch (DheException)
+                    {
+                        reinitializationRejected = true;
+                    }
+                    bool protectedOutputRejected = false;
+                    try
+                    {
+                        _ = ResourceReleaseGate(new Cli("resource-release-gate",
+                            AggregateArguments(changedReports, Path.Combine(resourceUpdateRoot2,
+                                "resource-release-gate-invalid-output.json"))));
+                    }
+                    catch (DheException)
+                    {
+                        protectedOutputRejected = true;
+                    }
+                    bool executionTamperRejected = false;
+                    var executionTamper = System.Text.Json.Nodes.JsonNode.Parse(
+                        changedReports[0].Report.GetRawText())!.AsObject();
+                    executionTamper["player"]!.AsObject()["retryFailure"] = "wrong-failure";
+                    try
+                    {
+                        using var tamperedDocument = JsonDocument.Parse(
+                            executionTamper.ToJsonString());
+                        ValidateResourceReleasePlayerCorrectness(tamperedDocument.RootElement);
+                    }
+                    catch (DheException)
+                    {
+                        executionTamperRejected = true;
+                    }
+                    if (aggregateAccepted)
+                    {
+                        JsonElement aggregate = ReadJson<JsonElement>(aggregatePath);
+                        aggregateAccepted = GetBool(aggregate, "passed") &&
+                            GetBool(aggregate, "releaseReady") &&
+                            GetBool(aggregate, "exactActiveBaseCoverage") &&
+                            GetInt(aggregate, "activeBaseCount") == changedReports.Length &&
+                            string.Equals(GetString(aggregate, "releaseLedgerSha256"),
+                                releaseProof.ReleaseLedgerSha256,
+                                StringComparison.OrdinalIgnoreCase) &&
+                            string.Equals(GetString(aggregate,
+                                    "expectedPreviousReleaseLedgerSha256"),
+                                releaseProof.ParentReleaseLedgerSha256,
+                                StringComparison.OrdinalIgnoreCase);
+                    }
+                    resourceReleaseAggregateGatePassed = aggregateAccepted &&
+                        incompleteRejected && candidateHeadRejected && channelRejected &&
+                        revisionRejected && previousHeadRejectedByAggregate &&
+                        reinitializationRejected && protectedOutputRejected &&
+                        executionTamperRejected;
                 }
                 var tamperedReport = System.Text.Json.Nodes.JsonNode.Parse(
                     changedReports[0].Report.GetRawText())!.AsObject();
@@ -2144,6 +2307,11 @@ internal static partial class Program
                 "tool", "Program.cs")).Contains(
                 "Changed Player evidence does not match the consecutive resource release head.",
                 StringComparison.Ordinal);
+            resourceReleaseAggregateGatePassed = File.Exists(Path.Combine(packageRoot,
+                    "schemas", "dhe-resource-release-gate.schema.json")) &&
+                File.ReadAllText(Path.Combine(packageRoot, "tool",
+                    "ResourceReleaseGate.cs")).Contains(
+                    "private static int ResourceReleaseGate", StringComparison.Ordinal);
         }
         AddRegressionCheck(checks, errors, "schema-workflow-output-contract", workflowSchemaPassed,
             realWorkflowOutputsValidated
@@ -2160,6 +2328,10 @@ internal static partial class Program
         AddRegressionCheck(checks, errors, "resource-player-consecutive-release-head",
             resourcePlayerConsecutiveReleaseHeadPassed,
             "every active Base Player must execute the exact consecutive resource release head");
+        AddRegressionCheck(checks, errors, "resource-release-aggregate-gate",
+            resourceReleaseAggregateGatePassed,
+            "the project-facing aggregate gate must authenticate every active Base and reject " +
+            "incomplete, stale, forked, reinitialized, or input-mutating release evidence");
         using var releaseResourceBase = JsonDocument.Parse("{\"mode\":\"Release\",\"releaseReady\":true}");
         using var incompleteResourceBase = JsonDocument.Parse("{\"mode\":\"Release\",\"releaseReady\":false}");
         using var exploratoryResourceBase = JsonDocument.Parse("{\"mode\":\"Exploratory\",\"releaseReady\":true}");

@@ -146,6 +146,21 @@ payload variant. The input
 is extensible, so additional representative Base reports can be bound as the
 matrix grows. Every online Base remains a mandatory input to `resource-update`.
 
+For a project resource release, aggregate all active Base reports with
+`resource-release-gate` before upload or pointer promotion. Pass the candidate
+ledger SHA from the build output, but obtain the expected channel, next revision,
+and previous ledger SHA from protected release state rather than from the
+candidate directory. A successful report proves exact active-Base coverage and binds each
+Base's target, payload variant, metadata set, changed/interpreter/AOT counts, and
+report SHA-256. Missing, duplicate, foreign-release, stale-parent, or reinitialized
+continuation inputs fail without producing a passing gate report.
+
+The first resource release explicitly passes `-InitializeReleaseLedger`; every
+later release supplies `-ExpectedPreviousReleaseLedgerSha256`. This command does
+not make a local file globally authoritative: CI or the release service must still
+compare-and-swap its protected head only after the aggregate gate and upload have
+succeeded.
+
 Treat the Base registry as an append-only online-support ledger. Creating a new
 Base app version appends its archived identity with `-ExistingRegistry`; the
 resulting revision names the previous registry SHA-256. A Base may disappear only
@@ -179,7 +194,7 @@ gate accepts only this direct transition and then checks the new current payload
 against every old and new active Base in one invocation. Do not initialize another
 release channel to bypass an incompatible historical Base.
 
-For formal qualification, pass the preceding release as `-ResourceUpdateRoot`
+For toolchain formal qualification, pass the preceding release as `-ResourceUpdateRoot`
 and the candidate continuation as `-ResourceUpdateRoot2`. Supply one
 `-WorkflowChangedRoots` report directory for every active Base in the candidate
 manifest. The gate rejects a report subset, a report from another release channel

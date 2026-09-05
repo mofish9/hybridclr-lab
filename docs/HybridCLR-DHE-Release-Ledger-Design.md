@@ -48,6 +48,15 @@ The next hotfix may keep the registry unchanged. If its active Base set changes,
 the registry must be the authenticated direct successor; the workflow does not
 assume a fixed number of Bases or require every hotfix to add a Base.
 
+Project publication uses `resource-release-gate` after every active Base has run.
+The command consumes the protected expected channel/revision/current candidate
+ledger and, for revision 2+, the protected previous ledger SHA. It emits one
+schema-validated approval report only when the candidate resource directory and
+all Base Player reports resolve to those exact identities. Revision 1 requires an
+explicit initialization flag; a continuation cannot reuse it. The protected
+release service remains responsible for atomically promoting the approved ledger
+head after upload.
+
 ## Contract
 
 `resource-update -Mode Release` requires registry mode and exactly one of:
