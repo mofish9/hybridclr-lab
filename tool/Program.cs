@@ -487,12 +487,6 @@ internal static partial class Program
         string baseId = GetString(identity, "baseId") ?? string.Empty;
         if (!IsHex(baseId, 64, 64))
             throw new DheException("Base build identity has an invalid baseId: " + identityPath);
-        string? identityNativeManifestPath = GetString(identity, "nativeManifestPath");
-        if (!string.IsNullOrWhiteSpace(identityNativeManifestPath) &&
-            !Path.GetFullPath(identityNativeManifestPath).Equals(
-                Path.GetFullPath(nativeManifestPath), StringComparison.OrdinalIgnoreCase))
-            throw new DheException("Base identity nativeManifestPath does not match the registry input: " +
-                identityPath);
         JsonElement native = ReadJson<JsonElement>(nativeManifestPath);
         if (!string.Equals(GetString(identity, "nativeManifestSha256"),
                 Sha256File(nativeManifestPath), StringComparison.OrdinalIgnoreCase))
@@ -514,12 +508,6 @@ internal static partial class Program
                     identityPath);
             string path = RequireFile(Path.Combine(baselineRoot, name + ".dll"),
                 "Base assembly " + name);
-            string? identityBaselinePath = GetString(assembly, "baselinePath");
-            if (!string.IsNullOrWhiteSpace(identityBaselinePath) &&
-                !Path.GetFullPath(identityBaselinePath).Equals(Path.GetFullPath(path),
-                    StringComparison.OrdinalIgnoreCase))
-                throw new DheException("Base assembly baselinePath does not match the registry root: " +
-                    name);
             string expectedHash = GetString(assembly, "baselineSha256") ?? string.Empty;
             if (!IsHex(expectedHash, 64, 64) ||
                 !string.Equals(Sha256File(path), expectedHash,
