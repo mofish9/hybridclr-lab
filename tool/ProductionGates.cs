@@ -1716,6 +1716,9 @@ internal static partial class Program
         AddRegressionCheck(checks, errors, "resource-player-interpreter-only-update",
             RunInterpreterOnlyResourceUpdateRegression(),
             "a resource update containing only a new interpreter assembly must retain no-op AOT proof without requiring a DHE transaction");
+        AddRegressionCheck(checks, errors, "resource-player-selected-base-noop",
+            RunSelectedBaseNoOpResourceUpdateRegression(),
+            "a current payload equal to one selected Base must require and accept complete no-op AOT evidence");
         var runtimeSource = File.ReadAllText(Path.Combine(cli.Root, "tool", "LabCommands.cs"));
         AddRegressionCheck(checks, errors, "runtime-package-source-binding",
             runtimeSource.Contains("ValidateRepoIdentity(\"hybridclr_unity\"", StringComparison.Ordinal),
@@ -3965,20 +3968,36 @@ internal static partial class Program
 
     private static bool RunInterpreterOnlyResourceUpdateRegression()
     {
-        using var player = JsonDocument.Parse("{" +
+        using var player = CreateResourceNoOpPlayerRegressionDocument(true);
+        var interpreterOnlyErrors = new List<string>();
+        ValidateResourcePlayerExecution(player.RootElement, 0, 1, interpreterOnlyErrors);
+        return interpreterOnlyErrors.Count == 0;
+    }
+
+    private static bool RunSelectedBaseNoOpResourceUpdateRegression()
+    {
+        using var validPlayer = CreateResourceNoOpPlayerRegressionDocument(true);
+        var validErrors = new List<string>();
+        ValidateResourcePlayerExecution(validPlayer.RootElement, 0, 0, validErrors);
+
+        using var weakPlayer = CreateResourceNoOpPlayerRegressionDocument(false);
+        var weakErrors = new List<string>();
+        ValidateResourcePlayerExecution(weakPlayer.RootElement, 0, 0, weakErrors);
+        return validErrors.Count == 0 && weakErrors.Count != 0;
+    }
+
+    private static JsonDocument CreateResourceNoOpPlayerRegressionDocument(bool noOpValidated)
+    {
+        return JsonDocument.Parse("{" +
             "\"changedMethodCount\":0,\"expectedChangedMethodCount\":0," +
             "\"interpreterEntryCount\":0,\"aotEntryCount\":1," +
             "\"resourceUpdateManifestPresent\":true,\"resourceUpdateValidated\":true," +
             "\"dispatchProbeValidated\":true,\"multiAssemblyValidated\":true," +
             "\"changedProbeChanged\":false,\"unchangedProbeChanged\":false," +
             "\"transactionStatus\":\"notApplicable\",\"retryValidated\":false," +
-            "\"noOpAotBehaviorValidated\":true,\"capabilityDirectPassed\":true," +
+            "\"noOpAotBehaviorValidated\":" + (noOpValidated ? "true" : "false") +
+            ",\"capabilityDirectPassed\":true," +
             "\"capabilityPassed\":true,\"secondaryAssemblyDirectValidated\":true}");
-        var interpreterOnlyErrors = new List<string>();
-        ValidateResourcePlayerExecution(player.RootElement, 0, 1, interpreterOnlyErrors);
-        var emptyUpdateErrors = new List<string>();
-        ValidateResourcePlayerExecution(player.RootElement, 0, 0, emptyUpdateErrors);
-        return interpreterOnlyErrors.Count == 0 && emptyUpdateErrors.Count != 0;
     }
 
     private static void RunIntegratedSourceLockRegressions(string regressionRoot,

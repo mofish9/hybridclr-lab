@@ -76,6 +76,7 @@ internal static partial class Program
         "resource-player-legacy-single-payload-compatibility",
         "resource-player-assembly-mode-binding",
         "resource-player-interpreter-only-update",
+        "resource-player-selected-base-noop",
         "resource-player-release-readiness",
         "resource-stage-aot-inventory-missing-rejected",
         "resource-stage-aot-inventory-hash-tamper-rejected",

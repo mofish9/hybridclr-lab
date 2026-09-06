@@ -686,10 +686,9 @@ internal static partial class Program
     private static void ValidateResourcePlayerExecution(JsonElement player, int expectedChanged,
         int interpreterOnlyAssemblyCount, List<string> errors)
     {
-        if (expectedChanged < 0 || interpreterOnlyAssemblyCount < 0 ||
-            (expectedChanged == 0 && interpreterOnlyAssemblyCount == 0))
+        if (expectedChanged < 0 || interpreterOnlyAssemblyCount < 0)
         {
-            errors.Add("Resource Player evidence contains no differential change or new assembly.");
+            errors.Add("Resource Player evidence contains an invalid change count.");
             return;
         }
         if (GetInt(player, "changedMethodCount") != expectedChanged ||
@@ -724,7 +723,7 @@ internal static partial class Program
         }
         catch (Exception exception)
         {
-            errors.Add("Interpreter-only resource update did not preserve Base AOT behavior: " +
+            errors.Add("No-op resource update did not preserve Base AOT behavior: " +
                 exception.Message);
         }
     }
