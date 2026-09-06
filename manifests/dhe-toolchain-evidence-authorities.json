@@ -44,6 +44,12 @@
       "packageId": "7f5998a95c8474b46b0eb9487d7369bc055f52bf05e3e9bc5087e7a9902eb44d",
       "sourceHead": "a927b8b0f497a842431789761c37256cf9a3b6f7",
       "sourceTree": "a6fc5cd84247f8ec31a625ca6c7fe8929fef6d69"
+    },
+    {
+      "toolchainVersion": "0.1.26",
+      "packageId": "b23759fccd900ba6f5ff6f250d75676c3b539f9af400ae2644412678183a3cf9",
+      "sourceHead": "fa780ee9e8e8679d213f5a98dcf86ff578d365d4",
+      "sourceTree": "d142fc251ce830c73327c388c6e01670a392a4aa"
     }
   ]
 }
