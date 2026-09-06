@@ -2441,7 +2441,7 @@ internal static partial class Program
                     throw new DheException(role + " evidence did not pass validation and coverage.");
                 ValidateEvidenceToolIdentity(report, reportPath, sourceRoot, sourceHead,
                     sourceTree);
-                ValidateManagedReleaseEvidence(report, reportPath, sourceRoot);
+                ValidateManagedReleaseEvidence(report, reportPath);
                 var changed = GetInt(report.GetProperty("capability"), "changedMethodCount");
                 var player = report.GetProperty("player");
                 if (changedRole)
@@ -2529,14 +2529,40 @@ internal static partial class Program
             throw new DheException(role + " contains resolver errors.");
     }
 
-    private static void ValidateManagedReleaseEvidence(JsonElement report, string reportPath,
-        string sourceRoot)
+    private static string ResolveManagedEvidenceContractRoot(JsonElement report,
+        string reportPath)
+    {
+        string reportRoot = Path.GetDirectoryName(reportPath)!;
+        string expectedPackageId = GetString(report, "expectedToolchainPackageId") ??
+            string.Empty;
+        string gatePath = ResolveEvidencePath(GetString(report, "toolchainGate"),
+            reportRoot, "Managed Player toolchain gate");
+        JsonElement gate = ReadJson<JsonElement>(gatePath);
+        RequireEvidenceFormat(gate, "hybridclr.dhe-toolchain-gate.json",
+            "Managed Player toolchain gate");
+        string packageRoot = RequireDirectory(GetString(gate, "packageRoot") ??
+            string.Empty, "Managed Player toolchain package");
+        PackageInspection inspection = InspectPackage(packageRoot, expectedPackageId, true);
+        if (!GetBool(gate, "passed") || !GetBool(gate, "requireRelease") ||
+            !GetBool(gate, "releaseReady") || !inspection.Passed ||
+            !string.Equals(GetString(gate, "packageId"), expectedPackageId,
+                StringComparison.OrdinalIgnoreCase))
+            throw new DheException(
+                "Managed Player toolchain package is not an authenticated Release package.");
+        return packageRoot;
+    }
+
+    private static void ValidateManagedReleaseEvidence(JsonElement report, string reportPath)
     {
         if (!string.Equals(GetString(report, "mode"), "Release", StringComparison.Ordinal) ||
             !GetBool(report, "releaseReady"))
             throw new DheException("Managed Player release evidence must come from a Release-ready workflow.");
 
         string reportRoot = Path.GetDirectoryName(reportPath)!;
+        // A supported Base can outlive the toolchain that built it. Validate its
+        // runtime locks against that Base's authenticated Release package; the
+        // current package separately authorizes the historical Package ID.
+        string contractRoot = ResolveManagedEvidenceContractRoot(report, reportPath);
         string runtimePath = ResolveEvidencePath(GetString(report, "runtimeSource"), reportRoot,
             "Managed Player runtime manifest");
         JsonElement runtime = ReadJson<JsonElement>(runtimePath);
@@ -2558,7 +2584,7 @@ internal static partial class Program
         if (!externalTree.Equals(GetString(headers, "stagedTreeSha256"),
                 StringComparison.OrdinalIgnoreCase))
             throw new DheException("Managed Player external header tree has changed.");
-        string currentRuntimeLock = RequireFile(Path.Combine(sourceRoot, "manifests",
+        string currentRuntimeLock = RequireFile(Path.Combine(contractRoot, "manifests",
             "dhe-runtime-lock.json"), "Managed Player runtime lock");
         if (!Sha256File(currentRuntimeLock).Equals(GetString(runtime, "dheRuntimeLockSha256"),
                 StringComparison.OrdinalIgnoreCase))
@@ -2589,9 +2615,9 @@ internal static partial class Program
             !GetBool(clean, "trackedSourcesRequired") || !GetBool(clean, "trackedSourcesComplete"))
             throw new DheException("Managed Player evidence is not bound to clean tracked project and tool sources.");
 
-        JsonElement repoLock = ReadJson<JsonElement>(RequireFile(Path.Combine(sourceRoot, "manifests",
+        JsonElement repoLock = ReadJson<JsonElement>(RequireFile(Path.Combine(contractRoot, "manifests",
             "repo-lock.json"), "Managed Player repository lock"));
-        JsonElement workflowLock = ReadJson<JsonElement>(RequireFile(Path.Combine(sourceRoot, "manifests",
+        JsonElement workflowLock = ReadJson<JsonElement>(RequireFile(Path.Combine(contractRoot, "manifests",
             "runtime-workflows.json"), "Managed Player runtime workflows"));
         string workflowId = GetString(runtime, "engineWorkflow") ?? string.Empty;
         JsonElement workflow = workflowLock.GetProperty("workflows").EnumerateArray().SingleOrDefault(item =>

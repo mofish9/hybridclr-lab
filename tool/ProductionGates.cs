@@ -1623,7 +1623,7 @@ internal static partial class Program
         {
             using var exploratoryManaged = JsonDocument.Parse("{\"mode\":\"Exploratory\"," +
                 "\"releaseReady\":false}");
-            ValidateManagedReleaseEvidence(exploratoryManaged.RootElement, output, cli.Root);
+            ValidateManagedReleaseEvidence(exploratoryManaged.RootElement, output);
         }
         catch { exploratoryManagedRejected = true; }
         AddRegressionCheck(checks, errors, "evidence-managed-release-binding",
@@ -2112,7 +2112,7 @@ internal static partial class Program
                             "changed resource workflow");
                         ValidateResourcePlayerEvidenceBindings(workflowReport, reportPath);
                     }
-                    ValidateManagedReleaseEvidence(workflowReport, reportPath, cli.Root);
+                    ValidateManagedReleaseEvidence(workflowReport, reportPath);
                     if (changedWorkflow)
                     {
                         var identity = GetChangedPlayerEvidenceIdentity(workflowReport, reportPath);

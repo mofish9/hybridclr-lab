@@ -107,7 +107,7 @@ internal static partial class Program
                 !GetBool(report, "coverageGatePassed"))
                 throw new DheException("Resource release Player did not pass workflow gates: " + path);
             ValidateResourcePlayerEvidenceBindings(report, path);
-            ValidateManagedReleaseEvidence(report, path, validationSourceRoot);
+            ValidateManagedReleaseEvidence(report, path);
             ValidateResourceReleasePlayerCorrectness(report);
 
             string reportPackageId = GetString(report,
