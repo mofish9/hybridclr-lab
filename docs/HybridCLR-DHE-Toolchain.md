@@ -44,9 +44,9 @@ changes only `DheMultiBaseProbe.CurrentValue` and the `DheDemoCalculator`
 constructor bodies in `HybridCLR.ManagedCasesAot.dll`. The command preserves
 assembly/module identity and rejects overlapping seed/output trees. The release
 regression requires this transformation to remain compatible and to produce
-exactly two body-only changes. Project hot-update DLLs continue to come from the
-project's normal managed compilation; this fixture is not a production IL
-rewriter.
+exactly two body-only changes; pass the authenticated seed DLL through
+`-ManagedCurrentSeed`. Project hot-update DLLs continue to come from the project's
+normal managed compilation; this fixture is not a production IL rewriter.
 
 Prepare every locked engine-specific `il2cpp_plus` checkout without manually
 creating worktrees:

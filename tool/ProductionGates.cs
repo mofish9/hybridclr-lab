@@ -777,20 +777,43 @@ internal static partial class Program
         AddRegressionCheck(checks, errors, "mv-assembly-metadata", !metadataCompatibility.Compatible,
             "assembly metadata change must be rejected");
 
-        var baseVariantAssembly = Path.Combine(regressionRoot, "base-variant-body-only.dll");
-        ManagedCaseVariants.WriteBase2CurrentAssembly(baseline, baseVariantAssembly);
-        MetaVersionSnapshot baseVariantMetaVersion = MetaVersionSnapshot.Create(baseVariantAssembly);
-        ResourceUpdateCompatibility baseVariantCompatibility = ResourceUpdateCompatibility.Analyze(
-            baselineMetaVersion, baseVariantMetaVersion);
+        bool baseVariantBodyOnlyPassed = false;
+        string baseVariantBodyOnlyDetails =
+            "ManagedCurrentSeed must identify an authenticated DHE_CURRENT fixture assembly";
+        string? managedCurrentSeed = cli.Optional("managedcurrentseed");
+        if (!string.IsNullOrWhiteSpace(managedCurrentSeed))
+        {
+            try
+            {
+                managedCurrentSeed = RequireFile(managedCurrentSeed,
+                    "Authenticated managed current fixture");
+                var seedMetaVersion = MetaVersionSnapshot.Create(managedCurrentSeed);
+                var baseVariantAssembly = Path.Combine(regressionRoot,
+                    "base-variant-body-only.dll");
+                ManagedCaseVariants.WriteBase2CurrentAssembly(managedCurrentSeed,
+                    baseVariantAssembly);
+                MetaVersionSnapshot baseVariantMetaVersion =
+                    MetaVersionSnapshot.Create(baseVariantAssembly);
+                ResourceUpdateCompatibility baseVariantCompatibility =
+                    ResourceUpdateCompatibility.Analyze(seedMetaVersion,
+                        baseVariantMetaVersion);
+                baseVariantBodyOnlyPassed = baseVariantCompatibility.Compatible &&
+                    baseVariantCompatibility.ChangedMethodCount == 2 &&
+                    baseVariantCompatibility.BodyOnlyChangedMethodCount == 2 &&
+                    baseVariantCompatibility.DependencyChangedMethodCount == 0 &&
+                    baseVariantCompatibility.UnsupportedChanges.Length == 0 &&
+                    seedMetaVersion.AssemblyMetadataVersion ==
+                        baseVariantMetaVersion.AssemblyMetadataVersion;
+                baseVariantBodyOnlyDetails =
+                    "Base-generation fixture must preserve module metadata and change exactly two method bodies";
+            }
+            catch (Exception exception)
+            {
+                baseVariantBodyOnlyDetails = exception.Message;
+            }
+        }
         AddRegressionCheck(checks, errors, "managed-current-base-variant-body-only",
-            baseVariantCompatibility.Compatible &&
-            baseVariantCompatibility.ChangedMethodCount == 2 &&
-            baseVariantCompatibility.BodyOnlyChangedMethodCount == 2 &&
-            baseVariantCompatibility.DependencyChangedMethodCount == 0 &&
-            baseVariantCompatibility.UnsupportedChanges.Length == 0 &&
-            baselineMetaVersion.AssemblyMetadataVersion ==
-                baseVariantMetaVersion.AssemblyMetadataVersion,
-            "Base-generation fixture must preserve module metadata and change exactly two method bodies");
+            baseVariantBodyOnlyPassed, baseVariantBodyOnlyDetails);
 
 		var referenceRemovalAssembly = Path.Combine(regressionRoot, "reference-removal.dll");
 		WriteMutatedAssembly(baseline, referenceRemovalAssembly, module =>
