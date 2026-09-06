@@ -24,12 +24,12 @@ Its formal entry points, generated-output boundary, and complete four-assembly
 Player evidence are documented in
 `docs/HybridCLR-DHE-Toolchain.md`,
 `docs/HybridCLR-DHE-Workflow-Review.md` and
-`docs/HybridCLR-DHE-Formal-Project-Validation.md`. Toolchain `0.1.31` is the
+`docs/HybridCLR-DHE-Formal-Project-Validation.md`. Toolchain `0.1.32` is the
 current conditionally accepted source and three-engine Windows release; its exact
 evidence and remaining platform gates are recorded in
-`docs/HybridCLR-DHE-Opt4-Release-0.1.31.md`. Toolchains `0.1.18`, `0.1.20`,
+`docs/HybridCLR-DHE-Opt4-Release-0.1.32.md`. Toolchains `0.1.18`, `0.1.20`,
 `0.1.21`, `0.1.22`, `0.1.23`, `0.1.24`, `0.1.25`, `0.1.26`, `0.1.27`,
-`0.1.28`, `0.1.29`, and `0.1.30`
+`0.1.28`, `0.1.29`, `0.1.30`, and `0.1.31`
 are retained as historical evidence. Projects must install an
 authenticated package whose manifest has `releaseReady=true` and pin its exact
 package ID.
@@ -124,6 +124,14 @@ A subsequent post-release run appended a seventh, previously archived real
 Tuanjie Base through a direct-successor registry. One revision 3 resource build
 then passed on all seven old and new Windows Players and advanced the same
 protected lab channel without rebuilding the original six Players.
+Toolchain `0.1.32` adds generation-neutral repeated current derivation and
+portable Base-archive evidence revalidation. Its Package ID is
+`5cee1f8aeda8e23576572a63ec0a1fd2a68104f327b2296ec3b4c8a9c518c964`, and its
+clean regression passed 143/143 checks. Three new real-Editor Base archives were
+added to the seven-Base registry in one successor build; one revision 4 payload
+then passed all ten Windows Players and advanced the protected lab channel with
+exact ten-Base coverage. See
+`docs/HybridCLR-DHE-Opt4-Post-Release-Ten-Base-Lifecycle.md`.
 Base identity now also binds `engineWorkflow` and `il2cppCodeGeneration`.
 Unity 2021 is locked to `OptimizeSpeed`; Unity 2022 FGS and Tuanjie 2022 FGS
 are locked to `OptimizeSize`. Base evidence created before these fields existed
