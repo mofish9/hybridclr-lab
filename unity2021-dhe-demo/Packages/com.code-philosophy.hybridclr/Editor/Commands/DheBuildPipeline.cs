@@ -597,6 +597,14 @@ namespace HybridCLR.Editor.Commands
                             options.AndroidArtifactLogPath,
                             (buildOptions.options & BuildOptions.Development) != 0);
                     }
+                    else if (options.Target == BuildTarget.iOS)
+                    {
+                        // Unity's iOS BuildPipeline exports an Xcode project rather
+                        // than a runnable artifact. Validate the export at the
+                        // package boundary so a successful BuildReport cannot hide
+                        // a partial project that would fail on macOS/Xcode.
+                        nativeResult.PlayerArtifactResult = FinalizeIosPlayerArtifact(outputPath);
+                    }
                     options.NativeFinalizeResultCallback?.Invoke(nativeResult);
                 }
                 // Baseline assembly inputs must remain bound while the
@@ -1400,6 +1408,69 @@ namespace HybridCLR.Editor.Commands
                 NativeLibrarySha256 = nativeHashes.ToArray(),
                 Passed = true,
             };
+        }
+
+        private static DhePlayerArtifactFinalizeResult FinalizeIosPlayerArtifact(
+            string outputPath)
+        {
+            string exportRoot = RequireDirectory(outputPath, "Unity iOS Xcode export root");
+            string[] xcodeProjects = Directory.GetDirectories(exportRoot, "*.xcodeproj",
+                SearchOption.TopDirectoryOnly);
+            if (xcodeProjects.Length != 1)
+            {
+                throw new BuildFailedException("Unity iOS export must contain exactly one .xcodeproj; found " +
+                    xcodeProjects.Length + ".");
+            }
+
+            RequireFile(Path.Combine(xcodeProjects[0], "project.pbxproj"),
+                "Unity iOS Xcode project.pbxproj");
+            foreach (string directory in new[] { "Classes", "Libraries", "Data" })
+            {
+                RequireDirectory(Path.Combine(exportRoot, directory),
+                    "Unity iOS Xcode export " + directory + " directory");
+            }
+
+            return new DhePlayerArtifactFinalizeResult
+            {
+                Kind = "ios-xcode-project",
+                OutputPath = Path.GetFullPath(exportRoot),
+                OutputSha256 = Sha256Directory(exportRoot),
+                BuildTask = "xcode-export",
+                ExitCode = 0,
+                NativeLibraryEntries = new string[0],
+                NativeLibrarySourcePaths = new string[0],
+                NativeLibrarySha256 = new string[0],
+                Passed = true,
+            };
+        }
+
+        private static string Sha256Directory(string root)
+        {
+            string fullRoot = RequireDirectory(root, "Directory to hash").TrimEnd(
+                Path.DirectorySeparatorChar, Path.AltDirectorySeparatorChar);
+            using (SHA256 sha = SHA256.Create())
+            {
+                foreach (string path in Directory.GetFiles(fullRoot, "*",
+                    SearchOption.AllDirectories).OrderBy(path =>
+                        Path.GetRelativePath(fullRoot, path).Replace('\\', '/'),
+                        StringComparer.Ordinal))
+                {
+                    string relative = Path.GetRelativePath(fullRoot, path).Replace('\\', '/');
+                    byte[] name = Encoding.UTF8.GetBytes(relative + "\n");
+                    sha.TransformBlock(name, 0, name.Length, name, 0);
+                    using (FileStream input = File.OpenRead(path))
+                    {
+                        byte[] buffer = new byte[1024 * 1024];
+                        int read;
+                        while ((read = input.Read(buffer, 0, buffer.Length)) > 0)
+                            sha.TransformBlock(buffer, 0, read, buffer, 0);
+                    }
+                    byte[] separator = { (byte)'\n' };
+                    sha.TransformBlock(separator, 0, separator.Length, separator, 0);
+                }
+                sha.TransformFinalBlock(new byte[0], 0, 0);
+                return BitConverter.ToString(sha.Hash).Replace("-", string.Empty).ToLowerInvariant();
+            }
         }
 
         private static string ResolveAndroidGradleRootFromBeeDag(string projectRoot,

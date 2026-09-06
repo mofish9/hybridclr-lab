@@ -2774,14 +2774,54 @@ internal static partial class Program
             !IsHex(GetString(report, "nativeGuardSourceSha256"), 64, 64))
             throw new DheException("DHE native-finalize is not bound to the finalized native manifest.");
 
-        if (!string.Equals(expectedTarget, "Android", StringComparison.OrdinalIgnoreCase)) return;
-
         JsonElement playerBuild = ReadJson<JsonElement>(RequireFile(playerBuildReportPath,
             "DHE final Player build evidence"));
         RequireEvidenceFormat(playerBuild, "hybridclr.dhe-adapter-player-build.json",
             "DHE final Player build");
         if (!GetBool(playerBuild, "passed") || GetBool(playerBuild, "scriptsOnly"))
-            throw new DheException("DHE Android final Player build evidence is invalid.");
+            throw new DheException("DHE final Player build evidence is invalid.");
+
+        if (string.Equals(expectedTarget, "iOS", StringComparison.OrdinalIgnoreCase))
+        {
+            if (!string.Equals(GetString(playerBuild, "target"), expectedTarget,
+                    StringComparison.OrdinalIgnoreCase))
+                throw new DheException("DHE iOS final Player build target is invalid.");
+            string iosArtifactPath = RequireDirectory(GetString(playerBuild, "playerPath") ?? string.Empty,
+                "DHE iOS Xcode export root");
+            if (!string.Equals(GetString(report, "playerArtifactKind"), "ios-xcode-project",
+                    StringComparison.Ordinal) ||
+                !string.Equals(Path.GetFullPath(GetString(report, "playerArtifactPath") ?? string.Empty),
+                    Path.GetFullPath(iosArtifactPath), StringComparison.OrdinalIgnoreCase) ||
+                !string.Equals(GetString(report, "playerArtifactSha256"),
+                    TreeHashForRelease(iosArtifactPath, Array.Empty<string>()),
+                    StringComparison.OrdinalIgnoreCase) ||
+                GetInt(report, "playerArtifactExitCode") != 0 ||
+                !string.Equals(GetString(report, "playerArtifactBuildTask"), "xcode-export",
+                    StringComparison.Ordinal))
+                throw new DheException("DHE iOS Xcode export artifact identity is invalid.");
+
+            string[] xcodeProjects = Directory.GetDirectories(iosArtifactPath, "*.xcodeproj",
+                SearchOption.TopDirectoryOnly);
+            if (xcodeProjects.Length != 1)
+                throw new DheException("DHE iOS Xcode export must contain exactly one .xcodeproj.");
+            RequireFile(Path.Combine(xcodeProjects[0], "project.pbxproj"),
+                "DHE iOS Xcode project.pbxproj");
+            foreach (string directory in new[] { "Classes", "Libraries", "Data" })
+                RequireDirectory(Path.Combine(iosArtifactPath, directory),
+                    "DHE iOS Xcode export " + directory + " directory");
+
+            string[] nativeEntries = ReadRequiredStringArray(report,
+                "playerArtifactNativeLibraryEntries", "DHE iOS native entries");
+            string[] nativeSources = ReadRequiredStringArray(report,
+                "playerArtifactNativeLibrarySourcePaths", "DHE iOS native source paths");
+            string[] nativeHashes = ReadRequiredStringArray(report,
+                "playerArtifactNativeLibrarySha256", "DHE iOS native hashes");
+            if (nativeEntries.Length != 0 || nativeSources.Length != 0 || nativeHashes.Length != 0)
+                throw new DheException("DHE iOS export must not report Android native library entries.");
+            return;
+        }
+
+        if (!string.Equals(expectedTarget, "Android", StringComparison.OrdinalIgnoreCase)) return;
 
         string artifactPath = RequireFile(GetString(report, "playerArtifactPath") ?? string.Empty,
             "DHE Android Player artifact");
@@ -3056,6 +3096,101 @@ internal static partial class Program
         catch { hashMismatchRejected = true; }
         AddRegressionCheck(checks, errors, "native-finalize-android-hash-mismatch-rejected",
             hashMismatchRejected, "host must reject Android artifacts whose native hash differs from Bee staging");
+
+        // iOS produces an Xcode export directory instead of an APK. Keep a
+        // small offline fixture here so the host gate verifies the exported
+        // project shape and directory identity even when macOS/Xcode is not
+        // available on the regression machine.
+        string iosProject = Path.Combine(root, "ios-project");
+        string iosBee = Path.Combine(iosProject, "Library", "Bee");
+        string iosCpp = Path.Combine(iosBee, "artifacts", "iOS", "cpp");
+        Directory.CreateDirectory(iosCpp);
+        string iosNativeManifest = Path.Combine(root, "ios-native-manifest.json");
+        File.WriteAllText(iosNativeManifest, "{}", new UTF8Encoding(false));
+        string iosBeeBackend = Path.Combine(root, "ios-bee-backend");
+        string iosDag = Path.Combine(iosBee, "Player123.dag");
+        string iosBeeLog = Path.Combine(root, "ios-bee.log");
+        foreach (string file in new[] { iosBeeBackend, iosDag, iosBeeLog })
+        {
+            Directory.CreateDirectory(Path.GetDirectoryName(file)!);
+            File.WriteAllText(file, string.Empty, new UTF8Encoding(false));
+        }
+        File.WriteAllText(iosDag + ".json", JsonSerializer.Serialize(new { path = iosCpp }),
+            new UTF8Encoding(false));
+        string iosExport = Path.Combine(root, "ios-export");
+        string iosXcodeProject = Path.Combine(iosExport, "Unity-iPhone.xcodeproj");
+        Directory.CreateDirectory(iosXcodeProject);
+        foreach (string directory in new[] { "Classes", "Libraries", "Data" })
+            Directory.CreateDirectory(Path.Combine(iosExport, directory));
+        File.WriteAllText(Path.Combine(iosXcodeProject, "project.pbxproj"),
+            "// !$*UTF8*$!", new UTF8Encoding(false));
+        string iosReportPath = Path.Combine(root, "ios-native-finalize.json");
+        string iosPlayerBuildPath = Path.Combine(root, "ios-build-final-player.json");
+        WriteJson(iosPlayerBuildPath, new
+        {
+            schemaVersion = 1,
+            format = "hybridclr.dhe-adapter-player-build.json",
+            generatedAtUtc = DateTimeOffset.UtcNow,
+            passed = true,
+            scriptsOnly = false,
+            target = "iOS",
+            playerPath = iosExport,
+        });
+        WriteJson(iosReportPath, new
+        {
+            schemaVersion = 1,
+            format = "hybridclr.dhe-adapter-native-finalize.json",
+            generatedAtUtc = DateTimeOffset.UtcNow,
+            passed = true,
+            target = "iOS",
+            generatedCppRoot = iosCpp,
+            manifestPath = iosNativeManifest,
+            nativeGuardSourceSha256 = new string('a', 64),
+            nativeManifestSha256 = Sha256File(iosNativeManifest),
+            beeBackendPath = iosBeeBackend,
+            dagPath = iosDag,
+            logPath = iosBeeLog,
+            attempts = 1,
+            exitCode = 0,
+            graphRegenerations = 0,
+            guardReapplications = 0,
+            buildProgramPath = "",
+            playerArtifactKind = "ios-xcode-project",
+            playerArtifactPath = iosExport,
+            playerArtifactSha256 = TreeHashForRelease(iosExport, Array.Empty<string>()),
+            playerArtifactGradleRoot = (string?)null,
+            playerArtifactBuildToolPath = (string?)null,
+            playerArtifactBuildProgramPath = (string?)null,
+            playerArtifactBuildTask = "xcode-export",
+            playerArtifactBuildLogPath = (string?)null,
+            playerArtifactExitCode = 0,
+            playerArtifactNativeLibraryEntries = Array.Empty<string>(),
+            playerArtifactNativeLibrarySourcePaths = Array.Empty<string>(),
+            playerArtifactNativeLibrarySha256 = Array.Empty<string>(),
+        });
+        bool iosAccepted = false;
+        try
+        {
+            ValidateNativeFinalizeEvidence(iosReportPath, iosPlayerBuildPath, "iOS", iosProject,
+                iosNativeManifest);
+            iosAccepted = true;
+        }
+        catch { }
+        AddRegressionCheck(checks, errors, "native-finalize-ios-xcode-structure",
+            iosAccepted,
+            "host must accept a complete iOS Xcode export and bind its directory identity");
+
+        bool iosMissingDataRejected = false;
+        try
+        {
+            Directory.Delete(Path.Combine(iosExport, "Data"), true);
+            ValidateNativeFinalizeEvidence(iosReportPath, iosPlayerBuildPath, "iOS", iosProject,
+                iosNativeManifest);
+        }
+        catch { iosMissingDataRejected = true; }
+        AddRegressionCheck(checks, errors, "native-finalize-ios-xcode-structure-rejected",
+            iosMissingDataRejected,
+            "host must reject an iOS Xcode export with a missing required Data directory");
     }
 
     private static void RunCrossTargetPayloadVariantRegressions(string sourceUpdateRoot,

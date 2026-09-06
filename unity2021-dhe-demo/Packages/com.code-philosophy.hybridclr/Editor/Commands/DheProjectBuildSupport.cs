@@ -130,16 +130,34 @@ namespace HybridCLR.Editor.Commands
             DheBeeRebuildResult rebuild = nativeResult.BeeRebuildResult;
             DhePlayerArtifactFinalizeResult artifact = nativeResult.PlayerArtifactResult;
             bool artifactRequired = string.Equals(options.Target, BuildTarget.Android.ToString(),
+                StringComparison.OrdinalIgnoreCase) ||
+                string.Equals(options.Target, BuildTarget.iOS.ToString(),
+                    StringComparison.OrdinalIgnoreCase);
+            bool androidArtifact = string.Equals(options.Target, BuildTarget.Android.ToString(),
+                StringComparison.OrdinalIgnoreCase);
+            bool iosArtifact = string.Equals(options.Target, BuildTarget.iOS.ToString(),
                 StringComparison.OrdinalIgnoreCase);
             bool artifactPassed = !artifactRequired || artifact != null && artifact.Passed &&
-                artifact.ExitCode == 0 && !string.IsNullOrWhiteSpace(artifact.OutputSha256) &&
-                !string.IsNullOrWhiteSpace(artifact.GradleRoot) &&
-                artifact.NativeLibraryEntries != null &&
-                artifact.NativeLibrarySourcePaths != null &&
-                artifact.NativeLibrarySha256 != null &&
-                artifact.NativeLibraryEntries.Length > 0 &&
-                artifact.NativeLibraryEntries.Length == artifact.NativeLibrarySourcePaths.Length &&
-                artifact.NativeLibraryEntries.Length == artifact.NativeLibrarySha256.Length;
+                artifact.ExitCode == 0 && !string.IsNullOrWhiteSpace(artifact.OutputPath) &&
+                !string.IsNullOrWhiteSpace(artifact.OutputSha256) &&
+                (string.IsNullOrWhiteSpace(options.PlayerOutputPath) ||
+                    string.Equals(Path.GetFullPath(artifact.OutputPath),
+                        Path.GetFullPath(options.PlayerOutputPath),
+                        StringComparison.OrdinalIgnoreCase)) &&
+                (androidArtifact && !string.IsNullOrWhiteSpace(artifact.GradleRoot) &&
+                    artifact.NativeLibraryEntries != null &&
+                    artifact.NativeLibrarySourcePaths != null &&
+                    artifact.NativeLibrarySha256 != null &&
+                    artifact.NativeLibraryEntries.Length > 0 &&
+                    artifact.NativeLibraryEntries.Length == artifact.NativeLibrarySourcePaths.Length &&
+                    artifact.NativeLibraryEntries.Length == artifact.NativeLibrarySha256.Length ||
+                 iosArtifact && string.Equals(artifact.Kind, "ios-xcode-project",
+                     StringComparison.Ordinal) && string.Equals(artifact.BuildTask, "xcode-export",
+                         StringComparison.Ordinal) && artifact.NativeLibraryEntries != null &&
+                    artifact.NativeLibrarySourcePaths != null && artifact.NativeLibrarySha256 != null &&
+                    artifact.NativeLibraryEntries.Length == 0 &&
+                    artifact.NativeLibrarySourcePaths.Length == 0 &&
+                    artifact.NativeLibrarySha256.Length == 0);
             bool rebuildPassed = rebuild != null && rebuild.ExitCode == 0 && artifactPassed;
             WriteJson(Path.Combine(adapterRoot, "native-finalize.json"), new NativeFinalizeEvidence
             {
@@ -1108,6 +1126,7 @@ namespace HybridCLR.Editor.Commands
         public int BeeMaxAttempts = 8;
         public int BeeTimeoutSeconds = 600;
         public bool GuardAllMethods;
+        public string PlayerOutputPath;
     }
 
     public sealed class DheProjectIdentityOptions

@@ -295,6 +295,11 @@ namespace HybridCLR.Lab.Editor
                 BeeMaxAttempts = 8,
                 BeeTimeoutSeconds = 600,
                 GuardAllMethods = true,
+                PlayerOutputPath = target == BuildTarget.Android
+                    ? Path.Combine(outputRoot, "player", "HybridCLRLab.apk")
+                    : target == BuildTarget.iOS
+                        ? Path.Combine(outputRoot, "player", "HybridCLRLab-iOS")
+                        : Path.Combine(outputRoot, "player", "HybridCLRLab.exe"),
             }, nativeResult, final);
         }
 

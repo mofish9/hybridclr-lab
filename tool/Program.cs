@@ -99,6 +99,8 @@ internal static partial class Program
         "native-finalize-attempt-limit-rejected",
         "native-finalize-missing-reapply-rejected",
         "native-finalize-android-hash-mismatch-rejected",
+        "native-finalize-ios-xcode-structure",
+        "native-finalize-ios-xcode-structure-rejected",
         "metadata-stress-touch-bounded",
         "base-workflow-aot-metadata-archive",
         "integrated-source-lock-line-ending-stable",
