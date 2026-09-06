@@ -3277,8 +3277,7 @@ internal static partial class Program
                 throw new DheException(
                     "Cross-target current fixtures are not metadata-stable and distinct.");
 
-            string tuanjieAssemblyName = NormalizeName(GetString(sourceAssemblies[1],
-                "assemblyName") ?? string.Empty);
+            string tuanjieAssemblyName = mutatedName;
             string tuanjieAssembly = Path.Combine(tuanjieRoot, tuanjieAssemblyName + ".dll");
             string tuanjieMutatedAssembly = Path.Combine(root, "tuanjie-mutated.dll");
             WriteMutatedAssembly(tuanjieAssembly, tuanjieMutatedAssembly, module =>
@@ -3288,6 +3287,7 @@ internal static partial class Program
                         candidate.Body.Instructions.Count != 0 &&
                         candidate.Body.ExceptionHandlers.Count == 0)
                     .OrderBy(candidate => candidate.MDToken.Raw).First();
+                method.Body.Instructions.Insert(0, Instruction.Create(OpCodes.Nop));
                 method.Body.Instructions.Insert(0, Instruction.Create(OpCodes.Nop));
             });
             File.Move(tuanjieMutatedAssembly, tuanjieAssembly, true);
