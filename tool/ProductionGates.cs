@@ -777,6 +777,21 @@ internal static partial class Program
         AddRegressionCheck(checks, errors, "mv-assembly-metadata", !metadataCompatibility.Compatible,
             "assembly metadata change must be rejected");
 
+        var baseVariantAssembly = Path.Combine(regressionRoot, "base-variant-body-only.dll");
+        ManagedCaseVariants.WriteBase2CurrentAssembly(baseline, baseVariantAssembly);
+        MetaVersionSnapshot baseVariantMetaVersion = MetaVersionSnapshot.Create(baseVariantAssembly);
+        ResourceUpdateCompatibility baseVariantCompatibility = ResourceUpdateCompatibility.Analyze(
+            baselineMetaVersion, baseVariantMetaVersion);
+        AddRegressionCheck(checks, errors, "managed-current-base-variant-body-only",
+            baseVariantCompatibility.Compatible &&
+            baseVariantCompatibility.ChangedMethodCount == 2 &&
+            baseVariantCompatibility.BodyOnlyChangedMethodCount == 2 &&
+            baseVariantCompatibility.DependencyChangedMethodCount == 0 &&
+            baseVariantCompatibility.UnsupportedChanges.Length == 0 &&
+            baselineMetaVersion.AssemblyMetadataVersion ==
+                baseVariantMetaVersion.AssemblyMetadataVersion,
+            "Base-generation fixture must preserve module metadata and change exactly two method bodies");
+
 		var referenceRemovalAssembly = Path.Combine(regressionRoot, "reference-removal.dll");
 		WriteMutatedAssembly(baseline, referenceRemovalAssembly, module =>
 		{

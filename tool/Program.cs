@@ -15,7 +15,8 @@ internal static partial class Program
     private const string PackageIdAlgorithm = "sha256-canonical-manifest-v2";
     private static readonly string[] RequiredRegressionChecks =
     {
-        "mv-field-order", "mv-switch-target", "mv-assembly-metadata", "mv-flags-tamper",
+        "mv-field-order", "mv-switch-target", "mv-assembly-metadata",
+        "managed-current-base-variant-body-only", "mv-flags-tamper",
         "mv-token-tamper", "verify-require-release", "verify-expected-id", "verify-package-id-recompute",
         "aot-metadata-set-order-independent", "aot-metadata-set-deduplicated",
         "aot-metadata-set-selection-bound", "aot-metadata-set-tamper-rejected",

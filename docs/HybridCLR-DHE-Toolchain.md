@@ -28,6 +28,26 @@ dotnet run --project tool/HybridCLR.DheTool.csproj -- native-tests \
 These commands use direct .NET process execution and fail closed when an
 external prerequisite (Unity, CMake, compiler, git, or dotnet) is missing.
 
+The multi-Base lab fixture can derive a second Base-generation current set from
+an already authenticated `DHE_CURRENT` assembly set without recompiling unchanged
+assemblies:
+
+```text
+dotnet run --project tool/HybridCLR.DheTool.csproj -- build-managed-cases \
+  -LabRoot . -Target StandaloneWindows64 -Variant current-base2 \
+  -SeedCurrentRoot C:/evidence/current-authenticated \
+  -OutputRoot C:/build/current-base2
+```
+
+This lab-only variant copies the three secondary assemblies byte-for-byte and
+changes only `DheMultiBaseProbe.CurrentValue` and the `DheDemoCalculator`
+constructor bodies in `HybridCLR.ManagedCasesAot.dll`. The command preserves
+assembly/module identity and rejects overlapping seed/output trees. The release
+regression requires this transformation to remain compatible and to produce
+exactly two body-only changes. Project hot-update DLLs continue to come from the
+project's normal managed compilation; this fixture is not a production IL
+rewriter.
+
 Prepare every locked engine-specific `il2cpp_plus` checkout without manually
 creating worktrees:
 

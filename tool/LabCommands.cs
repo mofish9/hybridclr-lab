@@ -179,8 +179,6 @@ internal static class LabCommands
         var isBase2 = variant.Equals("base2", StringComparison.OrdinalIgnoreCase) ||
             variant.Equals("current-base2", StringComparison.OrdinalIgnoreCase);
         var isStructural = variant.Equals("structural", StringComparison.OrdinalIgnoreCase);
-        GenerateTestManifest(new Cli("generate-test-manifest", new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase) { ["labroot"] = lab }));
-        GenerateMetadataStressSource(new Cli("generate-metadata-stress-source", new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase) { ["labroot"] = lab }));
         var output = ResolvePath(lab, cli.Optional("outputroot") ??
             (isCurrent
                 ? $"artifacts/managed-cases-{variant}/{target}"
@@ -190,6 +188,32 @@ internal static class LabCommands
             : variant.Equals("base2", StringComparison.OrdinalIgnoreCase)
                 ? $"artifacts/managed-cases-base2-aot/{target}"
                 : $"artifacts/managed-cases-aot/{target}");
+        if (variant.Equals("current-base2", StringComparison.OrdinalIgnoreCase))
+        {
+            var seedRoot = RequireDirectory(cli.Require("seedcurrentroot"));
+            RequireSeparateTrees(seedRoot, output);
+            SafeDelete(output, lab);
+            Directory.CreateDirectory(output);
+            foreach (var assemblyName in new[]
+                     {
+                         "HybridCLR.CrossAssemblyDerived",
+                         "HybridCLR.ManagedCases",
+                         "HybridCLR.ManagedCasesAot",
+                         "HybridCLR.MetadataStress",
+                     })
+            {
+                var source = Path.Combine(seedRoot, assemblyName + ".dll");
+                var destination = Path.Combine(output, assemblyName + ".dll");
+                if (assemblyName == "HybridCLR.ManagedCasesAot")
+                    ManagedCaseVariants.WriteBase2CurrentAssembly(source, destination);
+                else
+                    CopyRequired(source, destination);
+            }
+            Console.WriteLine("Managed cases (current-base2, metadata-preserving): " + output);
+            return 0;
+        }
+        GenerateTestManifest(new Cli("generate-test-manifest", new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase) { ["labroot"] = lab }));
+        GenerateMetadataStressSource(new Cli("generate-metadata-stress-source", new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase) { ["labroot"] = lab }));
         SafeDelete(output, lab); SafeDelete(aotOutput, lab);
         Directory.CreateDirectory(output); Directory.CreateDirectory(aotOutput);
         var targetDefine = target.Equals("StandaloneWindows64", StringComparison.OrdinalIgnoreCase) ? "HYBRIDCLR_TARGET_WINDOWS" : target.Equals("Android", StringComparison.OrdinalIgnoreCase) ? "HYBRIDCLR_TARGET_ANDROID" : "";
@@ -201,7 +225,6 @@ internal static class LabCommands
         {
             targetDefine,
             isCurrent ? "DHE_CURRENT" : string.Empty,
-            isBase2 ? "DHE_BASE2" : string.Empty,
             isStructural ? "DHE_STRUCTURE_CURRENT" : string.Empty,
         }.Where(value => !string.IsNullOrWhiteSpace(value)));
         var projects = new[]
@@ -794,6 +817,19 @@ internal static class LabCommands
     private static string StringProperty(JsonElement element, string name) => element.TryGetProperty(name, out var value) && value.ValueKind == JsonValueKind.String ? value.GetString() ?? "" : "";
     private static int PositiveInt(JsonElement element, string name) { if (!element.TryGetProperty(name, out var value) || !value.TryGetInt32(out var result) || result < 1) throw new InvalidOperationException(name + " must be at least 1."); return result; }
     private static string RequireDirectory(string path) { var full = Path.GetFullPath(path); if (!Directory.Exists(full)) throw new DirectoryNotFoundException(full); return full; }
+    private static void RequireSeparateTrees(string first, string second)
+    {
+        var firstPath = Path.GetFullPath(first).TrimEnd(Path.DirectorySeparatorChar,
+            Path.AltDirectorySeparatorChar);
+        var secondPath = Path.GetFullPath(second).TrimEnd(Path.DirectorySeparatorChar,
+            Path.AltDirectorySeparatorChar);
+        if (firstPath.Equals(secondPath, StringComparison.OrdinalIgnoreCase) ||
+            firstPath.StartsWith(secondPath + Path.DirectorySeparatorChar,
+                StringComparison.OrdinalIgnoreCase) ||
+            secondPath.StartsWith(firstPath + Path.DirectorySeparatorChar,
+                StringComparison.OrdinalIgnoreCase))
+            throw new InvalidOperationException("Seed and output trees must not overlap.");
+    }
     private static void CopyRequired(string source, string destination) { if (!File.Exists(source)) throw new FileNotFoundException(source); Directory.CreateDirectory(Path.GetDirectoryName(destination)!); File.Copy(source, destination, true); }
     private static void CopyDirectoryOrFile(string source, string destination) { if (File.Exists(source)) CopyRequired(source, destination); else CopyDirectory(source, destination); }
     private static void CopyDirectory(string source, string destination, IEnumerable<string>? ignored = null) { var skip = new HashSet<string>(ignored ?? Array.Empty<string>(), StringComparer.OrdinalIgnoreCase); if (!Directory.Exists(source)) throw new DirectoryNotFoundException(source); Directory.CreateDirectory(destination); foreach (var file in Directory.GetFiles(source, "*", SearchOption.AllDirectories)) { var rel = Path.GetRelativePath(source, file); if (skip.Contains(rel.Split(Path.DirectorySeparatorChar)[0])) continue; var target = Path.Combine(destination, rel); Directory.CreateDirectory(Path.GetDirectoryName(target)!); File.Copy(file, target, true); } }
