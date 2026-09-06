@@ -187,7 +187,7 @@ internal static partial class Program
                     throw new DheException("Active Base evidence package is not authorized: " +
                         packageId + ".");
                 PlayerToolchainAuthority actual = ValidateExactPlayerToolchainAuthority(
-                    report, path, packageId);
+                    report, path, packageId, historicalPackages[packageId]);
                 ValidateAuthorizedHistoricalPackage(expected, actual);
                 actualAuthorities.Add((report, path, actual));
             }

@@ -2553,7 +2553,7 @@ internal static partial class Program
                 if (!GetBool(report, "validationPassed") || !GetBool(report, "coverageGatePassed"))
                     throw new DheException(role + " evidence did not pass validation and coverage.");
                 ValidateEvidenceToolIdentity(report, reportPath, sourceRoot, sourceHead,
-                    sourceTree);
+                    sourceTree, managedContractRoots);
                 ValidateManagedReleaseEvidence(report, reportPath, managedContractRoots);
                 var changed = GetInt(report.GetProperty("capability"), "changedMethodCount");
                 var player = report.GetProperty("player");
@@ -3369,7 +3369,8 @@ internal static partial class Program
     }
 
     private static void ValidateEvidenceToolIdentity(JsonElement report, string reportPath,
-        string sourceRoot, string sourceHead, string sourceTree)
+        string sourceRoot, string sourceHead, string sourceTree,
+        IEnumerable<string>? additionalPackageRoots = null)
     {
         string reportRoot = Path.GetDirectoryName(reportPath)!;
         var cleanPath = ResolveEvidencePath(GetString(report, "cleanCheckoutGate"),
@@ -3385,14 +3386,27 @@ internal static partial class Program
             "Demo toolchain gate");
         JsonElement gate = ReadJson<JsonElement>(gatePath);
         RequireEvidenceFormat(gate, "hybridclr.dhe-toolchain-gate.json", "Demo toolchain gate");
-        string packageRoot = RequireDirectory(GetString(gate, "packageRoot") ?? string.Empty,
-            "Demo toolchain package");
+        string recordedPackageRoot = GetString(gate, "packageRoot") ?? string.Empty;
+        var packageCandidates = new List<string>();
+        if (!string.IsNullOrWhiteSpace(recordedPackageRoot))
+            packageCandidates.Add(Path.GetFullPath(Path.IsPathRooted(recordedPackageRoot)
+                ? recordedPackageRoot
+                : Path.Combine(Path.GetDirectoryName(gatePath)!, recordedPackageRoot)));
+        packageCandidates.AddRange((additionalPackageRoots ?? Array.Empty<string>())
+            .Where(path => !string.IsNullOrWhiteSpace(path)).Select(Path.GetFullPath));
+        string? packageRoot = packageCandidates.Distinct(StringComparer.OrdinalIgnoreCase)
+            .FirstOrDefault(candidate => Directory.Exists(candidate) &&
+                InspectPackage(candidate, expectedPackageId, true).Passed);
+        if (packageRoot == null)
+            throw new DheException("Demo toolchain package was not found. Checked roots: " +
+                string.Join(", ", packageCandidates) + ".");
         PackageInspection inspection = InspectPackage(packageRoot, expectedPackageId, true);
         if (!GetBool(gate, "passed") || !GetBool(gate, "requireRelease") ||
             !GetBool(gate, "releaseReady") || !inspection.Passed ||
             !string.Equals(GetString(gate, "packageId"), expectedPackageId,
                 StringComparison.OrdinalIgnoreCase))
-            throw new DheException("Demo evidence was not produced by its authenticated release toolchain.");
+            throw new DheException("Demo evidence was not produced by its authenticated release toolchain. " +
+                "Checked roots: " + string.Join(", ", packageCandidates) + ".");
 
         JsonElement packageManifest = ReadJson<JsonElement>(inspection.ManifestPath);
         JsonElement packageSource = packageManifest.GetProperty("sourceIdentity");

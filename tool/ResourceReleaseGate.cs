@@ -164,7 +164,7 @@ internal static partial class Program
                     throw new DheException("Historical Player toolchain evidence requires " +
                         "ValidationSourceRoot ancestry validation.");
                 ValidateEvidenceToolIdentity(report, path, validationSourceRoot,
-                    currentHead, currentTree);
+                    currentHead, currentTree, evidenceToolchainPackages.Values);
                 playerAuthorities.Add(path, ValidateExactPlayerToolchainAuthority(
                     report, path, reportPackageId,
                     evidenceToolchainPackages.TryGetValue(reportPackageId,
