@@ -170,11 +170,14 @@ internal static class LabCommands
             !variant.Equals("base2", StringComparison.OrdinalIgnoreCase) &&
             !variant.Equals("current", StringComparison.OrdinalIgnoreCase) &&
             !variant.Equals("current-base2", StringComparison.OrdinalIgnoreCase) &&
+            !variant.Equals("current-next", StringComparison.OrdinalIgnoreCase) &&
             !variant.Equals("structural", StringComparison.OrdinalIgnoreCase))
             throw new InvalidOperationException(
-                "build-managed-cases -Variant must be default, base2, current, current-base2, or structural.");
+                "build-managed-cases -Variant must be default, base2, current, current-next, current-base2, or structural.");
+        var isDerivedCurrent = variant.Equals("current-next", StringComparison.OrdinalIgnoreCase) ||
+            variant.Equals("current-base2", StringComparison.OrdinalIgnoreCase);
         var isCurrent = variant.Equals("current", StringComparison.OrdinalIgnoreCase) ||
-            variant.Equals("current-base2", StringComparison.OrdinalIgnoreCase) ||
+            isDerivedCurrent ||
             variant.Equals("structural", StringComparison.OrdinalIgnoreCase);
         var isBase2 = variant.Equals("base2", StringComparison.OrdinalIgnoreCase) ||
             variant.Equals("current-base2", StringComparison.OrdinalIgnoreCase);
@@ -188,7 +191,7 @@ internal static class LabCommands
             : variant.Equals("base2", StringComparison.OrdinalIgnoreCase)
                 ? $"artifacts/managed-cases-base2-aot/{target}"
                 : $"artifacts/managed-cases-aot/{target}");
-        if (variant.Equals("current-base2", StringComparison.OrdinalIgnoreCase))
+        if (isDerivedCurrent)
         {
             var seedRoot = RequireDirectory(cli.Require("seedcurrentroot"));
             RequireSeparateTrees(seedRoot, output);
@@ -205,11 +208,11 @@ internal static class LabCommands
                 var source = Path.Combine(seedRoot, assemblyName + ".dll");
                 var destination = Path.Combine(output, assemblyName + ".dll");
                 if (assemblyName == "HybridCLR.ManagedCasesAot")
-                    ManagedCaseVariants.WriteBase2CurrentAssembly(source, destination);
+                    ManagedCaseVariants.WriteNextCurrentAssembly(source, destination);
                 else
                     CopyRequired(source, destination);
             }
-            Console.WriteLine("Managed cases (current-base2, metadata-preserving): " + output);
+            Console.WriteLine("Managed cases (current-next, metadata-preserving): " + output);
             return 0;
         }
         GenerateTestManifest(new Cli("generate-test-manifest", new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase) { ["labroot"] = lab }));

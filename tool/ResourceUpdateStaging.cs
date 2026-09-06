@@ -250,6 +250,7 @@ internal static partial class Program
         JsonElement baseWorkflow = ReadJson<JsonElement>(baseWorkflowPath);
         RequireEvidenceFormat(baseWorkflow, "hybridclr.dhe-project-player-workflow.json",
             "Base workflow");
+        string? baseArchiveManifestPath = ValidateBaseArchiveForWorkflow(baseWorkflowPath);
 
         var errors = new List<string>();
         if (!GetBool(validation, "passed") || !GetBool(stage, "passed") ||
@@ -349,8 +350,8 @@ internal static partial class Program
             "Staged Base build identity");
         string workflowIdentityPath = ResolveEvidencePath(GetString(baseWorkflow, "buildIdentity"),
             Path.GetDirectoryName(baseWorkflowPath)!, "Base workflow build identity");
-        string nativeManifestPath = ResolveEvidencePath(GetString(baseWorkflow, "nativeManifest"),
-            Path.GetDirectoryName(baseWorkflowPath)!, "Base workflow native manifest");
+        string nativeManifestPath = ResolveBaseWorkflowNativeManifest(baseWorkflow,
+            baseWorkflowPath);
         JsonElement nativeManifest = ReadJson<JsonElement>(nativeManifestPath);
         if (!Sha256File(buildIdentityPath).Equals(GetString(stage, "baseBuildIdentitySha256"),
                 StringComparison.OrdinalIgnoreCase) ||
@@ -399,6 +400,15 @@ internal static partial class Program
                     StringComparison.OrdinalIgnoreCase)))
             errors.Add("Resource stage did not preserve immutable Base files.");
         if (errors.Count > 0) throw new DheException(string.Join(" ", errors));
+
+        string sourcePreflightPath = ResolveBaseWorkflowReference(baseWorkflow,
+            baseWorkflowPath, "sourcePreflight", "Base workflow source preflight");
+        string cleanCheckoutGatePath = ResolveBaseWorkflowReference(baseWorkflow,
+            baseWorkflowPath, "cleanCheckoutGate", "Base workflow clean checkout gate");
+        string toolchainGatePath = ResolveBaseWorkflowReference(baseWorkflow,
+            baseWorkflowPath, "toolchainGate", "Base workflow toolchain gate");
+        string runtimeSourcePath = ResolveBaseWorkflowReference(baseWorkflow,
+            baseWorkflowPath, "runtimeSource", "Base workflow runtime manifest");
 
         int methodCount = selectedBase.GetProperty("assemblies").EnumerateArray().Sum(item =>
             GetInt(item, "unchangedMethodCount") + GetInt(item, "changedMethodCount") +
@@ -449,9 +459,9 @@ internal static partial class Program
             batchReport = validationPath,
             runtimePlan = runtimePlanPath,
             runtimePlanProjectPath = stagedPlan,
-            sourcePreflight = GetString(baseWorkflow, "sourcePreflight"),
-            cleanCheckoutGate = GetString(baseWorkflow, "cleanCheckoutGate"),
-            toolchainGate = GetString(baseWorkflow, "toolchainGate"),
+            sourcePreflight = sourcePreflightPath,
+            cleanCheckoutGate = cleanCheckoutGatePath,
+            toolchainGate = toolchainGatePath,
             expectedToolchainPackageId = GetString(baseWorkflow, "expectedToolchainPackageId"),
             transaction = new
             {
@@ -524,12 +534,178 @@ internal static partial class Program
             baseRegistryLineageValidated = GetBool(manifest,
                 "baseRegistryLineageValidated"),
             artifactValidation = validationPath,
-            archiveManifest = (string?)null,
+            archiveManifest = baseArchiveManifestPath,
+            archiveManifestSha256 = baseArchiveManifestPath == null
+                ? null : Sha256File(baseArchiveManifestPath),
             archiveGate = (string?)null,
-            runtimeSource = GetString(baseWorkflow, "runtimeSource"),
+            runtimeSource = runtimeSourcePath,
         });
         Console.WriteLine("DHE resource Player workflow evidence: " + output);
         return 0;
+    }
+
+    private static string ResolveBaseWorkflowReference(JsonElement baseWorkflow,
+        string baseWorkflowPath, string property, string description)
+    {
+        return ResolveEvidencePath(GetString(baseWorkflow, property),
+            Path.GetDirectoryName(baseWorkflowPath)!, description);
+    }
+
+    private static string? ValidateBaseArchiveForWorkflow(string baseWorkflowPath,
+        string? explicitArchiveManifestPath = null, string? expectedArchiveManifestSha256 = null)
+    {
+        string workflow = RequireFile(baseWorkflowPath, "Archived Base workflow");
+        string archiveManifestPath = explicitArchiveManifestPath == null
+            ? Path.Combine(Path.GetDirectoryName(workflow)!, "dhe-archive-manifest.json")
+            : RequireFile(explicitArchiveManifestPath, "DHE Base archive manifest");
+        if (!File.Exists(archiveManifestPath))
+        {
+            if (explicitArchiveManifestPath != null)
+                throw new DheException("DHE Base archive manifest was not found: " +
+                    archiveManifestPath);
+            return null;
+        }
+
+        archiveManifestPath = Path.GetFullPath(archiveManifestPath);
+        if (!string.IsNullOrWhiteSpace(expectedArchiveManifestSha256) &&
+            (!IsHex(expectedArchiveManifestSha256, 64, 64) ||
+             !Sha256File(archiveManifestPath).Equals(expectedArchiveManifestSha256,
+                 StringComparison.OrdinalIgnoreCase)))
+            throw new DheException("DHE Base archive manifest hash does not match the resource evidence.");
+
+        string archiveRoot = Path.GetDirectoryName(archiveManifestPath)!;
+        JsonElement archiveManifest = ReadJson<JsonElement>(archiveManifestPath);
+        RequireEvidenceFormat(archiveManifest, "hybridclr.dhe-archive-manifest.json",
+            "DHE Base archive manifest");
+        if (!GetBool(archiveManifest, "offlineReleaseRevalidated"))
+            throw new DheException("DHE Base archive was not independently revalidated.");
+        string archivedWorkflow = RequireFile(ResolveContainedPath(archiveRoot,
+            GetString(archiveManifest, "workflowReport") ?? string.Empty,
+            "Archived Base workflow"), "Archived Base workflow");
+        if (!Path.GetFullPath(archivedWorkflow).Equals(Path.GetFullPath(workflow),
+                StringComparison.OrdinalIgnoreCase))
+            throw new DheException("DHE Base archive does not bind the selected workflow report.");
+
+        var records = archiveManifest.GetProperty("files").EnumerateArray().ToArray();
+        if (records.Length != GetInt(archiveManifest, "fileCount"))
+            throw new DheException("DHE Base archive file count does not match its index.");
+        var indexedPaths = new HashSet<string>(StringComparer.Ordinal);
+        var fileSetRecords = new List<string>();
+        foreach (JsonElement record in records)
+        {
+            string relative = GetString(record, "path") ?? string.Empty;
+            if (!IsPortableRelativePath(relative) || relative.Contains('\\') ||
+                !indexedPaths.Add(relative))
+                throw new DheException("DHE Base archive contains an unsafe or duplicate path: " +
+                    relative);
+            string path = RequireFile(ResolveContainedPath(archiveRoot, relative,
+                "DHE Base archive file"), "DHE Base archive file");
+            long size = GetLong(record, "size");
+            string hash = GetString(record, "sha256") ?? string.Empty;
+            if (new FileInfo(path).Length != size || !IsHex(hash, 64, 64) ||
+                !Sha256File(path).Equals(hash, StringComparison.OrdinalIgnoreCase))
+                throw new DheException("DHE Base archive file hash or size is invalid: " + relative);
+            fileSetRecords.Add(relative + "|" + size + "|" + hash);
+        }
+        string[] actualPaths = Directory.GetFiles(archiveRoot, "*", SearchOption.AllDirectories)
+            .Where(path => !Path.GetFullPath(path).Equals(archiveManifestPath,
+                StringComparison.OrdinalIgnoreCase))
+            .Select(path => Path.GetRelativePath(archiveRoot, path)
+                .Replace(Path.DirectorySeparatorChar, '/'))
+            .OrderBy(path => path, StringComparer.Ordinal).ToArray();
+        if (!actualPaths.SequenceEqual(indexedPaths.OrderBy(path => path, StringComparer.Ordinal),
+                StringComparer.Ordinal) ||
+            !Sha256Text(string.Join("\n", fileSetRecords)).Equals(
+                GetString(archiveManifest, "fileSetSha256"),
+                StringComparison.OrdinalIgnoreCase))
+            throw new DheException("DHE Base archive file set does not match its manifest.");
+        return archiveManifestPath;
+    }
+
+    private static bool ValidateResourceBaseArchive(JsonElement report, string reportPath)
+    {
+        if (!string.Equals(GetString(report, "format"),
+                "hybridclr.dhe-resource-player-workflow.json", StringComparison.Ordinal))
+            return false;
+        string? archiveManifestValue = GetString(report, "archiveManifest");
+        string? archiveManifestSha256 = GetString(report, "archiveManifestSha256");
+        if (string.IsNullOrWhiteSpace(archiveManifestValue) &&
+            string.IsNullOrWhiteSpace(archiveManifestSha256))
+            return false;
+        if (string.IsNullOrWhiteSpace(archiveManifestValue) ||
+            string.IsNullOrWhiteSpace(archiveManifestSha256))
+            throw new DheException("Resource Player Base archive identity is incomplete.");
+        string reportRoot = Path.GetDirectoryName(reportPath)!;
+        string baseWorkflowPath = ResolveEvidencePath(GetString(report,
+            "baseWorkflowReport"), reportRoot, "Resource Base workflow");
+        string archiveManifestPath = ResolveEvidencePath(archiveManifestValue,
+            reportRoot, "Resource Base archive manifest");
+        _ = ValidateBaseArchiveForWorkflow(baseWorkflowPath, archiveManifestPath,
+            archiveManifestSha256);
+        return true;
+    }
+
+    private static string ResolveBaseWorkflowNativeManifest(JsonElement baseWorkflow,
+        string baseWorkflowPath)
+    {
+        string reportRoot = Path.GetDirectoryName(baseWorkflowPath)!;
+        string nativeManifestPath = ResolveBaseWorkflowReference(baseWorkflow,
+            baseWorkflowPath, "nativeManifest", "Base workflow native manifest");
+        string expectedHash = GetString(baseWorkflow, "nativeManifestSha256") ??
+            string.Empty;
+        if (Sha256File(nativeManifestPath).Equals(expectedHash,
+                StringComparison.OrdinalIgnoreCase))
+            return nativeManifestPath;
+
+        string archiveManifestPath = Path.Combine(reportRoot,
+            "dhe-archive-manifest.json");
+        if (!File.Exists(archiveManifestPath))
+            return nativeManifestPath;
+
+        JsonElement archiveManifest = ReadJson<JsonElement>(archiveManifestPath);
+        RequireEvidenceFormat(archiveManifest,
+            "hybridclr.dhe-archive-manifest.json", "DHE Base archive manifest");
+        if (!GetBool(archiveManifest, "offlineReleaseRevalidated"))
+            throw new DheException("DHE Base archive was not independently revalidated.");
+
+        string archivedWorkflowPath = RequireFile(ResolveContainedPath(reportRoot,
+            GetString(archiveManifest, "workflowReport") ?? string.Empty,
+            "Archived Base workflow"), "Archived Base workflow");
+        if (!Path.GetFullPath(archivedWorkflowPath).Equals(
+                Path.GetFullPath(baseWorkflowPath), StringComparison.OrdinalIgnoreCase))
+            throw new DheException(
+                "DHE Base archive does not bind the selected workflow report.");
+
+        string immutableRelative = GetString(archiveManifest,
+            "immutableNativeManifest") ?? string.Empty;
+        string immutablePath = RequireFile(ResolveContainedPath(reportRoot,
+            immutableRelative, "Archived immutable native manifest"),
+            "Archived immutable native manifest");
+        string immutableHash = Sha256File(immutablePath);
+        if (!IsHex(expectedHash, 64, 64) ||
+            !immutableHash.Equals(expectedHash, StringComparison.OrdinalIgnoreCase) ||
+            !immutableHash.Equals(GetString(archiveManifest,
+                    "immutableNativeManifestSha256"),
+                StringComparison.OrdinalIgnoreCase))
+            throw new DheException(
+                "Archived immutable native manifest hash does not match the Base workflow.");
+
+        JsonElement[] fileRecords = archiveManifest.GetProperty("files")
+            .EnumerateArray().Where(item => string.Equals(GetString(item, "path"),
+                immutableRelative.Replace('\\', '/'), StringComparison.Ordinal)).ToArray();
+        if (fileRecords.Length != 1 ||
+            !immutableHash.Equals(GetString(fileRecords[0], "sha256"),
+                StringComparison.OrdinalIgnoreCase) ||
+            GetLong(fileRecords[0], "size") != new FileInfo(immutablePath).Length)
+            throw new DheException(
+                "DHE Base archive file index does not bind the immutable native manifest.");
+
+        JsonElement immutableNative = ReadJson<JsonElement>(immutablePath);
+        if (GetInt(immutableNative, "schemaVersion") != 1 ||
+            GetInt(immutableNative, "resolverVersion") != 3)
+            throw new DheException(
+                "Archived immutable native manifest has an invalid schema or resolver version.");
+        return immutablePath;
     }
 
     private static string[] ReadPlayerAssemblyNameArray(JsonElement player, string property,

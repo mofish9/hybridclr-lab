@@ -34,16 +34,17 @@ assemblies:
 
 ```text
 dotnet run --project tool/HybridCLR.DheTool.csproj -- build-managed-cases \
-  -LabRoot . -Target StandaloneWindows64 -Variant current-base2 \
+  -LabRoot . -Target StandaloneWindows64 -Variant current-next \
   -SeedCurrentRoot C:/evidence/current-authenticated \
-  -OutputRoot C:/build/current-base2
+  -OutputRoot C:/build/current-next
 ```
 
 This lab-only variant copies the three secondary assemblies byte-for-byte and
 changes only `DheMultiBaseProbe.CurrentValue` and the `DheDemoCalculator`
-constructor bodies in `HybridCLR.ManagedCasesAot.dll`. The command preserves
-assembly/module identity and rejects overlapping seed/output trees. The release
-regression requires this transformation to remain compatible and to produce
+constructor bodies in `HybridCLR.ManagedCasesAot.dll`. It can be applied to each
+authenticated output repeatedly; `current-base2` remains a compatibility alias.
+The command preserves assembly/module identity and rejects overlapping seed/output
+trees. The release regression requires this transformation to remain compatible and to produce
 exactly two method changes without metadata drift; pass the authenticated seed DLL through
 `-ManagedCurrentSeed`. Project hot-update DLLs continue to come from the project's
 normal managed compilation; this fixture is not a production IL rewriter.
@@ -422,7 +423,11 @@ resource manifest, stage report, Player result, and immutable Base workflow into
 `resource-player-workflow-report.json`. This is the only supported
 `player-changed` input for toolchain release evidence; a non-bootstrap changed
 Player build is intentionally rejected because online Base Players require
-universal guards.
+universal guards. When the Base workflow comes from a portable archive, the
+generated report resolves every archive-relative provenance reference before it
+is written outside that archive. Later qualification rehashes the complete
+archive file index and validates its recorded runtime, header, source, and
+package identities without requiring the historical build-machine paths.
 
 The distributed tool also ships `dhe-resource-player-workflow.schema.json` and
 validates this report as part of the schema gate. A legacy Player result may omit

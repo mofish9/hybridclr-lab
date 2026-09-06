@@ -16,7 +16,8 @@ internal static partial class Program
     private static readonly string[] RequiredRegressionChecks =
     {
         "mv-field-order", "mv-switch-target", "mv-assembly-metadata",
-        "managed-current-base-variant-metadata-stable", "mv-flags-tamper",
+        "managed-current-base-variant-metadata-stable",
+        "managed-current-consecutive-variant-metadata-stable", "mv-flags-tamper",
         "mv-token-tamper", "verify-require-release", "verify-expected-id", "verify-package-id-recompute",
         "aot-metadata-set-order-independent", "aot-metadata-set-deduplicated",
         "aot-metadata-set-selection-bound", "aot-metadata-set-tamper-rejected",
@@ -67,6 +68,7 @@ internal static partial class Program
         "resource-release-ledger-stale-head-rejected",
         "registry-empty-aot-metadata-set",
         "resource-player-evidence-binding",
+        "resource-player-archive-native-manifest-bound",
         "resource-player-release-ledger-binding",
         "resource-player-consecutive-release-head",
         "resource-release-aggregate-gate",
@@ -2632,7 +2634,7 @@ internal static partial class Program
     }
 
     private static string ResolveManagedEvidenceContractRoot(JsonElement report,
-        string reportPath)
+        string reportPath, IEnumerable<string>? additionalContractRoots = null)
     {
         string reportRoot = Path.GetDirectoryName(reportPath)!;
         string expectedPackageId = GetString(report, "expectedToolchainPackageId") ??
@@ -2642,15 +2644,28 @@ internal static partial class Program
         JsonElement gate = ReadJson<JsonElement>(gatePath);
         RequireEvidenceFormat(gate, "hybridclr.dhe-toolchain-gate.json",
             "Managed Player toolchain gate");
-        string packageRoot = RequireDirectory(GetString(gate, "packageRoot") ??
-            string.Empty, "Managed Player toolchain package");
-        PackageInspection inspection = InspectPackage(packageRoot, expectedPackageId, true);
+        string gatePackageRoot = GetString(gate, "packageRoot") ?? string.Empty;
+        var candidates = new List<string>();
+        if (!string.IsNullOrWhiteSpace(gatePackageRoot))
+        {
+            candidates.Add(Path.GetFullPath(Path.IsPathRooted(gatePackageRoot)
+                ? gatePackageRoot
+                : Path.Combine(Path.GetDirectoryName(gatePath)!, gatePackageRoot)));
+        }
+        candidates.AddRange((additionalContractRoots ?? Array.Empty<string>())
+            .Where(path => !string.IsNullOrWhiteSpace(path)).Select(Path.GetFullPath));
+        string? packageRoot = candidates.Distinct(StringComparer.OrdinalIgnoreCase)
+            .FirstOrDefault(candidate => Directory.Exists(candidate) &&
+                InspectPackage(candidate, expectedPackageId, true).Passed);
         if (!GetBool(gate, "passed") || !GetBool(gate, "requireRelease") ||
-            !GetBool(gate, "releaseReady") || !inspection.Passed ||
+            !GetBool(gate, "releaseReady") || packageRoot == null ||
             !string.Equals(GetString(gate, "packageId"), expectedPackageId,
+                StringComparison.OrdinalIgnoreCase) ||
+            !string.Equals(GetString(gate, "expectedPackageId"), expectedPackageId,
                 StringComparison.OrdinalIgnoreCase))
             throw new DheException(
-                "Managed Player toolchain package is not an authenticated Release package.");
+                "Managed Player toolchain package is not an authenticated Release package. " +
+                "Checked roots: " + string.Join(", ", candidates) + ".");
         return packageRoot;
     }
 
@@ -2684,16 +2699,22 @@ internal static partial class Program
             !GetBool(report, "releaseReady"))
             throw new DheException("Managed Player release evidence must come from a Release-ready workflow.");
 
+        bool archivedBase = ValidateResourceBaseArchive(report, reportPath);
         string reportRoot = Path.GetDirectoryName(reportPath)!;
         // A supported Base can outlive the toolchain that built it. Validate its
         // runtime locks against that Base's authenticated Release package; the
         // current package separately authorizes the historical Package ID.
-        string evidenceContractRoot = ResolveManagedEvidenceContractRoot(report, reportPath);
+        string evidenceContractRoot = ResolveManagedEvidenceContractRoot(report, reportPath,
+            additionalContractRoots);
         string runtimePath = ResolveEvidencePath(GetString(report, "runtimeSource"), reportRoot,
             "Managed Player runtime manifest");
         JsonElement runtime = ReadJson<JsonElement>(runtimePath);
         RequireEvidenceFormat(runtime, "hybridclr.dhe-runtime-manifest.json",
             "Managed Player runtime manifest");
+        bool archivedRuntime = string.Equals(GetString(runtime, "pathSemantics"),
+            "archive-relative-v1", StringComparison.Ordinal);
+        if (archivedBase != archivedRuntime)
+            throw new DheException("Managed Player archive and runtime path semantics do not agree.");
         if (!GetBool(runtime, "dheEnabled") || GetString(runtime, "dheRuntimeSourceMode") != "integrated")
             throw new DheException("Managed Player runtime evidence is not an integrated DHE runtime.");
         string contractRoot = ResolveManagedRuntimeContractRoot(runtime,
@@ -2701,17 +2722,29 @@ internal static partial class Program
         JsonElement headers = runtime.GetProperty("externalHeaders");
         if (GetBool(headers, "surrogate") || GetBool(headers, "explicitlyAllowed"))
             throw new DheException("Managed Player runtime evidence uses surrogate external headers.");
-        string stagedRuntime = RequireDirectory(GetString(runtime, "stagedLibil2cpp") ?? string.Empty,
-            "Managed Player staged runtime");
-        if (!TreeHashForRelease(stagedRuntime, Array.Empty<string>()).Equals(
-                GetString(runtime, "stagedRuntimeSha256"), StringComparison.OrdinalIgnoreCase))
-            throw new DheException("Managed Player staged runtime tree has changed.");
-        string stagedHeaders = RequireDirectory(GetString(headers, "stagedPath") ?? string.Empty,
-            "Managed Player staged external headers");
-        string externalTree = TreeHashForRelease(stagedHeaders, Array.Empty<string>());
-        if (!externalTree.Equals(GetString(headers, "stagedTreeSha256"),
-                StringComparison.OrdinalIgnoreCase))
-            throw new DheException("Managed Player external header tree has changed.");
+        string externalTree;
+        if (archivedBase)
+        {
+            if (!IsHex(GetString(runtime, "stagedRuntimeSha256"), 64, 64) ||
+                !IsHex(GetString(headers, "stagedTreeSha256"), 64, 64))
+                throw new DheException("Archived managed runtime tree identities are invalid.");
+            externalTree = GetString(headers, "stagedTreeSha256")!;
+        }
+        else
+        {
+            string stagedRuntime = RequireDirectory(GetString(runtime, "stagedLibil2cpp") ??
+                string.Empty, "Managed Player staged runtime");
+            if (!TreeHashForRelease(stagedRuntime, Array.Empty<string>()).Equals(
+                    GetString(runtime, "stagedRuntimeSha256"),
+                    StringComparison.OrdinalIgnoreCase))
+                throw new DheException("Managed Player staged runtime tree has changed.");
+            string stagedHeaders = RequireDirectory(GetString(headers, "stagedPath") ??
+                string.Empty, "Managed Player staged external headers");
+            externalTree = TreeHashForRelease(stagedHeaders, Array.Empty<string>());
+            if (!externalTree.Equals(GetString(headers, "stagedTreeSha256"),
+                    StringComparison.OrdinalIgnoreCase))
+                throw new DheException("Managed Player external header tree has changed.");
+        }
         string currentRuntimeLock = RequireFile(Path.Combine(contractRoot, "manifests",
             "dhe-runtime-lock.json"), "Managed Player runtime lock");
         if (!Sha256File(currentRuntimeLock).Equals(GetString(runtime, "dheRuntimeLockSha256"),
@@ -2765,6 +2798,7 @@ internal static partial class Program
             if (!string.Equals(expected, GetString(actual, "commit"), StringComparison.OrdinalIgnoreCase) ||
                 GetBool(actual, "dirty") || !IsHex(GetString(actual, "treeSha256"), 64, 64))
                 throw new DheException("Managed Player runtime source identity is invalid: " + repository);
+            if (archivedBase) continue;
             string sourcePath = RequireDirectory(GetString(actual, "path") ?? string.Empty,
                 "Managed Player " + repository + " source");
             if (!string.Equals(GitValue(sourcePath, "rev-parse", "HEAD"), expected,
@@ -3059,6 +3093,7 @@ internal static partial class Program
 
     private static void ValidateResourcePlayerEvidenceBindings(JsonElement report, string reportPath)
     {
+        _ = ValidateResourceBaseArchive(report, reportPath);
         string root = Path.GetDirectoryName(reportPath)!;
         string Bound(string pathProperty, string hashProperty, string description)
         {
@@ -3188,6 +3223,10 @@ internal static partial class Program
         JsonElement selectedValidationVariant = SelectPayloadVariant(validation, selectedVariantId,
             "Resource update validation");
         string payloadVariantSetHash = GetString(manifest, "payloadVariantSetSha256") ?? string.Empty;
+        string baseCleanCheckoutPath = ResolveBaseWorkflowReference(baseWorkflow,
+            baseWorkflowPath, "cleanCheckoutGate", "Base workflow clean checkout gate");
+        string reportCleanCheckoutPath = ResolveEvidencePath(GetString(report,
+            "cleanCheckoutGate"), root, "Resource Player clean checkout gate");
         if (!GetBool(validation, "passed") || !GetBool(stage, "passed") ||
             !GetBool(player, "passed") || !GetBool(baseWorkflow, "passed") ||
             !string.Equals(JsonSerializer.Serialize(player),
@@ -3229,8 +3268,9 @@ internal static partial class Program
              !OptionalJsonPropertiesEqual(stage, manifest, "baseRegistryRevision") ||
              !OptionalJsonPropertiesEqual(stage, manifest,
                  "baseRegistryLineageValidated") ||
-             !string.Equals(GetString(baseWorkflow, "cleanCheckoutGate"),
-                GetString(report, "cleanCheckoutGate"), StringComparison.OrdinalIgnoreCase))
+             !Path.GetFullPath(baseCleanCheckoutPath).Equals(
+                 Path.GetFullPath(reportCleanCheckoutPath),
+                 StringComparison.OrdinalIgnoreCase))
             throw new DheException("Resource Player evidence live bindings do not agree.");
     }
 

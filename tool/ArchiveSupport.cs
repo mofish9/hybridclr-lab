@@ -103,6 +103,14 @@ internal static partial class Program
             .Replace(Path.DirectorySeparatorChar, '/');
         File.WriteAllText(identityPath, identity.ToJsonString(Json), new UTF8Encoding(false));
 
+        var workflowPath = Path.Combine(archive, "player-workflow-report.json");
+        var workflow = JsonNode.Parse(File.ReadAllText(workflowPath))?.AsObject() ??
+            throw new DheException("Archived Player workflow is invalid.");
+        workflow["nativeManifest"] = Path.GetRelativePath(
+                Path.GetDirectoryName(workflowPath)!, immutablePath)
+            .Replace(Path.DirectorySeparatorChar, '/');
+        File.WriteAllText(workflowPath, workflow.ToJsonString(Json), new UTF8Encoding(false));
+
         var normalizedPath = Path.Combine(archive, "native", "dhe-native-manifest.json");
         var normalized = JsonNode.Parse(File.ReadAllText(normalizedPath))?.AsObject() ??
             throw new DheException("Archived native manifest is invalid.");

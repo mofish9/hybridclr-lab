@@ -816,6 +816,50 @@ internal static partial class Program
         AddRegressionCheck(checks, errors, "managed-current-base-variant-metadata-stable",
             baseVariantMetadataStablePassed, baseVariantMetadataStableDetails);
 
+        bool consecutiveVariantMetadataStablePassed = false;
+        string consecutiveVariantMetadataStableDetails = baseVariantMetadataStableDetails;
+        if (baseVariantMetadataStablePassed && !string.IsNullOrWhiteSpace(managedCurrentSeed))
+        {
+            try
+            {
+                var baseVariantAssembly = Path.Combine(regressionRoot,
+                    "base-variant-body-only.dll");
+                var consecutiveVariantAssembly = Path.Combine(regressionRoot,
+                    "consecutive-variant-body-only.dll");
+                ManagedCaseVariants.WriteNextCurrentAssembly(baseVariantAssembly,
+                    consecutiveVariantAssembly);
+                MetaVersionSnapshot baseVariantMetaVersion =
+                    MetaVersionSnapshot.Create(baseVariantAssembly);
+                MetaVersionSnapshot consecutiveVariantMetaVersion =
+                    MetaVersionSnapshot.Create(consecutiveVariantAssembly);
+                ResourceUpdateCompatibility consecutiveVariantCompatibility =
+                    ResourceUpdateCompatibility.Analyze(baseVariantMetaVersion,
+                        consecutiveVariantMetaVersion);
+                consecutiveVariantMetadataStablePassed =
+                    consecutiveVariantCompatibility.Compatible &&
+                    consecutiveVariantCompatibility.ChangedMethodCount == 2 &&
+                    consecutiveVariantCompatibility.BodyOnlyChangedMethodCount == 2 &&
+                    consecutiveVariantCompatibility.DependencyChangedMethodCount == 0 &&
+                    consecutiveVariantCompatibility.ChangedExistingTypeCount == 0 &&
+                    consecutiveVariantCompatibility.UnsupportedChanges.Length == 0 &&
+                    baseVariantMetaVersion.AssemblyMetadataVersion ==
+                        consecutiveVariantMetaVersion.AssemblyMetadataVersion &&
+                    !Sha256File(baseVariantAssembly).Equals(
+                        Sha256File(consecutiveVariantAssembly),
+                        StringComparison.OrdinalIgnoreCase);
+                consecutiveVariantMetadataStableDetails =
+                    "Consecutive current derivation must preserve metadata and change exactly two methods";
+            }
+            catch (Exception exception)
+            {
+                consecutiveVariantMetadataStableDetails = exception.Message;
+            }
+        }
+        AddRegressionCheck(checks, errors,
+            "managed-current-consecutive-variant-metadata-stable",
+            consecutiveVariantMetadataStablePassed,
+            consecutiveVariantMetadataStableDetails);
+
 		var referenceRemovalAssembly = Path.Combine(regressionRoot, "reference-removal.dll");
 		WriteMutatedAssembly(baseline, referenceRemovalAssembly, module =>
 		{
@@ -1737,6 +1781,10 @@ internal static partial class Program
         AddRegressionCheck(checks, errors, "base-workflow-aot-metadata-archive",
             RunBaseAotMetadataArchiveRegression(regressionRoot),
             "Base workflow metadata archives must be content-bound, registry-ready, and fail closed on tampering");
+        AddRegressionCheck(checks, errors,
+            "resource-player-archive-native-manifest-bound",
+            RunArchivedNativeManifestResolutionRegression(regressionRoot),
+            "resource Player evidence must resolve the immutable native manifest from a revalidated Base archive");
         var bootstrapWorkflowDoc = ReadJson<JsonElement>(Path.Combine(cli.Root, "manifests",
             "runtime-workflows.json"));
         JsonElement[] bootstrapWorkflows = LabCommands.SelectBootstrapWorkflowRecords(bootstrapWorkflowDoc, null, true);
@@ -3861,6 +3909,118 @@ internal static partial class Program
                 StringComparison.OrdinalIgnoreCase) &&
             !Directory.Exists(Path.Combine(root, "aot-metadata-root"));
         return valid && tamperRejected && archivePreserved && traversalRejected && emptySetValid;
+    }
+
+    private static bool RunArchivedNativeManifestResolutionRegression(string regressionRoot)
+    {
+        string root = Path.Combine(regressionRoot, "archived-native-resolution");
+        string nativeRoot = Path.Combine(root, "native");
+        string provenanceRoot = Path.Combine(root, "provenance");
+        Directory.CreateDirectory(nativeRoot);
+        Directory.CreateDirectory(provenanceRoot);
+
+        string workflowPath = Path.Combine(root, "player-workflow-report.json");
+        string normalizedPath = Path.Combine(nativeRoot, "dhe-native-manifest.json");
+        string immutablePath = Path.Combine(provenanceRoot,
+            "native-manifest.original.bin");
+        string sourcePreflightPath = Path.Combine(root, "source-preflight.json");
+        string cleanCheckoutPath = Path.Combine(root, "clean-checkout.json");
+        string toolchainGatePath = Path.Combine(root, "toolchain-gate.json");
+        string runtimeSourcePath = Path.Combine(provenanceRoot, "runtime-manifest.json");
+        WriteJson(normalizedPath, new
+        {
+            schemaVersion = 1,
+            format = "hybridclr.dhe-native-manifest.json",
+            pathSemantics = "archive-relative-v1",
+            normalized = true,
+        });
+        WriteJson(immutablePath, new
+        {
+            schemaVersion = 1,
+            resolverVersion = 3,
+            pathSemantics = "workspace-absolute-v1",
+        });
+        foreach (string path in new[]
+                 { sourcePreflightPath, cleanCheckoutPath, toolchainGatePath, runtimeSourcePath })
+            WriteJson(path, new { schemaVersion = 1, passed = true });
+        string immutableHash = Sha256File(immutablePath);
+        WriteJson(workflowPath, new
+        {
+            schemaVersion = 1,
+            format = "hybridclr.dhe-project-player-workflow.json",
+            nativeManifest = "native/dhe-native-manifest.json",
+            nativeManifestSha256 = immutableHash,
+            sourcePreflight = "source-preflight.json",
+            cleanCheckoutGate = "clean-checkout.json",
+            toolchainGate = "toolchain-gate.json",
+            runtimeSource = "provenance/runtime-manifest.json",
+        });
+        string archiveManifestPath = Path.Combine(root, "dhe-archive-manifest.json");
+        var archiveFiles = Directory.GetFiles(root, "*", SearchOption.AllDirectories)
+            .Where(path => !Path.GetFullPath(path).Equals(archiveManifestPath,
+                StringComparison.OrdinalIgnoreCase))
+            .OrderBy(path => Path.GetRelativePath(root, path)
+                .Replace(Path.DirectorySeparatorChar, '/'), StringComparer.Ordinal)
+            .Select(path => new
+            {
+                path = Path.GetRelativePath(root, path)
+                    .Replace(Path.DirectorySeparatorChar, '/'),
+                size = new FileInfo(path).Length,
+                sha256 = Sha256File(path),
+            }).ToArray();
+        WriteJson(archiveManifestPath, new
+        {
+            schemaVersion = 1,
+            format = "hybridclr.dhe-archive-manifest.json",
+            workflowReport = "player-workflow-report.json",
+            immutableNativeManifest = "provenance/native-manifest.original.bin",
+            immutableNativeManifestSha256 = immutableHash,
+            offlineReleaseRevalidated = true,
+            files = archiveFiles,
+            fileCount = archiveFiles.Length,
+            fileSetSha256 = Sha256Text(string.Join("\n", archiveFiles.Select(file =>
+                file.path + "|" + file.size + "|" + file.sha256))),
+        });
+
+        JsonElement workflow = ReadJson<JsonElement>(workflowPath);
+        bool archiveValidated = ValidateBaseArchiveForWorkflow(workflowPath)
+            ?.Equals(archiveManifestPath, StringComparison.OrdinalIgnoreCase) == true;
+        bool resolved = ResolveBaseWorkflowNativeManifest(workflow, workflowPath)
+            .Equals(immutablePath, StringComparison.OrdinalIgnoreCase);
+        bool referencesResolved = new[]
+        {
+            (Property: "sourcePreflight", Description: "source preflight",
+                Expected: sourcePreflightPath),
+            (Property: "cleanCheckoutGate", Description: "clean checkout gate",
+                Expected: cleanCheckoutPath),
+            (Property: "toolchainGate", Description: "toolchain gate",
+                Expected: toolchainGatePath),
+            (Property: "runtimeSource", Description: "runtime manifest",
+                Expected: runtimeSourcePath),
+        }.All(item => ResolveBaseWorkflowReference(workflow, workflowPath,
+                item.Property, item.Description)
+            .Equals(item.Expected, StringComparison.OrdinalIgnoreCase));
+        File.AppendAllText(immutablePath, "tampered", new UTF8Encoding(false));
+        bool tamperRejected = false;
+        try
+        {
+            _ = ResolveBaseWorkflowNativeManifest(workflow, workflowPath);
+        }
+        catch (DheException)
+        {
+            tamperRejected = true;
+        }
+        bool archiveTamperRejected = false;
+        try
+        {
+            _ = ValidateBaseArchiveForWorkflow(workflowPath);
+        }
+        catch (DheException)
+        {
+            archiveTamperRejected = true;
+        }
+        return archiveValidated && resolved && referencesResolved && tamperRejected &&
+            archiveTamperRejected;
     }
 
     private static bool RunLegacySinglePayloadSelectionRegression()

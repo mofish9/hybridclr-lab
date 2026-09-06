@@ -167,6 +167,7 @@
     "baseRegistryLineageValidated": { "type": "boolean" },
     "artifactValidation": { "type": "string", "minLength": 1 },
     "archiveManifest": { "type": ["string", "null"] },
+    "archiveManifestSha256": { "type": ["string", "null"], "pattern": "^[0-9a-fA-F]{64}$" },
     "archiveGate": { "type": ["string", "null"] },
     "runtimeSource": { "type": ["string", "null"] },
     "methodCount": { "type": "integer", "minimum": 0 },
