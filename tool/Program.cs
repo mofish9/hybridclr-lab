@@ -2374,12 +2374,18 @@ internal static partial class Program
         if (schemaErrors.Count == 0) ValidateJsonSchema(schema, evidence, schema, "$", schemaErrors);
         if (schemaErrors.Count > 0)
             throw new DheException("Generated release evidence violates its schema: " + string.Join("; ", schemaErrors));
-        ValidateEvidenceFiles(evidence, outputRoot, sourceRoot);
+        string[] configuredEvidenceRoots = cli.GetList("evidencetoolchainroots")
+            .Select(path => RequireDirectory(path, "Historical evidence toolchain package"))
+            .Select(Path.GetFullPath)
+            .Distinct(StringComparer.OrdinalIgnoreCase)
+            .ToArray();
+        ValidateEvidenceFiles(evidence, outputRoot, sourceRoot, configuredEvidenceRoots);
         Console.WriteLine("DHE release evidence: " + evidencePath);
         return 0;
     }
 
-    private static void ValidateEvidenceFiles(JsonElement evidence, string baseDirectory, string sourceRoot)
+    private static void ValidateEvidenceFiles(JsonElement evidence, string baseDirectory,
+        string sourceRoot, IEnumerable<string>? additionalPackageRoots = null)
     {
         if (!evidence.TryGetProperty("files", out var files) || files.ValueKind != JsonValueKind.Array ||
             files.GetArrayLength() < RequiredStaticReleaseEvidenceRoles.Length +
@@ -2399,12 +2405,10 @@ internal static partial class Program
         {
             Path.GetFullPath(sourceRoot),
         };
-        string[] configuredEvidenceRoots = cli.GetList("evidencetoolchainroots")
-            .Select(path => RequireDirectory(path, "Historical evidence toolchain package"))
-            .Select(Path.GetFullPath)
-            .Distinct(StringComparer.OrdinalIgnoreCase)
-            .ToArray();
-        foreach (string root in configuredEvidenceRoots)
+        foreach (string root in (additionalPackageRoots ?? Array.Empty<string>())
+                     .Where(path => !string.IsNullOrWhiteSpace(path))
+                     .Select(Path.GetFullPath)
+                     .Distinct(StringComparer.OrdinalIgnoreCase))
             managedContractRoots.Add(root);
         foreach (JsonElement item in files.EnumerateArray())
         {
@@ -3951,7 +3955,8 @@ internal static partial class Program
             if (!string.Equals(GetString(evidence, "sourceHead"), sourceHead, StringComparison.OrdinalIgnoreCase) ||
                 !string.Equals(GetString(evidence, "sourceTree"), sourceTree, StringComparison.OrdinalIgnoreCase))
                 throw new DheException("Toolchain release evidence does not match the source HEAD/tree being published.");
-            ValidateEvidenceFiles(evidence, Path.GetDirectoryName(evidencePath)!, root);
+            ValidateEvidenceFiles(evidence, Path.GetDirectoryName(evidencePath)!, root,
+                cli.GetList("evidencetoolchainroots"));
             releaseReady = true;
         }
         if (releaseReady && (!clean || !tracked)) throw new DheException("Release publishing requires a clean Git-tracked source tree.");
