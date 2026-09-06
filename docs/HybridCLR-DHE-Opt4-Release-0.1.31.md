@@ -126,6 +126,12 @@ and the new channel-head SHA-256 is
 `edbee27aed5829640cb982a92a02a7b585bfb292671cf7115d75b50713f3480f`.
 This is an isolated lab channel, not CAT production content.
 
+After release, the same package also appended a seventh archived Tuanjie Base
+through a direct-successor registry and qualified one revision 3 resource build
+on all seven old and new Windows Players. See
+`docs/HybridCLR-DHE-Opt4-Post-Release-Seven-Base-Onboarding.md`. This additive
+evidence does not change the 0.1.31 package identity.
+
 ## Remaining gates
 
 - Android ARM64 and iOS device correctness, memory, tail latency, temperature,

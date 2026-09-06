@@ -120,6 +120,10 @@ The clean regression passed 141/141 checks. A second six-Base resource revision
 then passed on all Windows Players, including one `0 changed / 0 interpreter`
 Base, and advanced an isolated protected channel from revision 1 to revision 2
 without rebuilding any Base Player.
+A subsequent post-release run appended a seventh, previously archived real
+Tuanjie Base through a direct-successor registry. One revision 3 resource build
+then passed on all seven old and new Windows Players and advanced the same
+protected lab channel without rebuilding the original six Players.
 Base identity now also binds `engineWorkflow` and `il2cppCodeGeneration`.
 Unity 2021 is locked to `OptimizeSpeed`; Unity 2022 FGS and Tuanjie 2022 FGS
 are locked to `OptimizeSize`. Base evidence created before these fields existed
