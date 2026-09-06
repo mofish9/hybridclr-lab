@@ -52,6 +52,15 @@ namespace HybridCLR.Lab
             }
 
             WriteResult(result);
+            string holdSecondsValue = GetArgument("-labHoldSeconds");
+            if (!string.IsNullOrWhiteSpace(holdSecondsValue))
+            {
+                if (!int.TryParse(holdSecondsValue, out int holdSeconds) ||
+                    holdSeconds < 0 || holdSeconds > 10)
+                    throw new InvalidDataException("-labHoldSeconds must be between 0 and 10.");
+                if (holdSeconds > 0)
+                    System.Threading.Thread.Sleep(holdSeconds * 1000);
+            }
             Debug.Log("[HybridCLR Lab] DHE demo: " + (result.passed ? "passed" : "failed"));
             Application.Quit(exitCode);
         }
@@ -1625,10 +1634,32 @@ namespace HybridCLR.Lab
 
         private sealed class StreamingAssetsProvider : IDheRuntimeAssetProvider
         {
+            private readonly string _externalRoot;
+
+            public StreamingAssetsProvider()
+            {
+                string requestedRoot = GetArgument("-labDheAssetRoot");
+                if (string.IsNullOrWhiteSpace(requestedRoot))
+                {
+                    _externalRoot = string.Empty;
+                    return;
+                }
+                if (!Path.IsPathRooted(requestedRoot))
+                    throw new InvalidDataException("-labDheAssetRoot must be an absolute path.");
+                _externalRoot = Path.GetFullPath(requestedRoot).TrimEnd(
+                    Path.DirectorySeparatorChar, Path.AltDirectorySeparatorChar);
+                string manifest = ResolveExternalPath(ResourceManifestFile);
+                if (!File.Exists(manifest))
+                    throw new FileNotFoundException(
+                        "The external DHE resource root has no release manifest.", manifest);
+            }
+
             public bool Exists(string assetPath)
             {
                 try
                 {
+                    if (UseExternalPath(assetPath))
+                        return File.Exists(ResolveExternalPath(assetPath));
                     return DheStreamingAssetReader.Exists(assetPath);
                 }
                 catch
@@ -1645,7 +1676,45 @@ namespace HybridCLR.Lab
 
             public byte[] LoadBytes(string assetPath)
             {
+                if (UseExternalPath(assetPath))
+                {
+                    string path = ResolveExternalPath(assetPath);
+                    if (!File.Exists(path))
+                        throw new FileNotFoundException(
+                            "The external DHE resource release is incomplete.", path);
+                    return File.ReadAllBytes(path);
+                }
                 return DheStreamingAssetReader.Read(assetPath);
+            }
+
+            private bool UseExternalPath(string assetPath)
+            {
+                if (_externalRoot.Length == 0 ||
+                    !assetPath.StartsWith(RuntimeAssetRoot, StringComparison.Ordinal))
+                    return false;
+                string relative = assetPath.Substring(RuntimeAssetRoot.Length);
+                return !relative.StartsWith("BaseMetaVersion/", StringComparison.Ordinal);
+            }
+
+            private string ResolveExternalPath(string assetPath)
+            {
+                if (!assetPath.StartsWith(RuntimeAssetRoot, StringComparison.Ordinal))
+                    throw new InvalidDataException(
+                        "External DHE asset is outside RuntimeAssetRoot: " + assetPath);
+                string relative = assetPath.Substring(RuntimeAssetRoot.Length)
+                    .Replace('\\', '/').TrimStart('/');
+                string[] segments = relative.Split('/');
+                if (segments.Length == 0 || segments.Any(segment =>
+                        segment.Length == 0 || segment == "." || segment == ".."))
+                    throw new InvalidDataException(
+                        "External DHE asset path is unsafe: " + assetPath);
+                string path = Path.GetFullPath(Path.Combine(_externalRoot,
+                    relative.Replace('/', Path.DirectorySeparatorChar)));
+                string prefix = _externalRoot + Path.DirectorySeparatorChar;
+                if (!path.StartsWith(prefix, StringComparison.OrdinalIgnoreCase))
+                    throw new InvalidDataException(
+                        "External DHE asset escapes its root: " + assetPath);
+                return path;
             }
         }
 

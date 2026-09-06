@@ -1,6 +1,7 @@
 using System.Text;
 using System.Text.Json;
 using System.Security.Cryptography;
+using System.IO.Compression;
 
 namespace HybridCLR.DheTool;
 
@@ -44,8 +45,23 @@ internal static partial class Program
         var baseRelative = baseMetaVersionAssetRoot[runtimeAssetRoot.Length..].TrimEnd('/');
         if (!IsPortableRelativePath(baseRelative))
             throw new DheException("Base MetaVersion destination is not a portable relative path.");
-        var embeddedBaseRoot = RequireDirectory(ResolveContainedPath(assetRoot, baseRelative,
-            "Embedded Base MetaVersion root"), "Embedded Base MetaVersion root");
+        string? basePlayerApkOption = cli.Optional("baseplayerapk");
+        using MaterializedAndroidApkBase? androidApkBase =
+            string.IsNullOrWhiteSpace(basePlayerApkOption)
+                ? null
+                : MaterializedAndroidApkBase.Create(
+                    RequireFile(basePlayerApkOption, "Immutable Android Base APK"),
+                    runtimeAssetRoot, baseMetaVersionAssetRoot, baseBuildIdentityPath);
+        if (androidApkBase != null &&
+            (!string.Equals(GetString(baseBuildIdentity, "target"), "Android",
+                 StringComparison.Ordinal) ||
+             !string.Equals(GetString(selectedBase, "target"), "Android",
+                 StringComparison.Ordinal)))
+            throw new DheException("BasePlayerApk requires an Android Base identity and registry entry.");
+        var embeddedBaseRoot = androidApkBase?.MaterializedRoot ??
+            RequireDirectory(ResolveContainedPath(assetRoot, baseRelative,
+                "Embedded Base MetaVersion root"), "Embedded Base MetaVersion root");
+        string embeddedBaseRootRecord = androidApkBase?.LogicalRoot ?? embeddedBaseRoot;
         var embeddedBase = ValidateEmbeddedBaseMetaVersionSet(embeddedBaseRoot, manifest,
             baseBuildIdentity, selectedBase);
         var baseTreeBefore = TreeHashForRelease(embeddedBaseRoot, Array.Empty<string>());
@@ -92,8 +108,12 @@ internal static partial class Program
 
         var payloads = ValidateResourceUpdatePayload(updateRoot, manifest, runtimePlan,
             selectedBase, runtimeAssetRoot, baseMetaVersionAssetRoot);
-        var immutableFiles = cli.GetList("immutablefiles").Select(path =>
-            RequireFile(path, "Immutable Player file")).Distinct(StringComparer.OrdinalIgnoreCase).ToArray();
+        var immutableFiles = cli.GetList("immutablefiles")
+            .Concat(androidApkBase == null
+                ? Array.Empty<string>()
+                : new[] { androidApkBase.ArtifactPath })
+            .Select(path => RequireFile(path, "Immutable Player file"))
+            .Distinct(StringComparer.OrdinalIgnoreCase).ToArray();
         var immutableBefore = immutableFiles.ToDictionary(path => path, Sha256File,
             StringComparer.OrdinalIgnoreCase);
 
@@ -183,7 +203,11 @@ internal static partial class Program
             stagedPlanSha256 = runtimePlanSha256,
             stagedManifestPath,
             stagedValidationPath,
-            embeddedBaseRoot,
+            embeddedBaseRoot = embeddedBaseRootRecord,
+            embeddedBaseSourceKind = androidApkBase == null ? "directory" : "android-apk",
+            embeddedBaseArtifactPath = androidApkBase?.ArtifactPath,
+            embeddedBaseArtifactSha256 = androidApkBase?.ArtifactSha256,
+            embeddedBaseEntryRoot = androidApkBase?.EntryRoot,
             selectedBaseId = embeddedBase.BaseId,
             selectedAotMetadataSetId = GetString(selectedBase, "aotMetadataSetId"),
             baseRegistrySha256 = GetString(manifest, "baseRegistrySha256"),
@@ -215,6 +239,104 @@ internal static partial class Program
         });
         Console.WriteLine("DHE resource update staged without modifying the Base: " + output);
         return 0;
+    }
+
+    private sealed class MaterializedAndroidApkBase : IDisposable
+    {
+        private MaterializedAndroidApkBase(string artifactPath, string artifactSha256,
+            string entryRoot, string materializedRoot)
+        {
+            ArtifactPath = artifactPath;
+            ArtifactSha256 = artifactSha256;
+            EntryRoot = entryRoot;
+            MaterializedRoot = materializedRoot;
+            LogicalRoot = artifactPath + "!/" + entryRoot.TrimEnd('/');
+        }
+
+        public string ArtifactPath { get; }
+        public string ArtifactSha256 { get; }
+        public string EntryRoot { get; }
+        public string MaterializedRoot { get; }
+        public string LogicalRoot { get; }
+
+        public static MaterializedAndroidApkBase Create(string apkPath,
+            string runtimeAssetRoot, string baseMetaVersionAssetRoot,
+            string buildIdentityPath)
+        {
+            if (!string.Equals(Path.GetExtension(apkPath), ".apk",
+                    StringComparison.OrdinalIgnoreCase))
+                throw new DheException("BasePlayerApk must name an .apk file.");
+            string entryRoot = "assets/" + baseMetaVersionAssetRoot.Trim('/');
+            string runtimeRoot = runtimeAssetRoot.Trim('/');
+            int separator = runtimeRoot.LastIndexOf('/');
+            if (separator <= 0)
+                throw new DheException(
+                    "Android RuntimeAssetRoot must have a parent for build-identity.json.");
+            string identityEntryName = "assets/" + runtimeRoot[..separator] +
+                "/build-identity.json";
+            string materializedRoot = Path.Combine(Path.GetTempPath(),
+                "hybridclr-dhe-apk-base-" + Guid.NewGuid().ToString("N"));
+            Directory.CreateDirectory(materializedRoot);
+            try
+            {
+                using ZipArchive apk = ZipFile.OpenRead(apkPath);
+                ZipArchiveEntry[] identityEntries = apk.Entries.Where(entry =>
+                    string.Equals(entry.FullName, identityEntryName,
+                        StringComparison.Ordinal)).ToArray();
+                if (identityEntries.Length != 1)
+                    throw new DheException("Android Base APK must contain exactly one " +
+                        identityEntryName + ".");
+                byte[] embeddedIdentity = ReadZipEntry(identityEntries[0]);
+                if (!string.Equals(Sha256Bytes(embeddedIdentity),
+                        Sha256File(buildIdentityPath), StringComparison.OrdinalIgnoreCase))
+                    throw new DheException(
+                        "Android Base APK build identity differs from BaseBuildIdentity.");
+
+                string prefix = entryRoot + "/";
+                ZipArchiveEntry[] entries = apk.Entries.Where(entry =>
+                    entry.FullName.StartsWith(prefix, StringComparison.Ordinal)).ToArray();
+                if (entries.Length == 0)
+                    throw new DheException(
+                        "Android Base APK contains no embedded Base MetaVersion files.");
+                var names = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+                foreach (ZipArchiveEntry entry in entries)
+                {
+                    string relative = entry.FullName[prefix.Length..];
+                    if (!IsPortableRelativePath(relative) || relative.Contains('/') ||
+                        !relative.EndsWith(".mv.bytes", StringComparison.OrdinalIgnoreCase) ||
+                        !names.Add(relative))
+                        throw new DheException(
+                            "Android Base APK contains an invalid Base MetaVersion entry: " +
+                            entry.FullName);
+                    File.WriteAllBytes(Path.Combine(materializedRoot, relative),
+                        ReadZipEntry(entry));
+                }
+                return new MaterializedAndroidApkBase(apkPath, Sha256File(apkPath),
+                    entryRoot, materializedRoot);
+            }
+            catch
+            {
+                Directory.Delete(materializedRoot, true);
+                throw;
+            }
+        }
+
+        private static byte[] ReadZipEntry(ZipArchiveEntry entry)
+        {
+            if (entry.Length <= 0 || entry.Length > int.MaxValue)
+                throw new DheException("Android Base APK entry has an invalid size: " +
+                    entry.FullName);
+            using Stream input = entry.Open();
+            using var output = new MemoryStream(checked((int)entry.Length));
+            input.CopyTo(output);
+            return output.ToArray();
+        }
+
+        public void Dispose()
+        {
+            if (Directory.Exists(MaterializedRoot))
+                Directory.Delete(MaterializedRoot, true);
+        }
     }
 
     /// <summary>
@@ -365,6 +487,21 @@ internal static partial class Program
                 StringComparison.OrdinalIgnoreCase))
             errors.Add("Base build identity or native manifest is not bound to the selected resource record.");
 
+        string? devicePlayerRunPath = null;
+        string? requestedDevicePlayerRun = cli.Optional("deviceplayerrun");
+        if (string.Equals(target, "Android", StringComparison.Ordinal))
+        {
+            devicePlayerRunPath = RequireFile(cli.Require("deviceplayerrun"),
+                "Android device Player run");
+            ValidateDevicePlayerRunBindings(devicePlayerRunPath, updateRoot, manifestPath,
+                releaseLedger, stagePath, stage, playerPath, player, buildIdentityPath);
+        }
+        else if (!string.IsNullOrWhiteSpace(requestedDevicePlayerRun))
+        {
+            throw new DheException(
+                "DevicePlayerRun is currently supported only for Android Player evidence.");
+        }
+
         string[] assemblyNames = selectedManifestVariant.GetProperty("assemblies").EnumerateArray()
             .Select(item => GetString(item, "assemblyName") ?? string.Empty)
             .Where(name => name.Length > 0).OrderBy(name => name, StringComparer.OrdinalIgnoreCase)
@@ -424,6 +561,7 @@ internal static partial class Program
             buildIdentityPath, nativeManifestPath,
         };
         if (releaseLedger != null) evidenceInputs.Add(releaseLedger.SourcePath);
+        if (devicePlayerRunPath != null) evidenceInputs.Add(devicePlayerRunPath);
         var output = SafeReportPath(cli.Require("output"), evidenceInputs);
         WriteJson(output, new
         {
@@ -517,6 +655,9 @@ internal static partial class Program
             baseWorkflowReport = baseWorkflowPath,
             baseWorkflowReportSha256 = Sha256File(baseWorkflowPath),
             playerResultSha256 = Sha256File(playerPath),
+            devicePlayerRun = devicePlayerRunPath,
+            devicePlayerRunSha256 = devicePlayerRunPath == null
+                ? null : Sha256File(devicePlayerRunPath),
             buildIdentitySha256 = Sha256File(buildIdentityPath),
             runtimePlanSha256 = Sha256File(runtimePlanPath),
             selectedBaseId,
@@ -542,6 +683,106 @@ internal static partial class Program
         });
         Console.WriteLine("DHE resource Player workflow evidence: " + output);
         return 0;
+    }
+
+    private static void ValidateDevicePlayerRunBindings(string deviceRunPath,
+        string updateRoot, string manifestPath, ReleaseLedgerDocument? releaseLedger,
+        string stagePath, JsonElement stage, string playerPath, JsonElement player,
+        string buildIdentityPath)
+    {
+        JsonElement run = ReadJson<JsonElement>(deviceRunPath);
+        RequireEvidenceFormat(run, "hybridclr.dhe-device-player-run.json",
+            "Android device Player run");
+        string apkPath = RequireFile(GetString(run, "apkPath") ?? string.Empty,
+            "Android device run APK");
+        string logcatPath = RequireFile(GetString(run, "logcat") ?? string.Empty,
+            "Android device run logcat");
+        string stagedAssetRoot = RequireDirectory(GetString(run,
+            "stagedAssetRoot") ?? string.Empty, "Android staged asset root");
+        AndroidStagedFile[] stagedFiles = ReadAndroidStagedFiles(stage, stagedAssetRoot);
+        Dictionary<string, string> reportFiles = run.GetProperty("stagedFiles")
+            .EnumerateArray().ToDictionary(item =>
+                GetString(item, "path") ?? string.Empty,
+                item => GetString(item, "sha256") ?? string.Empty,
+                StringComparer.OrdinalIgnoreCase);
+        bool fileSetMatches = reportFiles.Count == stagedFiles.Length &&
+            stagedFiles.All(file => reportFiles.TryGetValue(file.RelativePath,
+                out string? hash) && string.Equals(hash, file.Sha256,
+                    StringComparison.OrdinalIgnoreCase));
+        JsonElement[] immutableApkRecords = stage.GetProperty("immutableFiles")
+            .EnumerateArray().Where(item => string.Equals(Path.GetFullPath(
+                    GetString(item, "path") ?? string.Empty), apkPath,
+                StringComparison.OrdinalIgnoreCase)).ToArray();
+        bool releaseMatches = releaseLedger != null &&
+            string.Equals(Path.GetFullPath(GetString(run,
+                    "releaseLedger") ?? string.Empty), releaseLedger.SourcePath,
+                StringComparison.OrdinalIgnoreCase) &&
+            string.Equals(GetString(run, "releaseLedgerSha256"), releaseLedger.Sha256,
+                StringComparison.OrdinalIgnoreCase);
+        if (!GetBool(run, "passed") ||
+            !string.Equals(GetString(run, "target"), "Android", StringComparison.Ordinal) ||
+            !GetBool(run, "uniqueProcessId") || GetInt(run, "processId") <= 0 ||
+            !GetBool(run, "processExited") || !GetBool(run, "playerPassed") ||
+            !GetBool(run, "installValidated") ||
+            !GetBool(run, "payloadPushValidated") ||
+            !GetBool(run, "payloadRoundTripValidated") ||
+            !GetBool(run, "launchValidated") ||
+            !string.Equals(Path.GetFullPath(GetString(run,
+                    "resourceUpdateRoot") ?? string.Empty), updateRoot,
+                StringComparison.OrdinalIgnoreCase) ||
+            !string.Equals(Path.GetFullPath(GetString(run,
+                    "resourceUpdateManifest") ?? string.Empty), manifestPath,
+                StringComparison.OrdinalIgnoreCase) ||
+            !string.Equals(GetString(run, "resourceUpdateManifestSha256"),
+                Sha256File(manifestPath), StringComparison.OrdinalIgnoreCase) ||
+            !releaseMatches ||
+            !string.Equals(Path.GetFullPath(GetString(run,
+                    "stageReport") ?? string.Empty), stagePath,
+                StringComparison.OrdinalIgnoreCase) ||
+            !string.Equals(GetString(run, "stageReportSha256"), Sha256File(stagePath),
+                StringComparison.OrdinalIgnoreCase) ||
+            !string.Equals(Path.GetFullPath(GetString(run,
+                    "playerResult") ?? string.Empty), playerPath,
+                StringComparison.OrdinalIgnoreCase) ||
+            !string.Equals(GetString(run, "playerResultSha256"), Sha256File(playerPath),
+                StringComparison.OrdinalIgnoreCase) ||
+            !string.Equals(Path.GetFullPath(GetString(run,
+                    "baseBuildIdentity") ?? string.Empty), buildIdentityPath,
+                StringComparison.OrdinalIgnoreCase) ||
+            !string.Equals(GetString(run, "baseBuildIdentitySha256"),
+                Sha256File(buildIdentityPath), StringComparison.OrdinalIgnoreCase) ||
+            !string.Equals(GetString(run, "selectedBaseId"),
+                GetString(stage, "selectedBaseId"), StringComparison.OrdinalIgnoreCase) ||
+            !string.Equals(GetString(run, "selectedBaseId"),
+                GetString(player, "selectedBaseId"), StringComparison.OrdinalIgnoreCase) ||
+            !string.Equals(GetString(run, "selectedPayloadVariantId") ?? "default",
+                GetString(stage, "payloadVariantId") ?? "default",
+                StringComparison.OrdinalIgnoreCase) ||
+            !string.Equals(GetString(run, "selectedCurrentAssemblySetSha256"),
+                GetString(stage, "currentAssemblySetSha256"),
+                StringComparison.OrdinalIgnoreCase) ||
+            !string.Equals(Path.GetFullPath(GetString(stage,
+                    "assetRoot") ?? string.Empty), stagedAssetRoot,
+                StringComparison.OrdinalIgnoreCase) ||
+            GetInt(run, "stagedFileCount") != stagedFiles.Length || !fileSetMatches ||
+            !string.Equals(GetString(stage, "embeddedBaseSourceKind"), "android-apk",
+                StringComparison.Ordinal) ||
+            !string.Equals(Path.GetFullPath(GetString(stage,
+                    "embeddedBaseArtifactPath") ?? string.Empty), apkPath,
+                StringComparison.OrdinalIgnoreCase) ||
+            !string.Equals(GetString(run, "apkSha256"), Sha256File(apkPath),
+                StringComparison.OrdinalIgnoreCase) ||
+            !string.Equals(GetString(stage, "embeddedBaseArtifactSha256"),
+                Sha256File(apkPath), StringComparison.OrdinalIgnoreCase) ||
+            immutableApkRecords.Length != 1 ||
+            !string.Equals(GetString(immutableApkRecords[0], "sha256Before"),
+                Sha256File(apkPath), StringComparison.OrdinalIgnoreCase) ||
+            !string.Equals(GetString(immutableApkRecords[0], "sha256After"),
+                Sha256File(apkPath), StringComparison.OrdinalIgnoreCase) ||
+            !string.Equals(GetString(run, "logcatSha256"), Sha256File(logcatPath),
+                StringComparison.OrdinalIgnoreCase))
+            throw new DheException(
+                "Android device Player run does not match its APK, stage, payload, or Player result.");
     }
 
     private static string ResolveBaseWorkflowReference(JsonElement baseWorkflow,

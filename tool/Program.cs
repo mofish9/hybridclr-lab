@@ -40,6 +40,8 @@ internal static partial class Program
         "resource-stage-base-registry-lineage-bound",
         "resource-stage-base-registry-parent-tamper-rejected",
         "resource-stage-direct-base-valid",
+        "resource-stage-android-apk-base-bound",
+        "resource-stage-android-apk-tamper-rejected",
         "resource-cross-target-payload-release",
         "resource-cross-target-selection-bound",
         "resource-cross-target-selected-payload-tamper-rejected",
@@ -90,6 +92,7 @@ internal static partial class Program
         "bootstrap-engine-workflow-matrix",
         "source-boundary-git-root-resolution", "git-relative-root-resolution",
         "unity-stale-lock-recovery",
+        "android-device-smoke-contract",
         "native-universal-body-filter",
         "native-finalize-bee-graph-regeneration",
         "native-finalize-attempt-limit-rejected",
@@ -144,6 +147,7 @@ internal static partial class Program
                 "resource-release-build" => ResourceReleaseBuild(cli),
                 "resource-update" => ResourceUpdate(cli),
                 "stage-resource-update" => StageResourceUpdate(cli),
+                "android-device-smoke" => AndroidDeviceSmoke(cli),
                 "resource-player-evidence" => ResourcePlayerEvidence(cli),
                 "resource-release-gate" => ResourceReleaseGate(cli),
                 "channel-state" => ChannelState(cli),
@@ -3114,7 +3118,8 @@ internal static partial class Program
         string playerPath = Bound("playerResult", "playerResultSha256", "Resource Player result");
         string baseWorkflowPath = Bound("baseWorkflowReport", "baseWorkflowReportSha256",
             "Base workflow report");
-        _ = Bound("buildIdentity", "buildIdentitySha256", "Base build identity");
+        string buildIdentityPath = Bound("buildIdentity", "buildIdentitySha256",
+            "Base build identity");
         _ = Bound("runtimePlan", "runtimePlanSha256", "Resource runtime plan");
         string nativePath = ResolveEvidencePath(GetString(report, "nativeManifest"), root,
             "Base native manifest");
@@ -3157,6 +3162,25 @@ internal static partial class Program
                 GetString(report, "parentReleaseLedgerSha256"),
                 StringComparison.OrdinalIgnoreCase))
             throw new DheException("Resource Player evidence release ledger binding is invalid.");
+        string? devicePlayerRunValue = GetString(report, "devicePlayerRun");
+        string? devicePlayerRunSha256 = GetString(report, "devicePlayerRunSha256");
+        if (string.Equals(GetString(report, "target"), "Android", StringComparison.Ordinal))
+        {
+            string devicePlayerRunPath = ResolveEvidencePath(devicePlayerRunValue,
+                root, "Android device Player run");
+            if (!string.Equals(Sha256File(devicePlayerRunPath), devicePlayerRunSha256,
+                    StringComparison.OrdinalIgnoreCase))
+                throw new DheException(
+                    "Android device Player run hash does not match resource Player evidence.");
+            ValidateDevicePlayerRunBindings(devicePlayerRunPath, updateRoot, manifestPath,
+                ledger, stagePath, stage, playerPath, player, buildIdentityPath);
+        }
+        else if (!string.IsNullOrWhiteSpace(devicePlayerRunValue) ||
+                 !string.IsNullOrWhiteSpace(devicePlayerRunSha256))
+        {
+            throw new DheException(
+                "Non-Android resource Player evidence contains an Android device run.");
+        }
         string stagedLedgerPath = ResolveEvidencePath(GetString(report, "stagedReleaseLedger"),
             root, "Staged resource release ledger");
         string stagedLedgerFromStage = ResolveEvidencePath(GetString(stage,
@@ -4166,7 +4190,8 @@ internal static partial class Program
     private static void PrintHelp() => Console.WriteLine(string.Join(Environment.NewLine,
         "HybridCLR DHE C# tool",
         "Commands: version, mv, batch, base-registry, resource-release-build, resource-update, " +
-        "stage-resource-update, resource-player-evidence, resource-release-gate, " +
+        "stage-resource-update, android-device-smoke, resource-player-evidence, " +
+        "resource-release-gate, " +
         "channel-state, baseline-manifest, aot-metadata-manifest, preflight, workflow, " +
         "release-gate, regression, schema-validate, schema-gate, validate, archive, " +
         "doctor, verify-package, release-evidence, publish, install, new-adapter, " +

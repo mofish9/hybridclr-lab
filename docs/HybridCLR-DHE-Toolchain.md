@@ -418,6 +418,23 @@ runtime plan and every current DLL, MetaVersion, and supplemental AOT metadata h
 before copying. The complete lifecycle and current compatibility subset are in
 `docs/HybridCLR-DHE-Resource-Only-Design.md`.
 
+An Android APK is immutable and cannot also be the writable catalog destination.
+Create an empty external staging directory and pass `-BasePlayerApk`:
+
+```text
+dotnet HybridCLR.DheTool.dll stage-resource-update \
+  -UpdateRoot C:/release/resource-205 \
+  -AssetRoot C:/build/android/base-100-external \
+  -BaseBuildIdentity C:/archive/base-100/build-identity.json \
+  -BasePlayerApk C:/archive/base-100/player.apk \
+  -Output C:/evidence/base-100-stage.json
+```
+
+The command reads `build-identity.json` and Base MetaVersion entries directly
+from the APK ZIP, requires them to equal the archived identity, and automatically
+adds the APK to `immutableFiles`. Current payload files are written only below
+`AssetRoot`; the APK hash must remain unchanged.
+
 Run `resource-player-evidence` after the real Player/device smoke. It binds the
 resource manifest, stage report, Player result, and immutable Base workflow into
 `resource-player-workflow-report.json`. This is the only supported
@@ -435,6 +452,9 @@ both payload-selection fields only for a `single-current-payload` release whose
 authenticated manifest and validation contain one implicit `default` payload. A
 partial pair or any variant release remains fail-closed; generated evidence
 always records the inferred or selected variant and current assembly-set hash.
+For an Android target, `resource-player-evidence` additionally requires
+`-DevicePlayerRun` from `android-device-smoke`; a standalone JSON copied from an
+unverified device is not accepted.
 
 After every active Base has produced that report, run the project-facing aggregate
 gate once for the resource release:
@@ -674,6 +694,36 @@ APK/AAB to the requested Player path, and prove all ABI entries match staging.
 artifact hash, native source paths, archive entries, and hashes. The C# host
 rejects stale Gradle roots, more than eight attempts, graph regeneration without
 guard reapplication, array misalignment, and source/archive hash drift.
+
+After APK-aware staging, execute the resource-only update on one connected
+device with the C# host:
+
+```text
+dotnet HybridCLR.DheTool.dll android-device-smoke \
+  -Root C:/tools/HybridCLRDhe \
+  -AdbPath C:/Unity/Editor/Data/PlaybackEngines/AndroidPlayer/SDK/platform-tools/adb \
+  -Apk C:/archive/base-100/player.apk \
+  -ApplicationId com.company.game \
+  -BaseBuildIdentity C:/archive/base-100/build-identity.json \
+  -ResourceUpdateRoot C:/release/resource-205 \
+  -StageReport C:/evidence/base-100-stage.json \
+  -OutputRoot C:/evidence/base-100-device
+```
+
+Use `-DeviceSerial` when more than one device is attached. The command installs
+the exact APK, clears only that application's data, pushes every staged file
+below the application's external files directory, pulls every file back for
+SHA-256 verification, launches Unity with `-labDheAssetRoot`, captures one PID,
+pulls the Player result and logcat, and requires the process to exit. Its
+`dhe-device-player-run.json` binds the device, APK, Base identity, stage,
+resource manifest, release ledger, selected payload, and Player result. With no
+ready device it fails without writing passing evidence.
+
+The demo's external provider treats the downloaded release as an overlay. Once
+the external manifest is present, plan and payload files may not fall back to
+the APK; missing files fail closed. Base MetaVersion always comes from the APK,
+so each installed Base computes its own changed-method set against the same
+downloaded current payload.
 
 iOS uses the same C# Bee graph regeneration and guard reapplication path, with
 no PowerShell dependency. This repository has no macOS/Xcode environment, so

@@ -17,6 +17,17 @@
     {
       "if": { "properties": { "mode": { "const": "Exploratory" } }, "required": ["mode"] },
       "then": { "properties": { "releaseReady": { "const": false }, "releaseChannelId": { "type": "null" }, "releaseRevision": { "type": "null" }, "parentReleaseLedgerSha256": { "type": "null" }, "releaseLedgerSha256": { "type": "null" }, "stagedReleaseLedgerPath": { "type": "null" } } }
+    },
+    {
+      "if": { "properties": { "embeddedBaseSourceKind": { "const": "android-apk" } }, "required": ["embeddedBaseSourceKind"] },
+      "then": {
+        "required": ["embeddedBaseArtifactPath", "embeddedBaseArtifactSha256", "embeddedBaseEntryRoot"],
+        "properties": {
+          "embeddedBaseArtifactPath": { "type": "string", "minLength": 1 },
+          "embeddedBaseArtifactSha256": { "type": "string", "pattern": "^[0-9a-fA-F]{64}$" },
+          "embeddedBaseEntryRoot": { "type": "string", "pattern": "^assets/.+BaseMetaVersion$" }
+        }
+      }
     }
   ],
   "properties": {
@@ -42,6 +53,10 @@
     "stagedManifestPath": { "type": "string", "minLength": 1 },
     "stagedValidationPath": { "type": "string", "minLength": 1 },
     "embeddedBaseRoot": { "type": "string", "minLength": 1 },
+    "embeddedBaseSourceKind": { "enum": ["directory", "android-apk"] },
+    "embeddedBaseArtifactPath": { "type": ["string", "null"] },
+    "embeddedBaseArtifactSha256": { "type": ["string", "null"], "pattern": "^[0-9a-fA-F]{64}$" },
+    "embeddedBaseEntryRoot": { "type": ["string", "null"] },
     "selectedBaseId": { "type": "string", "pattern": "^[0-9a-fA-F]{64}$" },
     "selectedAotMetadataSetId": { "type": "string", "pattern": "^[0-9a-fA-F]{64}$" },
     "baseRegistrySha256": { "type": ["string", "null"], "pattern": "^[0-9a-fA-F]{64}$" },

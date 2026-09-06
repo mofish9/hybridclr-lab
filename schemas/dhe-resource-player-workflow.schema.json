@@ -34,6 +34,22 @@
     {
       "if": { "properties": { "resourceReleaseMode": { "const": "Exploratory" } }, "required": ["resourceReleaseMode"] },
       "then": { "properties": { "resourceReleaseReady": { "const": false }, "releaseChannelId": { "type": "null" }, "releaseRevision": { "type": "null" }, "parentReleaseLedgerSha256": { "type": "null" }, "releaseLedger": { "type": "null" }, "releaseLedgerSha256": { "type": "null" }, "stagedReleaseLedger": { "type": "null" } } }
+    },
+    {
+      "if": { "properties": { "target": { "const": "Android" } }, "required": ["target"] },
+      "then": {
+        "required": ["devicePlayerRun", "devicePlayerRunSha256"],
+        "properties": {
+          "devicePlayerRun": { "type": "string", "minLength": 1 },
+          "devicePlayerRunSha256": { "type": "string", "pattern": "^[0-9a-fA-F]{64}$" }
+        }
+      },
+      "else": {
+        "properties": {
+          "devicePlayerRun": { "type": "null" },
+          "devicePlayerRunSha256": { "type": "null" }
+        }
+      }
     }
   ],
   "properties": {
@@ -153,6 +169,8 @@
     "baseWorkflowReport": { "type": "string", "minLength": 1 },
     "baseWorkflowReportSha256": { "type": "string", "pattern": "^[0-9a-fA-F]{64}$" },
     "playerResultSha256": { "type": "string", "pattern": "^[0-9a-fA-F]{64}$" },
+    "devicePlayerRun": { "type": ["string", "null"] },
+    "devicePlayerRunSha256": { "type": ["string", "null"], "pattern": "^[0-9a-fA-F]{64}$" },
     "buildIdentitySha256": { "type": "string", "pattern": "^[0-9a-fA-F]{64}$" },
     "runtimePlanSha256": { "type": "string", "pattern": "^[0-9a-fA-F]{64}$" },
     "selectedBaseId": { "type": "string", "pattern": "^[0-9a-fA-F]{64}$" },

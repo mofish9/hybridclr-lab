@@ -1881,6 +1881,58 @@ internal static partial class Program
         AddRegressionCheck(checks, errors, "dhe-cross-platform-streaming-reader",
             crossPlatformDheReader,
             "the demo DHE asset reader must handle Android APK StreamingAssets as well as filesystem platforms");
+        string dhePlayerRunnerPath = Path.Combine(cli.Root, "unity2021-dhe-demo", "Assets",
+            "Runtime", "HybridCLRDhePlayerRunner.cs");
+        string dhePlayerRunnerSource = File.Exists(dhePlayerRunnerPath)
+            ? File.ReadAllText(dhePlayerRunnerPath) : string.Empty;
+        bool androidDeviceSmokeContract = false;
+        try
+        {
+            AdbDevice selected = SelectAdbDevice(ParseAdbDevices(
+                "List of devices attached\nserial-one device product:test model:device\n"), null);
+            bool invalidApplicationRejected;
+            try
+            {
+                _ = ValidateAndroidApplicationId("invalid/application");
+                invalidApplicationRejected = false;
+            }
+            catch (DheException)
+            {
+                invalidApplicationRejected = true;
+            }
+            bool escapingRootRejected;
+            try
+            {
+                _ = ValidateAndroidRemoteAssetRoot(
+                    "/sdcard/Android/data/com.mofish.lab/files/../escape",
+                    "com.mofish.lab");
+                escapingRootRejected = false;
+            }
+            catch (DheException)
+            {
+                escapingRootRejected = true;
+            }
+            androidDeviceSmokeContract = selected.Serial == "serial-one" &&
+                ValidateAndroidApplicationId("com.mofish.lab") == "com.mofish.lab" &&
+                ValidateAndroidActivity("com.unity3d.player.UnityPlayerActivity") ==
+                    "com.unity3d.player.UnityPlayerActivity" &&
+                ValidateAndroidRemoteAssetRoot(
+                    "/sdcard/Android/data/com.mofish.lab/files/HybridCLRLab/DheUpdate",
+                    "com.mofish.lab").EndsWith("/DheUpdate", StringComparison.Ordinal) &&
+                invalidApplicationRejected && escapingRootRejected &&
+                dhePlayerRunnerSource.Contains("-labDheAssetRoot", StringComparison.Ordinal) &&
+                dhePlayerRunnerSource.Contains(
+                    "The external DHE resource release is incomplete.",
+                    StringComparison.Ordinal) &&
+                dhePlayerRunnerSource.Contains("BaseMetaVersion/", StringComparison.Ordinal);
+        }
+        catch
+        {
+            androidDeviceSmokeContract = false;
+        }
+        AddRegressionCheck(checks, errors, "android-device-smoke-contract",
+            androidDeviceSmokeContract,
+            "Android device smoke must select one device, constrain remote paths, and use a fail-closed external payload overlay");
         RunIntegratedSourceLockRegressions(regressionRoot, checks, errors);
 
         var weakNoOpRejected = false;
@@ -4471,6 +4523,92 @@ internal static partial class Program
             "dhe-resource-update.json"));
         var positiveRuntimePlan = ReadJson<JsonElement>(Path.Combine(positive.Update,
             "dhe-runtime-plan.json"));
+        string positiveRuntimeAssetRoot = RequirePortableAssetRoot(
+            GetString(positiveManifest, "runtimeAssetRoot"), "runtimeAssetRoot");
+        string positiveBaseMetaVersionAssetRoot = RequirePortableAssetRoot(
+            GetString(positiveManifest, "baseMetaVersionAssetRoot"),
+            "baseMetaVersionAssetRoot");
+        string positiveBaseRelative = positiveBaseMetaVersionAssetRoot[
+            positiveRuntimeAssetRoot.Length..].Trim('/');
+        string positiveEmbeddedBase = ResolveContainedPath(positive.Assets,
+            positiveBaseRelative, "Regression embedded Base MetaVersion root");
+        string positiveIdentityEntryRoot = positiveRuntimeAssetRoot.Trim('/');
+        positiveIdentityEntryRoot = positiveIdentityEntryRoot[..
+            positiveIdentityEntryRoot.LastIndexOf('/')];
+
+        string CreateAndroidApk(string name, bool tamperIdentity)
+        {
+            string apkPath = Path.Combine(root, name + ".apk");
+            using ZipArchive apk = ZipFile.Open(apkPath, ZipArchiveMode.Create);
+            ZipArchiveEntry identityEntry = apk.CreateEntry("assets/" +
+                positiveIdentityEntryRoot + "/build-identity.json",
+                CompressionLevel.NoCompression);
+            byte[] identityBytes = File.ReadAllBytes(positive.Identity);
+            if (tamperIdentity) identityBytes[^1] ^= 0x5a;
+            using (Stream output = identityEntry.Open())
+                output.Write(identityBytes, 0, identityBytes.Length);
+            foreach (string source in Directory.GetFiles(positiveEmbeddedBase,
+                         "*.mv.bytes", SearchOption.TopDirectoryOnly))
+            {
+                ZipArchiveEntry entry = apk.CreateEntry("assets/" +
+                    positiveBaseMetaVersionAssetRoot.Trim('/') + "/" +
+                    Path.GetFileName(source), CompressionLevel.NoCompression);
+                using Stream output = entry.Open();
+                using FileStream input = File.OpenRead(source);
+                input.CopyTo(output);
+            }
+            return apkPath;
+        }
+
+        string positiveApk = CreateAndroidApk("android-base-positive", false);
+        bool androidApkBound = false;
+        try
+        {
+            using MaterializedAndroidApkBase materialized =
+                MaterializedAndroidApkBase.Create(positiveApk,
+                    positiveRuntimeAssetRoot, positiveBaseMetaVersionAssetRoot,
+                    positive.Identity);
+            JsonElement positiveIdentity = ReadJson<JsonElement>(positive.Identity);
+            string positiveBaseId = GetString(positiveIdentity, "baseId") ?? string.Empty;
+            JsonElement selectedBase = positiveManifest.GetProperty("supportedBases")
+                .EnumerateArray().Single(item => string.Equals(GetString(item, "baseId"),
+                    positiveBaseId, StringComparison.OrdinalIgnoreCase));
+            (string BaseId, string SetSha256) validated =
+                ValidateEmbeddedBaseMetaVersionSet(materialized.MaterializedRoot,
+                    positiveManifest, positiveIdentity, selectedBase);
+            androidApkBound = validated.BaseId == positiveBaseId &&
+                string.Equals(validated.SetSha256,
+                    GetString(positiveIdentity, "baseMetaVersionSetSha256"),
+                    StringComparison.OrdinalIgnoreCase) &&
+                materialized.LogicalRoot.Contains("!/assets/", StringComparison.Ordinal) &&
+                string.Equals(materialized.ArtifactSha256, Sha256File(positiveApk),
+                    StringComparison.OrdinalIgnoreCase);
+        }
+        catch
+        {
+            androidApkBound = false;
+        }
+        AddRegressionCheck(checks, errors, "resource-stage-android-apk-base-bound",
+            androidApkBound,
+            "APK staging must bind its embedded BuildIdentity and Base MetaVersion set without modifying the APK");
+
+        bool androidApkTamperRejected;
+        string tamperedApk = CreateAndroidApk("android-base-identity-tamper", true);
+        try
+        {
+            using MaterializedAndroidApkBase _ = MaterializedAndroidApkBase.Create(
+                tamperedApk, positiveRuntimeAssetRoot,
+                positiveBaseMetaVersionAssetRoot, positive.Identity);
+            androidApkTamperRejected = false;
+        }
+        catch (DheException)
+        {
+            androidApkTamperRejected = true;
+        }
+        AddRegressionCheck(checks, errors,
+            "resource-stage-android-apk-tamper-rejected",
+            androidApkTamperRejected,
+            "APK staging must reject an embedded BuildIdentity that differs from the archived Base identity");
         bool releaseLedgerBound = false;
         try
         {
@@ -4762,8 +4900,6 @@ internal static partial class Program
             activeWorkflowTamperRejected,
             "a hash-rebound active Base workflow change must fail parent lineage validation.");
 
-        string positiveRuntimeAssetRoot = RequirePortableAssetRoot(
-            GetString(positiveManifest, "runtimeAssetRoot"), "runtimeAssetRoot");
         JsonElement[] positiveAotMetadata = positiveManifest.GetProperty("aotMetadataSets")
             .EnumerateArray()
             .SelectMany(set => set.GetProperty("assemblies").EnumerateArray())
