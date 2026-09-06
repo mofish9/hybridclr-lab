@@ -72,6 +72,7 @@ internal static partial class Program
         "resource-release-aggregate-gate",
         "channel-state-cas-workflow",
         "evidence-portable-mixed-toolchain-authorities",
+        "evidence-immediate-predecessor-authorized",
         "resource-player-legacy-single-payload-compatibility",
         "resource-player-assembly-mode-binding",
         "resource-player-interpreter-only-update",

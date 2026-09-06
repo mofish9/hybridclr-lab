@@ -1551,6 +1551,17 @@ internal static partial class Program
         if (!string.IsNullOrWhiteSpace(packageRoot))
         {
             packageRoot = RequireDirectory(packageRoot, "Regression package");
+            PackageInspection predecessorCandidate = InspectPackage(packageRoot, null, false);
+            bool predecessorAuthorized = predecessorCandidate.Passed &&
+                IsHex(predecessorCandidate.PackageId, 64, 64) &&
+                HasImmediatePredecessorAuthority(
+                    predecessorCandidate.ToolchainVersion ?? string.Empty,
+                    ReadEvidenceAuthoritySet(packageRoot, packageRoot,
+                        predecessorCandidate.PackageId!));
+            AddRegressionCheck(checks, errors,
+                "evidence-immediate-predecessor-authorized", predecessorAuthorized,
+                "a successor toolchain must authorize its immediately preceding Release " +
+                "for long-lived Base evidence");
             var requireReleaseRejected = VerifyPackage(new Cli("verify-package", new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase)
             { ["packageroot"] = packageRoot, ["requirerelease"] = "true" })) != 0;
             AddRegressionCheck(checks, errors, "verify-require-release", requireReleaseRejected,
@@ -1597,6 +1608,9 @@ internal static partial class Program
         }
         else
         {
+            AddRegressionCheck(checks, errors,
+                "evidence-immediate-predecessor-authorized", false,
+                "PackageRoot is required for predecessor authority validation.");
             foreach (var name in new[] { "verify-require-release", "verify-expected-id", "verify-package-id-recompute",
                          "verify-extra-source", "verify-release-bit-tamper" })
                 AddRegressionCheck(checks, errors, name, false, "PackageRoot is required for production regression.");

@@ -30,6 +30,14 @@ so its SHA-256 contributes to the current package ID. The current package does n
 authorize itself through the list; `-ExpectedToolchainPackageId` remains the
 external trust pin for the publisher.
 
+Before publishing a successor toolchain, add every preceding official Release
+package that may have built a still-online Base. In particular, the immediately
+preceding package must move from `current-package` authority in its own release to
+`authorized-historical-package` authority in the successor. Omitting it creates
+an upgrade gap even when the runtime contract is unchanged. Published package
+directories and Package IDs are immutable; a missed authority is corrected by a
+new toolchain version, never by rewriting the earlier manifest.
+
 For every `resource-player-workflow` report, `resource-release-gate` applies one
 of three modes:
 

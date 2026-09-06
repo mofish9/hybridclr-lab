@@ -114,6 +114,18 @@ internal static partial class Program
             part.All(char.IsDigit));
     }
 
+    private static bool HasImmediatePredecessorAuthority(string currentVersion,
+        EvidenceAuthoritySet authoritySet)
+    {
+        if (!System.Version.TryParse(currentVersion, out System.Version? parsed) ||
+            parsed == null || parsed.Build <= 0)
+            return false;
+        string predecessor = parsed.Major + "." + parsed.Minor + "." +
+            (parsed.Build - 1).ToString(System.Globalization.CultureInfo.InvariantCulture);
+        return authoritySet.Authorities.Values.Any(authority => string.Equals(
+            authority.ToolchainVersion, predecessor, StringComparison.Ordinal));
+    }
+
     private static void ValidateAuthorizedHistoricalPackage(EvidenceAuthority expected,
         PlayerToolchainAuthority actual)
     {
