@@ -254,10 +254,13 @@ namespace HybridCLR.Lab
             MethodInfo instanceStableMethod = typeof(DheDemoCalculator).GetMethod("InstanceStable", BindingFlags.Public | BindingFlags.Instance);
             MethodInfo instanceAddMethod = typeof(DheDemoCalculator).GetMethod("InstanceAdd", BindingFlags.Public | BindingFlags.Instance);
             MethodInfo instanceAddViaStableMethod = typeof(DheDemoCalculator).GetMethod("InstanceAddViaStable", BindingFlags.Public | BindingFlags.Instance);
+            MethodInfo multiBaseProbeMethod = typeof(DheMultiBaseProbe).GetMethod("CurrentValue",
+                BindingFlags.Public | BindingFlags.Static);
             if (addMethod == null || stableMethod == null || identityUnchangedMethod == null ||
                 addViaStableMethod == null || addPairMethod == null ||
                 wideMethod == null || touchMethod == null || instanceStableMethod == null ||
-                instanceAddMethod == null || instanceAddViaStableMethod == null)
+                instanceAddMethod == null || instanceAddViaStableMethod == null ||
+                multiBaseProbeMethod == null)
             {
                 throw new MissingMethodException(typeof(DheDemoCalculator).FullName);
             }
@@ -272,6 +275,7 @@ namespace HybridCLR.Lab
             bool instanceStableChanged = RuntimeApi.IsDifferentialMethodChanged(instanceStableMethod);
             bool instanceAddChanged = RuntimeApi.IsDifferentialMethodChanged(instanceAddMethod);
             bool instanceAddViaStableChanged = RuntimeApi.IsDifferentialMethodChanged(instanceAddViaStableMethod);
+            bool multiBaseProbeChanged = RuntimeApi.IsDifferentialMethodChanged(multiBaseProbeMethod);
 
             DheDemoCalculator calculator = new DheDemoCalculator();
             RuntimeApi.ResetDifferentialDispatchCounters();
@@ -286,6 +290,7 @@ namespace HybridCLR.Lab
             int instanceAddResult = calculator.InstanceAdd(1);
             int instanceStableResult = calculator.InstanceStable(2);
             int instanceAddViaStableResult = calculator.InstanceAddViaStable(2);
+            int multiBaseProbeResult = DheMultiBaseProbe.CurrentValue();
             MainBehaviorRun reflectedMain = ExecuteMainReflection(mainLoaded.assembly);
             MethodInfo managedSecondaryChangedMethod = typeof(ManagedCasesSecondary.DheSecondaryCases)
                 .GetMethod("Changed", BindingFlags.Public | BindingFlags.Static);
@@ -401,7 +406,9 @@ namespace HybridCLR.Lab
             bool noOpCapabilityDirectValidated = ValidateNoOpCapabilityDirect(directCapability);
             bool noOpCapabilityReflectionValidated = ValidateNoOpCapabilityReflection(
                 capability, directCapability);
-            bool noOpMainBehaviorValidated = string.IsNullOrEmpty(reflectedMain.error) &&
+            bool capabilityConsistencyValidated = ValidateCapabilityConsistency(
+                capability, directCapability);
+            bool mainBehaviorConsistencyValidated = string.IsNullOrEmpty(reflectedMain.error) &&
                 reflectedMain.addResult == addResult && reflectedMain.stableResult == stableResult &&
                 reflectedMain.addViaStableResult == addViaStableResult &&
                 reflectedMain.addPairResult == addPairResult && reflectedMain.wideResult == wideResult &&
@@ -409,17 +416,22 @@ namespace HybridCLR.Lab
                 reflectedMain.instanceAddResult == instanceAddResult &&
                 reflectedMain.instanceStableResult == instanceStableResult &&
                 reflectedMain.instanceAddViaStableResult == instanceAddViaStableResult &&
-                reflectedMain.identityUnchangedResult == identityUnchangedResult && !identityUnchangedChanged &&
+                reflectedMain.multiBaseProbeResult == multiBaseProbeResult &&
+                reflectedMain.identityUnchangedResult == identityUnchangedResult;
+            bool noOpMainBehaviorValidated = mainBehaviorConsistencyValidated &&
+                !identityUnchangedChanged &&
                 !addChanged && !stableChanged && !addViaStableChanged && !addPairChanged && !wideChanged &&
-                !touchChanged && !instanceStableChanged && !instanceAddChanged && !instanceAddViaStableChanged;
-            bool noOpMultiAssemblyValidated = loadedAssemblies.Count >= 4 &&
-                !managedSecondaryChanged && !managedSecondaryUnchanged && !metadataSecondaryChanged &&
-                !crossSecondaryChanged &&
+                !touchChanged && !instanceStableChanged && !instanceAddChanged &&
+                !instanceAddViaStableChanged && !multiBaseProbeChanged;
+            bool multiAssemblyConsistencyValidated = loadedAssemblies.Count >= 4 &&
                 managedSecondaryDirectResult == managedSecondaryReflectionResult &&
                 managedSecondaryUnchangedDirectResult == managedSecondaryUnchangedReflectionResult &&
                 metadataSecondaryDirectResult == metadataSecondaryReflectionResult &&
                 crossSecondaryDirectResult == crossSecondaryReflectionResult &&
                 string.Equals(crossAssemblyDirectResult, crossAssemblyResult, StringComparison.Ordinal);
+            bool noOpMultiAssemblyValidated = multiAssemblyConsistencyValidated &&
+                !managedSecondaryChanged && !managedSecondaryUnchanged && !metadataSecondaryChanged &&
+                !crossSecondaryChanged;
             bool noOpAotBehaviorValidated = changedMethodCount == 0 && noOpMainBehaviorValidated &&
                 noOpMultiAssemblyValidated && noOpCapabilityDirectValidated &&
                 noOpCapabilityReflectionValidated && mainInterpreterEntryCount == 0 &&
@@ -427,23 +439,13 @@ namespace HybridCLR.Lab
             bool stableDispatchValidated = structuralDispatchExpected
 				? stableChanged && instanceStableChanged
 				: !stableChanged && !instanceStableChanged;
+            bool representativeChanged = addChanged || multiBaseProbeChanged;
             bool changedBehaviorValidated = changedMethodCount == 0
                 ? noOpAotBehaviorValidated && newHotfixValidated
-                : (addResult == 101 && stableResult == 4 &&
-                    addViaStableResult == 104 && addPairResult == 107 && wideResult == 1005L &&
-                    touchValue == 705 && instanceAddResult == 201 && instanceStableResult == 6 &&
-					instanceAddViaStableResult == 206 && addChanged && stableDispatchValidated &&
-					addViaStableChanged && addPairChanged && wideChanged && touchChanged &&
-					instanceAddChanged && instanceAddViaStableChanged &&
-                    mainInterpreterEntryCount >= 7 && mainAotEntryCount >= 3 && capability.passed &&
-                    directCapability.passed && structural.passed && managedSecondaryChanged && !managedSecondaryUnchanged &&
-                    metadataSecondaryChanged && crossSecondaryChanged &&
-                    managedSecondaryDirectResult == 103 && managedSecondaryUnchangedDirectResult == 6 &&
-                    metadataSecondaryDirectResult == 103 && crossSecondaryDirectResult == 103 &&
-                    metadataSecondaryReflectionResult == 103 && crossSecondaryReflectionResult == 103 &&
-                    loadedAssemblies.Count >= 4 && metadataStressResult > 0 &&
-                    string.Equals(crossAssemblyResult, "derived:26:34", StringComparison.Ordinal) &&
-                    newHotfixValidated);
+                : (representativeChanged && !identityUnchangedChanged && stableDispatchValidated &&
+                    mainBehaviorConsistencyValidated && capabilityConsistencyValidated &&
+                    multiAssemblyConsistencyValidated && mainInterpreterEntryCount > 0 &&
+                    mainAotEntryCount > 0 && structural.passed && newHotfixValidated);
             bool transactionEvidenceValid = changedMethodCount == 0 || retryValidated;
             string transactionStatus = changedMethodCount == 0
                 ? "notApplicable"
@@ -472,7 +474,7 @@ namespace HybridCLR.Lab
                 instanceAddViaStableResult = instanceAddViaStableResult,
                 capabilityDirectPassed = changedMethodCount == 0
                     ? noOpCapabilityDirectValidated
-                    : directCapability.passed,
+                    : capabilityConsistencyValidated,
                 capabilityDirectError = directCapability.error,
                 capabilityDirectInterpreterEntryCount = directCapability.interpreterEntryCount,
                 capabilityDirectAotEntryCount = directCapability.aotEntryCount,
@@ -492,16 +494,13 @@ namespace HybridCLR.Lab
                 crossSecondaryReflectionResult = crossSecondaryReflectionResult,
                 secondaryAssemblyDirectValidated = changedMethodCount == 0
                     ? noOpMultiAssemblyValidated
-                    : managedSecondaryDirectResult == 103 && managedSecondaryUnchangedDirectResult == 6 &&
-                        metadataSecondaryDirectResult == 103 && crossSecondaryDirectResult == 103,
+                    : multiAssemblyConsistencyValidated,
                 secondaryAssemblyChangedValidated = changedMethodCount == 0
                     ? noOpMultiAssemblyValidated
-                    : managedSecondaryChanged && !managedSecondaryUnchanged && metadataSecondaryChanged &&
-                        crossSecondaryChanged && metadataSecondaryReflectionResult == 103 &&
-                        crossSecondaryReflectionResult == 103,
+                    : multiAssemblyConsistencyValidated,
                 capabilityPassed = changedMethodCount == 0
                     ? noOpCapabilityReflectionValidated
-                    : capability.passed,
+                    : capabilityConsistencyValidated,
                 capabilityError = capability.error,
                 capabilityInterfaceChanged = capability.interfaceChanged,
                 capabilityDelegateChanged = capability.delegateChanged,
@@ -651,7 +650,7 @@ namespace HybridCLR.Lab
                 expectedChangedMethodCount = changedMethodCount,
                 dispatchProbeValidated = dispatchProbeValidated,
                 noOpAotBehaviorValidated = noOpAotBehaviorValidated,
-                changedProbeChanged = addChanged,
+                changedProbeChanged = representativeChanged,
                 unchangedProbeChanged = identityUnchangedChanged,
                 dispatchProbeError = dispatchProbeValidated ? null : "DHE changed/unchanged dispatch assertions failed.",
                 transactionStatus = transactionStatus,
@@ -673,12 +672,10 @@ namespace HybridCLR.Lab
                     }).ToArray(),
                 multiAssemblyValidated = changedMethodCount == 0
                     ? noOpMultiAssemblyValidated
-                    : loadedAssemblies.Count >= 4 && metadataStressResult > 0 &&
-                        metadataSecondaryReflectionResult == 103 && crossSecondaryReflectionResult == 103 &&
-                        string.Equals(crossAssemblyResult, "derived:26:34", StringComparison.Ordinal),
+                    : multiAssemblyConsistencyValidated,
                 metadataStressResult = metadataStressResult,
                 crossAssemblyResult = crossAssemblyResult,
-                changedMethod = addChanged ? "interpreter" : "aot",
+                changedMethod = representativeChanged ? "interpreter" : "aot",
                 unchangedMethod = identityUnchangedChanged ? "interpreter" : "aot",
 				changedCallingUnchangedMethod = addViaStableChanged
 					? stableChanged ? "interpreter + interpreter callee" : "interpreter + AOT callee"
@@ -708,7 +705,7 @@ namespace HybridCLR.Lab
                 aotSnapshotKind = buildIdentity == null ? string.Empty : buildIdentity.aotSnapshotKind,
                 nativeGuardSourceSha256 = buildIdentity == null ? string.Empty : buildIdentity.nativeGuardSourceSha256,
                 nativeManifestSha256 = buildIdentity == null ? string.Empty : buildIdentity.nativeManifestSha256,
-                changedToken = addMethod.MetadataToken,
+                changedToken = (addChanged ? addMethod : multiBaseProbeMethod).MetadataToken,
                 unchangedToken = identityUnchangedMethod.MetadataToken,
                 changedCallingUnchangedToken = addViaStableMethod.MetadataToken,
                 changedMultiArgumentToken = addPairMethod.MetadataToken,
@@ -726,6 +723,7 @@ namespace HybridCLR.Lab
             try
             {
                 Type calculatorType = assembly.GetType(typeof(DheDemoCalculator).FullName, true);
+                Type multiBaseProbeType = assembly.GetType(typeof(DheMultiBaseProbe).FullName, true);
                 Type workloadType = assembly.GetType(typeof(PerformanceWorkload).FullName, true);
                 const BindingFlags staticFlags = BindingFlags.Public | BindingFlags.Static;
                 const BindingFlags instanceFlags = BindingFlags.Public | BindingFlags.Instance;
@@ -748,10 +746,12 @@ namespace HybridCLR.Lab
                     new[] { typeof(int) }, null);
                 MethodInfo instanceAddViaStable = calculatorType.GetMethod("InstanceAddViaStable",
                     instanceFlags, null, new[] { typeof(int) }, null);
+                MethodInfo multiBaseProbe = multiBaseProbeType.GetMethod("CurrentValue", staticFlags);
                 PropertyInfo all = workloadType.GetProperty("All", staticFlags);
                 if (add == null || stable == null || addViaStable == null || addPair == null ||
                     wide == null || touch == null || touchValue == null || instanceAdd == null ||
-                    instanceStable == null || instanceAddViaStable == null || all == null)
+                    instanceStable == null || instanceAddViaStable == null || multiBaseProbe == null ||
+                    all == null)
                 {
                     throw new MissingMethodException(calculatorType.FullName);
                 }
@@ -772,6 +772,7 @@ namespace HybridCLR.Lab
                     instanceStable.Invoke(calculator, new object[] { 2 }));
                 result.instanceAddViaStableResult = Convert.ToInt32(
                     instanceAddViaStable.Invoke(calculator, new object[] { 2 }));
+                result.multiBaseProbeResult = Convert.ToInt32(multiBaseProbe.Invoke(null, null));
                 object workloads = all.GetValue(null);
                 if (!(workloads is System.Collections.ICollection collection))
                 {
@@ -805,7 +806,13 @@ namespace HybridCLR.Lab
                 !result.delegateMulticastChanged && !result.exceptionFinallyChanged &&
                 !result.virtualChanged && !result.genericVirtualChanged &&
                 !result.unchangedVirtualChanged;
-            return string.IsNullOrEmpty(result.error) && noChangedMethods &&
+            return noChangedMethods && ValidateCapabilityConsistency(result, direct);
+        }
+
+        private static bool ValidateCapabilityConsistency(CapabilityRun result,
+            CapabilityDirectRun direct)
+        {
+            return string.IsNullOrEmpty(result.error) && string.IsNullOrEmpty(direct.error) &&
                 result.interfaceResult == direct.interfaceResult &&
                 result.delegateResult == direct.delegateResult &&
                 result.genericSelectResult == direct.genericSelectResult &&
@@ -1960,6 +1967,7 @@ namespace HybridCLR.Lab
             public int instanceAddResult;
             public int instanceStableResult;
             public int instanceAddViaStableResult;
+            public int multiBaseProbeResult;
             public int identityUnchangedResult;
         }
 

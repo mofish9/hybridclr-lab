@@ -656,6 +656,11 @@ transaction status is `notApplicable`. The Player must also set
 against equivalent reflection calls, the complete multi-assembly scope, a
 positive AOT entry count, and the absence of interpreter dispatch. The no-op
 gate must not encode business-result constants from the first Base generation.
+Changed-player validation follows the same rule: the project selects and invokes
+an actually changed probe, keeps an unchanged AOT control, and validates its own
+business oracle. Core DHE evidence checks dispatch, direct/reflection consistency,
+multi-assembly execution, structural capability, and transaction rollback without
+assuming that every later payload has one fixed set of changed methods or results.
 
 Publishing the toolchain itself in `-Mode Release` requires
 `-ReleaseEvidence <report>`. Generate it from a clean source identity with the

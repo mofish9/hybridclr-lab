@@ -169,11 +169,15 @@ internal static class LabCommands
         if (!variant.Equals("default", StringComparison.OrdinalIgnoreCase) &&
             !variant.Equals("base2", StringComparison.OrdinalIgnoreCase) &&
             !variant.Equals("current", StringComparison.OrdinalIgnoreCase) &&
+            !variant.Equals("current-base2", StringComparison.OrdinalIgnoreCase) &&
             !variant.Equals("structural", StringComparison.OrdinalIgnoreCase))
             throw new InvalidOperationException(
-                "build-managed-cases -Variant must be default, base2, current, or structural.");
+                "build-managed-cases -Variant must be default, base2, current, current-base2, or structural.");
         var isCurrent = variant.Equals("current", StringComparison.OrdinalIgnoreCase) ||
+            variant.Equals("current-base2", StringComparison.OrdinalIgnoreCase) ||
             variant.Equals("structural", StringComparison.OrdinalIgnoreCase);
+        var isBase2 = variant.Equals("base2", StringComparison.OrdinalIgnoreCase) ||
+            variant.Equals("current-base2", StringComparison.OrdinalIgnoreCase);
         var isStructural = variant.Equals("structural", StringComparison.OrdinalIgnoreCase);
         GenerateTestManifest(new Cli("generate-test-manifest", new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase) { ["labroot"] = lab }));
         GenerateMetadataStressSource(new Cli("generate-metadata-stress-source", new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase) { ["labroot"] = lab }));
@@ -197,6 +201,7 @@ internal static class LabCommands
         {
             targetDefine,
             isCurrent ? "DHE_CURRENT" : string.Empty,
+            isBase2 ? "DHE_BASE2" : string.Empty,
             isStructural ? "DHE_STRUCTURE_CURRENT" : string.Empty,
         }.Where(value => !string.IsNullOrWhiteSpace(value)));
         var projects = new[]
@@ -229,8 +234,9 @@ internal static class LabCommands
 			"--output", aotOutput, "--nologo", "--no-incremental", "-v:minimal" };
         if (isCurrent)
             aotArgs.Add("-p:DefineConstants=HYBRIDCLR_AOT_BENCHMARK%3BDHE_CURRENT" +
+                (isBase2 ? "%3BDHE_BASE2" : string.Empty) +
                 (isStructural ? "%3BDHE_STRUCTURE_CURRENT" : string.Empty));
-        else if (variant.Equals("base2", StringComparison.OrdinalIgnoreCase))
+        else if (isBase2)
             aotArgs.Add("-p:DefineConstants=HYBRIDCLR_AOT_BENCHMARK%3BDHE_BASE2");
 		else
 			aotArgs.Add("-p:DefineConstants=HYBRIDCLR_AOT_BENCHMARK");
