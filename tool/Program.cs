@@ -2399,6 +2399,13 @@ internal static partial class Program
         {
             Path.GetFullPath(sourceRoot),
         };
+        string[] configuredEvidenceRoots = cli.GetList("evidencetoolchainroots")
+            .Select(path => RequireDirectory(path, "Historical evidence toolchain package"))
+            .Select(Path.GetFullPath)
+            .Distinct(StringComparer.OrdinalIgnoreCase)
+            .ToArray();
+        foreach (string root in configuredEvidenceRoots)
+            managedContractRoots.Add(root);
         foreach (JsonElement item in files.EnumerateArray())
         {
             string? role = GetString(item, "role");
@@ -2414,7 +2421,8 @@ internal static partial class Program
             if (!Sha256File(full).Equals(expected, StringComparison.OrdinalIgnoreCase))
                 throw new DheException("Release evidence file hash mismatch: " + path);
             JsonElement managedReport = ReadJson<JsonElement>(full);
-            managedContractRoots.Add(ResolveManagedEvidenceContractRoot(managedReport, full));
+            managedContractRoots.Add(ResolveManagedEvidenceContractRoot(managedReport, full,
+                managedContractRoots));
         }
         foreach (var item in files.EnumerateArray())
         {
