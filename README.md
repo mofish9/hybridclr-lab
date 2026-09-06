@@ -139,6 +139,10 @@ overlay/device gate and cross-target staging contract. The r5 candidate appends
 three Android Bases to the six Windows Bases, but remains unpromoted until
 Android Player evidence is available; see
 `docs/HybridCLR-DHE-Opt4-Post-Release-R5-Cross-Target.md`.
+The subsequent r6 and r7 runs derived consecutive current payloads without
+rebuilding any Base; r7 reused registry revision 6 and staged the update for all
+nine Bases. See
+`docs/HybridCLR-DHE-Opt4-Post-Release-R7-Consecutive-Cross-Target.md`.
 Base identity now also binds `engineWorkflow` and `il2cppCodeGeneration`.
 Unity 2021 is locked to `OptimizeSpeed`; Unity 2022 FGS and Tuanjie 2022 FGS
 are locked to `OptimizeSize`. Base evidence created before these fields existed
