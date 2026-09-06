@@ -133,7 +133,7 @@ then passed all ten Windows Players and advanced the protected lab channel with
 exact ten-Base coverage. See
 `docs/HybridCLR-DHE-Opt4-Post-Release-Ten-Base-Lifecycle.md`.
 The current C# package is `HybridCLRDhe-0.1.32-opt4.20`, based on the clean
-`c108d87` source line. It retains the Android APK overlay/device gate and
+`0e7fd9d` source line. It retains the Android APK overlay/device gate and
 cross-target staging contract, and adds a target-independent iOS Xcode-export
 artifact gate. The iOS gate validates the exported `.xcodeproj`, `project.pbxproj`,
 `Classes`, `Libraries`, `Data`, and a canonical directory hash before evidence is

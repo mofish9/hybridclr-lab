@@ -2,7 +2,7 @@
 
 ## Scope
 
-Commit `c108d87` adds an offline integrity gate for the iOS leg of the DHE
+Commit `0e7fd9d` adds an offline integrity gate for the iOS leg of the DHE
 workflow. Unity iOS output is an Xcode project directory, so an ordinary
 `BuildReport` is not enough to prove that the native finalization handoff is
 complete.
