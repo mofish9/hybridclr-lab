@@ -32,7 +32,8 @@ internal static partial class Program
         BaseRegistryEntry[] Entries,
         BaseRegistryRetirement[] RetiredBases);
 
-    private static BaseRegistryDocument ReadBaseRegistry(string path)
+    private static BaseRegistryDocument ReadBaseRegistry(string path,
+        bool requireArtifacts = true)
     {
         string sourcePath = RequireFile(path, "DHE Base registry");
         JsonElement document = ReadJson<JsonElement>(sourcePath);
@@ -86,11 +87,11 @@ internal static partial class Program
                 throw new DheException("DHE Base registry contains an invalid label.");
 
             string baselineRoot = ResolveBaseRegistryPath(item, "baselineRoot", registryDirectory,
-                pathSemantics, requireDirectory: true);
+                pathSemantics, requireDirectory: true, requireArtifacts: requireArtifacts);
             string nativeManifest = ResolveBaseRegistryPath(item, "nativeManifest", registryDirectory,
-                pathSemantics, requireDirectory: false);
+                pathSemantics, requireDirectory: false, requireArtifacts: requireArtifacts);
             string buildIdentity = ResolveBaseRegistryPath(item, "buildIdentity", registryDirectory,
-                pathSemantics, requireDirectory: false);
+                pathSemantics, requireDirectory: false, requireArtifacts: requireArtifacts);
             if (!buildIdentityPaths.Add(buildIdentity))
                 throw new DheException("DHE Base registry reuses one build identity path for multiple entries.");
 
@@ -102,7 +103,8 @@ internal static partial class Program
                     string.IsNullOrWhiteSpace(metadataValue.GetString()))
                     throw new DheException("DHE Base registry aotMetadataRoot must be a path or null.");
                 aotMetadataRoot = ResolveBaseRegistryPath(item, "aotMetadataRoot",
-                    registryDirectory, pathSemantics, requireDirectory: true);
+                    registryDirectory, pathSemantics, requireDirectory: true,
+                    requireArtifacts: requireArtifacts);
             }
 
             entries.Add(new BaseRegistryEntry(baseId, engineWorkflow, payloadVariantId, label, baselineRoot,
@@ -163,7 +165,11 @@ internal static partial class Program
             throw new DheException(
                 "Base registry revision 2 or later requires PreviousBaseRegistry.");
 
-        BaseRegistryDocument previous = ReadBaseRegistry(previousPath);
+        // The parent file in a published resource is an authenticated identity
+        // copy. Its artifact paths are relative to the original registry and
+        // need not exist beside that relocated audit copy.
+        BaseRegistryDocument previous = ReadBaseRegistry(previousPath,
+            requireArtifacts: false);
         if (!string.Equals(current.RegistryId, previous.RegistryId, StringComparison.Ordinal) ||
             current.Revision != previous.Revision + 1 ||
             !string.Equals(current.ParentRegistrySha256, previous.Sha256,
@@ -251,7 +257,8 @@ internal static partial class Program
     }
 
     private static string ResolveBaseRegistryPath(JsonElement entry, string property,
-        string registryDirectory, string pathSemantics, bool requireDirectory)
+        string registryDirectory, string pathSemantics, bool requireDirectory,
+        bool requireArtifacts)
     {
         string raw = GetString(entry, property) ?? string.Empty;
         if (string.IsNullOrWhiteSpace(raw) || raw.IndexOf('\0') >= 0)
@@ -264,10 +271,13 @@ internal static partial class Program
             throw new DheException("DHE Base registry " + property +
                 " must be an absolute workspace path.");
         string resolved = Path.GetFullPath(rooted ? raw : Path.Combine(registryDirectory, raw));
-        if (requireDirectory)
-            RequireDirectory(resolved, "DHE Base registry " + property);
-        else
-            RequireFile(resolved, "DHE Base registry " + property);
+        if (requireArtifacts)
+        {
+            if (requireDirectory)
+                RequireDirectory(resolved, "DHE Base registry " + property);
+            else
+                RequireFile(resolved, "DHE Base registry " + property);
+        }
         return resolved;
     }
 }
