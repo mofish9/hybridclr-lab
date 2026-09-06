@@ -84,6 +84,14 @@ rerun against the unchanged locked runtime and each reports `passed=true`,
   GC, and unsupported field-storage changes remain fail-closed and require a new
   Base Player.
 
+## Post-release additive evidence
+
+The released 0.1.30 package subsequently requalified the same resource payload
+on six distinct Windows Base Players across all three engine workflows. See
+`docs/HybridCLR-DHE-Opt4-Post-Release-Multi-Base-Player-Rerun.md`. This additive
+rerun does not alter the package identity or replace the original release
+evidence, and it does not stand in for Android or iOS device gates.
+
 ## Rollback
 
 Before adoption, pin the 0.1.28 Package ID
