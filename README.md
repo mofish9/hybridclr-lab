@@ -6,8 +6,8 @@ HybridCLR community runtime on Tuanjie 1.10.0.
 ## Fixed baseline
 
 - Tuanjie: `1.10.0` (`2022.3.62t12`)
-- HybridCLR package: `v8.13.0` (`22fb364`, tree
-  `89C676E9CF77083776DA66F9F05A02F0E8CA981824970165556B93079862C23A`,
+- HybridCLR package: `v8.13.0` (`18abd01`, canonical tree
+  `1C6BD0ED1EDF4F3A7DD30747C789790B4076AFA135FEE40039889BD976F5C9CF`,
   no package opt tag), published on `optimize/v8.13.0`.
 - HybridCLR runtime: `v8.13.0-opt4.2` (`fe3b1ed`)
 - il2cpp_plus: `v2022-tuanjie-8.13.0-opt4.1` (`52968ad`)
@@ -24,11 +24,12 @@ Its formal entry points, generated-output boundary, and complete four-assembly
 Player evidence are documented in
 `docs/HybridCLR-DHE-Toolchain.md`,
 `docs/HybridCLR-DHE-Workflow-Review.md` and
-`docs/HybridCLR-DHE-Formal-Project-Validation.md`. Toolchain `0.1.27` is the
+`docs/HybridCLR-DHE-Formal-Project-Validation.md`. Toolchain `0.1.28` is the
 current conditionally accepted source and three-engine Windows release; its exact
 evidence and remaining platform gates are recorded in
-`docs/HybridCLR-DHE-Opt4-Release-0.1.27.md`. Toolchains `0.1.18`, `0.1.20`,
-`0.1.21`, `0.1.22`, `0.1.23`, `0.1.24`, `0.1.25`, and `0.1.26` are retained as historical evidence. Projects must install an
+`docs/HybridCLR-DHE-Opt4-Release-0.1.28.md`. Toolchains `0.1.18`, `0.1.20`,
+`0.1.21`, `0.1.22`, `0.1.23`, `0.1.24`, `0.1.25`, `0.1.26`, and `0.1.27`
+are retained as historical evidence. Projects must install an
 authenticated package whose manifest has `releaseReady=true` and pin its exact
 package ID.
 Toolchain `0.1.20` replaces generated-function
@@ -97,6 +98,16 @@ both interpreter and AOT dispatch, and the protected channel advanced from
 revision 2 to 3 with exact six-Base coverage. The clean regression passed
 122/122 checks and now validates immutable genesis evidence independently from
 the latest N-1 to N release pair.
+Toolchain `0.1.28` is the target-specific payload release. Its package ID is
+`b054796c7d97f8c6a7399e1d8b25fdb70fff664901f93248d5ab1afed32164fb`.
+One release can carry named managed payload variants, and every Base binds and
+stages only its selected variant and current assembly-set hash. Three of six
+Windows Base Players selected `windows`, three selected `android`, and all six
+passed dispatch and rollback/retry against two distinct payload hashes. The clean
+regression passed 128/128 checks. Three real Editors built ARM64 APKs and the
+current three-engine native CTest matrix passed, but Android device execution,
+iOS, macOS, CAT integration, and production performance/memory gates remain
+incomplete.
 Base identity now also binds `engineWorkflow` and `il2cppCodeGeneration`.
 Unity 2021 is locked to `OptimizeSpeed`; Unity 2022 FGS and Tuanjie 2022 FGS
 are locked to `OptimizeSize`. Base evidence created before these fields existed
