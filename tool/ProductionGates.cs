@@ -3230,14 +3230,16 @@ internal static partial class Program
                     "Cross-target regression requires at least one valid source payload variant.");
             JsonElement[] sourceAssemblies = sourceVariant.GetProperty("assemblies")
                 .EnumerateArray().ToArray();
-            if (sourceAssemblies.Length == 0 || sourceRegistry.Entries.Length < 2)
+            if (sourceAssemblies.Length < 2 || sourceRegistry.Entries.Length < 2)
                 throw new DheException(
-                    "Cross-target regression requires payload assemblies and at least two Bases.");
+                    "Cross-target regression requires at least two payload assemblies and two Bases.");
 
             string windowsRoot = Path.Combine(root, "current-windows");
             string androidRoot = Path.Combine(root, "current-android");
+            string tuanjieRoot = Path.Combine(root, "current-tuanjie");
             Directory.CreateDirectory(windowsRoot);
             Directory.CreateDirectory(androidRoot);
+            Directory.CreateDirectory(tuanjieRoot);
             foreach (JsonElement assembly in sourceAssemblies)
             {
                 string name = NormalizeName(GetString(assembly, "assemblyName") ?? string.Empty);
@@ -3247,6 +3249,7 @@ internal static partial class Program
                     name + " source current assembly");
                 File.Copy(source, Path.Combine(windowsRoot, name + ".dll"), true);
                 File.Copy(source, Path.Combine(androidRoot, name + ".dll"), true);
+                File.Copy(source, Path.Combine(tuanjieRoot, name + ".dll"), true);
             }
 
             string mutatedName = NormalizeName(GetString(sourceAssemblies[0],
@@ -3274,6 +3277,31 @@ internal static partial class Program
                 throw new DheException(
                     "Cross-target current fixtures are not metadata-stable and distinct.");
 
+            string tuanjieAssemblyName = NormalizeName(GetString(sourceAssemblies[1],
+                "assemblyName") ?? string.Empty);
+            string tuanjieAssembly = Path.Combine(tuanjieRoot, tuanjieAssemblyName + ".dll");
+            string tuanjieMutatedAssembly = Path.Combine(root, "tuanjie-mutated.dll");
+            WriteMutatedAssembly(tuanjieAssembly, tuanjieMutatedAssembly, module =>
+            {
+                MethodDef method = module.GetTypes().SelectMany(type => type.Methods)
+                    .Where(candidate => candidate.HasBody && !candidate.IsConstructor &&
+                        candidate.Body.Instructions.Count != 0 &&
+                        candidate.Body.ExceptionHandlers.Count == 0)
+                    .OrderBy(candidate => candidate.MDToken.Raw).First();
+                method.Body.Instructions.Insert(0, Instruction.Create(OpCodes.Nop));
+            });
+            File.Move(tuanjieMutatedAssembly, tuanjieAssembly, true);
+            ResourceUpdateCompatibility tuanjieCompatibility =
+                ResourceUpdateCompatibility.Analyze(
+                    MetaVersionSnapshot.Create(Path.Combine(windowsRoot,
+                        tuanjieAssemblyName + ".dll")),
+                    MetaVersionSnapshot.Create(tuanjieAssembly));
+            if (!tuanjieCompatibility.Compatible ||
+                tuanjieCompatibility.ChangedMethodCount == 0 ||
+                tuanjieCompatibility.ChangedExistingTypeCount != 0)
+                throw new DheException(
+                    "Tuanjie current fixture is not metadata-stable and distinct.");
+
             string[] assemblyNames = sourceAssemblies.Select(item => NormalizeName(
                     GetString(item, "assemblyName") ?? string.Empty))
                 .OrderBy(value => value, StringComparer.OrdinalIgnoreCase).ToArray();
@@ -3294,26 +3322,21 @@ internal static partial class Program
             File.WriteAllText(settingsPath, settingsText.ToString(),
                 new UTF8Encoding(false));
 
-            string[] baseTargets = sourceRegistry.Entries.Select(entry =>
-                GetString(ReadJson<JsonElement>(entry.BuildIdentity), "target") ??
-                string.Empty).ToArray();
-            bool hasAndroidBase = baseTargets.Contains("Android",
-                StringComparer.OrdinalIgnoreCase);
-            bool hasWindowsBase = baseTargets.Contains("StandaloneWindows64",
-                StringComparer.OrdinalIgnoreCase);
-            bool hasMixedWindowsAndroidBases = hasAndroidBase && hasWindowsBase;
-            string[] payloadVariantIds = sourceRegistry.Entries.Select((entry, index) =>
-            {
-                string target = baseTargets[index];
-                return hasMixedWindowsAndroidBases
-                    ? string.Equals(target, "Android", StringComparison.OrdinalIgnoreCase)
-                        ? "android" : "windows"
-                    : index % 2 == 0 ? "windows" : "android";
-            }).ToArray();
+            string[] payloadVariantIds = sourceRegistry.Entries.Select(entry =>
+                entry.EngineWorkflow switch
+                {
+                    "Unity2021Standard" => "windows",
+                    "Unity2022Fgs" => "android",
+                    "Tuanjie2022Fgs" => "tuanjie",
+                    _ => throw new DheException(
+                        "Cross-target regression encountered an unknown engine workflow: " +
+                        entry.EngineWorkflow),
+                }).ToArray();
             if (!payloadVariantIds.Contains("windows", StringComparer.OrdinalIgnoreCase) ||
-                !payloadVariantIds.Contains("android", StringComparer.OrdinalIgnoreCase))
+                !payloadVariantIds.Contains("android", StringComparer.OrdinalIgnoreCase) ||
+                !payloadVariantIds.Contains("tuanjie", StringComparer.OrdinalIgnoreCase))
                 throw new DheException(
-                    "Cross-target regression could not bind Bases to both payload variants.");
+                    "Cross-target regression could not bind all three engine payload variants.");
 
             string registryPath = Path.Combine(root, "dhe-base-registry.json");
             var registryArguments = new Dictionary<string, string>(
@@ -3342,6 +3365,7 @@ internal static partial class Program
             var variantRoots = new Dictionary<string, string>
             {
                 ["android"] = androidRoot,
+                ["tuanjie"] = tuanjieRoot,
             };
             if (ResourceUpdate(new Cli("resource-update", new Dictionary<string, string>(
                 StringComparer.OrdinalIgnoreCase)
@@ -3369,14 +3393,26 @@ internal static partial class Program
                 "currentAssemblySetSha256") ?? string.Empty;
             string androidSet = GetString(variantsById["android"],
                 "currentAssemblySetSha256") ?? string.Empty;
+            string tuanjieSet = GetString(variantsById["tuanjie"],
+                "currentAssemblySetSha256") ?? string.Empty;
+            bool engineVariantBinding = registry.Entries.All(entry =>
+                (entry.EngineWorkflow == "Unity2021Standard" && entry.PayloadVariantId == "windows") ||
+                (entry.EngineWorkflow == "Unity2022Fgs" && entry.PayloadVariantId == "android") ||
+                (entry.EngineWorkflow == "Tuanjie2022Fgs" && entry.PayloadVariantId == "tuanjie"));
             ReleaseLedgerDocument ledger = ReadReleaseLedger(RequireFile(Path.Combine(
                 releaseRoot, ReleaseLedgerFileName), "Cross-target release ledger"));
             releasePassed = string.Equals(GetString(manifest, "payloadModel"),
                     "variant-current-payload", StringComparison.Ordinal) &&
-                variantsById.Count == 2 && !variantsById.ContainsKey("default") &&
+                variantsById.Count == 3 && !variantsById.ContainsKey("default") &&
                 IsHex(windowsSet, 64, 64) && IsHex(androidSet, 64, 64) &&
+                IsHex(tuanjieSet, 64, 64) &&
                 !string.Equals(windowsSet, androidSet,
                     StringComparison.OrdinalIgnoreCase) &&
+                !string.Equals(windowsSet, tuanjieSet,
+                    StringComparison.OrdinalIgnoreCase) &&
+                !string.Equals(androidSet, tuanjieSet,
+                    StringComparison.OrdinalIgnoreCase) &&
+                engineVariantBinding &&
                 ledger.ActiveBaseCount == registry.Entries.Length &&
                 string.Equals(ledger.PayloadVariantSetSha256,
                     GetString(manifest, "payloadVariantSetSha256"),
@@ -3556,9 +3592,7 @@ internal static partial class Program
             }
             primaryVariantContractPassed = duplicatePrimaryRejected &&
                 invalidPrimaryRejected;
-            details = hasMixedWindowsAndroidBases
-                ? "one Release bound real Windows and Android Base identities to two distinct current payload variants"
-                : "one Release exercised two distinct current payload variants across the authenticated Windows Base matrix; Android Player identity remains a separate gate";
+            details = "one Release bound Unity 2021, Unity 2022, and Tuanjie 2022 Base identities to three distinct current payload variants";
         }
         catch (Exception exception)
         {
