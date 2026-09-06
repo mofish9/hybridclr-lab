@@ -24,11 +24,11 @@ Its formal entry points, generated-output boundary, and complete four-assembly
 Player evidence are documented in
 `docs/HybridCLR-DHE-Toolchain.md`,
 `docs/HybridCLR-DHE-Workflow-Review.md` and
-`docs/HybridCLR-DHE-Formal-Project-Validation.md`. Toolchain `0.1.26` is the
+`docs/HybridCLR-DHE-Formal-Project-Validation.md`. Toolchain `0.1.27` is the
 current conditionally accepted source and three-engine Windows release; its exact
 evidence and remaining platform gates are recorded in
-`docs/HybridCLR-DHE-Opt4-Release-0.1.26.md`. Toolchains `0.1.18`, `0.1.20`,
-`0.1.21`, `0.1.22`, `0.1.23`, `0.1.24`, and `0.1.25` are retained as historical evidence. Projects must install an
+`docs/HybridCLR-DHE-Opt4-Release-0.1.27.md`. Toolchains `0.1.18`, `0.1.20`,
+`0.1.21`, `0.1.22`, `0.1.23`, `0.1.24`, `0.1.25`, and `0.1.26` are retained as historical evidence. Projects must install an
 authenticated package whose manifest has `releaseReady=true` and pin its exact
 package ID.
 Toolchain `0.1.20` replaces generated-function
@@ -65,7 +65,7 @@ per active Base, the exact candidate and parent ledger heads, genesis versus
 continuation policy, payload variants, runtime identity, and Player dispatch
 before emitting a release-ready resource approval report. Its clean regression
 passes 119/119 checks.
-Toolchain `0.1.25` is the active protected-channel release. Its package ID is
+Toolchain `0.1.25` is the protected-channel release. Its package ID is
 `7f5998a95c8474b46b0eb9487d7369bc055f52bf05e3e9bc5087e7a9902eb44d`. A single
 SHA-256-pinned snapshot now drives resource construction and aggregate Player
 qualification, while promotion stores the resource and approval by content hash
@@ -75,7 +75,7 @@ two concurrent promoters, gate/snapshot tampering, orphan staging recovery, and
 post-commit snapshot-output recovery. Its `filesystem-cas-v1` guarantee requires
 filesystem support for exclusive handles and same-directory atomic rename;
 object stores require an equivalent conditional-write adapter.
-Toolchain `0.1.26` is the active portable evidence-authority release. Its package
+Toolchain `0.1.26` is the portable evidence-authority release. Its package
 ID is `b23759fccd900ba6f5ff6f250d75676c3b539f9af400ae2644412678183a3cf9`. Its authenticated
 `explicit-package-id-set-v1` manifest allows one resource release to revalidate
 active Base Players created by several explicitly named historical Release
@@ -88,6 +88,15 @@ historical packages actually referenced by its active Bases.
 The clean regression passed 121/121 checks. A formal five-Base gate used two
 relocated 0.1.20 packages, no `ValidationSourceRoot`, and promoted a state-bound
 revision 2 head with all five Players in `authorized-historical-package` mode.
+Toolchain `0.1.27` is the active Base-generation release. Its package ID is
+`3af3d63e986470de6556c6023c438374e030c240aea3c9f2b168c1a0837c76fc`.
+One current payload executed successfully on six Windows Base Players spanning
+two application generations: five historical Players reported 27 or 29 changed
+methods, while the new Unity 2021 Base reported only two. Every result retained
+both interpreter and AOT dispatch, and the protected channel advanced from
+revision 2 to 3 with exact six-Base coverage. The clean regression passed
+122/122 checks and now validates immutable genesis evidence independently from
+the latest N-1 to N release pair.
 Base identity now also binds `engineWorkflow` and `il2cppCodeGeneration`.
 Unity 2021 is locked to `OptimizeSpeed`; Unity 2022 FGS and Tuanjie 2022 FGS
 are locked to `OptimizeSize`. Base evidence created before these fields existed
