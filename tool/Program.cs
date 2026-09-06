@@ -93,6 +93,7 @@ internal static partial class Program
         "source-boundary-git-root-resolution", "git-relative-root-resolution",
         "unity-stale-lock-recovery",
         "android-device-smoke-contract",
+        "dhe-runner-provider-overlay",
         "native-universal-body-filter",
         "native-finalize-bee-graph-regeneration",
         "native-finalize-attempt-limit-rejected",

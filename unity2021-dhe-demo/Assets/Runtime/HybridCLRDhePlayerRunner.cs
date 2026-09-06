@@ -136,8 +136,8 @@ namespace HybridCLR.Lab
                 {
                     throw new InvalidDataException("DHE runtime plan contains duplicate assembly: " + assemblyPlan.assemblyName);
                 }
-                byte[] assemblyCurrent = DheStreamingAssetReader.Read(assemblyPlan.current);
-                byte[] assemblyCurrentMv = DheStreamingAssetReader.Read(assemblyPlan.currentMetaVersion);
+                byte[] assemblyCurrent = provider.LoadBytes(assemblyPlan.current);
+                byte[] assemblyCurrentMv = provider.LoadBytes(assemblyPlan.currentMetaVersion);
                 bool interpreterOnly = string.Equals(assemblyPlan.executionMode,
                     "interpreter-only", StringComparison.Ordinal);
                 if (!interpreterOnly && !string.Equals(assemblyPlan.executionMode,
@@ -155,7 +155,7 @@ namespace HybridCLR.Lab
                     if (string.IsNullOrWhiteSpace(assemblyPlan.baseMetaVersion))
                         throw new InvalidDataException("DHE differential assembly has no Base MetaVersion: " +
                             assemblyPlan.assemblyName);
-                    byte[] assemblyBaseMv = DheStreamingAssetReader.Read(assemblyPlan.baseMetaVersion);
+                    byte[] assemblyBaseMv = provider.LoadBytes(assemblyPlan.baseMetaVersion);
                     baseMv = ParseMetaVersion(assemblyBaseMv, assemblyPlan.assemblyName);
                 }
                 byte[] assemblyCurrentHash = Sha256(assemblyCurrent);
@@ -206,7 +206,7 @@ namespace HybridCLR.Lab
                              StringComparison.Ordinal)))
             {
                 if (!DheRuntime.LoadInterpreterAssemblyImage(loaded.plan.assemblyName,
-                        DheStreamingAssetReader.Read(loaded.plan.current),
+                        provider.LoadBytes(loaded.plan.current),
                         out Assembly interpreterAssembly, out LoadImageErrorCode interpreterLoadError,
                         out string interpreterLoadMessage))
                 {
@@ -236,11 +236,11 @@ namespace HybridCLR.Lab
             }
 
             LoadedDheAssembly mainLoaded = loadedAssemblies[MainAssemblyName];
-            byte[] current = DheStreamingAssetReader.Read(mainLoaded.plan.current);
-            byte[] mv = DheStreamingAssetReader.Read(mainLoaded.plan.currentMetaVersion);
+            byte[] current = provider.LoadBytes(mainLoaded.plan.current);
+            byte[] mv = provider.LoadBytes(mainLoaded.plan.currentMetaVersion);
             byte[] snapshot = mainLoaded.baselineHash;
             DheBuildIdentityData buildIdentity = JsonUtility.FromJson<DheBuildIdentityData>(
-                System.Text.Encoding.UTF8.GetString(DheStreamingAssetReader.Read(BuildIdentityFile)));
+                System.Text.Encoding.UTF8.GetString(provider.LoadBytes(BuildIdentityFile)));
             byte[] currentHash = Sha256(current);
             byte[] baselineHash = mainLoaded.baselineHash;
             byte[] expectedCurrentHash = mainLoaded.mvCurrentHash;

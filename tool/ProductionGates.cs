@@ -1933,6 +1933,32 @@ internal static partial class Program
         AddRegressionCheck(checks, errors, "android-device-smoke-contract",
             androidDeviceSmokeContract,
             "Android device smoke must select one device, constrain remote paths, and use a fail-closed external payload overlay");
+        bool dheRunnerProviderOverlay = dhePlayerRunnerSource.Contains(
+                "byte[] assemblyCurrent = provider.LoadBytes(assemblyPlan.current);",
+                StringComparison.Ordinal) &&
+            dhePlayerRunnerSource.Contains(
+                "byte[] assemblyCurrentMv = provider.LoadBytes(assemblyPlan.currentMetaVersion);",
+                StringComparison.Ordinal) &&
+            dhePlayerRunnerSource.Contains(
+                "byte[] assemblyBaseMv = provider.LoadBytes(assemblyPlan.baseMetaVersion);",
+                StringComparison.Ordinal) &&
+            dhePlayerRunnerSource.Contains(
+                "provider.LoadBytes(loaded.plan.current),",
+                StringComparison.Ordinal) &&
+            dhePlayerRunnerSource.Contains(
+                "byte[] current = provider.LoadBytes(mainLoaded.plan.current);",
+                StringComparison.Ordinal) &&
+            dhePlayerRunnerSource.Contains(
+                "byte[] mv = provider.LoadBytes(mainLoaded.plan.currentMetaVersion);",
+                StringComparison.Ordinal) &&
+            dhePlayerRunnerSource.Contains(
+                "System.Text.Encoding.UTF8.GetString(provider.LoadBytes(BuildIdentityFile))",
+                StringComparison.Ordinal) &&
+            dhePlayerRunnerSource.Split(new[] { "DheStreamingAssetReader.Read(" },
+                StringSplitOptions.None).Length - 1 == 1;
+        AddRegressionCheck(checks, errors, "dhe-runner-provider-overlay",
+            dheRunnerProviderOverlay,
+            "DHE Player payload, MetaVersion, and identity reads must use the asset provider; only its embedded fallback may call the StreamingAssets reader");
         RunIntegratedSourceLockRegressions(regressionRoot, checks, errors);
 
         var weakNoOpRejected = false;
