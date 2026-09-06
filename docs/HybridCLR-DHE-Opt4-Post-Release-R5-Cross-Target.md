@@ -51,6 +51,24 @@ release ledger. The APK identities are:
 These are build and transfer identities only. APK staging is not Android Player
 correctness, and no `dhe-device-player-run.json` was produced.
 
+## Consecutive current update
+
+To verify that the cross-target registry is reusable, a second current was
+derived from the r5 payload without rebuilding any Base. The Windows and Android
+variants remained byte-for-byte equal for `HybridCLR.CrossAssemblyDerived.dll`,
+`HybridCLR.ManagedCases.dll`, and `HybridCLR.MetadataStress.dll`; only
+`HybridCLR.ManagedCasesAot.dll` changed. The exploratory continuation used the
+same registry revision `6` and produced:
+
+- current assembly-set SHA-256: `69d3b5adc902e5316269b48ce107e20cdf1d6017dbec972c98c69263e1b52de0`;
+- payload variant-set SHA-256: `8376b3775db562d9d1974c74b96a41e301cd0059a633bf42ed3a08e1ebb3f6cc`;
+- candidate Base validation: `9/9` compatible, lineage validated;
+- wrapper staging: `9/9` passed;
+- staging schema gate: `36` documents passed, `0` errors.
+
+This is a lifecycle and selection proof, not a Release promotion. The update
+remains marked exploratory until the Android device reports are available.
+
 ## Gate result
 
 The project-facing aggregate gate correctly rejects the candidate until all nine
