@@ -132,12 +132,14 @@ added to the seven-Base registry in one successor build; one revision 4 payload
 then passed all ten Windows Players and advanced the protected lab channel with
 exact ten-Base coverage. See
 `docs/HybridCLR-DHE-Opt4-Post-Release-Ten-Base-Lifecycle.md`.
-The current C# package is `HybridCLRDhe-0.1.32-opt4.18`, Package ID
-`a1c4347c533080b4c8bc2d5344fe8bf5e6b0c0cb5b9ccf0d10f1ef6bb68a9284`, based on
-source commit `a051cb3` and a clean 146/146 regression. It adds the Android APK
-overlay/device gate and cross-target staging contract. The r5 candidate appends
-three Android Bases to the six Windows Bases, but remains unpromoted until
-Android Player evidence is available; see
+The current C# package is `HybridCLRDhe-0.1.32-opt4.20`, based on the clean
+`c108d87` source line. It retains the Android APK overlay/device gate and
+cross-target staging contract, and adds a target-independent iOS Xcode-export
+artifact gate. The iOS gate validates the exported `.xcodeproj`, `project.pbxproj`,
+`Classes`, `Libraries`, `Data`, and a canonical directory hash before evidence is
+accepted; it does not claim Xcode link, signing, device, or performance evidence.
+The r5 candidate appends three Android Bases to the six Windows Bases, but remains
+unpromoted until Android Player evidence is available; see
 `docs/HybridCLR-DHE-Opt4-Post-Release-R5-Cross-Target.md`.
 The subsequent r6 and r7 runs derived consecutive current payloads without
 rebuilding any Base; r7 reused registry revision 6 and staged the update for all

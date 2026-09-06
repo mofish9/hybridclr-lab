@@ -726,10 +726,14 @@ so each installed Base computes its own changed-method set against the same
 downloaded current payload.
 
 iOS uses the same C# Bee graph regeneration and guard reapplication path, with
-no PowerShell dependency. This repository has no macOS/Xcode environment, so
-the generated Xcode project, final linked binary/IPA, signing, device
-correctness, memory, and tail-latency gates remain conditional rather than
-passed.
+no PowerShell dependency. After Unity exports the project, the package records
+an `ios-xcode-project` artifact and a canonical directory hash. The host
+revalidates that hash and requires exactly one `.xcodeproj` containing
+`project.pbxproj`, plus the Unity `Classes`, `Libraries`, and `Data` directories.
+This is an offline export-integrity gate only. This repository has no
+macOS/Xcode environment, so Xcode compilation/linking, signing, IPA output,
+device correctness, memory, and tail-latency gates remain conditional rather
+than passed.
 
 ## Baseline manifest
 
