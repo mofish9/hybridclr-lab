@@ -1593,8 +1593,9 @@ internal static partial class Program
         try
         {
             using var wrongRole = JsonDocument.Parse("{\"schemaVersion\":1,\"format\":\"hybridclr.dhe-regression.json\",\"passed\":true}");
-            ValidateEvidenceRole("native-tuanjie2022", wrongRole.RootElement, output, new string('a', 40),
-                new string('b', 40), cli.Root);
+            ValidateEvidenceRole("native-tuanjie2022", wrongRole.RootElement, output,
+                new string('a', 40), new string('b', 40), cli.Root,
+                Array.Empty<string>());
         }
         catch { roleRejected = true; }
         AddRegressionCheck(checks, errors, "evidence-role-format", roleRejected,
@@ -1611,8 +1612,9 @@ internal static partial class Program
                 "\"runtimeRoot\":\"missing\",\"runtimeTreeSha256\":\"" + new string('b', 64) + "\"," +
                 "\"externalTreeSha256\":\"" + new string('c', 64) + "\"," +
                 "\"nativeExitCode\":0,\"surrogateHeadersAllowed\":false,\"errors\":[]}");
-            ValidateEvidenceRole("native-tuanjie2022", unboundNative.RootElement, output, new string('a', 40),
-                new string('b', 40), cli.Root);
+            ValidateEvidenceRole("native-tuanjie2022", unboundNative.RootElement, output,
+                new string('a', 40), new string('b', 40), cli.Root,
+                Array.Empty<string>());
         }
         catch { unboundNativeRejected = true; }
         AddRegressionCheck(checks, errors, "evidence-native-runtime-binding", unboundNativeRejected,
@@ -2112,7 +2114,8 @@ internal static partial class Program
                             "changed resource workflow");
                         ValidateResourcePlayerEvidenceBindings(workflowReport, reportPath);
                     }
-                    ValidateManagedReleaseEvidence(workflowReport, reportPath);
+                    ValidateManagedReleaseEvidence(workflowReport, reportPath,
+                        cli.GetList("evidencetoolchainroots").Append(packageRoot));
                     if (changedWorkflow)
                     {
                         var identity = GetChangedPlayerEvidenceIdentity(workflowReport, reportPath);

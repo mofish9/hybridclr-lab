@@ -2305,6 +2305,27 @@ internal static partial class Program
         var evidenceHashes = new Dictionary<string, string>(StringComparer.Ordinal);
         var changedReports = new List<(JsonElement Report, string Path)>();
         JsonElement? regressionReport = null;
+        var managedContractRoots = new HashSet<string>(StringComparer.OrdinalIgnoreCase)
+        {
+            Path.GetFullPath(sourceRoot),
+        };
+        foreach (JsonElement item in files.EnumerateArray())
+        {
+            string? role = GetString(item, "role");
+            if (role is not ("player-changed" or "demo-noop")) continue;
+            string? path = GetString(item, "path");
+            string? expected = GetString(item, "sha256");
+            if (string.IsNullOrWhiteSpace(path) || Path.IsPathRooted(path) ||
+                path.Contains("..", StringComparison.Ordinal) ||
+                !IsHex(expected, 64, 64))
+                throw new DheException("Release evidence contains an unsafe managed file entry.");
+            string full = RequireFile(Path.Combine(baseDirectory, path),
+                "Release managed evidence file");
+            if (!Sha256File(full).Equals(expected, StringComparison.OrdinalIgnoreCase))
+                throw new DheException("Release evidence file hash mismatch: " + path);
+            JsonElement managedReport = ReadJson<JsonElement>(full);
+            managedContractRoots.Add(ResolveManagedEvidenceContractRoot(managedReport, full));
+        }
         foreach (var item in files.EnumerateArray())
         {
             var path = GetString(item, "path");
@@ -2322,7 +2343,8 @@ internal static partial class Program
                 throw new DheException("Release evidence file hash mismatch: " + path);
             var report = ReadJson<JsonElement>(full);
             if (!GetBool(report, "passed")) throw new DheException("Release evidence report is not a passing result: " + path);
-            ValidateEvidenceRole(role, report, full, sourceHead!, sourceTree!, sourceRoot);
+            ValidateEvidenceRole(role, report, full, sourceHead!, sourceTree!, sourceRoot,
+                managedContractRoots);
             string key = GetReleaseEvidenceKey(item, report, full);
             if (!evidenceHashes.TryAdd(key, expected!))
                 throw new DheException("Release evidence contains a duplicate identity: " + key + ".");
@@ -2361,7 +2383,8 @@ internal static partial class Program
     }
 
     private static void ValidateEvidenceRole(string role, JsonElement report, string reportPath,
-        string sourceHead, string sourceTree, string sourceRoot)
+        string sourceHead, string sourceTree, string sourceRoot,
+        IEnumerable<string> managedContractRoots)
     {
         switch (role)
         {
@@ -2441,7 +2464,7 @@ internal static partial class Program
                     throw new DheException(role + " evidence did not pass validation and coverage.");
                 ValidateEvidenceToolIdentity(report, reportPath, sourceRoot, sourceHead,
                     sourceTree);
-                ValidateManagedReleaseEvidence(report, reportPath);
+                ValidateManagedReleaseEvidence(report, reportPath, managedContractRoots);
                 var changed = GetInt(report.GetProperty("capability"), "changedMethodCount");
                 var player = report.GetProperty("player");
                 if (changedRole)
@@ -2552,7 +2575,28 @@ internal static partial class Program
         return packageRoot;
     }
 
-    private static void ValidateManagedReleaseEvidence(JsonElement report, string reportPath)
+    private static string ResolveManagedRuntimeContractRoot(JsonElement runtime,
+        string evidenceContractRoot, IEnumerable<string>? additionalContractRoots)
+    {
+        string expectedLockSha256 = GetString(runtime, "dheRuntimeLockSha256") ??
+            string.Empty;
+        IEnumerable<string> candidates = new[] { evidenceContractRoot }
+            .Concat(additionalContractRoots ?? Array.Empty<string>())
+            .Select(Path.GetFullPath)
+            .Distinct(StringComparer.OrdinalIgnoreCase);
+        foreach (string candidate in candidates)
+        {
+            string lockPath = Path.Combine(candidate, "manifests", "dhe-runtime-lock.json");
+            if (File.Exists(lockPath) && Sha256File(lockPath).Equals(expectedLockSha256,
+                    StringComparison.OrdinalIgnoreCase))
+                return candidate;
+        }
+        throw new DheException(
+            "Managed Player runtime lock does not match an authenticated release contract.");
+    }
+
+    private static void ValidateManagedReleaseEvidence(JsonElement report, string reportPath,
+        IEnumerable<string>? additionalContractRoots = null)
     {
         if (!string.Equals(GetString(report, "mode"), "Release", StringComparison.Ordinal) ||
             !GetBool(report, "releaseReady"))
@@ -2562,7 +2606,7 @@ internal static partial class Program
         // A supported Base can outlive the toolchain that built it. Validate its
         // runtime locks against that Base's authenticated Release package; the
         // current package separately authorizes the historical Package ID.
-        string contractRoot = ResolveManagedEvidenceContractRoot(report, reportPath);
+        string evidenceContractRoot = ResolveManagedEvidenceContractRoot(report, reportPath);
         string runtimePath = ResolveEvidencePath(GetString(report, "runtimeSource"), reportRoot,
             "Managed Player runtime manifest");
         JsonElement runtime = ReadJson<JsonElement>(runtimePath);
@@ -2570,6 +2614,8 @@ internal static partial class Program
             "Managed Player runtime manifest");
         if (!GetBool(runtime, "dheEnabled") || GetString(runtime, "dheRuntimeSourceMode") != "integrated")
             throw new DheException("Managed Player runtime evidence is not an integrated DHE runtime.");
+        string contractRoot = ResolveManagedRuntimeContractRoot(runtime,
+            evidenceContractRoot, additionalContractRoots);
         JsonElement headers = runtime.GetProperty("externalHeaders");
         if (GetBool(headers, "surrogate") || GetBool(headers, "explicitlyAllowed"))
             throw new DheException("Managed Player runtime evidence uses surrogate external headers.");
