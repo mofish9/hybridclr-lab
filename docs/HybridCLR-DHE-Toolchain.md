@@ -44,7 +44,7 @@ changes only `DheMultiBaseProbe.CurrentValue` and the `DheDemoCalculator`
 constructor bodies in `HybridCLR.ManagedCasesAot.dll`. The command preserves
 assembly/module identity and rejects overlapping seed/output trees. The release
 regression requires this transformation to remain compatible and to produce
-exactly two body-only changes; pass the authenticated seed DLL through
+exactly two method changes without metadata drift; pass the authenticated seed DLL through
 `-ManagedCurrentSeed`. Project hot-update DLLs continue to come from the project's
 normal managed compilation; this fixture is not a production IL rewriter.
 
@@ -699,7 +699,11 @@ evidence directories; `-WorkflowNoopRoot` supplies the no-op directory.
 It must also receive every historical Release package named by the candidate's
 authority manifest through `-EvidenceToolchainRoots`. This is an exact-set check:
 missing, extra, duplicate-ID, non-Release, or version/head/tree-mismatched packages
-fail the toolchain release regression.
+fail the toolchain release regression. Once a channel has advanced beyond revision
+2, pass its immutable genesis resource and matching registry through
+`-ReleaseGenesisRoot` and `-ReleaseGenesisBaseRegistry`. This keeps the genesis
+test independent from the current `-ResourceUpdateRoot` to
+`-ResourceUpdateRoot2` consecutive-release pair.
 
 ```text
 dotnet HybridCLR.DheTool.dll release-evidence \

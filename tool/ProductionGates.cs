@@ -777,8 +777,8 @@ internal static partial class Program
         AddRegressionCheck(checks, errors, "mv-assembly-metadata", !metadataCompatibility.Compatible,
             "assembly metadata change must be rejected");
 
-        bool baseVariantBodyOnlyPassed = false;
-        string baseVariantBodyOnlyDetails =
+        bool baseVariantMetadataStablePassed = false;
+        string baseVariantMetadataStableDetails =
             "ManagedCurrentSeed must identify an authenticated DHE_CURRENT fixture assembly";
         string? managedCurrentSeed = cli.Optional("managedcurrentseed");
         if (!string.IsNullOrWhiteSpace(managedCurrentSeed))
@@ -797,23 +797,24 @@ internal static partial class Program
                 ResourceUpdateCompatibility baseVariantCompatibility =
                     ResourceUpdateCompatibility.Analyze(seedMetaVersion,
                         baseVariantMetaVersion);
-                baseVariantBodyOnlyPassed = baseVariantCompatibility.Compatible &&
+                baseVariantMetadataStablePassed = baseVariantCompatibility.Compatible &&
                     baseVariantCompatibility.ChangedMethodCount == 2 &&
-                    baseVariantCompatibility.BodyOnlyChangedMethodCount == 2 &&
-                    baseVariantCompatibility.DependencyChangedMethodCount == 0 &&
+                    baseVariantCompatibility.BodyOnlyChangedMethodCount == 1 &&
+                    baseVariantCompatibility.DependencyChangedMethodCount == 1 &&
+                    baseVariantCompatibility.ChangedExistingTypeCount == 0 &&
                     baseVariantCompatibility.UnsupportedChanges.Length == 0 &&
                     seedMetaVersion.AssemblyMetadataVersion ==
                         baseVariantMetaVersion.AssemblyMetadataVersion;
-                baseVariantBodyOnlyDetails =
-                    "Base-generation fixture must preserve module metadata and change exactly two method bodies";
+                baseVariantMetadataStableDetails =
+                    "Base-generation fixture must preserve metadata and change exactly two methods";
             }
             catch (Exception exception)
             {
-                baseVariantBodyOnlyDetails = exception.Message;
+                baseVariantMetadataStableDetails = exception.Message;
             }
         }
-        AddRegressionCheck(checks, errors, "managed-current-base-variant-body-only",
-            baseVariantBodyOnlyPassed, baseVariantBodyOnlyDetails);
+        AddRegressionCheck(checks, errors, "managed-current-base-variant-metadata-stable",
+            baseVariantMetadataStablePassed, baseVariantMetadataStableDetails);
 
 		var referenceRemovalAssembly = Path.Combine(regressionRoot, "reference-removal.dll");
 		WriteMutatedAssembly(baseline, referenceRemovalAssembly, module =>
@@ -1022,6 +1023,12 @@ internal static partial class Program
         string? resourceUpdateRoot2 = cli.Optional("resourceupdateroot2");
         string? resourceAssetRoot = cli.Optional("resourceassetroot");
         string? resourceBaseBuildIdentity = cli.Optional("resourcebasebuildidentity");
+        string? releaseGenesisRoot = cli.Optional("releasegenesisroot");
+        string? releaseGenesisBaseRegistry = cli.Optional("releasegenesisbaseregistry");
+        if (string.IsNullOrWhiteSpace(releaseGenesisRoot) !=
+            string.IsNullOrWhiteSpace(releaseGenesisBaseRegistry))
+            throw new DheException(
+                "ReleaseGenesisRoot and ReleaseGenesisBaseRegistry must be supplied together.");
         if (!string.IsNullOrWhiteSpace(resourceUpdateRoot) ||
             !string.IsNullOrWhiteSpace(resourceUpdateRoot2) ||
             !string.IsNullOrWhiteSpace(resourceAssetRoot) ||
@@ -1130,12 +1137,20 @@ internal static partial class Program
             try
             {
                 BaseRegistryDocument sourceRegistry = ReadBaseRegistry(resourceBaseRegistry);
+                BaseRegistryDocument releaseLedgerRegistry = string.IsNullOrWhiteSpace(
+                    releaseGenesisBaseRegistry)
+                    ? sourceRegistry
+                    : ReadBaseRegistry(releaseGenesisBaseRegistry);
+                if (!string.Equals(sourceRegistry.RegistryId,
+                        releaseLedgerRegistry.RegistryId, StringComparison.Ordinal))
+                    throw new DheException(
+                        "Release genesis and active Base registries must use the same RegistryId.");
                 string builderRoot = Path.Combine(regressionRoot, "base-registry-builder");
                 Directory.CreateDirectory(builderRoot);
 
                 if (!string.IsNullOrWhiteSpace(resourceUpdateRoot))
                 {
-                    string releaseRoot = RequireDirectory(resourceUpdateRoot,
+                    string releaseRoot = RequireDirectory(releaseGenesisRoot ?? resourceUpdateRoot,
                         "Release ledger regression resource update");
                     string ledgerPath = RequireFile(Path.Combine(releaseRoot,
                         ReleaseLedgerFileName), "Release ledger regression head");
@@ -1147,14 +1162,14 @@ internal static partial class Program
                             ["mode"] = "Release",
                             ["initializereleaseledger"] = "true",
                             ["releasechannelid"] = ledger.ChannelId,
-                        }), sourceRegistry, null);
+                        }), releaseLedgerRegistry, null);
                     releaseLedgerInitialized = ledger.Revision == 1 &&
                         initialized.ReleaseReady && initialized.Revision == 1 &&
                         string.Equals(initialized.ChannelId, ledger.ChannelId,
                             StringComparison.Ordinal) &&
-                        string.Equals(ledger.BaseRegistrySha256, sourceRegistry.Sha256,
+                        string.Equals(ledger.BaseRegistrySha256, releaseLedgerRegistry.Sha256,
                             StringComparison.OrdinalIgnoreCase) &&
-                        ledger.ActiveBaseCount == sourceRegistry.Entries.Length;
+                        ledger.ActiveBaseCount == releaseLedgerRegistry.Entries.Length;
 
                     var continuationArguments = new Dictionary<string, string>(
                         StringComparer.OrdinalIgnoreCase)
@@ -1164,7 +1179,8 @@ internal static partial class Program
                         ["expectedpreviousreleaseledgersha256"] = ledger.Sha256,
                     };
                     ResourceReleaseContext continuation = PrepareResourceReleaseContext(
-                        new Cli("resource-update", continuationArguments), sourceRegistry, null);
+                        new Cli("resource-update", continuationArguments),
+                        releaseLedgerRegistry, null);
                     releaseLedgerContinuation = continuation.ReleaseReady &&
                         continuation.Revision == ledger.Revision + 1 &&
                         string.Equals(continuation.ChannelId, ledger.ChannelId,
@@ -1172,10 +1188,10 @@ internal static partial class Program
                         string.Equals(continuation.ParentLedgerSha256, ledger.Sha256,
                             StringComparison.OrdinalIgnoreCase);
 
-                    BaseRegistryDocument resetRegistry = new(sourceRegistry.SourcePath,
-                        sourceRegistry.PathSemantics, new string('0', 64),
-                        sourceRegistry.RegistryId, 1, null,
-                        new[] { sourceRegistry.Entries[0] },
+                    BaseRegistryDocument resetRegistry = new(releaseLedgerRegistry.SourcePath,
+                        releaseLedgerRegistry.PathSemantics, new string('0', 64),
+                        releaseLedgerRegistry.RegistryId, 1, null,
+                        new[] { releaseLedgerRegistry.Entries[0] },
                         Array.Empty<BaseRegistryRetirement>());
                     try
                     {

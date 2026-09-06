@@ -16,7 +16,7 @@ internal static partial class Program
     private static readonly string[] RequiredRegressionChecks =
     {
         "mv-field-order", "mv-switch-target", "mv-assembly-metadata",
-        "managed-current-base-variant-body-only", "mv-flags-tamper",
+        "managed-current-base-variant-metadata-stable", "mv-flags-tamper",
         "mv-token-tamper", "verify-require-release", "verify-expected-id", "verify-package-id-recompute",
         "aot-metadata-set-order-independent", "aot-metadata-set-deduplicated",
         "aot-metadata-set-selection-bound", "aot-metadata-set-tamper-rejected",
