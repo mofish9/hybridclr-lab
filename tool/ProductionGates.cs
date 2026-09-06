@@ -3205,6 +3205,7 @@ internal static partial class Program
         bool variantSetTamperRejected = false;
         bool missingVariantRejected = false;
         bool primaryVariantContractPassed = false;
+        bool consecutiveThreeVariantPassed = false;
         string details = "Cross-target payload regression did not complete.";
 
         try
@@ -3485,6 +3486,123 @@ internal static partial class Program
             }
             selectionPassed = allStagesPassed;
 
+            string CreateNextVariantRoot(string sourceRoot, string name, int nopCount)
+            {
+                string nextRoot = Path.Combine(root, name);
+                Directory.CreateDirectory(nextRoot);
+                foreach (JsonElement assembly in sourceAssemblies)
+                {
+                    string assemblyName = NormalizeName(GetString(assembly,
+                        "assemblyName") ?? string.Empty);
+                    File.Copy(Path.Combine(sourceRoot, assemblyName + ".dll"),
+                        Path.Combine(nextRoot, assemblyName + ".dll"), true);
+                }
+                string assemblyPath = Path.Combine(nextRoot, mutatedName + ".dll");
+                string nextAssemblyPath = Path.Combine(root, name + "-mutated.dll");
+                WriteMutatedAssembly(assemblyPath, nextAssemblyPath, module =>
+                {
+                    MethodDef method = module.GetTypes().SelectMany(type => type.Methods)
+                        .Where(candidate => candidate.HasBody && !candidate.IsConstructor &&
+                            candidate.Body.Instructions.Count != 0 &&
+                            candidate.Body.ExceptionHandlers.Count == 0)
+                        .OrderBy(candidate => candidate.MDToken.Raw).First();
+                    for (int index = 0; index < nopCount; index++)
+                        method.Body.Instructions.Insert(0, Instruction.Create(OpCodes.Nop));
+                });
+                File.Move(nextAssemblyPath, assemblyPath, true);
+                return nextRoot;
+            }
+
+            string windowsNextRoot = CreateNextVariantRoot(windowsRoot,
+                "current-windows-next", 1);
+            string androidNextRoot = CreateNextVariantRoot(androidRoot,
+                "current-android-next", 1);
+            string tuanjieNextRoot = CreateNextVariantRoot(tuanjieRoot,
+                "current-tuanjie-next", 1);
+            string nextReleaseRoot = Path.Combine(root, "release-next");
+            string firstLedgerPath = Path.Combine(releaseRoot, ReleaseLedgerFileName);
+            var nextVariantRoots = new Dictionary<string, string>
+            {
+                ["android"] = androidNextRoot,
+                ["tuanjie"] = tuanjieNextRoot,
+            };
+            if (ResourceUpdate(new Cli("resource-update", new Dictionary<string, string>(
+                StringComparer.OrdinalIgnoreCase)
+            {
+                ["currentroot"] = windowsNextRoot,
+                ["currentvariantid"] = "windows",
+                ["currentvariantroots"] = JsonSerializer.Serialize(nextVariantRoots),
+                ["settingsfile"] = settingsPath,
+                ["baseregistry"] = registryPath,
+                ["outputroot"] = nextReleaseRoot,
+                ["mode"] = "Release",
+                ["previousreleaseledger"] = firstLedgerPath,
+                ["expectedpreviousreleaseledgersha256"] = Sha256File(firstLedgerPath),
+                ["releasechannelid"] = "regression-cross-target",
+            })) == 0)
+            {
+                JsonElement nextManifest = ReadJson<JsonElement>(Path.Combine(nextReleaseRoot,
+                    "dhe-resource-update.json"));
+                JsonElement[] nextVariants = nextManifest.GetProperty("payloadVariants")
+                    .EnumerateArray().ToArray();
+                var nextVariantsById = nextVariants.ToDictionary(item =>
+                        GetString(item, "variantId") ?? string.Empty,
+                    item => item, StringComparer.OrdinalIgnoreCase);
+                ReleaseLedgerDocument nextLedger = ReadReleaseLedger(RequireFile(
+                    Path.Combine(nextReleaseRoot, ReleaseLedgerFileName),
+                    "Consecutive cross-target release ledger"));
+                bool nextStagesPassed = true;
+                for (int index = 0; index < registry.Entries.Length; index++)
+                {
+                    BaseRegistryEntry entry = registry.Entries[index];
+                    string assetRoot = CreateBaseAssets(entry,
+                        "next-base-" + index.ToString("D3", CultureInfo.InvariantCulture));
+                    string stagePath = Path.Combine(root, "next-stages",
+                        "base-" + index.ToString("D3", CultureInfo.InvariantCulture) + ".json");
+                    int stageExit = StageResourceUpdate(new Cli("stage-resource-update",
+                        new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase)
+                        {
+                            ["updateroot"] = nextReleaseRoot,
+                            ["assetroot"] = assetRoot,
+                            ["basebuildidentity"] = entry.BuildIdentity,
+                            ["output"] = stagePath,
+                        }));
+                    JsonElement stage = stageExit == 0
+                        ? ReadJson<JsonElement>(stagePath)
+                        : default;
+                    string expectedVariant = entry.PayloadVariantId;
+                    string expectedSet = nextVariantsById.TryGetValue(expectedVariant,
+                            out JsonElement nextVariant)
+                        ? GetString(nextVariant, "currentAssemblySetSha256") ?? string.Empty
+                        : string.Empty;
+                    string variantPath = "payload/variants/" + expectedVariant + "/";
+                    string[] selectedVariantFiles = stageExit == 0
+                        ? stage.GetProperty("stagedFiles").EnumerateArray()
+                            .Select(item => GetString(item, "path") ?? string.Empty)
+                            .Where(path => path.Contains("payload/variants/",
+                                StringComparison.OrdinalIgnoreCase)).ToArray()
+                        : Array.Empty<string>();
+                    nextStagesPassed &= stageExit == 0 &&
+                        string.Equals(GetString(stage, "payloadVariantId"), expectedVariant,
+                            StringComparison.OrdinalIgnoreCase) &&
+                        string.Equals(GetString(stage, "currentAssemblySetSha256"), expectedSet,
+                            StringComparison.OrdinalIgnoreCase) &&
+                        selectedVariantFiles.Length == sourceAssemblies.Length * 2 &&
+                        selectedVariantFiles.All(path => path.StartsWith(variantPath,
+                            StringComparison.OrdinalIgnoreCase));
+                }
+                consecutiveThreeVariantPassed = nextStagesPassed &&
+                    nextVariantsById.Count == 3 &&
+                    nextLedger.Revision == ledger.Revision + 1 &&
+                    string.Equals(nextLedger.ParentLedgerSha256, ledger.Sha256,
+                        StringComparison.OrdinalIgnoreCase) &&
+                    nextLedger.ActiveBaseCount == registry.Entries.Length &&
+                    IsHex(GetString(nextManifest, "payloadVariantSetSha256"), 64, 64) &&
+                    !string.Equals(GetString(nextManifest, "payloadVariantSetSha256"),
+                        GetString(manifest, "payloadVariantSetSha256"),
+                        StringComparison.OrdinalIgnoreCase);
+            }
+
             BaseRegistryEntry androidBase = registry.Entries.First(entry =>
                 string.Equals(entry.PayloadVariantId, "android",
                     StringComparison.OrdinalIgnoreCase));
@@ -3604,6 +3722,10 @@ internal static partial class Program
         AddRegressionCheck(checks, errors, "resource-cross-target-selection-bound",
             selectionPassed,
             "every active Base must stage only its registry-selected payload variant and assembly set");
+        AddRegressionCheck(checks, errors,
+            "resource-cross-target-consecutive-three-variant",
+            consecutiveThreeVariantPassed,
+            "a consecutive single resource release must update every Base through all three engine payload variants");
         AddRegressionCheck(checks, errors,
             "resource-cross-target-selected-payload-tamper-rejected",
             selectedPayloadTamperRejected,

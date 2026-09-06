@@ -42,7 +42,7 @@ internal static partial class Program
         "resource-stage-direct-base-valid",
         "resource-stage-android-apk-base-bound",
         "resource-stage-android-apk-tamper-rejected",
-        "resource-cross-target-payload-release",
+        "resource-cross-target-payload-release", "resource-cross-target-consecutive-three-variant",
         "resource-cross-target-selection-bound",
         "resource-cross-target-selected-payload-tamper-rejected",
         "resource-cross-target-variant-set-tamper-rejected",
