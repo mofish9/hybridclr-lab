@@ -972,9 +972,14 @@ internal static partial class Program
         string previousUpdateRoot, string candidateUpdateRoot,
         IReadOnlyCollection<(JsonElement Report, string Path)> reports,
         string authorityRoot, string authorityPackageId, string validationSourceRoot,
-        string schemaRoot, string? baseRegistryPath,
-        IReadOnlyCollection<string> evidenceToolchainRoots, out string details)
+        string schemaRoot, string? baseRegistryPath, string settingsFile,
+        IReadOnlyCollection<string> evidenceToolchainRoots,
+        out bool protectedResourceReleaseBuildPassed,
+        out string protectedResourceReleaseBuildDetails, out string details)
     {
+        protectedResourceReleaseBuildPassed = false;
+        protectedResourceReleaseBuildDetails =
+            "protected resource release build did not complete";
         details = "protected channel snapshot, adoption, promotion, and CAS validated";
         try
         {
@@ -1042,6 +1047,103 @@ internal static partial class Program
                 !string.Equals(adoptedSnapshot.PreviousReleaseLedgerSha256,
                     previousLedger.Sha256, StringComparison.OrdinalIgnoreCase))
                 throw new DheException("Adopted channel snapshot is inconsistent.");
+
+            if (!string.IsNullOrWhiteSpace(baseRegistryPath))
+            {
+                BaseRegistryDocument releaseBuildRegistry = ReadBaseRegistry(baseRegistryPath);
+                JsonElement candidateManifest = ReadJson<JsonElement>(RequireFile(Path.Combine(
+                    candidateUpdateRoot, "dhe-resource-update.json"),
+                    "Protected release build candidate manifest"));
+                string releaseBuildRoot = Path.Combine(regressionRoot,
+                    "channel-state-resource-release-build");
+                string currentRoot = Path.Combine(releaseBuildRoot, "current");
+                var variants = new List<object>();
+                string candidateCurrentSet = GetString(candidateManifest,
+                    "currentAssemblySetSha256") ?? string.Empty;
+                bool primaryAssigned = false;
+                foreach (JsonElement variant in candidateManifest.GetProperty("payloadVariants")
+                             .EnumerateArray())
+                {
+                    string variantId = GetString(variant, "variantId") ?? string.Empty;
+                    string variantRoot = Path.Combine(currentRoot, variantId);
+                    Directory.CreateDirectory(variantRoot);
+                    foreach (JsonElement assembly in variant.GetProperty("assemblies")
+                                 .EnumerateArray())
+                    {
+                        string name = NormalizeName(GetString(assembly,
+                            "assemblyName") ?? string.Empty);
+                        string source = RequireFile(ResolveContainedPath(candidateUpdateRoot,
+                            GetString(assembly, "dll") ?? string.Empty,
+                            "Protected release build current assembly"),
+                            "Protected release build current assembly");
+                        File.Copy(source, Path.Combine(variantRoot, name + ".dll"), true);
+                    }
+                    bool primary = !primaryAssigned && string.Equals(GetString(variant,
+                        "currentAssemblySetSha256"), candidateCurrentSet,
+                        StringComparison.OrdinalIgnoreCase);
+                    primaryAssigned |= primary;
+                    variants.Add(new { variantId, root = variantRoot, primary });
+                }
+                if (!primaryAssigned)
+                    throw new DheException("Protected release build has no primary current variant.");
+
+                string? previousRegistry = null;
+                if (releaseBuildRegistry.Revision > 1)
+                {
+                    string parentAudit = GetString(candidateManifest,
+                        "baseRegistryParentAuditPath") ?? string.Empty;
+                    previousRegistry = RequireFile(ResolveContainedPath(candidateUpdateRoot,
+                        parentAudit, "Protected release build parent registry"),
+                        "Protected release build parent registry");
+                }
+                string configPath = Path.Combine(releaseBuildRoot,
+                    "protected-release-config.json");
+                string outputRoot = Path.Combine(releaseBuildRoot, "release");
+                WriteJson(configPath, new
+                {
+                    schemaVersion = 1,
+                    format = "hybridclr.dhe-resource-release-build-config.json",
+                    pathSemantics = "config-relative-v1",
+                    mode = "Release",
+                    settingsFile,
+                    outputRoot,
+                    existingRegistry = releaseBuildRegistry.SourcePath,
+                    previousRegistry,
+                    registryId = releaseBuildRegistry.RegistryId,
+                    currentVariants = variants.ToArray(),
+                    newBases = Array.Empty<object>(),
+                    retireBaseIds = Array.Empty<string>(),
+                    retirementReason = (string?)null,
+                    channelSnapshot = adoptedSnapshotPath,
+                    expectedChannelSnapshotSha256 = adoptedSnapshotSha256,
+                    initializeReleaseLedger = false,
+                });
+                string releaseBuildSchemas = Directory.Exists(Path.Combine(schemaRoot,
+                    "schemas")) ? Path.Combine(schemaRoot, "schemas") : schemaRoot;
+                if (ResourceReleaseBuild(new Cli("resource-release-build",
+                        new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase)
+                        {
+                            ["config"] = configPath,
+                            ["schemasroot"] = releaseBuildSchemas,
+                        })) != 0)
+                    throw new DheException("Protected resource release build failed.");
+                JsonElement releaseBuild = ReadJson<JsonElement>(Path.Combine(outputRoot,
+                    "dhe-resource-release-build.json"));
+                protectedResourceReleaseBuildPassed = GetBool(releaseBuild, "passed") &&
+                    GetBool(releaseBuild, "releaseReady") &&
+                    GetBool(releaseBuild, "exactActiveBaseCoverage") &&
+                    GetInt(releaseBuild, "activeBaseCount") ==
+                        releaseBuildRegistry.Entries.Length &&
+                    GetInt(releaseBuild, "releaseRevision") == proof.ReleaseRevision &&
+                    string.Equals(GetString(releaseBuild, "releaseChannelId"),
+                        proof.ReleaseChannelId, StringComparison.Ordinal) &&
+                    string.Equals(GetString(releaseBuild,
+                            "parentReleaseLedgerSha256"), previousLedger.Sha256,
+                        StringComparison.OrdinalIgnoreCase);
+                protectedResourceReleaseBuildDetails = protectedResourceReleaseBuildPassed
+                    ? "one snapshot-pinned Release build reproduced the next channel revision"
+                    : "snapshot-pinned Release build report did not match the protected head";
+            }
 
             bool snapshotResourceContextPassed = true;
             if (!string.IsNullOrWhiteSpace(baseRegistryPath))

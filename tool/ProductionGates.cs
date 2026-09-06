@@ -1128,6 +1128,18 @@ internal static partial class Program
                 RequireFile(resourceBaseRegistry,
                     "Cross-target regression Base registry"),
                 regressionRoot, checks, errors);
+            string? releaseBuildSettings = cli.Optional("settingsfile");
+            if (!string.IsNullOrWhiteSpace(releaseBuildSettings))
+                RunResourceReleaseBuildRegressions(
+                    RequireDirectory(resourceUpdateRoot,
+                        "Resource release build regression update"),
+                    RequireFile(resourceBaseRegistry,
+                        "Resource release build regression registry"),
+                    RequireFile(releaseBuildSettings,
+                        "Resource release build regression settings"),
+                    RequireDirectory(Path.Combine(cli.Root, "schemas"),
+                        "Resource release build regression schemas"),
+                    regressionRoot, checks, errors);
         }
 
         bool baseRegistryBuilderPassed = false;
@@ -2056,6 +2068,9 @@ internal static partial class Program
         var channelStateCasWorkflowPassed = false;
         var channelStateCasWorkflowDetails =
             "the distributed package contains the protected channel-state implementation and schemas";
+        var protectedResourceReleaseBuildPassed = false;
+        var protectedResourceReleaseBuildDetails =
+            "the distributed package contains the protected resource release build implementation";
         var portableMixedToolchainAuthoritiesPassed = false;
         var portableMixedToolchainAuthoritiesDetails =
             "the distributed package contains its evidence authority set and schema";
@@ -2436,7 +2451,11 @@ internal static partial class Program
                     channelStateCasWorkflowPassed = RunChannelStateRegression(
                         regressionRoot, resourceUpdateRoot, resourceUpdateRoot2,
                         changedReports, authorityRoot, authorityPackageId, cli.Root,
-                        packageRoot, resourceBaseRegistry, channelEvidenceRoots,
+                        packageRoot, resourceBaseRegistry,
+                        RequireFile(cli.Optional("settingsfile") ?? string.Empty,
+                            "Protected resource release build settings"),
+                        channelEvidenceRoots, out protectedResourceReleaseBuildPassed,
+                        out protectedResourceReleaseBuildDetails,
                         out channelStateCasWorkflowDetails);
                 }
                 var tamperedReport = System.Text.Json.Nodes.JsonNode.Parse(
@@ -2489,6 +2508,10 @@ internal static partial class Program
                     "dhe-channel-snapshot.schema.json")) &&
                 File.ReadAllText(Path.Combine(packageRoot, "tool", "ChannelState.cs"))
                     .Contains("private static int ChannelState", StringComparison.Ordinal);
+            protectedResourceReleaseBuildPassed = File.Exists(Path.Combine(packageRoot,
+                    "tool", "ResourceReleaseBuild.cs")) &&
+                File.Exists(Path.Combine(packageRoot, "schemas",
+                    "dhe-resource-release-build.schema.json"));
             portableMixedToolchainAuthoritiesPassed = File.Exists(Path.Combine(packageRoot,
                     "manifests", "dhe-toolchain-evidence-authorities.json")) &&
                 File.Exists(Path.Combine(packageRoot, "schemas",
@@ -2519,6 +2542,8 @@ internal static partial class Program
             "incomplete, stale, forked, reinitialized, or input-mutating release evidence");
         AddRegressionCheck(checks, errors, "channel-state-cas-workflow",
             channelStateCasWorkflowPassed, channelStateCasWorkflowDetails);
+        AddRegressionCheck(checks, errors, "resource-release-build-protected-release",
+            protectedResourceReleaseBuildPassed, protectedResourceReleaseBuildDetails);
         AddRegressionCheck(checks, errors,
             "evidence-portable-mixed-toolchain-authorities",
             portableMixedToolchainAuthoritiesPassed,
@@ -3283,6 +3308,313 @@ internal static partial class Program
             "resource-cross-target-primary-variant-contract",
             primaryVariantContractPassed,
             "CurrentVariantId must be valid and cannot be redefined by CurrentVariantRoots");
+    }
+
+    private static void RunResourceReleaseBuildRegressions(string sourceUpdateRoot,
+        string sourceRegistryPath, string settingsFile, string schemasRoot,
+        string regressionRoot, List<object> checks, List<string> errors)
+    {
+        bool registryReuse = false;
+        bool threeEngineOnboarding = false;
+        bool oldBasesPreserved = false;
+        bool variantSelection = false;
+        bool staleSnapshotRejected = false;
+        bool missingVariantRejected = false;
+        bool duplicateBaseRejected = false;
+        bool partialOutputRejected = false;
+        bool replacementRestored = false;
+        bool exactCoverage = false;
+        string details = "resource-release-build regression did not complete";
+        try
+        {
+            string root = Path.Combine(regressionRoot, "resource-release-build");
+            Directory.CreateDirectory(root);
+            BaseRegistryDocument sourceRegistry = ReadBaseRegistry(sourceRegistryPath);
+            BaseRegistryEntry[] initialEntries = RequiredPlayerEngineWorkflows.Select(workflow =>
+                sourceRegistry.Entries.FirstOrDefault(entry => string.Equals(entry.EngineWorkflow,
+                    workflow, StringComparison.Ordinal)) ?? throw new DheException(
+                    "Resource release build regression is missing workflow " + workflow + "."))
+                .ToArray();
+            BaseRegistryEntry[] addedEntries = sourceRegistry.Entries.Where(entry =>
+                initialEntries.All(initial => !string.Equals(initial.BaseId, entry.BaseId,
+                    StringComparison.OrdinalIgnoreCase))).ToArray();
+            if (addedEntries.Length < 2)
+                throw new DheException("Resource release build regression requires multiple " +
+                    "additional Base archives.");
+
+            JsonElement sourceManifest = ReadJson<JsonElement>(RequireFile(Path.Combine(
+                sourceUpdateRoot, "dhe-resource-update.json"),
+                "Resource release build source manifest"));
+            string currentSet = GetString(sourceManifest,
+                "currentAssemblySetSha256") ?? string.Empty;
+            var variantConfigs = new List<object>();
+            var variantRoots = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
+            string? primaryVariantId = null;
+            foreach (JsonElement variant in sourceManifest.GetProperty("payloadVariants")
+                         .EnumerateArray())
+            {
+                string variantId = GetString(variant, "variantId") ?? string.Empty;
+                string variantRoot = Path.Combine(root, "current", variantId);
+                Directory.CreateDirectory(variantRoot);
+                foreach (JsonElement assembly in variant.GetProperty("assemblies").EnumerateArray())
+                {
+                    string assemblyName = NormalizeName(GetString(assembly,
+                        "assemblyName") ?? string.Empty);
+                    string source = RequireFile(ResolveContainedPath(sourceUpdateRoot,
+                        GetString(assembly, "dll") ?? string.Empty,
+                        "Resource release build current assembly"),
+                        "Resource release build current assembly");
+                    File.Copy(source, Path.Combine(variantRoot, assemblyName + ".dll"), true);
+                }
+                bool primary = primaryVariantId == null && string.Equals(GetString(variant,
+                    "currentAssemblySetSha256"), currentSet,
+                    StringComparison.OrdinalIgnoreCase);
+                if (primary) primaryVariantId = variantId;
+                variantRoots.Add(variantId, variantRoot);
+                variantConfigs.Add(new { variantId, root = variantRoot, primary });
+            }
+            if (primaryVariantId == null)
+                throw new DheException("Resource release build source has no primary payload variant.");
+            if (variantRoots.Count < 2)
+                throw new DheException("Resource release build regression requires two current variants.");
+
+            object BaseInput(BaseRegistryEntry entry) => new
+            {
+                buildIdentity = entry.BuildIdentity,
+                baselineRoot = entry.BaselineRoot,
+                nativeManifest = entry.NativeManifest,
+                engineWorkflow = entry.EngineWorkflow,
+                payloadVariantId = entry.PayloadVariantId,
+                label = entry.Label,
+                aotMetadataRoot = entry.AotMetadataRoot,
+            };
+
+            string WriteConfig(string name, string outputRoot, string? existingRegistry,
+                string? previousRegistry, IEnumerable<object> currentVariants,
+                IEnumerable<BaseRegistryEntry> newBases, string mode = "Exploratory",
+                string? snapshot = null, string? snapshotSha256 = null,
+                bool initialize = false)
+            {
+                string path = Path.Combine(root, name + ".json");
+                WriteJson(path, new
+                {
+                    schemaVersion = 1,
+                    format = "hybridclr.dhe-resource-release-build-config.json",
+                    pathSemantics = "config-relative-v1",
+                    mode,
+                    settingsFile,
+                    outputRoot,
+                    existingRegistry,
+                    previousRegistry,
+                    registryId = "regression-resource-release-build",
+                    currentVariants = currentVariants.ToArray(),
+                    newBases = newBases.Select(BaseInput).ToArray(),
+                    retireBaseIds = Array.Empty<string>(),
+                    retirementReason = (string?)null,
+                    channelSnapshot = snapshot,
+                    expectedChannelSnapshotSha256 = snapshotSha256,
+                    initializeReleaseLedger = initialize,
+                });
+                return path;
+            }
+
+            int Build(string config) => ResourceReleaseBuild(new Cli(
+                "resource-release-build", new Dictionary<string, string>(
+                    StringComparer.OrdinalIgnoreCase)
+                {
+                    ["config"] = config,
+                    ["schemasroot"] = schemasRoot,
+                }));
+
+            string initialOutput = Path.Combine(root, "initial-release");
+            string initialConfig = WriteConfig("initial-config", initialOutput, null,
+                null, variantConfigs, initialEntries);
+            if (Build(initialConfig) != 0)
+                throw new DheException("Initial resource release build failed.");
+            string initialRegistryPath = RequireFile(Path.Combine(initialOutput, "registry",
+                "dhe-base-registry.json"), "Initial resource release build registry");
+            BaseRegistryDocument initialRegistry = ReadBaseRegistry(initialRegistryPath);
+
+            string onboardingOutput = Path.Combine(root, "onboarding-release");
+            string onboardingConfig = WriteConfig("onboarding-config", onboardingOutput,
+                initialRegistryPath, null, variantConfigs, addedEntries);
+            if (Build(onboardingConfig) != 0)
+                throw new DheException("Three-engine Base onboarding build failed.");
+            string onboardingRegistryPath = RequireFile(Path.Combine(onboardingOutput,
+                "registry", "dhe-base-registry.json"),
+                "Onboarding resource release build registry");
+            BaseRegistryDocument onboardingRegistry = ReadBaseRegistry(onboardingRegistryPath);
+            JsonElement onboardingReport = ReadJson<JsonElement>(Path.Combine(onboardingOutput,
+                "dhe-resource-release-build.json"));
+            threeEngineOnboarding = onboardingRegistry.Revision == 2 &&
+                string.Equals(onboardingRegistry.ParentRegistrySha256,
+                    initialRegistry.Sha256, StringComparison.OrdinalIgnoreCase) &&
+                addedEntries.All(entry => onboardingRegistry.Entries.Any(current =>
+                    string.Equals(current.BaseId, entry.BaseId,
+                        StringComparison.OrdinalIgnoreCase))) &&
+                RequiredPlayerEngineWorkflows.All(workflow => onboardingRegistry.Entries.Any(entry =>
+                    string.Equals(entry.EngineWorkflow, workflow,
+                        StringComparison.Ordinal)));
+            oldBasesPreserved = initialEntries.All(entry =>
+                onboardingRegistry.Entries.Any(current => string.Equals(current.BaseId,
+                    entry.BaseId, StringComparison.OrdinalIgnoreCase))) &&
+                onboardingRegistry.Entries.Length == initialEntries.Length + addedEntries.Length;
+
+            string reuseOutput = Path.Combine(root, "reuse-release");
+            string reuseConfig = WriteConfig("reuse-config", reuseOutput,
+                onboardingRegistryPath, initialRegistryPath, variantConfigs,
+                Array.Empty<BaseRegistryEntry>());
+            if (Build(reuseConfig) != 0)
+                throw new DheException("Unchanged registry reuse build failed.");
+            JsonElement reuseReport = ReadJson<JsonElement>(Path.Combine(reuseOutput,
+                "dhe-resource-release-build.json"));
+            JsonElement reuseManifest = ReadJson<JsonElement>(Path.Combine(reuseOutput,
+                "resource", "dhe-resource-update.json"));
+            registryReuse = GetString(reuseReport, "registryDisposition") == "reused" &&
+                reuseReport.GetProperty("registry").ValueKind == JsonValueKind.Null &&
+                GetInt(reuseReport, "registryRevision") == onboardingRegistry.Revision &&
+                string.Equals(GetString(reuseReport, "registrySha256"),
+                    onboardingRegistry.Sha256, StringComparison.OrdinalIgnoreCase) &&
+                !Directory.Exists(Path.Combine(reuseOutput, "registry"));
+
+            JsonElement runtimePlan = ReadJson<JsonElement>(Path.Combine(onboardingOutput,
+                "resource", "dhe-runtime-plan.json"));
+            var expectedVariants = onboardingRegistry.Entries.ToDictionary(entry => entry.BaseId,
+                entry => entry.PayloadVariantId, StringComparer.OrdinalIgnoreCase);
+            variantSelection = runtimePlan.GetProperty("baseSelections").EnumerateArray().All(
+                selection => expectedVariants.TryGetValue(GetString(selection, "baseId") ??
+                        string.Empty, out string? expected) &&
+                    string.Equals(expected, GetString(selection, "payloadVariantId"),
+                        StringComparison.OrdinalIgnoreCase));
+            string[] activeIds = onboardingRegistry.Entries.Select(entry => entry.BaseId)
+                .OrderBy(value => value, StringComparer.OrdinalIgnoreCase).ToArray();
+            string[] manifestIds = reuseManifest.GetProperty("supportedBases").EnumerateArray()
+                .Select(item => GetString(item, "baseId") ?? string.Empty)
+                .OrderBy(value => value, StringComparer.OrdinalIgnoreCase).ToArray();
+            exactCoverage = GetBool(onboardingReport, "exactActiveBaseCoverage") &&
+                GetInt(onboardingReport, "activeBaseCount") == activeIds.Length &&
+                activeIds.SequenceEqual(manifestIds, StringComparer.OrdinalIgnoreCase) &&
+                Directory.GetFiles(onboardingOutput, "dhe-resource-update.json",
+                    SearchOption.AllDirectories).Length == 1;
+
+            string missingVariantId = onboardingRegistry.Entries
+                .Select(entry => entry.PayloadVariantId)
+                .Distinct(StringComparer.OrdinalIgnoreCase)
+                .First(id => variantRoots.Count > 1);
+            object[] reducedVariants = variantConfigs.Where(item =>
+                !string.Equals(GetString(JsonSerializer.SerializeToElement(item, Json),
+                    "variantId"), missingVariantId,
+                    StringComparison.OrdinalIgnoreCase)).ToArray();
+            if (reducedVariants.Length == 0)
+                throw new DheException("Missing-variant regression could not retain a current variant.");
+            JsonElement firstReduced = JsonSerializer.SerializeToElement(reducedVariants[0], Json);
+            reducedVariants[0] = new
+            {
+                variantId = GetString(firstReduced, "variantId"),
+                root = GetString(firstReduced, "root"),
+                primary = true,
+            };
+            for (int index = 1; index < reducedVariants.Length; index++)
+            {
+                JsonElement item = JsonSerializer.SerializeToElement(reducedVariants[index], Json);
+                reducedVariants[index] = new
+                {
+                    variantId = GetString(item, "variantId"),
+                    root = GetString(item, "root"),
+                    primary = false,
+                };
+            }
+            string missingOutput = Path.Combine(root, "missing-variant-output");
+            string missingConfig = WriteConfig("missing-variant-config", missingOutput,
+                onboardingRegistryPath, initialRegistryPath, reducedVariants,
+                Array.Empty<BaseRegistryEntry>());
+            try
+            {
+                _ = Build(missingConfig);
+            }
+            catch (DheException)
+            {
+                missingVariantRejected = !Directory.Exists(missingOutput);
+            }
+
+            string duplicateOutput = Path.Combine(root, "duplicate-base-output");
+            string duplicateConfig = WriteConfig("duplicate-base-config", duplicateOutput,
+                null, null, variantConfigs, new[] { initialEntries[0], initialEntries[0] });
+            try
+            {
+                _ = Build(duplicateConfig);
+            }
+            catch (DheException)
+            {
+                duplicateBaseRejected = !Directory.Exists(duplicateOutput);
+            }
+
+            string staleOutput = Path.Combine(root, "stale-snapshot-output");
+            string staleConfig = WriteConfig("stale-snapshot-config", staleOutput,
+                initialRegistryPath, null, variantConfigs, Array.Empty<BaseRegistryEntry>(),
+                "Release", initialConfig, new string('f', 64));
+            try
+            {
+                _ = Build(staleConfig);
+            }
+            catch (DheException)
+            {
+                staleSnapshotRejected = !Directory.Exists(staleOutput);
+            }
+            partialOutputRejected = missingVariantRejected && duplicateBaseRejected &&
+                staleSnapshotRejected && !Directory.GetDirectories(root, ".*.staging-*",
+                    SearchOption.TopDirectoryOnly).Any();
+
+            string replacementOutput = Path.Combine(root, "replacement-output");
+            string replacementStaging = Path.Combine(root, "replacement-staging");
+            Directory.CreateDirectory(replacementOutput);
+            Directory.CreateDirectory(replacementStaging);
+            File.WriteAllText(Path.Combine(replacementOutput, "identity.txt"), "old",
+                new UTF8Encoding(false));
+            File.WriteAllText(Path.Combine(replacementStaging, "identity.txt"), "new",
+                new UTF8Encoding(false));
+            try
+            {
+                PublishResourceReleaseDirectory(replacementStaging, replacementOutput, true,
+                    () => throw new IOException("injected final move failure"));
+            }
+            catch (IOException)
+            {
+                replacementRestored = Directory.Exists(replacementOutput) &&
+                    File.ReadAllText(Path.Combine(replacementOutput, "identity.txt")) == "old" &&
+                    !Directory.GetDirectories(root, ".replacement-output.backup-*",
+                        SearchOption.TopDirectoryOnly).Any();
+            }
+            if (Directory.Exists(replacementStaging))
+                Directory.Delete(replacementStaging, true);
+            details = "one atomic build created a three-engine successor, preserved old " +
+                "Bases, selected variants, and failed closed";
+        }
+        catch (Exception exception)
+        {
+            details = exception.Message;
+        }
+
+        AddRegressionCheck(checks, errors, "resource-release-build-registry-reuse",
+            registryReuse, details);
+        AddRegressionCheck(checks, errors,
+            "resource-release-build-three-engine-onboarding", threeEngineOnboarding, details);
+        AddRegressionCheck(checks, errors,
+            "resource-release-build-old-bases-preserved", oldBasesPreserved, details);
+        AddRegressionCheck(checks, errors,
+            "resource-release-build-variant-selection", variantSelection, details);
+        AddRegressionCheck(checks, errors,
+            "resource-release-build-stale-snapshot-rejected", staleSnapshotRejected, details);
+        AddRegressionCheck(checks, errors,
+            "resource-release-build-missing-variant-rejected", missingVariantRejected, details);
+        AddRegressionCheck(checks, errors,
+            "resource-release-build-duplicate-base-rejected", duplicateBaseRejected, details);
+        AddRegressionCheck(checks, errors,
+            "resource-release-build-partial-output-rejected", partialOutputRejected, details);
+        AddRegressionCheck(checks, errors,
+            "resource-release-build-replacement-restored", replacementRestored, details);
+        AddRegressionCheck(checks, errors,
+            "resource-release-build-exact-active-base-coverage", exactCoverage, details);
     }
 
     private static bool RunExtensiblePlayerMatrixRegression(string regressionRoot)

@@ -310,6 +310,43 @@ ledger path/hash, channel ID, and next revision; it cannot be combined with the
 legacy explicit head arguments. A stale snapshot is rejected by both qualification
 and promotion.
 
+`resource-release-build` is the production entry point that binds registry
+onboarding and the resource build into one filesystem transaction. Start from
+`templates/dhe-resource-release-build-config.json`, keep every path relative to
+the config file (absolute paths remain accepted), and invoke:
+
+```text
+dotnet HybridCLR.DheTool.dll resource-release-build \
+  -Config C:/project/ProjectSettings/DHE/dhe-resource-release-build-config.json \
+  -Root C:/project/Tools/HybridCLRDhe
+```
+
+For an ordinary hotfix, set `newBases` and `retireBaseIds` to empty arrays and
+point `existingRegistry` at the exact active registry. Its revision does not
+change. If that registry is revision 2 or later, `previousRegistry` must name its
+direct parent so the existing lineage is revalidated. For a newly shipped main
+package, add its immutable archive to `newBases`; the command creates one direct
+successor under `registry/` and includes every previous active Base. Several new
+Unity 2021, Unity 2022, and Tuanjie 2022 Bases may be added in the same operation.
+Each entry selects one ID from `currentVariants`; exactly one current variant is
+marked primary for the legacy top-level payload fields.
+
+Release mode always requires `channelSnapshot` and its expected SHA-256. Set
+`initializeReleaseLedger` only for an uninitialized snapshot. The command writes
+the registry and resource candidate in a unique sibling staging directory, checks
+exact Base and variant coverage, validates every JSON contract, and only then
+renames the complete directory to `outputRoot`. Existing output is rejected unless
+`-ForceOutput` is explicit; replacement first moves it to a sibling backup and
+restores it if the final rename fails. A successful build still requires one
+`resource-player-evidence` result per active Base, `resource-release-gate`, and
+`channel-state promote`. It does not publish or advance the channel head itself.
+The game resource/catalog input is `<outputRoot>/resource`; the complete wrapper
+directory is the release-system record and must also be retained immutably because
+its sibling `registry/` file is the operational input for the next Base-set change.
+Do not relocate that registry independently from the Base archive topology named by
+its relative paths. The registry copy below `resource/audit/` authenticates the
+published Base set but is not an operational path index.
+
 Release qualification must execute that exact continuation on every active Base.
 `regression -ResourceUpdateRoot <previous> -ResourceUpdateRoot2 <candidate>` binds
 the complete `-WorkflowChangedRoots` Player set to the candidate manifest and

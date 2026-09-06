@@ -1,7 +1,7 @@
 {
   "schemaVersion": 1,
   "format": "hybridclr.dhe-toolchain-layout.json",
-  "toolchainVersion": "0.1.28",
+  "toolchainVersion": "0.1.29",
   "contractVersion": 1,
   "exactPaths": [
     ".gitattributes",
@@ -20,6 +20,7 @@
     "tool/ChannelState.cs",
     "tool/BaseRegistry.cs",
     "tool/ReleaseLedger.cs",
+    "tool/ResourceReleaseBuild.cs",
     "tool/LabCommands.cs",
     "tool/ManagedCaseVariants.cs",
     "tool/dnlib.dll",
@@ -28,6 +29,7 @@
     "docs/HybridCLR-DHE-Resource-Only-Design.md",
     "docs/HybridCLR-DHE-Release-Ledger-Design.md",
     "docs/HybridCLR-DHE-Evidence-Authority-Set-Design.md",
+    "docs/HybridCLR-DHE-Base-Onboarding-Design.md",
     "docs/HybridCLR-DHE-Workflow-Review.md",
     "docs/THIRD-PARTY-NOTICES.md",
     "manifests/dhe-package-lock.json",
@@ -50,6 +52,8 @@
     "schemas/dhe-resource-evidence.schema.json",
     "schemas/dhe-resource-player-workflow.schema.json",
     "schemas/dhe-resource-release-gate.schema.json",
+    "schemas/dhe-resource-release-build-config.schema.json",
+    "schemas/dhe-resource-release-build.schema.json",
     "schemas/dhe-resource-update.schema.json",
     "schemas/dhe-resource-update-validation.schema.json",
     "schemas/dhe-resource-stage.schema.json",
@@ -94,7 +98,8 @@
     "schemas/dhe-yooasset-build.schema.json",
     "templates/DheWorkflowBuild.cs",
     "templates/DheBuildIdentity.cs",
-    "templates/dhe-workflow-config.json"
+    "templates/dhe-workflow-config.json",
+    "templates/dhe-resource-release-build-config.json"
   ],
   "prefixes": [
     "patches/dhe-lite/"
@@ -110,6 +115,7 @@
     "baseline-manifest",
     "batch",
     "base-registry",
+    "resource-release-build",
     "resource-update",
     "stage-resource-update",
     "resource-player-evidence",

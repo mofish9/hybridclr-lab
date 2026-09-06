@@ -45,6 +45,17 @@ internal static partial class Program
         "resource-cross-target-variant-set-tamper-rejected",
         "resource-cross-target-missing-variant-rejected",
         "resource-cross-target-primary-variant-contract",
+        "resource-release-build-registry-reuse",
+        "resource-release-build-three-engine-onboarding",
+        "resource-release-build-old-bases-preserved",
+        "resource-release-build-variant-selection",
+        "resource-release-build-stale-snapshot-rejected",
+        "resource-release-build-missing-variant-rejected",
+        "resource-release-build-duplicate-base-rejected",
+        "resource-release-build-partial-output-rejected",
+        "resource-release-build-replacement-restored",
+        "resource-release-build-exact-active-base-coverage",
+        "resource-release-build-protected-release",
         "resource-base-registry", "base-registry-builder",
         "base-registry-build-configuration-tamper-rejected",
         "base-registry-lineage", "base-registry-implicit-removal-rejected",
@@ -126,6 +137,7 @@ internal static partial class Program
                 "mv" or "metaversion" => GenerateMetaVersion(cli),
                 "batch" => Batch(cli),
                 "base-registry" => BuildBaseRegistry(cli),
+                "resource-release-build" => ResourceReleaseBuild(cli),
                 "resource-update" => ResourceUpdate(cli),
                 "stage-resource-update" => StageResourceUpdate(cli),
                 "resource-player-evidence" => ResourcePlayerEvidence(cli),
@@ -366,13 +378,38 @@ internal static partial class Program
     {
         string outputPath = Path.GetFullPath(cli.Require("output"));
         string? existingPath = cli.Optional("existingregistry");
-        string[] identityPaths = ReadPathList(cli, "baseidentities", "baseidentity");
-        string[] baselineRoots = ReadPathList(cli, "baselineroots", "baselineroot");
-        string[] nativeManifestPaths = ReadPathList(cli, "basenativemanifests", "basenativemanifest");
-        string[] workflowValues = cli.GetList("engineworkflows").ToArray();
-        string[] variantValues = cli.GetList("payloadvariantids").ToArray();
-        string[] labelValues = cli.GetList("labels").ToArray();
-        string[] aotValues = cli.GetList("aotmetadataroots").ToArray();
+        string[] identityPaths;
+        string[] baselineRoots;
+        string[] nativeManifestPaths;
+        string[] workflowValues;
+        string[] variantValues;
+        string[] labelValues;
+        string[] aotValues;
+        string? structuredEntries = cli.Optional("baseentriesjson");
+        if (!string.IsNullOrWhiteSpace(structuredEntries))
+        {
+            string[] legacyEntryArguments =
+            {
+                "baseidentities", "baseidentity", "baselineroots", "baselineroot",
+                "basenativemanifests", "basenativemanifest", "engineworkflows",
+                "payloadvariantids", "labels", "aotmetadataroots",
+            };
+            if (legacyEntryArguments.Any(name => !string.IsNullOrWhiteSpace(cli.Optional(name))))
+                throw new DheException("BaseEntriesJson cannot be combined with parallel new-Base arguments.");
+            (identityPaths, baselineRoots, nativeManifestPaths, workflowValues,
+                variantValues, labelValues, aotValues) = ReadStructuredBaseRegistryEntries(
+                structuredEntries);
+        }
+        else
+        {
+            identityPaths = ReadPathList(cli, "baseidentities", "baseidentity");
+            baselineRoots = ReadPathList(cli, "baselineroots", "baselineroot");
+            nativeManifestPaths = ReadPathList(cli, "basenativemanifests", "basenativemanifest");
+            workflowValues = cli.GetList("engineworkflows").ToArray();
+            variantValues = cli.GetList("payloadvariantids").ToArray();
+            labelValues = cli.GetList("labels").ToArray();
+            aotValues = cli.GetList("aotmetadataroots").ToArray();
+        }
         string[] retireBaseIds = cli.GetList("retirebaseids").ToArray();
         string? retirementReason = cli.Optional("retirementreason")?.Trim();
         if (retireBaseIds.Distinct(StringComparer.OrdinalIgnoreCase).Count() !=
@@ -654,6 +691,46 @@ internal static partial class Program
             ? Array.Empty<string>()
             : value.Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries)
                 .Select(Path.GetFullPath).ToArray();
+    }
+
+    private static (string[] IdentityPaths, string[] BaselineRoots,
+        string[] NativeManifestPaths, string[] WorkflowValues, string[] VariantValues,
+        string[] LabelValues, string[] AotValues) ReadStructuredBaseRegistryEntries(string raw)
+    {
+        JsonElement entries;
+        try
+        {
+            using JsonDocument document = JsonDocument.Parse(raw);
+            entries = document.RootElement.Clone();
+        }
+        catch (JsonException exception)
+        {
+            throw new DheException("BaseEntriesJson must be a JSON array: " + exception.Message);
+        }
+        if (entries.ValueKind != JsonValueKind.Array)
+            throw new DheException("BaseEntriesJson must be a JSON array.");
+        var identities = new List<string>();
+        var baselines = new List<string>();
+        var nativeManifests = new List<string>();
+        var workflows = new List<string>();
+        var variants = new List<string>();
+        var labels = new List<string>();
+        var aotRoots = new List<string>();
+        foreach (JsonElement entry in entries.EnumerateArray())
+        {
+            if (entry.ValueKind != JsonValueKind.Object)
+                throw new DheException("BaseEntriesJson contains a non-object entry.");
+            identities.Add(Path.GetFullPath(GetString(entry, "buildIdentity") ?? string.Empty));
+            baselines.Add(Path.GetFullPath(GetString(entry, "baselineRoot") ?? string.Empty));
+            nativeManifests.Add(Path.GetFullPath(GetString(entry, "nativeManifest") ?? string.Empty));
+            workflows.Add(GetString(entry, "engineWorkflow") ?? string.Empty);
+            variants.Add(GetString(entry, "payloadVariantId") ?? string.Empty);
+            labels.Add(GetString(entry, "label") ?? string.Empty);
+            string? aotRoot = GetString(entry, "aotMetadataRoot");
+            aotRoots.Add(string.IsNullOrWhiteSpace(aotRoot) ? "null" : Path.GetFullPath(aotRoot));
+        }
+        return (identities.ToArray(), baselines.ToArray(), nativeManifests.ToArray(),
+            workflows.ToArray(), variants.ToArray(), labels.ToArray(), aotRoots.ToArray());
     }
 
     /// <summary>
@@ -4046,7 +4123,7 @@ internal static partial class Program
 
     private static void PrintHelp() => Console.WriteLine(string.Join(Environment.NewLine,
         "HybridCLR DHE C# tool",
-        "Commands: version, mv, batch, base-registry, resource-update, " +
+        "Commands: version, mv, batch, base-registry, resource-release-build, resource-update, " +
         "stage-resource-update, resource-player-evidence, resource-release-gate, " +
         "channel-state, baseline-manifest, aot-metadata-manifest, preflight, workflow, " +
         "release-gate, regression, schema-validate, schema-gate, validate, archive, " +
@@ -4059,6 +4136,9 @@ internal static partial class Program
         "-BaselineRoots, -BaseNativeManifests, -EngineWorkflows, with optional " +
         "-PayloadVariantIds, -Labels, and -AotMetadataRoots. Retiring an online Base " +
         "requires -RetireBaseIds and -RetirementReason.",
+        "Resource release build accepts one config-relative JSON document with -Config, " +
+        "uses -SchemasRoot (or <Root>/schemas), and replaces an existing output only with " +
+        "-ForceOutput.",
         "Release resource update accepts a protected -ChannelSnapshot, or the legacy " +
         "explicit ledger arguments. Registry revision 2 or later also requires " +
         "-PreviousBaseRegistry when its Base set changes.",
