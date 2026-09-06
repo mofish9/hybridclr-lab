@@ -24,11 +24,12 @@ Its formal entry points, generated-output boundary, and complete four-assembly
 Player evidence are documented in
 `docs/HybridCLR-DHE-Toolchain.md`,
 `docs/HybridCLR-DHE-Workflow-Review.md` and
-`docs/HybridCLR-DHE-Formal-Project-Validation.md`. Toolchain `0.1.28` is the
+`docs/HybridCLR-DHE-Formal-Project-Validation.md`. Toolchain `0.1.31` is the
 current conditionally accepted source and three-engine Windows release; its exact
 evidence and remaining platform gates are recorded in
-`docs/HybridCLR-DHE-Opt4-Release-0.1.28.md`. Toolchains `0.1.18`, `0.1.20`,
-`0.1.21`, `0.1.22`, `0.1.23`, `0.1.24`, `0.1.25`, `0.1.26`, and `0.1.27`
+`docs/HybridCLR-DHE-Opt4-Release-0.1.31.md`. Toolchains `0.1.18`, `0.1.20`,
+`0.1.21`, `0.1.22`, `0.1.23`, `0.1.24`, `0.1.25`, `0.1.26`, `0.1.27`,
+`0.1.28`, `0.1.29`, and `0.1.30`
 are retained as historical evidence. Projects must install an
 authenticated package whose manifest has `releaseReady=true` and pin its exact
 package ID.
@@ -108,6 +109,17 @@ regression passed 128/128 checks. Three real Editors built ARM64 APKs and the
 current three-engine native CTest matrix passed, but Android device execution,
 iOS, macOS, CAT integration, and production performance/memory gates remain
 incomplete.
+Toolchains `0.1.29` and `0.1.30` added the atomic config-driven Base onboarding
+builder and complete historical evidence authority set. Toolchain `0.1.31`
+accepts a fully proven no-op result when one selected Base already contains the
+current managed payload. It still requires positive AOT entries, zero interpreter
+entries, complete assembly/dispatch/capability validation, and
+`noOpAotBehaviorValidated=true`. Its package ID is
+`5af090eca274468623a7b4e8bab3ceeb669f378f7293bfeb3d1498c69ba7d960`.
+The clean regression passed 141/141 checks. A second six-Base resource revision
+then passed on all Windows Players, including one `0 changed / 0 interpreter`
+Base, and advanced an isolated protected channel from revision 1 to revision 2
+without rebuilding any Base Player.
 Base identity now also binds `engineWorkflow` and `il2cppCodeGeneration`.
 Unity 2021 is locked to `OptimizeSpeed`; Unity 2022 FGS and Tuanjie 2022 FGS
 are locked to `OptimizeSize`. Base evidence created before these fields existed
