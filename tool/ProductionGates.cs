@@ -3758,6 +3758,8 @@ internal static partial class Program
         bool partialOutputRejected = false;
         bool replacementRestored = false;
         bool exactCoverage = false;
+        bool onboardingAllBaseStaging = false;
+        bool reuseAllBaseStaging = false;
         string details = "resource-release-build regression did not complete";
         try
         {
@@ -3823,6 +3825,67 @@ internal static partial class Program
                 aotMetadataRoot = entry.AotMetadataRoot,
             };
 
+            bool StageAllBases(string name, string updateRoot,
+                BaseRegistryDocument registry)
+            {
+                try
+                {
+                    string assetsRoot = Path.Combine(root, name + "-all-base-assets");
+                    string stagesRoot = Path.Combine(root, name + "-all-base-stages");
+                    Directory.CreateDirectory(assetsRoot);
+                    Directory.CreateDirectory(stagesRoot);
+                    int stagedCount = 0;
+                    for (int index = 0; index < registry.Entries.Length; index++)
+                    {
+                        BaseRegistryEntry entry = registry.Entries[index];
+                        JsonElement identity = ReadJson<JsonElement>(entry.BuildIdentity);
+                        string runtimeAssetRoot = RequirePortableAssetRoot(
+                            GetString(identity, "runtimeAssetRoot"),
+                            "onboarding identity runtimeAssetRoot");
+                        string baseAssetRoot = RequirePortableAssetRoot(
+                            GetString(identity, "baseMetaVersionAssetRoot"),
+                            "onboarding identity baseMetaVersionAssetRoot");
+                        if (!baseAssetRoot.StartsWith(runtimeAssetRoot,
+                                StringComparison.OrdinalIgnoreCase))
+                            throw new DheException(
+                                "onboarding BaseMetaVersionAssetRoot is outside RuntimeAssetRoot.");
+                        string relative = baseAssetRoot[runtimeAssetRoot.Length..].TrimEnd('/');
+                        string assetRoot = Path.Combine(assetsRoot,
+                            index.ToString("D3", CultureInfo.InvariantCulture));
+                        string baseRoot = ResolveContainedPath(assetRoot, relative,
+                            "onboarding embedded Base MetaVersion root");
+                        Directory.CreateDirectory(baseRoot);
+                        foreach (JsonElement assembly in identity.GetProperty("assemblies")
+                                     .EnumerateArray())
+                        {
+                            string assemblyName = NormalizeName(GetString(assembly,
+                                "assemblyName") ?? string.Empty);
+                            string baseline = RequireFile(Path.Combine(entry.BaselineRoot,
+                                assemblyName + ".dll"),
+                                "onboarding Base assembly " + assemblyName);
+                            MetaVersionSnapshot.Create(baseline).WriteBinary(Path.Combine(
+                                baseRoot, assemblyName + ".mv.bytes"));
+                        }
+                        string stagePath = Path.Combine(stagesRoot,
+                            index.ToString("D3", CultureInfo.InvariantCulture) + ".json");
+                        int exit = StageResourceUpdate(new Cli("stage-resource-update",
+                            new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase)
+                            {
+                                ["updateroot"] = updateRoot,
+                                ["assetroot"] = assetRoot,
+                                ["basebuildidentity"] = entry.BuildIdentity,
+                                ["output"] = stagePath,
+                            }));
+                        if (exit == 0) stagedCount++;
+                    }
+                    return stagedCount == registry.Entries.Length;
+                }
+                catch
+                {
+                    return false;
+                }
+            }
+
             string WriteConfig(string name, string outputRoot, string? existingRegistry,
                 string? previousRegistry, IEnumerable<object> currentVariants,
                 IEnumerable<BaseRegistryEntry> newBases, string mode = "Exploratory",
@@ -3880,6 +3943,8 @@ internal static partial class Program
             BaseRegistryDocument onboardingRegistry = ReadBaseRegistry(onboardingRegistryPath);
             JsonElement onboardingReport = ReadJson<JsonElement>(Path.Combine(onboardingOutput,
                 "dhe-resource-release-build.json"));
+            onboardingAllBaseStaging = StageAllBases("onboarding",
+                Path.Combine(onboardingOutput, "resource"), onboardingRegistry);
             threeEngineOnboarding = onboardingRegistry.Revision == 2 &&
                 string.Equals(onboardingRegistry.ParentRegistrySha256,
                     initialRegistry.Sha256, StringComparison.OrdinalIgnoreCase) &&
@@ -3904,6 +3969,8 @@ internal static partial class Program
                 "dhe-resource-release-build.json"));
             JsonElement reuseManifest = ReadJson<JsonElement>(Path.Combine(reuseOutput,
                 "resource", "dhe-resource-update.json"));
+            reuseAllBaseStaging = StageAllBases("reuse", Path.Combine(reuseOutput,
+                "resource"), onboardingRegistry);
             registryReuse = GetString(reuseReport, "registryDisposition") == "reused" &&
                 reuseReport.GetProperty("registry").ValueKind == JsonValueKind.Null &&
                 GetInt(reuseReport, "registryRevision") == onboardingRegistry.Revision &&
@@ -4049,6 +4116,14 @@ internal static partial class Program
             "resource-release-build-replacement-restored", replacementRestored, details);
         AddRegressionCheck(checks, errors,
             "resource-release-build-exact-active-base-coverage", exactCoverage, details);
+        AddRegressionCheck(checks, errors,
+            "resource-release-build-onboarding-all-base-staging",
+            onboardingAllBaseStaging,
+            "the onboarding resource package must stage successfully for every old and newly added Base");
+        AddRegressionCheck(checks, errors,
+            "resource-release-build-reuse-all-base-staging",
+            reuseAllBaseStaging,
+            "a later resource package with the reused registry must stage successfully for every active Base");
     }
 
     private static bool RunExtensiblePlayerMatrixRegression(string regressionRoot)

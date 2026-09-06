@@ -58,6 +58,8 @@ internal static partial class Program
         "resource-release-build-partial-output-rejected",
         "resource-release-build-replacement-restored",
         "resource-release-build-exact-active-base-coverage",
+        "resource-release-build-onboarding-all-base-staging",
+        "resource-release-build-reuse-all-base-staging",
         "resource-release-build-protected-release",
         "resource-base-registry", "base-registry-builder",
         "base-registry-build-configuration-tamper-rejected",
