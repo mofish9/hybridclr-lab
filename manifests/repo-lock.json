@@ -11,9 +11,9 @@
     "hybridclr_unity": {
       "upstream": "https://github.com/focus-creative-games/hybridclr_unity.git",
       "fork": "https://github.com/mofish9/hybridclr_unity.git",
-      "tag": "optimize/dhe-cross-target-multibase-v8.13.0",
+      "tag": "optimize/v8.13.0",
       "commit": "18abd01ca9847f06a64bde3cc9fc9e24a1b63d10",
-      "localBranch": "optimize/dhe-cross-target-multibase-v8.13.0"
+      "localBranch": "optimize/v8.13.0"
     },
     "hybridclr": {
       "upstream": "https://github.com/focus-creative-games/hybridclr.git",
