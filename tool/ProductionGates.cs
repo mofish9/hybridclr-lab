@@ -1274,6 +1274,7 @@ internal static partial class Program
                             {
                                 ["mode"] = "Exploratory",
                                 ["currentroot"] = fgsCurrentRoot,
+                                ["currentvariantid"] = fgsEntry.PayloadVariantId,
                                 ["baseregistry"] = fgsRegistryPath,
                                 ["settingsfile"] = RequireFile(settingsFile,
                                     "FGS empty metadata regression settings"),
@@ -2083,6 +2084,13 @@ internal static partial class Program
             changedWorkflowRoots.All(Directory.Exists) &&
             !string.IsNullOrWhiteSpace(noOpWorkflowRoot) && Directory.Exists(noOpWorkflowRoot))
         {
+            PackageInspection candidatePackage = InspectPackage(packageRoot, null, false);
+            if (!candidatePackage.Passed || !IsHex(candidatePackage.PackageId, 64, 64))
+                throw new DheException("Regression package is not an authenticated candidate: " +
+                    string.Join("; ", candidatePackage.Errors));
+            IReadOnlyDictionary<string, string> authenticatedEvidenceToolchains =
+                ReadEvidenceToolchainRoots(cli.GetList("evidencetoolchainroots"),
+                    candidatePackage.PackageId!);
             var workflowRoots = changedWorkflowRoots.Select((root, index) =>
                     (Name: "changed-" + (index + 1).ToString("D3"),
                         Role: "player-changed", Root: root))
@@ -2115,7 +2123,7 @@ internal static partial class Program
                         ValidateResourcePlayerEvidenceBindings(workflowReport, reportPath);
                     }
                     ValidateManagedReleaseEvidence(workflowReport, reportPath,
-                        cli.GetList("evidencetoolchainroots").Append(packageRoot));
+                        authenticatedEvidenceToolchains.Values.Append(cli.Root));
                     if (changedWorkflow)
                     {
                         var identity = GetChangedPlayerEvidenceIdentity(workflowReport, reportPath);
@@ -2195,25 +2203,95 @@ internal static partial class Program
                         "Resource release aggregate authority package");
                     string authorityPackageId = GetString(changedReports[0].Report,
                         "expectedToolchainPackageId") ?? string.Empty;
+                    string[] SelectAggregateEvidenceToolchainRoots(
+                        IEnumerable<(JsonElement Report, string Path)> inputs)
+                    {
+                        var inputReports = inputs.ToArray();
+                        var selected = new Dictionary<string, string>(
+                            StringComparer.OrdinalIgnoreCase);
+                        foreach (string packageId in inputReports.Select(item =>
+                                     GetString(item.Report, "expectedToolchainPackageId") ??
+                                     string.Empty).Distinct(StringComparer.OrdinalIgnoreCase))
+                        {
+                            if (string.Equals(packageId, authorityPackageId,
+                                    StringComparison.OrdinalIgnoreCase))
+                                continue;
+                            if (!authenticatedEvidenceToolchains.TryGetValue(packageId,
+                                    out string? root))
+                                throw new DheException("Active Base evidence package is missing " +
+                                    "from EvidenceToolchainRoots: " + packageId + ".");
+                            selected.Add(packageId, root);
+                        }
+
+                        bool MatchesRuntimeLock(string root, string expectedSha256)
+                        {
+                            string lockPath = Path.Combine(root, "manifests",
+                                "dhe-runtime-lock.json");
+                            return File.Exists(lockPath) && Sha256File(lockPath).Equals(
+                                expectedSha256, StringComparison.OrdinalIgnoreCase);
+                        }
+
+                        foreach ((JsonElement report, string reportPath) in inputReports)
+                        {
+                            string reportRoot = Path.GetDirectoryName(reportPath)!;
+                            string runtimePath = ResolveEvidencePath(GetString(report,
+                                "runtimeSource"), reportRoot,
+                                "Aggregate managed runtime manifest");
+                            JsonElement runtime = ReadJson<JsonElement>(runtimePath);
+                            string expectedLock = GetString(runtime,
+                                "dheRuntimeLockSha256") ?? string.Empty;
+                            if (new[] { authorityRoot }.Concat(selected.Values).Any(root =>
+                                    MatchesRuntimeLock(root, expectedLock)))
+                                continue;
+                            KeyValuePair<string, string> match =
+                                authenticatedEvidenceToolchains
+                                    .Where(item => !string.Equals(item.Key,
+                                        authorityPackageId,
+                                        StringComparison.OrdinalIgnoreCase) &&
+                                        MatchesRuntimeLock(item.Value, expectedLock))
+                                    .OrderBy(item => item.Key, StringComparer.Ordinal)
+                                    .FirstOrDefault();
+                            if (string.IsNullOrWhiteSpace(match.Key))
+                                throw new DheException("No authenticated Release package " +
+                                    "provides runtime lock " + expectedLock +
+                                    " for active Base report " + reportPath + ".");
+                            selected.TryAdd(match.Key, match.Value);
+                        }
+                        return selected.OrderBy(item => item.Key,
+                                StringComparer.Ordinal)
+                            .Select(item => item.Value).ToArray();
+                    }
+
                     Dictionary<string, string> AggregateArguments(
                         IEnumerable<(JsonElement Report, string Path)> inputs,
-                        string aggregateOutput) => new(StringComparer.OrdinalIgnoreCase)
+                        string aggregateOutput)
                     {
-                        ["toolchainroot"] = authorityRoot,
-                        ["expectedtoolchainpackageid"] = authorityPackageId,
-                        ["validationsourceroot"] = cli.Root,
-                        ["schemaroot"] = packageRoot,
-                        ["resourceupdateroot"] = resourceUpdateRoot2,
-                        ["expectedreleasechannelid"] = releaseProof.ReleaseChannelId,
-                        ["expectedreleaserevision"] = releaseProof.ReleaseRevision.ToString(
-                            CultureInfo.InvariantCulture),
-                        ["expectedreleaseledgersha256"] = releaseProof.ReleaseLedgerSha256,
-                        ["expectedpreviousreleaseledgersha256"] =
-                            releaseProof.ParentReleaseLedgerSha256 ?? string.Empty,
-                        ["requireenginematrix"] = "true",
-                        ["changedplayers"] = string.Join(',', inputs.Select(item => item.Path)),
-                        ["output"] = aggregateOutput,
-                    };
+                        var inputReports = inputs.ToArray();
+                        var values = new Dictionary<string, string>(
+                            StringComparer.OrdinalIgnoreCase)
+                        {
+                            ["toolchainroot"] = authorityRoot,
+                            ["expectedtoolchainpackageid"] = authorityPackageId,
+                            ["validationsourceroot"] = cli.Root,
+                            ["schemaroot"] = packageRoot,
+                            ["resourceupdateroot"] = resourceUpdateRoot2,
+                            ["expectedreleasechannelid"] = releaseProof.ReleaseChannelId,
+                            ["expectedreleaserevision"] = releaseProof.ReleaseRevision.ToString(
+                                CultureInfo.InvariantCulture),
+                            ["expectedreleaseledgersha256"] = releaseProof.ReleaseLedgerSha256,
+                            ["expectedpreviousreleaseledgersha256"] =
+                                releaseProof.ParentReleaseLedgerSha256 ?? string.Empty,
+                            ["requireenginematrix"] = "true",
+                            ["changedplayers"] = string.Join(',', inputReports.Select(
+                                item => item.Path)),
+                            ["output"] = aggregateOutput,
+                        };
+                        string[] evidenceRoots =
+                            SelectAggregateEvidenceToolchainRoots(inputReports);
+                        if (evidenceRoots.Length != 0)
+                            values["evidencetoolchainroots"] = string.Join(',', evidenceRoots);
+                        return values;
+                    }
 
                     string aggregatePath = Path.Combine(regressionRoot,
                         "resource-release-gate.json");
@@ -2221,16 +2299,23 @@ internal static partial class Program
                         "resource-release-gate", AggregateArguments(changedReports,
                             aggregatePath))) == 0;
                     bool incompleteRejected = false;
+                    var incompleteReports = changedReports.Where(item => string.Equals(
+                            GetString(item.Report, "expectedToolchainPackageId"),
+                            authorityPackageId, StringComparison.OrdinalIgnoreCase))
+                        .GroupBy(item => GetChangedPlayerEvidenceIdentity(item.Report,
+                            item.Path).EngineWorkflow, StringComparer.Ordinal)
+                        .Select(group => group.First()).ToArray();
                     try
                     {
                         _ = ResourceReleaseGate(new Cli("resource-release-gate",
-                            AggregateArguments(changedReports.Take(changedReports.Length - 1),
+                            AggregateArguments(incompleteReports,
                                 Path.Combine(regressionRoot,
                                     "resource-release-gate-incomplete.json"))));
                     }
-                    catch (DheException)
+                    catch (DheException exception)
                     {
-                        incompleteRejected = true;
+                        incompleteRejected = exception.Message.Contains(
+                            "cover every active Base", StringComparison.Ordinal);
                     }
                     bool candidateHeadRejected = false;
                     try
@@ -2346,10 +2431,12 @@ internal static partial class Program
                         revisionRejected && previousHeadRejectedByAggregate &&
                         reinitializationRejected && protectedOutputRejected &&
                         executionTamperRejected;
+                    string[] channelEvidenceRoots =
+                        SelectAggregateEvidenceToolchainRoots(changedReports);
                     channelStateCasWorkflowPassed = RunChannelStateRegression(
                         regressionRoot, resourceUpdateRoot, resourceUpdateRoot2,
                         changedReports, authorityRoot, authorityPackageId, cli.Root,
-                        packageRoot, resourceBaseRegistry,
+                        packageRoot, resourceBaseRegistry, channelEvidenceRoots,
                         out channelStateCasWorkflowDetails);
                 }
                 var tamperedReport = System.Text.Json.Nodes.JsonNode.Parse(
@@ -2832,8 +2919,12 @@ internal static partial class Program
                 ? defaultVariants[0]
                 : sourceVariants.Length == 1
                     ? sourceVariants[0]
-                    : throw new DheException(
-                        "Cross-target regression requires one unambiguous source payload variant.");
+                    : sourceVariants.OrderBy(item => GetString(item, "variantId"),
+                        StringComparer.Ordinal).FirstOrDefault();
+            if (sourceVariant.ValueKind == JsonValueKind.Undefined ||
+                defaultVariants.Length > 1)
+                throw new DheException(
+                    "Cross-target regression requires at least one valid source payload variant.");
             JsonElement[] sourceAssemblies = sourceVariant.GetProperty("assemblies")
                 .EnumerateArray().ToArray();
             if (sourceAssemblies.Length == 0 || sourceRegistry.Entries.Length < 2)
@@ -3788,7 +3879,7 @@ internal static partial class Program
                 int firstBaseCount = GetInt(firstManifest, "baseRegistryEntryCount");
                 int secondBaseCount = GetInt(secondManifest, "baseRegistryEntryCount");
                 consecutiveStable = !string.IsNullOrWhiteSpace(firstCurrent) &&
-                    !string.Equals(firstCurrent, secondCurrent, StringComparison.OrdinalIgnoreCase) &&
+                    !string.IsNullOrWhiteSpace(secondCurrent) &&
                     string.Equals(GetString(firstReport, "selectedBaseId"),
                         GetString(secondReport, "selectedBaseId"), StringComparison.OrdinalIgnoreCase) &&
                     string.Equals(GetString(firstReport, "selectedAotMetadataSetId"),
@@ -4347,8 +4438,12 @@ internal static partial class Program
         var tampered = CopyFixture("payload-tamper");
         var tamperedManifest = ReadJson<JsonElement>(Path.Combine(tampered.Update,
             "dhe-resource-update.json"));
-        string tamperedVariantId = GetString(tamperedManifest.GetProperty("supportedBases")
-            .EnumerateArray().First(), "payloadVariantId") ?? "default";
+        JsonElement payloadTamperIdentity = ReadJson<JsonElement>(tampered.Identity);
+        string tamperedBaseId = GetString(payloadTamperIdentity, "baseId") ?? string.Empty;
+        JsonElement tamperedBase = tamperedManifest.GetProperty("supportedBases")
+            .EnumerateArray().Single(item => string.Equals(GetString(item, "baseId"),
+                tamperedBaseId, StringComparison.OrdinalIgnoreCase));
+        string tamperedVariantId = GetString(tamperedBase, "payloadVariantId") ?? "default";
         JsonElement tamperedVariant = SelectPayloadVariant(tamperedManifest, tamperedVariantId,
             "Regression payload variant");
         string tamperedPayload = ResolveContainedPath(tampered.Update,
@@ -4365,8 +4460,12 @@ internal static partial class Program
         var missing = CopyFixture("payload-missing");
         var missingManifest = ReadJson<JsonElement>(Path.Combine(missing.Update,
             "dhe-resource-update.json"));
-        string missingVariantId = GetString(missingManifest.GetProperty("supportedBases")
-            .EnumerateArray().First(), "payloadVariantId") ?? "default";
+        JsonElement missingIdentity = ReadJson<JsonElement>(missing.Identity);
+        string missingBaseId = GetString(missingIdentity, "baseId") ?? string.Empty;
+        JsonElement missingBase = missingManifest.GetProperty("supportedBases")
+            .EnumerateArray().Single(item => string.Equals(GetString(item, "baseId"),
+                missingBaseId, StringComparison.OrdinalIgnoreCase));
+        string missingVariantId = GetString(missingBase, "payloadVariantId") ?? "default";
         JsonElement missingVariant = SelectPayloadVariant(missingManifest, missingVariantId,
             "Regression payload variant");
         string missingPayload = ResolveContainedPath(missing.Update,

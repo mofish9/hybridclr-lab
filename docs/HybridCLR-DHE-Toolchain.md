@@ -420,11 +420,14 @@ cross-engine-channel policy. A normal project channel needs reports for all of i
 active Bases, not artificial Bases from engines it has never shipped.
 
 `EvidenceToolchainRoots` is the comma-separated set of historical Release package
-locations actually referenced by active Base reports. The gate resolves them by
-recomputed Package ID, verifies version/head/tree against the current authenticated
-authority set, and rejects duplicate IDs, wrong packages, current-package
-substitution, and unused roots. It records all resolved package identities and each
-Player's `current-package` or `authorized-historical-package` mode. During promotion,
+locations actually referenced by active Base reports. A root may authenticate the
+toolchain that built a Base or the exact runtime lock used by that Base when those
+two package generations differ. The gate resolves every root by recomputed Package
+ID, requires an exact runtime-lock SHA-256 match before using a runtime contract,
+then verifies the locked repository/workflow commits and trees. It rejects duplicate
+IDs, wrong packages, current-package substitution, and roots used by neither role.
+It records all resolved package identities and each Player's `current-package` or
+`authorized-historical-package` mode. During promotion,
 `channel-state promote` passes those roots back through a complete gate regeneration
 and compares every field before CAS publication.
 

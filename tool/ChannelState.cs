@@ -972,7 +972,8 @@ internal static partial class Program
         string previousUpdateRoot, string candidateUpdateRoot,
         IReadOnlyCollection<(JsonElement Report, string Path)> reports,
         string authorityRoot, string authorityPackageId, string validationSourceRoot,
-        string schemaRoot, string? baseRegistryPath, out string details)
+        string schemaRoot, string? baseRegistryPath,
+        IReadOnlyCollection<string> evidenceToolchainRoots, out string details)
     {
         details = "protected channel snapshot, adoption, promotion, and CAS validated";
         try
@@ -1079,20 +1080,28 @@ internal static partial class Program
             }
 
             Dictionary<string, string> GateArguments(string snapshotPath,
-                string snapshotSha256, string output) => new(StringComparer.OrdinalIgnoreCase)
+                string snapshotSha256, string output)
             {
-                ["toolchainroot"] = authorityRoot,
-                ["expectedtoolchainpackageid"] = authorityPackageId,
-                ["validationsourceroot"] = validationSourceRoot,
-                ["schemaroot"] = schemaRoot,
-                ["resourceupdateroot"] = candidateUpdateRoot,
-                ["channelsnapshot"] = snapshotPath,
-                ["expectedchannelsnapshotsha256"] = snapshotSha256,
-                ["expectedreleaseledgersha256"] = proof.ReleaseLedgerSha256,
-                ["requireenginematrix"] = "true",
-                ["changedplayers"] = string.Join(',', reports.Select(item => item.Path)),
-                ["output"] = output,
-            };
+                var values = new Dictionary<string, string>(
+                    StringComparer.OrdinalIgnoreCase)
+                {
+                    ["toolchainroot"] = authorityRoot,
+                    ["expectedtoolchainpackageid"] = authorityPackageId,
+                    ["validationsourceroot"] = validationSourceRoot,
+                    ["schemaroot"] = schemaRoot,
+                    ["resourceupdateroot"] = candidateUpdateRoot,
+                    ["channelsnapshot"] = snapshotPath,
+                    ["expectedchannelsnapshotsha256"] = snapshotSha256,
+                    ["expectedreleaseledgersha256"] = proof.ReleaseLedgerSha256,
+                    ["requireenginematrix"] = "true",
+                    ["changedplayers"] = string.Join(',', reports.Select(item => item.Path)),
+                    ["output"] = output,
+                };
+                if (evidenceToolchainRoots.Count != 0)
+                    values["evidencetoolchainroots"] = string.Join(',',
+                        evidenceToolchainRoots);
+                return values;
+            }
 
             string regressionGateRoot = Path.Combine(regressionRoot, "channel-gates");
             Directory.CreateDirectory(regressionGateRoot);

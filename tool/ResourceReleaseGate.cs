@@ -95,6 +95,8 @@ internal static partial class Program
             StringComparer.OrdinalIgnoreCase);
         var playerAuthorities = new Dictionary<string, PlayerToolchainAuthority>(
             StringComparer.OrdinalIgnoreCase);
+        var runtimeContractAuthorities = new Dictionary<string, PlayerToolchainAuthority>(
+            StringComparer.OrdinalIgnoreCase);
         bool historicalToolEvidenceAccepted = false;
         bool portableHistoricalToolEvidenceAccepted = false;
         foreach (string playerPath in playerPaths)
@@ -107,8 +109,28 @@ internal static partial class Program
                 !GetBool(report, "coverageGatePassed"))
                 throw new DheException("Resource release Player did not pass workflow gates: " + path);
             ValidateResourcePlayerEvidenceBindings(report, path);
-            ValidateManagedReleaseEvidence(report, path,
+            string runtimeContractRoot = ValidateManagedReleaseEvidence(report, path,
                 evidenceToolchainPackages.Values.Append(toolchainRoot));
+            string runtimeContractPackageId;
+            if (Path.GetFullPath(runtimeContractRoot).Equals(toolchainRoot,
+                    StringComparison.OrdinalIgnoreCase))
+            {
+                runtimeContractPackageId = authority.PackageId!;
+            }
+            else
+            {
+                runtimeContractPackageId = evidenceToolchainPackages.SingleOrDefault(item =>
+                    Path.GetFullPath(item.Value).Equals(Path.GetFullPath(runtimeContractRoot),
+                        StringComparison.OrdinalIgnoreCase)).Key ?? string.Empty;
+                if (!IsHex(runtimeContractPackageId, 64, 64))
+                    throw new DheException("Managed Player runtime contract did not resolve " +
+                        "to an authenticated evidence toolchain package.");
+            }
+            if (!runtimeContractAuthorities.ContainsKey(runtimeContractPackageId))
+                runtimeContractAuthorities.Add(runtimeContractPackageId,
+                    InspectReleaseToolchainAuthority(runtimeContractRoot,
+                        runtimeContractPackageId,
+                        "Managed Player runtime contract package"));
             ValidateResourceReleasePlayerCorrectness(report);
 
             string reportPackageId = GetString(report,
@@ -154,7 +176,7 @@ internal static partial class Program
             reports.Add((report, path));
         }
         EnsureEvidenceToolchainRootsAreReferenced(evidenceToolchainPackages,
-            playerAuthorityPackageIds.Values);
+            playerAuthorityPackageIds.Values.Concat(runtimeContractAuthorities.Keys));
 
         bool requireEngineMatrix = cli.Has("requireenginematrix");
         MultiBaseResourceReleaseProof proof = ReadMultiBaseResourceReleaseProof(reports,
@@ -290,6 +312,7 @@ internal static partial class Program
                 .Distinct(StringComparer.OrdinalIgnoreCase)
                 .OrderBy(value => value, StringComparer.Ordinal).ToArray(),
             evidenceToolchainPackages = playerAuthorities.Values
+                .Concat(runtimeContractAuthorities.Values)
                 .GroupBy(item => item.PackageId, StringComparer.OrdinalIgnoreCase)
                 .Select(group => group.First())
                 .OrderBy(item => item.PackageId, StringComparer.Ordinal)

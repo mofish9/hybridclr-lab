@@ -113,9 +113,11 @@ commit/tree/hash 为准。
    revision 1 必须显式授权初始化，后续 revision 必须提供精确 parent 且禁止重新初始化。
    若 active Base 来自旧 DHE 工具包，当前 Release 包必须通过已认证的
    `explicit-package-id-set-v1` 清单显式授权其 Package ID；发布机用
-   `-EvidenceToolchainRoots` 提供这些历史 Release 包的当前位置。gate 会逐包重算 Package ID，
-   核对 version/head/tree，并记录每个 Player 的 authority mode。未知、已撤销、wrong-ID、重复 ID、
-   未被 active Base 使用的 root 都失败，且存在显式清单后不能用 Git ancestry 绕过。
+   `-EvidenceToolchainRoots` 提供这些历史 Release 包的当前位置。若 Base 的构建工具包与生成其
+   runtime lock 的工具包不是同一代，还必须提供后者；gate 先精确匹配 runtime-lock SHA-256，
+   再核对锁定的 repo/workflow commit 与 tree。它会逐包重算 Package ID，并记录每个 Player 的
+   authority mode。未知、已撤销、wrong-ID、重复 ID、既未用于 Base 工具身份也未用于 runtime
+   contract 的 root 都失败，且存在显式清单后不能用 Git ancestry 绕过。
 8. `channel-state promote` 重新执行 aggregate gate，把资源与审批写入内容寻址目录，随后在
    channel 独占锁内比较 snapshot 绑定的 head SHA 并原子替换 `head.json`。两个并发 candidate
    只能一个成功，stale gate 不能重放；已有线上 ledger 首次接管必须显式执行

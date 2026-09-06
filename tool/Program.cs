@@ -2576,7 +2576,8 @@ internal static partial class Program
     }
 
     private static string ResolveManagedRuntimeContractRoot(JsonElement runtime,
-        string evidenceContractRoot, IEnumerable<string>? additionalContractRoots)
+        string evidenceContractRoot, IEnumerable<string>? additionalContractRoots,
+        string reportPath)
     {
         string expectedLockSha256 = GetString(runtime, "dheRuntimeLockSha256") ??
             string.Empty;
@@ -2591,11 +2592,13 @@ internal static partial class Program
                     StringComparison.OrdinalIgnoreCase))
                 return candidate;
         }
-        throw new DheException(
-            "Managed Player runtime lock does not match an authenticated release contract.");
+        throw new DheException("Managed Player runtime lock " + expectedLockSha256 +
+            " does not match an authenticated release contract for report " +
+            Path.GetFullPath(reportPath) + ". Checked roots: " +
+            string.Join(", ", candidates) + ".");
     }
 
-    private static void ValidateManagedReleaseEvidence(JsonElement report, string reportPath,
+    private static string ValidateManagedReleaseEvidence(JsonElement report, string reportPath,
         IEnumerable<string>? additionalContractRoots = null)
     {
         if (!string.Equals(GetString(report, "mode"), "Release", StringComparison.Ordinal) ||
@@ -2615,7 +2618,7 @@ internal static partial class Program
         if (!GetBool(runtime, "dheEnabled") || GetString(runtime, "dheRuntimeSourceMode") != "integrated")
             throw new DheException("Managed Player runtime evidence is not an integrated DHE runtime.");
         string contractRoot = ResolveManagedRuntimeContractRoot(runtime,
-            evidenceContractRoot, additionalContractRoots);
+            evidenceContractRoot, additionalContractRoots, reportPath);
         JsonElement headers = runtime.GetProperty("externalHeaders");
         if (GetBool(headers, "surrogate") || GetBool(headers, "explicitlyAllowed"))
             throw new DheException("Managed Player runtime evidence uses surrogate external headers.");
@@ -2756,6 +2759,7 @@ internal static partial class Program
                 throw new DheException(
                     "Resource Player evidence release identity does not match its ledger.");
         }
+        return contractRoot;
     }
 
     private static string GetReleaseEvidenceKey(JsonElement record, JsonElement report, string reportPath)
