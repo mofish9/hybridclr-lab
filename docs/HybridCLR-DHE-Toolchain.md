@@ -345,19 +345,23 @@ platform's assembly into another. For example:
 
 ```text
 dotnet HybridCLR.DheTool.dll resource-update \
-  -CurrentRoot C:/build/current-android \
-  -CurrentVariantRoots {"android":"C:/build/current-android","windows":"C:/build/current-windows"} \
+  -CurrentRoot C:/build/current-windows \
+  -CurrentVariantId windows \
+  -CurrentVariantRoots {"android":"C:/build/current-android"} \
   -BaseRegistry C:/release/base-registry/supported-bases.json \
   -SettingsFile C:/project/ProjectSettings/HybridCLRSettings.asset \
   -OutputRoot C:/build/resource-update
 ```
 
 Set `payloadVariantId` to `android` or `windows` in each registry entry. The manifest
-and runtime plan retain top-level default records for compatibility and add
-`payloadVariants[]`; each Base is bound to one variant hash and the runtime loads only
-that variant's DLL/MV files. This is still one resource package. Every variant must
-independently pass its target's guard and Player gates; if all targets share a compatible
-metadata shape, keep using one default variant.
+and runtime plan retain top-level records for the `-CurrentRoot` payload for compatibility
+and add `payloadVariants[]`; each Base is bound to one variant hash and the runtime loads
+only that variant's DLL/MV files. `-CurrentVariantId` defaults to `default`, so existing
+single-target commands and payload paths do not change. Give it the real target/channel
+name for a multi-variant release so the package does not contain an unused duplicate
+`default` payload. This is still one resource package. Every variant must independently
+pass its target's guard and Player gates; if all targets share a compatible metadata shape,
+keep using one default variant.
 
 Assembly execution mode is classified against both Base sets. A name in the
 Base DHE set is `dhe-differential`; a name absent from the complete Base AOT
@@ -725,7 +729,8 @@ reports plus every `player-changed` report by SHA-256. `-ChangedPlayers` accepts
 a comma-separated list, requires at least three distinct Base identities, and
 must cover `Unity2021Standard`, `Unity2022Fgs`, and `Tuanjie2022Fgs`. Additional
 Base reports may be supplied. Every changed result must be backed by the same
-resource manifest, validation, current assembly set, and target. Each managed role is rebound to its integrated
+resource manifest and validation, must select the current assembly set bound to
+its own payload variant, and must match its Base record's target. Each managed role is rebound to its integrated
 runtime manifest, clean tracked sources, real Editor headers, and the authenticated
 release toolchain that executed it. This toolchain may be the preceding release;
 the clean current host independently revalidates the complete evidence to avoid a

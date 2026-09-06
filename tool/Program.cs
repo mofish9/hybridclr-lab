@@ -39,6 +39,12 @@ internal static partial class Program
         "resource-stage-base-registry-lineage-bound",
         "resource-stage-base-registry-parent-tamper-rejected",
         "resource-stage-direct-base-valid",
+        "resource-cross-target-payload-release",
+        "resource-cross-target-selection-bound",
+        "resource-cross-target-selected-payload-tamper-rejected",
+        "resource-cross-target-variant-set-tamper-rejected",
+        "resource-cross-target-missing-variant-rejected",
+        "resource-cross-target-primary-variant-contract",
         "resource-base-registry", "base-registry-builder",
         "base-registry-build-configuration-tamper-rejected",
         "base-registry-lineage", "base-registry-implicit-removal-rejected",
@@ -312,11 +318,11 @@ internal static partial class Program
     }
 
     private static Dictionary<string, string> ReadCurrentVariantRoots(Cli cli,
-        string defaultCurrentRoot)
+        string primaryVariantId, string primaryCurrentRoot)
     {
         var roots = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase)
         {
-            ["default"] = defaultCurrentRoot,
+            [primaryVariantId] = primaryCurrentRoot,
         };
         string? raw = cli.Optional("currentvariantroots");
         if (string.IsNullOrWhiteSpace(raw))
@@ -343,7 +349,7 @@ internal static partial class Program
                 "Current " + property.Name + " variant root");
             if (roots.TryGetValue(property.Name, out string? prior) &&
                 !string.Equals(prior, root, StringComparison.OrdinalIgnoreCase))
-                throw new DheException("CurrentVariantRoots cannot redefine the default root.");
+                throw new DheException("CurrentVariantRoots cannot redefine the primary current root.");
             roots[property.Name] = root;
         }
         return roots;
@@ -662,7 +668,11 @@ internal static partial class Program
     {
         var currentRoot = RequireDirectory(cli.Require("currentroot"), "Current root");
         var settingsPath = RequireFile(cli.Require("settingsfile"), "HybridCLR settings");
-        var currentVariantRoots = ReadCurrentVariantRoots(cli, currentRoot);
+        string primaryCurrentVariantId = cli.Optional("currentvariantid") ?? "default";
+        if (!IsPayloadVariantId(primaryCurrentVariantId))
+            throw new DheException("CurrentVariantId is invalid.");
+        var currentVariantRoots = ReadCurrentVariantRoots(cli, primaryCurrentVariantId,
+            currentRoot);
         string? baseRegistryPath = cli.Optional("baseregistry");
         string? previousBaseRegistryPath = cli.Optional("previousbaseregistry");
         string? previousReleaseLedgerPath = cli.Optional("previousreleaseledger");
@@ -711,8 +721,11 @@ internal static partial class Program
         {
             if (!string.IsNullOrWhiteSpace(previousBaseRegistryPath))
                 throw new DheException("PreviousBaseRegistry requires BaseRegistry.");
-            if (currentVariantRoots.Count != 1)
-                throw new DheException("CurrentVariantRoots requires a BaseRegistry with payloadVariantId entries.");
+            if (currentVariantRoots.Count != 1 ||
+                !string.Equals(primaryCurrentVariantId, "default",
+                    StringComparison.OrdinalIgnoreCase))
+                throw new DheException("Named current payload variants require a BaseRegistry with " +
+                    "payloadVariantId entries.");
             baselineRoots = (cli.Optional("baseroots") ?? cli.Require("baselineroot"))
                 .Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries)
                 .Select(path => RequireDirectory(path, "DHE base snapshot root")).ToArray();
@@ -865,11 +878,13 @@ internal static partial class Program
             }
             currentVariants.Add(variant.VariantId, variant);
         }
-        var defaultVariant = currentVariants["default"];
-        var currentSetHash = defaultVariant.CurrentSetHash;
+        var primaryVariant = currentVariants[primaryCurrentVariantId];
+        var currentSetHash = primaryVariant.CurrentSetHash;
         string payloadVariantSetHash = NamedVariantSetHash(currentVariants.Values.Select(variant =>
             (variant.VariantId, variant.CurrentSetHash)));
-        string payloadModel = currentVariants.Count == 1
+        string payloadModel = currentVariants.Count == 1 &&
+                              string.Equals(primaryCurrentVariantId, "default",
+                                  StringComparison.OrdinalIgnoreCase)
             ? "single-current-payload"
             : "variant-current-payload";
         string?[] aotMetadataRoots;
@@ -933,8 +948,8 @@ internal static partial class Program
             }
         }
 
-        var payloadFiles = defaultVariant.PayloadFiles;
-        var runtimeAssemblies = defaultVariant.RuntimeAssemblies;
+        var payloadFiles = primaryVariant.PayloadFiles;
+        var runtimeAssemblies = primaryVariant.RuntimeAssemblies;
 
         var metadataSetsById = new Dictionary<string, ResourceAotMetadataSet>(
             StringComparer.OrdinalIgnoreCase);
@@ -3971,6 +3986,9 @@ internal static partial class Program
         "Release resource update accepts a protected -ChannelSnapshot, or the legacy " +
         "explicit ledger arguments. Registry revision 2 or later also requires " +
         "-PreviousBaseRegistry when its Base set changes.",
+        "For target-specific current assemblies, name -CurrentRoot with " +
+        "-CurrentVariantId and add the remaining JSON map with -CurrentVariantRoots. " +
+        "Single-target releases may omit CurrentVariantId and retain default.",
         "Resource release qualification uses resource-release-gate with the same " +
         "channel snapshot and one Player report per active Base. Pass historical " +
         "Release package locations with -EvidenceToolchainRoots when active Bases " +

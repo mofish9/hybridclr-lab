@@ -106,7 +106,8 @@ legacy parallel-argument form only for a separately validated no-metadata workfl
 The default current DLL bytes are shared across the registry. Platform-specific conditional
 members, P/Invoke declarations, or other managed metadata differences are not translated;
 the affected Base must bind a separate `payloadVariantId` and variant root. Use
-`-CurrentVariantRoots {"android":"C:/build/current-android","windows":"C:/build/current-windows"}`
+`-CurrentRoot C:/build/current-windows -CurrentVariantId windows` and
+`-CurrentVariantRoots {"android":"C:/build/current-android"}`
 with a registry whose entries select `android` or `windows`. The manifest/runtime plan
 contains all variants, while each Player stages and loads only its selected variant.
 Android/iOS and desktop still require independent target-specific Player gates.

@@ -1119,6 +1119,17 @@ internal static partial class Program
         AddRegressionCheck(checks, errors, "resource-base-registry", baseRegistryPassed,
             baseRegistryDetails);
 
+        if (!string.IsNullOrWhiteSpace(resourceUpdateRoot) &&
+            !string.IsNullOrWhiteSpace(resourceBaseRegistry))
+        {
+            RunCrossTargetPayloadVariantRegressions(
+                RequireDirectory(resourceUpdateRoot,
+                    "Cross-target regression resource update"),
+                RequireFile(resourceBaseRegistry,
+                    "Cross-target regression Base registry"),
+                regressionRoot, checks, errors);
+        }
+
         bool baseRegistryBuilderPassed = false;
         bool baseRegistryBuildConfigurationTamperRejected = false;
         bool baseRegistryLineagePassed = false;
@@ -2787,6 +2798,397 @@ internal static partial class Program
         catch { hashMismatchRejected = true; }
         AddRegressionCheck(checks, errors, "native-finalize-android-hash-mismatch-rejected",
             hashMismatchRejected, "host must reject Android artifacts whose native hash differs from Bee staging");
+    }
+
+    private static void RunCrossTargetPayloadVariantRegressions(string sourceUpdateRoot,
+        string sourceRegistryPath, string regressionRoot, List<object> checks,
+        List<string> errors)
+    {
+        string root = Path.Combine(regressionRoot, "cross-target-payload-variants");
+        Directory.CreateDirectory(root);
+        bool releasePassed = false;
+        bool selectionPassed = false;
+        bool selectedPayloadTamperRejected = false;
+        bool variantSetTamperRejected = false;
+        bool missingVariantRejected = false;
+        bool primaryVariantContractPassed = false;
+        string details = "Cross-target payload regression did not complete.";
+
+        try
+        {
+            BaseRegistryDocument sourceRegistry = ReadBaseRegistry(sourceRegistryPath);
+            JsonElement sourceManifest = ReadJson<JsonElement>(RequireFile(Path.Combine(
+                sourceUpdateRoot, "dhe-resource-update.json"),
+                "Cross-target source resource manifest"));
+            JsonElement[] sourceVariants = sourceManifest.GetProperty("payloadVariants")
+                .EnumerateArray().ToArray();
+            JsonElement[] defaultVariants = sourceVariants.Where(item => string.Equals(
+                GetString(item, "variantId"), "default",
+                StringComparison.OrdinalIgnoreCase)).ToArray();
+            JsonElement sourceVariant = defaultVariants.Length == 1
+                ? defaultVariants[0]
+                : sourceVariants.Length == 1
+                    ? sourceVariants[0]
+                    : throw new DheException(
+                        "Cross-target regression requires one unambiguous source payload variant.");
+            JsonElement[] sourceAssemblies = sourceVariant.GetProperty("assemblies")
+                .EnumerateArray().ToArray();
+            if (sourceAssemblies.Length == 0 || sourceRegistry.Entries.Length < 2)
+                throw new DheException(
+                    "Cross-target regression requires payload assemblies and at least two Bases.");
+
+            string windowsRoot = Path.Combine(root, "current-windows");
+            string androidRoot = Path.Combine(root, "current-android");
+            Directory.CreateDirectory(windowsRoot);
+            Directory.CreateDirectory(androidRoot);
+            foreach (JsonElement assembly in sourceAssemblies)
+            {
+                string name = NormalizeName(GetString(assembly, "assemblyName") ?? string.Empty);
+                string source = RequireFile(ResolveContainedPath(sourceUpdateRoot,
+                    GetString(assembly, "dll") ?? string.Empty,
+                    "Cross-target source current assembly"),
+                    name + " source current assembly");
+                File.Copy(source, Path.Combine(windowsRoot, name + ".dll"), true);
+                File.Copy(source, Path.Combine(androidRoot, name + ".dll"), true);
+            }
+
+            string mutatedName = NormalizeName(GetString(sourceAssemblies[0],
+                "assemblyName") ?? string.Empty);
+            string androidAssembly = Path.Combine(androidRoot, mutatedName + ".dll");
+            string mutatedAssembly = Path.Combine(root, "android-mutated.dll");
+            WriteMutatedAssembly(androidAssembly, mutatedAssembly, module =>
+            {
+                MethodDef method = module.GetTypes().SelectMany(type => type.Methods)
+                    .Where(candidate => candidate.HasBody && !candidate.IsConstructor &&
+                        candidate.Body.Instructions.Count != 0 &&
+                        candidate.Body.ExceptionHandlers.Count == 0)
+                    .OrderBy(candidate => candidate.MDToken.Raw).First();
+                method.Body.Instructions.Insert(0, Instruction.Create(OpCodes.Nop));
+            });
+            File.Move(mutatedAssembly, androidAssembly, true);
+            ResourceUpdateCompatibility variantCompatibility =
+                ResourceUpdateCompatibility.Analyze(
+                    MetaVersionSnapshot.Create(Path.Combine(windowsRoot,
+                        mutatedName + ".dll")),
+                    MetaVersionSnapshot.Create(androidAssembly));
+            if (!variantCompatibility.Compatible ||
+                variantCompatibility.ChangedMethodCount == 0 ||
+                variantCompatibility.ChangedExistingTypeCount != 0)
+                throw new DheException(
+                    "Cross-target current fixtures are not metadata-stable and distinct.");
+
+            string[] assemblyNames = sourceAssemblies.Select(item => NormalizeName(
+                    GetString(item, "assemblyName") ?? string.Empty))
+                .OrderBy(value => value, StringComparer.OrdinalIgnoreCase).ToArray();
+            string[] patchNames = sourceManifest.GetProperty("aotMetadataSets")
+                .EnumerateArray().SelectMany(set => set.GetProperty("assemblies")
+                    .EnumerateArray()).Select(assembly => NormalizeName(
+                    GetString(assembly, "assemblyName") ?? string.Empty))
+                .Distinct(StringComparer.OrdinalIgnoreCase)
+                .OrderBy(value => value, StringComparer.OrdinalIgnoreCase).ToArray();
+            string settingsPath = Path.Combine(root, "HybridCLRSettings.asset");
+            var settingsText = new StringBuilder();
+            settingsText.AppendLine("hotUpdateAssemblies:");
+            foreach (string name in assemblyNames) settingsText.AppendLine("- " + name);
+            settingsText.AppendLine("dheAotAssemblies:");
+            foreach (string name in assemblyNames) settingsText.AppendLine("- " + name);
+            settingsText.AppendLine("patchAOTAssemblies:");
+            foreach (string name in patchNames) settingsText.AppendLine("- " + name);
+            File.WriteAllText(settingsPath, settingsText.ToString(),
+                new UTF8Encoding(false));
+
+            string[] baseTargets = sourceRegistry.Entries.Select(entry =>
+                GetString(ReadJson<JsonElement>(entry.BuildIdentity), "target") ??
+                string.Empty).ToArray();
+            bool hasAndroidBase = baseTargets.Contains("Android",
+                StringComparer.OrdinalIgnoreCase);
+            bool hasWindowsBase = baseTargets.Contains("StandaloneWindows64",
+                StringComparer.OrdinalIgnoreCase);
+            bool hasMixedWindowsAndroidBases = hasAndroidBase && hasWindowsBase;
+            string[] payloadVariantIds = sourceRegistry.Entries.Select((entry, index) =>
+            {
+                string target = baseTargets[index];
+                return hasMixedWindowsAndroidBases
+                    ? string.Equals(target, "Android", StringComparison.OrdinalIgnoreCase)
+                        ? "android" : "windows"
+                    : index % 2 == 0 ? "windows" : "android";
+            }).ToArray();
+            if (!payloadVariantIds.Contains("windows", StringComparer.OrdinalIgnoreCase) ||
+                !payloadVariantIds.Contains("android", StringComparer.OrdinalIgnoreCase))
+                throw new DheException(
+                    "Cross-target regression could not bind Bases to both payload variants.");
+
+            string registryPath = Path.Combine(root, "dhe-base-registry.json");
+            var registryArguments = new Dictionary<string, string>(
+                StringComparer.OrdinalIgnoreCase)
+            {
+                ["baseidentities"] = string.Join(',', sourceRegistry.Entries.Select(
+                    entry => entry.BuildIdentity)),
+                ["baselineroots"] = string.Join(',', sourceRegistry.Entries.Select(
+                    entry => entry.BaselineRoot)),
+                ["basenativemanifests"] = string.Join(',', sourceRegistry.Entries.Select(
+                    entry => entry.NativeManifest)),
+                ["engineworkflows"] = string.Join(',', sourceRegistry.Entries.Select(
+                    entry => entry.EngineWorkflow)),
+                ["payloadvariantids"] = string.Join(',', payloadVariantIds),
+                ["registryid"] = "regression-cross-target-multibase",
+                ["output"] = registryPath,
+            };
+            if (sourceRegistry.Entries.Any(entry => entry.AotMetadataRoot != null))
+                registryArguments["aotmetadataroots"] = string.Join(',',
+                    sourceRegistry.Entries.Select(entry => entry.AotMetadataRoot ?? "null"));
+            if (BuildBaseRegistry(new Cli("base-registry", registryArguments)) != 0)
+                throw new DheException("Cross-target Base registry generation failed.");
+            BaseRegistryDocument registry = ReadBaseRegistry(registryPath);
+
+            string releaseRoot = Path.Combine(root, "release");
+            var variantRoots = new Dictionary<string, string>
+            {
+                ["android"] = androidRoot,
+            };
+            if (ResourceUpdate(new Cli("resource-update", new Dictionary<string, string>(
+                StringComparer.OrdinalIgnoreCase)
+            {
+                ["currentroot"] = windowsRoot,
+                ["currentvariantid"] = "windows",
+                ["currentvariantroots"] = JsonSerializer.Serialize(variantRoots),
+                ["settingsfile"] = settingsPath,
+                ["baseregistry"] = registryPath,
+                ["outputroot"] = releaseRoot,
+                ["mode"] = "Release",
+                ["initializereleaseledger"] = "true",
+                ["releasechannelid"] = "regression-cross-target",
+            })) != 0)
+                throw new DheException("Cross-target resource release generation failed.");
+
+            JsonElement manifest = ReadJson<JsonElement>(Path.Combine(releaseRoot,
+                "dhe-resource-update.json"));
+            JsonElement[] variants = manifest.GetProperty("payloadVariants")
+                .EnumerateArray().ToArray();
+            var variantsById = variants.ToDictionary(item =>
+                    GetString(item, "variantId") ?? string.Empty,
+                item => item, StringComparer.OrdinalIgnoreCase);
+            string windowsSet = GetString(variantsById["windows"],
+                "currentAssemblySetSha256") ?? string.Empty;
+            string androidSet = GetString(variantsById["android"],
+                "currentAssemblySetSha256") ?? string.Empty;
+            ReleaseLedgerDocument ledger = ReadReleaseLedger(RequireFile(Path.Combine(
+                releaseRoot, ReleaseLedgerFileName), "Cross-target release ledger"));
+            releasePassed = string.Equals(GetString(manifest, "payloadModel"),
+                    "variant-current-payload", StringComparison.Ordinal) &&
+                variantsById.Count == 2 && !variantsById.ContainsKey("default") &&
+                IsHex(windowsSet, 64, 64) && IsHex(androidSet, 64, 64) &&
+                !string.Equals(windowsSet, androidSet,
+                    StringComparison.OrdinalIgnoreCase) &&
+                ledger.ActiveBaseCount == registry.Entries.Length &&
+                string.Equals(ledger.PayloadVariantSetSha256,
+                    GetString(manifest, "payloadVariantSetSha256"),
+                    StringComparison.OrdinalIgnoreCase);
+
+            string CreateBaseAssets(BaseRegistryEntry entry, string name)
+            {
+                JsonElement identity = ReadJson<JsonElement>(entry.BuildIdentity);
+                string runtimeAssetRoot = RequirePortableAssetRoot(
+                    GetString(identity, "runtimeAssetRoot"), "identity runtimeAssetRoot");
+                string baseAssetRoot = RequirePortableAssetRoot(
+                    GetString(identity, "baseMetaVersionAssetRoot"),
+                    "identity baseMetaVersionAssetRoot");
+                string relative = baseAssetRoot[runtimeAssetRoot.Length..].TrimEnd('/');
+                string assetRoot = Path.Combine(root, "assets", name);
+                string baseRoot = ResolveContainedPath(assetRoot, relative,
+                    "Cross-target embedded Base MetaVersion root");
+                Directory.CreateDirectory(baseRoot);
+                foreach (JsonElement identityAssembly in identity.GetProperty("assemblies")
+                             .EnumerateArray())
+                {
+                    string assemblyName = NormalizeName(GetString(identityAssembly,
+                        "assemblyName") ?? string.Empty);
+                    string baseline = RequireFile(Path.Combine(entry.BaselineRoot,
+                        assemblyName + ".dll"),
+                        assemblyName + " cross-target Base assembly");
+                    MetaVersionSnapshot.Create(baseline).WriteBinary(Path.Combine(baseRoot,
+                        assemblyName + ".mv.bytes"));
+                }
+                return assetRoot;
+            }
+
+            bool allStagesPassed = true;
+            for (int index = 0; index < registry.Entries.Length; index++)
+            {
+                BaseRegistryEntry entry = registry.Entries[index];
+                string assetRoot = CreateBaseAssets(entry,
+                    "base-" + index.ToString("D3", CultureInfo.InvariantCulture));
+                string stagePath = Path.Combine(root, "stages",
+                    "base-" + index.ToString("D3", CultureInfo.InvariantCulture) + ".json");
+                int stageExit = StageResourceUpdate(new Cli("stage-resource-update",
+                    new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase)
+                    {
+                        ["updateroot"] = releaseRoot,
+                        ["assetroot"] = assetRoot,
+                        ["basebuildidentity"] = entry.BuildIdentity,
+                        ["output"] = stagePath,
+                    }));
+                JsonElement stage = stageExit == 0
+                    ? ReadJson<JsonElement>(stagePath)
+                    : default;
+                string expectedVariant = entry.PayloadVariantId;
+                string expectedSet = GetString(variantsById[expectedVariant],
+                    "currentAssemblySetSha256") ?? string.Empty;
+                string variantPath = "payload/variants/" + expectedVariant + "/";
+                string[] selectedVariantFiles = stageExit == 0
+                    ? stage.GetProperty("stagedFiles").EnumerateArray()
+                        .Select(item => GetString(item, "path") ?? string.Empty)
+                        .Where(path => path.Contains("payload/variants/",
+                            StringComparison.OrdinalIgnoreCase)).ToArray()
+                    : Array.Empty<string>();
+                allStagesPassed &= stageExit == 0 &&
+                    string.Equals(GetString(stage, "payloadVariantId"), expectedVariant,
+                        StringComparison.OrdinalIgnoreCase) &&
+                    string.Equals(GetString(stage, "currentAssemblySetSha256"),
+                        expectedSet, StringComparison.OrdinalIgnoreCase) &&
+                    selectedVariantFiles.Length == sourceAssemblies.Length * 2 &&
+                    selectedVariantFiles.All(path => path.StartsWith(variantPath,
+                        StringComparison.OrdinalIgnoreCase));
+            }
+            selectionPassed = allStagesPassed;
+
+            BaseRegistryEntry androidBase = registry.Entries.First(entry =>
+                string.Equals(entry.PayloadVariantId, "android",
+                    StringComparison.OrdinalIgnoreCase));
+            string tamperedRoot = Path.Combine(root, "selected-payload-tamper");
+            CopyDirectory(releaseRoot, tamperedRoot);
+            JsonElement tamperedManifest = ReadJson<JsonElement>(Path.Combine(tamperedRoot,
+                "dhe-resource-update.json"));
+            JsonElement tamperedVariant = SelectPayloadVariant(tamperedManifest, "android",
+                "Cross-target selected payload variant");
+            string tamperedPayload = ResolveContainedPath(tamperedRoot,
+                GetString(tamperedVariant.GetProperty("assemblies")[0], "dll") ??
+                    string.Empty, "Cross-target selected payload");
+            byte[] tamperedBytes = File.ReadAllBytes(tamperedPayload);
+            tamperedBytes[^1] ^= 0x5a;
+            File.WriteAllBytes(tamperedPayload, tamperedBytes);
+            try
+            {
+                _ = StageResourceUpdate(new Cli("stage-resource-update",
+                    new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase)
+                    {
+                        ["updateroot"] = tamperedRoot,
+                        ["assetroot"] = CreateBaseAssets(androidBase, "tamper-base"),
+                        ["basebuildidentity"] = androidBase.BuildIdentity,
+                        ["output"] = Path.Combine(root, "selected-payload-tamper-stage.json"),
+                    }));
+            }
+            catch (DheException)
+            {
+                selectedPayloadTamperRejected = true;
+            }
+
+            string variantSetTamperRoot = Path.Combine(root, "variant-set-tamper");
+            CopyDirectory(releaseRoot, variantSetTamperRoot);
+            string variantSetManifestPath = Path.Combine(variantSetTamperRoot,
+                "dhe-resource-update.json");
+            var variantSetManifest = System.Text.Json.Nodes.JsonNode.Parse(
+                File.ReadAllText(variantSetManifestPath))!.AsObject();
+            variantSetManifest["payloadVariantSetSha256"] = new string('f', 64);
+            File.WriteAllText(variantSetManifestPath,
+                variantSetManifest.ToJsonString(Json), new UTF8Encoding(false));
+            try
+            {
+                _ = StageResourceUpdate(new Cli("stage-resource-update",
+                    new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase)
+                    {
+                        ["updateroot"] = variantSetTamperRoot,
+                        ["assetroot"] = CreateBaseAssets(androidBase,
+                            "variant-set-tamper-base"),
+                        ["basebuildidentity"] = androidBase.BuildIdentity,
+                        ["output"] = Path.Combine(root, "variant-set-tamper-stage.json"),
+                    }));
+            }
+            catch (DheException)
+            {
+                variantSetTamperRejected = true;
+            }
+
+            try
+            {
+                _ = ResourceUpdate(new Cli("resource-update",
+                    new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase)
+                    {
+                        ["currentroot"] = windowsRoot,
+                        ["currentvariantid"] = "windows",
+                        ["settingsfile"] = settingsPath,
+                        ["baseregistry"] = registryPath,
+                        ["outputroot"] = Path.Combine(root, "missing-variant-release"),
+                    }));
+            }
+            catch (DheException)
+            {
+                missingVariantRejected = true;
+            }
+
+            bool duplicatePrimaryRejected = false;
+            try
+            {
+                _ = ReadCurrentVariantRoots(new Cli("resource-update",
+                    new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase)
+                    {
+                        ["currentvariantroots"] = JsonSerializer.Serialize(
+                            new Dictionary<string, string> { ["windows"] = androidRoot }),
+                    }), "windows", windowsRoot);
+            }
+            catch (DheException)
+            {
+                duplicatePrimaryRejected = true;
+            }
+            bool invalidPrimaryRejected = false;
+            try
+            {
+                _ = ResourceUpdate(new Cli("resource-update",
+                    new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase)
+                    {
+                        ["currentroot"] = windowsRoot,
+                        ["currentvariantid"] = "../windows",
+                        ["settingsfile"] = settingsPath,
+                        ["baseregistry"] = registryPath,
+                        ["outputroot"] = Path.Combine(root, "invalid-primary-release"),
+                    }));
+            }
+            catch (DheException)
+            {
+                invalidPrimaryRejected = true;
+            }
+            primaryVariantContractPassed = duplicatePrimaryRejected &&
+                invalidPrimaryRejected;
+            details = hasMixedWindowsAndroidBases
+                ? "one Release bound real Windows and Android Base identities to two distinct current payload variants"
+                : "one Release exercised two distinct current payload variants across the authenticated Windows Base matrix; Android Player identity remains a separate gate";
+        }
+        catch (Exception exception)
+        {
+            details = exception.Message;
+        }
+
+        AddRegressionCheck(checks, errors, "resource-cross-target-payload-release",
+            releasePassed, details);
+        AddRegressionCheck(checks, errors, "resource-cross-target-selection-bound",
+            selectionPassed,
+            "every active Base must stage only its registry-selected payload variant and assembly set");
+        AddRegressionCheck(checks, errors,
+            "resource-cross-target-selected-payload-tamper-rejected",
+            selectedPayloadTamperRejected,
+            "a selected target payload whose bytes drift must fail staging");
+        AddRegressionCheck(checks, errors,
+            "resource-cross-target-variant-set-tamper-rejected",
+            variantSetTamperRejected,
+            "the authenticated payload-variant set must reject manifest tampering");
+        AddRegressionCheck(checks, errors,
+            "resource-cross-target-missing-variant-rejected",
+            missingVariantRejected,
+            "release generation must reject a registry Base whose current payload variant is absent");
+        AddRegressionCheck(checks, errors,
+            "resource-cross-target-primary-variant-contract",
+            primaryVariantContractPassed,
+            "CurrentVariantId must be valid and cannot be redefined by CurrentVariantRoots");
     }
 
     private static bool RunExtensiblePlayerMatrixRegression(string regressionRoot)
