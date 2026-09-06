@@ -124,14 +124,21 @@ A subsequent post-release run appended a seventh, previously archived real
 Tuanjie Base through a direct-successor registry. One revision 3 resource build
 then passed on all seven old and new Windows Players and advanced the same
 protected lab channel without rebuilding the original six Players.
-Toolchain `0.1.32` adds generation-neutral repeated current derivation and
-portable Base-archive evidence revalidation. Its Package ID is
+Historical toolchain `0.1.32-opt4.17` adds generation-neutral repeated current
+derivation and portable Base-archive evidence revalidation. Its Package ID is
 `5cee1f8aeda8e23576572a63ec0a1fd2a68104f327b2296ec3b4c8a9c518c964`, and its
 clean regression passed 143/143 checks. Three new real-Editor Base archives were
 added to the seven-Base registry in one successor build; one revision 4 payload
 then passed all ten Windows Players and advanced the protected lab channel with
 exact ten-Base coverage. See
 `docs/HybridCLR-DHE-Opt4-Post-Release-Ten-Base-Lifecycle.md`.
+The current C# package is `HybridCLRDhe-0.1.32-opt4.18`, Package ID
+`a1c4347c533080b4c8bc2d5344fe8bf5e6b0c0cb5b9ccf0d10f1ef6bb68a9284`, based on
+source commit `a051cb3` and a clean 146/146 regression. It adds the Android APK
+overlay/device gate and cross-target staging contract. The r5 candidate appends
+three Android Bases to the six Windows Bases, but remains unpromoted until
+Android Player evidence is available; see
+`docs/HybridCLR-DHE-Opt4-Post-Release-R5-Cross-Target.md`.
 Base identity now also binds `engineWorkflow` and `il2cppCodeGeneration`.
 Unity 2021 is locked to `OptimizeSpeed`; Unity 2022 FGS and Tuanjie 2022 FGS
 are locked to `OptimizeSize`. Base evidence created before these fields existed
