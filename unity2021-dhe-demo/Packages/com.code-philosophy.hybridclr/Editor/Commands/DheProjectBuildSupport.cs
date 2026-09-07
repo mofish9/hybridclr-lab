@@ -1006,6 +1006,13 @@ namespace HybridCLR.Editor.Commands
                 ? Path.GetFileNameWithoutExtension(trimmed) : trimmed;
         }
 
+        private static string RequireDirectory(string path, string description)
+        {
+            if (string.IsNullOrWhiteSpace(path) || !Directory.Exists(path))
+                throw new BuildFailedException(description + " is missing: " + path);
+            return Path.GetFullPath(path);
+        }
+
         private static string RequireFile(string path, string description)
         {
             string full = Path.GetFullPath(path ?? string.Empty);

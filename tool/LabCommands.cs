@@ -171,17 +171,19 @@ internal static class LabCommands
             !variant.Equals("current", StringComparison.OrdinalIgnoreCase) &&
             !variant.Equals("current-base2", StringComparison.OrdinalIgnoreCase) &&
             !variant.Equals("current-next", StringComparison.OrdinalIgnoreCase) &&
+            !variant.Equals("evolution", StringComparison.OrdinalIgnoreCase) &&
             !variant.Equals("structural", StringComparison.OrdinalIgnoreCase))
             throw new InvalidOperationException(
-                "build-managed-cases -Variant must be default, base2, current, current-next, current-base2, or structural.");
+                "build-managed-cases -Variant must be default, base2, current, current-next, current-base2, structural, or evolution.");
+        var isEvolution = variant.Equals("evolution", StringComparison.OrdinalIgnoreCase);
         var isDerivedCurrent = variant.Equals("current-next", StringComparison.OrdinalIgnoreCase) ||
             variant.Equals("current-base2", StringComparison.OrdinalIgnoreCase);
         var isCurrent = variant.Equals("current", StringComparison.OrdinalIgnoreCase) ||
             isDerivedCurrent ||
-            variant.Equals("structural", StringComparison.OrdinalIgnoreCase);
+            variant.Equals("structural", StringComparison.OrdinalIgnoreCase) || isEvolution;
         var isBase2 = variant.Equals("base2", StringComparison.OrdinalIgnoreCase) ||
             variant.Equals("current-base2", StringComparison.OrdinalIgnoreCase);
-        var isStructural = variant.Equals("structural", StringComparison.OrdinalIgnoreCase);
+        var isStructural = variant.Equals("structural", StringComparison.OrdinalIgnoreCase) || isEvolution;
         var output = ResolvePath(lab, cli.Optional("outputroot") ??
             (isCurrent
                 ? $"artifacts/managed-cases-{variant}/{target}"
@@ -229,6 +231,7 @@ internal static class LabCommands
             targetDefine,
             isCurrent ? "DHE_CURRENT" : string.Empty,
             isStructural ? "DHE_STRUCTURE_CURRENT" : string.Empty,
+            isEvolution ? "DHE_EVOLUTION_CURRENT" : string.Empty,
         }.Where(value => !string.IsNullOrWhiteSpace(value)));
         var projects = new[]
         {
@@ -261,7 +264,8 @@ internal static class LabCommands
         if (isCurrent)
             aotArgs.Add("-p:DefineConstants=HYBRIDCLR_AOT_BENCHMARK%3BDHE_CURRENT" +
                 (isBase2 ? "%3BDHE_BASE2" : string.Empty) +
-                (isStructural ? "%3BDHE_STRUCTURE_CURRENT" : string.Empty));
+                (isStructural ? "%3BDHE_STRUCTURE_CURRENT" : string.Empty) +
+                (isEvolution ? "%3BDHE_EVOLUTION_CURRENT" : string.Empty));
         else if (isBase2)
             aotArgs.Add("-p:DefineConstants=HYBRIDCLR_AOT_BENCHMARK%3BDHE_BASE2");
 		else

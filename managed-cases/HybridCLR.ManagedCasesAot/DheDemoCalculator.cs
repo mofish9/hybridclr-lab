@@ -69,8 +69,11 @@ namespace HybridCLR.Lab.ManagedCasesAot
 			remove => TouchValue += 170;
 		}
 
-		public int ExerciseCurrentMembers(int value)
-		{
+        public int ExerciseCurrentMembers(int value)
+        {
+#if DHE_EVOLUTION_CURRENT
+            DheEvolutionAssertions.Validate(this);
+#endif
 			var typeMarker = (DheMetadataMarkerAttribute)Attribute.GetCustomAttribute(
 				typeof(DheDemoCalculator), typeof(DheMetadataMarkerAttribute));
 			var fieldMarker = (DheMetadataMarkerAttribute)Attribute.GetCustomAttribute(
@@ -250,6 +253,26 @@ namespace HybridCLR.Lab.ManagedCasesAot
         {
             return value + 500;
         }
+
+#if DHE_EVOLUTION_CURRENT
+        [DheMetadataMarker(2201, "added-method")]
+        public int AddedAttributedMethod(int value) => value + 2200;
+
+        [DheMetadataMarker(2202, "added-generic-method")]
+        public T AddedAttributedGenericMethod<T>(T value) => value;
+
+        public async System.Threading.Tasks.Task<int> AddedAsyncMethod(int value)
+        {
+            await System.Threading.Tasks.Task.Delay(1).ConfigureAwait(false);
+            return value + 2300;
+        }
+
+        public System.Collections.Generic.IEnumerable<int> AddedIteratorMethod(int value)
+        {
+            yield return value + 2400;
+            yield return value + 2401;
+        }
+#endif
 
         public static int AddedStaticFieldRoundTrip(int value)
         {

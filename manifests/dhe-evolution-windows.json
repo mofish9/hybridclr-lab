@@ -1,0 +1,54 @@
+{
+  "labRoot": "..",
+  "toolAssembly": "../../../artifacts/dhe-evolution-20260907/host/HybridCLR.DheTool.dll",
+  "outputRoot": "../../../artifacts/dhe-evolution-20260907/replay-frozen",
+  "updates": [
+    "../../../artifacts/dhe-evolution-20260907/resource-structural-six-base",
+    "../../../artifacts/dhe-evolution-20260907/resource-structural-next-six-base"
+  ],
+  "timeoutSeconds": 120,
+  "bases": [
+    {
+      "label": "u21-default",
+      "playerRoot": "../../../artifacts/dhe-fresh-three-base-e2e-20260906/base-u21-default/player",
+      "buildIdentity": "../../../artifacts/dhe-fresh-three-base-e2e-20260906/base-u21-default/build-identity.json",
+      "skipFirstUpdate": false
+    },
+    {
+      "label": "u22-default",
+      "playerRoot": "../../../artifacts/dhe-fresh-three-base-e2e-20260906/base-u22-default/player",
+      "buildIdentity": "../../../artifacts/dhe-fresh-three-base-e2e-20260906/base-u22-default/build-identity.json",
+      "skipFirstUpdate": false
+    },
+    {
+      "label": "tuanjie-default",
+      "playerRoot": "../../../artifacts/dhe-fresh-three-base-e2e-20260906/base-tuanjie-default/player",
+      "buildIdentity": "../../../artifacts/dhe-fresh-three-base-e2e-20260906/base-tuanjie-default/build-identity.json",
+      "skipFirstUpdate": false
+    },
+    {
+      "label": "u21-r6",
+      "playerRoot": "../../../artifacts/resume-r7-thirteen-base-20260907/base-u21-r6-opt4.25/player",
+      "buildIdentity": "../../../artifacts/resume-r7-thirteen-base-20260907/base-u21-r6-opt4.25/build-identity.json",
+      "skipFirstUpdate": false
+    },
+    {
+      "label": "u22-r6",
+      "playerRoot": "../../../artifacts/resume-r7-thirteen-base-20260907/base-u22-r6-opt4.25/player",
+      "buildIdentity": "../../../artifacts/resume-r7-thirteen-base-20260907/base-u22-r6-opt4.25/build-identity.json",
+      "skipFirstUpdate": false
+    },
+    {
+      "label": "tuanjie-r6",
+      "playerRoot": "../../../artifacts/resume-r7-thirteen-base-20260907/base-tuanjie-r6-opt4.25/player",
+      "buildIdentity": "../../../artifacts/resume-r7-thirteen-base-20260907/base-tuanjie-r6-opt4.25/build-identity.json",
+      "skipFirstUpdate": false
+    },
+    {
+      "label": "u21-skipped",
+      "playerRoot": "../../../artifacts/dhe-fresh-three-base-e2e-20260906/base-u21-default/player",
+      "buildIdentity": "../../../artifacts/dhe-fresh-three-base-e2e-20260906/base-u21-default/build-identity.json",
+      "skipFirstUpdate": true
+    }
+  ]
+}
