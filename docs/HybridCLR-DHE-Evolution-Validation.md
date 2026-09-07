@@ -1,6 +1,20 @@
 # DHE evolution implementation and validation
 
-## Latest checkpoint: same-runtime original/evolved cold differential
+## In progress: existing generic reference-type fields
+
+The `19f439b` fixture adds instance and static fields to DheAddedGenericType<T>.
+Its raw and Unity-prepared DLLs pass all 23 CLR assertion groups, including nine
+new generic-field groups. The ordinary C# workflow prepares the current assembly
+without a new Player. Resource validation against the frozen six-Base registry
+accepts the three original Bases, where the whole generic type is new, and rejects
+all three evolved Bases with the six expected generic-field/layout/static-field
+reasons. No publishable manifest or runtime plan is emitted. This is a reproduced
+capability gap, not a passing evolution gate. See
+`docs/HybridCLR-DHE-Generic-Field-Evolution.md` for artifacts and implementation
+requirements. The next work is native generic field resolution/storage and its
+tests; no offline rejection has been disabled.
+
+## Latest completed checkpoint: same-runtime original/evolved cold differential
 
 The clean `7e35687` replay passes 18 cold Windows processes on six Bases: original
 and structurally evolved managed generations for all three engines, using the
