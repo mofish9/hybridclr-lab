@@ -170,3 +170,26 @@ reference remains rejected. Base MV and current MV wire format are unchanged.
 New runtime capabilities are required for these features so old runtimes cannot
 be relabeled as compatible. Both changes remain under the existing registration
 publication/lifetime rules and require no new mutable cache or object sidecar.
+
+## First v3 Player failure and linker repair
+
+The first real Unity 2021 evolution update loaded successfully and identified 95
+changed methods, but failed while resolving
+`System.Reflection.Assembly.GetReferencedAssemblies`. The archived Base's
+`mscorlib.dll` contains neither that Assembly method nor the RuntimeAssembly
+override. This is not a passing evolution Player result:
+`artifacts/dhe-evolution-20260908/player-evolution-u21.json` (workspace root).
+The offline assembly-reference check did not detect the missing member.
+
+The generated linker descriptor names framework types under the `netstandard`
+facade rather than their actual implementation assemblies. A package-owned
+UnityLinker callback now resolves references against the target's real pre-link
+inputs, preserves those external types in their defining assemblies, and preserves
+all DHE root assemblies. Seven standalone tests cover forwarding, root retention,
+determinism, deduplication, and missing inputs. Unity 2021 Editor compilation also
+passes. A new Base must be built and tested; the failed Base is retained unchanged.
+An archived Base cannot gain stripped native APIs through a resource update.
+
+The latest parameter-attribute evolution DLL also passed the eight offline
+compatibility tests. Remaining work includes member-level AOT availability checks,
+actual evolution Player execution, and broader future external-API preservation.
