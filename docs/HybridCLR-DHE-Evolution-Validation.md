@@ -35,6 +35,9 @@ Native compilation/CTest and new Windows Bases have not yet verified this fix.
 The first Unity 2021 native build exposed a nonexistent image-classification
 macro in the new constructor resolver. HybridCLR `82e6829` uses the existing
 `IsInterpreterImage` API; the failed `native-logical-attributes` log is retained.
+The next build compiled the runtime but rejected aggregate initialization of
+Il2CppClass's zero-length vtable in the test fixture. The fixture now uses the
+existing calloc allocation pattern with scoped ownership; both failed logs remain.
 They must use clean locked commits, real headers on all three engines, and the
 same repeated/Attribute resources, requiring named-field, named-property and
 constructor-overload receipts. Native repairs require a new experimental Base;

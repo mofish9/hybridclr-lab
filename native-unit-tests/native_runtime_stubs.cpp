@@ -3,6 +3,7 @@
 #include <condition_variable>
 #include <cstdlib>
 #include <cstring>
+#include <memory>
 #include <mutex>
 #include <vector>
 
@@ -586,7 +587,10 @@ namespace native_test
                 return true;
             }
         } image;
-        Il2CppClass klass{};
+        std::unique_ptr<Il2CppClass, decltype(&std::free)> storage(
+            static_cast<Il2CppClass*>(std::calloc(1, sizeof(Il2CppClass))), &std::free);
+        if (!storage) return false;
+        Il2CppClass& klass = *storage;
         PropertyInfo physical[2]{};
         PropertyInfo logical[3]{};
 #if UNITY_ENGINE_TUANJIE
