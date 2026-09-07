@@ -24,12 +24,12 @@ Its formal entry points, generated-output boundary, and complete four-assembly
 Player evidence are documented in
 `docs/HybridCLR-DHE-Toolchain.md`,
 `docs/HybridCLR-DHE-Workflow-Review.md` and
-`docs/HybridCLR-DHE-Formal-Project-Validation.md`. Toolchain `0.1.34` is the
+`docs/HybridCLR-DHE-Formal-Project-Validation.md`. Toolchain `0.1.35` is the
 current conditionally accepted source and three-engine Windows release; its exact
 evidence and remaining platform gates are recorded in
-`docs/HybridCLR-DHE-Opt4-Release-0.1.34.md`. Toolchains `0.1.18`, `0.1.20`,
+`docs/HybridCLR-DHE-Opt4-Release-0.1.35.md`. Toolchains `0.1.18`, `0.1.20`,
 `0.1.21`, `0.1.22`, `0.1.23`, `0.1.24`, `0.1.25`, `0.1.26`, `0.1.27`,
-`0.1.28`, `0.1.29`, `0.1.30`, `0.1.31`, `0.1.32`, and `0.1.33`
+`0.1.28`, `0.1.29`, `0.1.30`, `0.1.31`, `0.1.32`, `0.1.33`, and `0.1.34`
 are retained as historical evidence. Projects must install an
 authenticated package whose manifest has `releaseReady=true` and pin its exact
 package ID.
@@ -143,7 +143,7 @@ revision 6 Bases built by the three real Editors, and promoted one resource head
 after all 13 Windows Players passed. Each new Base identified exactly two changed
 methods while unchanged dispatch remained AOT. See
 `docs/HybridCLR-DHE-Opt4-Release-0.1.33.md`.
-The current release line is `HybridCLRDhe-0.1.34-opt4.26`, Package ID
+The preceding release line is `HybridCLRDhe-0.1.34-opt4.26`, Package ID
 `80b3d477927eb7018268f0e9951086ae1b59a4b2fbea0ffb5c006ad2ed481eb5`.
 Its C# `resource-release-qualify` command replaces the manual per-Base
 stage/Player/evidence loop with one exact-coverage operation. Direct `process`
@@ -157,6 +157,15 @@ and includes a target-independent iOS Xcode-export artifact gate. Android ARM64
 device, iOS/macOS/Xcode execution, and production performance or memory gates
 remain incomplete; Windows evidence must not be presented as those target results.
 See `docs/HybridCLR-DHE-Opt4-Release-0.1.34.md`.
+The current release line is `HybridCLRDhe-0.1.35-opt4.27`, Package ID
+`fa7c50ea46b39856ab77e1eed49b55639ce652299d971651b50b0f8c9664becb`.
+Its C# `resource-release-plan` command joins a registry-bound runner catalog to
+every active Base and emits the exact `resource-release-qualify` configuration.
+Missing or duplicate Bases, registry drift, invalid report-template tokens, and a
+stale protected-channel snapshot fail before any Player starts. The clean source
+regression passes `163/163` checks while revalidating all 13 Windows Base reports,
+the no-op Base, and the Unity 2021, Unity 2022, and Tuanjie 2022 evidence matrix.
+See `docs/HybridCLR-DHE-Opt4-Release-0.1.35.md`.
 Base identity now also binds `engineWorkflow` and `il2cppCodeGeneration`.
 Unity 2021 is locked to `OptimizeSpeed`; Unity 2022 FGS and Tuanjie 2022 FGS
 are locked to `OptimizeSize`. Base evidence created before these fields existed
