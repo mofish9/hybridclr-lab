@@ -676,6 +676,9 @@ namespace
         hybridclr::native_test::SetDheSupplementalMethod(nullptr);
         CHECK(!hybridclr::metadata::MetadataModule::IsImplementedByInterpreter(&inflatedSupplemental));
         hybridclr::native_test::SetAOTMetadataAvailable(false);
+#if __has_include("hybridclr/metadata/DheCustomAttributeMetadata.h")
+        CHECK(hybridclr::native_test::VerifyDheAttributePropertyIndices());
+#endif
 
 		// A later unresolved token must roll back preparation of an earlier token
 		// and leave the assembly unpublished.

@@ -23,6 +23,9 @@
 #include "hybridclr/interpreter/Interpreter.h"
 #include "hybridclr/interpreter/InterpreterModule.h"
 #include "hybridclr/metadata/AOTHomologousImage.h"
+#if __has_include("hybridclr/metadata/DheCustomAttributeMetadata.h")
+#include "hybridclr/metadata/DheCustomAttributeMetadata.h"
+#endif
 #include "hybridclr/metadata/MetadataUtil.h"
 #include "native_test_hooks.h"
 
@@ -455,7 +458,7 @@ namespace native_test
 namespace metadata
 {
 #if __has_include("hybridclr/DheRuntime.h")
-    class TestAotImage final : public AOTHomologousImage
+    class TestAotImage : public AOTHomologousImage
     {
     public:
         const Il2CppType* ReadTypeFromResolutionScope(uint32_t, uint32_t, uint32_t) override { std::abort(); }
@@ -548,3 +551,76 @@ namespace metadata
     };
 }
 }
+
+#if __has_include("hybridclr/metadata/DheCustomAttributeMetadata.h")
+namespace hybridclr
+{
+namespace native_test
+{
+    bool VerifyDheAttributePropertyIndices()
+    {
+        class PropertyImage final : public metadata::TestAotImage
+        {
+        public:
+            Il2CppClass* owner = nullptr;
+            PropertyInfo* logical = nullptr;
+            uintptr_t count = 3;
+            bool HasLogicalPropertyView(Il2CppClass* klass) override { return klass == owner; }
+            const PropertyInfo* GetFirstLogicalProperty(Il2CppClass* klass, void** iter) override
+            {
+                if (klass != owner || count == 0) return nullptr;
+                *iter = reinterpret_cast<void*>(1);
+                return logical;
+            }
+            bool TryGetNextLogicalProperty(Il2CppClass* klass, void** iter, const PropertyInfo** property) override
+            {
+                uintptr_t index = reinterpret_cast<uintptr_t>(*iter);
+                if (klass != owner) return false;
+                if (index >= count)
+                {
+                    *property = nullptr;
+                    return true;
+                }
+                *property = logical + index;
+                *iter = reinterpret_cast<void*>(index + 1);
+                return true;
+            }
+        } image;
+        Il2CppClass klass{};
+        PropertyInfo physical[2]{};
+        PropertyInfo logical[3]{};
+#if UNITY_ENGINE_TUANJIE
+        PropertyInfo* physicalPointers[] = { physical, physical + 1 };
+        klass.properties = physicalPointers;
+#else
+        klass.properties = physical;
+#endif
+        klass.property_count = 2;
+        image.owner = &klass;
+        image.logical = logical;
+        for (PropertyInfo& property : physical) property.parent = &klass;
+        for (PropertyInfo& property : logical) property.parent = &klass;
+        int32_t index = -1;
+        if (metadata::TryGetDheAttributePropertyIndex(nullptr, logical, index) ||
+            metadata::TryGetDheAttributePropertyIndex(&image, physical, index)) return false;
+        for (uint32_t i = 0; i < 3; i++)
+        {
+            if (!metadata::TryGetDheAttributePropertyIndex(&image, logical + i, index) ||
+                index != static_cast<int32_t>(i + 2) ||
+                metadata::GetDheAttributePropertyByIndex(&image, &klass, index) != logical + i) return false;
+        }
+        if (metadata::GetDheAttributePropertyByIndex(nullptr, &klass, 0) != physical ||
+            metadata::GetDheAttributePropertyByIndex(&image, &klass, 1) != physical + 1 ||
+            metadata::GetDheAttributePropertyByIndex(nullptr, &klass, 2) != nullptr ||
+            metadata::GetDheAttributePropertyByIndex(&image, &klass, 5) != nullptr ||
+            metadata::GetDheAttributePropertyByIndex(&image, &klass, 0xffffffffu) != nullptr) return false;
+        PropertyInfo detached{};
+        detached.parent = &klass;
+        if (metadata::TryGetDheAttributePropertyIndex(&image, &detached, index)) return false;
+        image.count = 0;
+        return !metadata::TryGetDheAttributePropertyIndex(&image, logical, index) &&
+            metadata::GetDheAttributePropertyByIndex(&image, &klass, 2) == nullptr;
+    }
+}
+}
+#endif

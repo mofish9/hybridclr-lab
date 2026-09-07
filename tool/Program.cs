@@ -327,7 +327,9 @@ internal static partial class Program
                 continue;
             }
             ResourceUpdateCompatibility compatibility = ResourceUpdateCompatibility.Analyze(
-                candidate.BaseMetaVersion, candidate.CurrentMetaVersion, addressTakenFields);
+                candidate.BaseMetaVersion, candidate.CurrentMetaVersion, addressTakenFields,
+                currentAssemblySet: candidates.Where(item => item.CurrentMetaVersion != null)
+                    .Select(item => item.CurrentMetaVersion!));
             WriteJson(baseJson, candidate.BaseMetaVersion.ToJson(candidate.Baseline));
             candidate.BaseMetaVersion.WriteBinary(baseBinary);
             WriteJson(currentJson, candidate.CurrentMetaVersion.ToJson(candidate.Current));
@@ -1212,7 +1214,8 @@ internal static partial class Program
                 }
                 var compatibility = ResourceUpdateCompatibility.Analyze(baselineSnapshot,
                     currentSnapshot, currentVariant.AddressTakenFields,
-                    usesUnresolvedCallStubs: baseEngineWorkflow != "Unity2021Standard");
+                    usesUnresolvedCallStubs: baseEngineWorkflow != "Unity2021Standard",
+                    currentAssemblySet: currentVariant.Snapshots.Values);
                 requiredRuntimeCapabilities.UnionWith(
                     compatibility.RequiredRuntimeCapabilities);
                 var missingGuards = compatibility.GuardRequiredMethods.Where(method =>

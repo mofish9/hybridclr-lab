@@ -4,7 +4,7 @@ internal sealed class ResourceUpdateCompatibility
 {
 	public const string Policy = "dhe-proven-safe-subset-v1";
 	public const string RuntimeProtocol = "dhe-runtime-protocol-v1";
-    public const string CurrentNativeRuntimeContract = "dhe-runtime-v8";
+    public const string CurrentNativeRuntimeContract = "dhe-runtime-v9";
     public static readonly string[] KnownRuntimeCapabilities =
     {
 		"aot-guard-v1",
@@ -30,6 +30,7 @@ internal sealed class ResourceUpdateCompatibility
         "supplemental-method-generic-invocation-v1",
         "supplemental-generic-unresolved-stubs-v1",
         "homologous-attribute-constructors-v1",
+        "logical-attribute-members-v1",
         "supplemental-nested-types-v1",
         "supplemental-top-level-types-v1",
     };
@@ -67,7 +68,7 @@ internal sealed class ResourceUpdateCompatibility
 
     public static ResourceUpdateCompatibility Analyze(MetaVersionSnapshot baseline,
         MetaVersionSnapshot current, IEnumerable<string>? addressTakenFields = null,
-        bool usesUnresolvedCallStubs = true)
+        bool usesUnresolvedCallStubs = true, IEnumerable<MetaVersionSnapshot>? currentAssemblySet = null)
     {
         var baselineMethods = baseline.Methods.ToDictionary(method => method.StableId,
             StringComparer.OrdinalIgnoreCase);
@@ -243,6 +244,8 @@ internal sealed class ResourceUpdateCompatibility
         var baseTypeNames = new HashSet<string>(baseline.Types.Select(type => type.Identity), StringComparer.Ordinal);
         if (current.LocalAttributeConstructorTypeNames.Any(baseTypeNames.Contains))
             requiredCapabilities.Add("homologous-attribute-constructors-v1");
+        if (RequiresLogicalAttributeMetadata(baseline, currentAssemblySet ?? new[] { current }))
+            requiredCapabilities.Add("logical-attribute-members-v1");
         if (addedTypes.Any(type => type.LocalReferencedTypeNames.Any(baseTypeNames.Contains)))
             requiredCapabilities.Add("supplemental-type-base-references-v1");
         if (addedTypes.Any(type => type.LocalDeclarationReferencedTypeNames.Any(baseTypeNames.Contains)))
@@ -293,6 +296,32 @@ internal sealed class ResourceUpdateCompatibility
             UnsupportedChanges = unsupported.Distinct(StringComparer.Ordinal).OrderBy(value => value,
                 StringComparer.Ordinal).ToArray(),
         };
+    }
+
+    private static bool RequiresLogicalAttributeMetadata(MetaVersionSnapshot baseline,
+        IEnumerable<MetaVersionSnapshot> currentAssemblySet)
+    {
+        var snapshots = currentAssemblySet.ToDictionary(snapshot => snapshot.AssemblyName, StringComparer.OrdinalIgnoreCase);
+        var baseTypes = baseline.Types.Select(type => type.Identity).ToHashSet(StringComparer.Ordinal);
+        var baseMethods = baseline.Methods.Select(method => method.Identity).ToHashSet(StringComparer.Ordinal);
+        foreach (MetaVersionAttributeUse use in snapshots.Values.SelectMany(snapshot => snapshot.AttributeUses))
+        {
+            if (string.Equals(use.AssemblyName, baseline.AssemblyName, StringComparison.OrdinalIgnoreCase) &&
+                baseTypes.Contains(use.TypeName) && !baseMethods.Contains(use.ConstructorIdentity))
+                return true;
+            if (!use.HasNamedProperties) continue;
+            var type = new MetaVersionTypeReference(use.AssemblyName, use.TypeName);
+            var visited = new HashSet<MetaVersionTypeReference>();
+            while (visited.Add(type))
+            {
+                if (string.Equals(type.AssemblyName, baseline.AssemblyName, StringComparison.OrdinalIgnoreCase) &&
+                    baseTypes.Contains(type.TypeName)) return true;
+                if (!snapshots.TryGetValue(type.AssemblyName, out MetaVersionSnapshot? owner) ||
+                    !owner.TypeParents.TryGetValue(type.TypeName, out MetaVersionTypeReference? parent)) break;
+                type = parent;
+            }
+        }
+        return false;
     }
 
     private static bool HasSignatureReplacement(IEnumerable<MetaVersionMethod> removed,

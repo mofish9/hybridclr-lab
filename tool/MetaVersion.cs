@@ -31,6 +31,11 @@ internal sealed class MetaVersionSnapshot
     public string[] AddressTakenFieldIdentities { get; private init; } = Array.Empty<string>();
     [JsonIgnore]
     public string[] LocalAttributeConstructorTypeNames { get; private init; } = Array.Empty<string>();
+    [JsonIgnore]
+    public MetaVersionAttributeUse[] AttributeUses { get; private init; } = Array.Empty<MetaVersionAttributeUse>();
+    [JsonIgnore]
+    public IReadOnlyDictionary<string, MetaVersionTypeReference> TypeParents { get; private init; } =
+        new Dictionary<string, MetaVersionTypeReference>();
 
     public static MetaVersionSnapshot Create(string assemblyPath)
     {
@@ -74,7 +79,28 @@ internal sealed class MetaVersionSnapshot
             AddressTakenFieldIdentities = addressTakenFields.OrderBy(value => value,
                 StringComparer.Ordinal).ToArray(),
             LocalAttributeConstructorTypeNames = ReadLocalAttributeConstructorTypes(module),
+            AttributeUses = ReadAttributeUses(module),
+            TypeParents = module.GetTypes().Where(type => type.BaseType != null).ToDictionary(type => type.FullName,
+                type => new MetaVersionTypeReference(type.BaseType.DefinitionAssembly?.Name.String ?? "", type.BaseType.FullName),
+                StringComparer.Ordinal),
         };
+    }
+
+    private static MetaVersionAttributeUse[] ReadAttributeUses(ModuleDefMD module)
+    {
+        var uses = new List<MetaVersionAttributeUse>();
+        for (uint row = 1; row <= module.Metadata.TablesStream.CustomAttributeTable.Rows; row++)
+        {
+            CustomAttribute attribute = module.ReadCustomAttribute(row) ??
+                throw new InvalidDataException("Custom attribute is missing.");
+            ICustomAttributeType constructor = attribute.Constructor ??
+                throw new InvalidDataException("Custom attribute constructor is missing.");
+            uses.Add(new MetaVersionAttributeUse(constructor.DeclaringType.DefinitionAssembly?.Name.String ?? "",
+                constructor.DeclaringType.FullName,
+                constructor.DeclaringType.FullName + "::" + constructor.Name + "|" + constructor.MethodSig,
+                attribute.NamedArguments.Any(argument => !argument.IsField)));
+        }
+        return uses.Distinct().ToArray();
     }
 
     private static string[] ReadLocalAttributeConstructorTypes(ModuleDefMD module)
@@ -659,6 +685,10 @@ internal sealed class MetaVersionSnapshot
         }
     }
 }
+
+internal sealed record MetaVersionTypeReference(string AssemblyName, string TypeName);
+internal sealed record MetaVersionAttributeUse(string AssemblyName, string TypeName,
+    string ConstructorIdentity, bool HasNamedProperties);
 
 internal sealed record MetaVersionType(string Identity, string StableId, string Version, uint Token, uint Flags,
     [property: JsonIgnore] string LayoutVersion,

@@ -1,5 +1,43 @@
 # DHE evolution implementation and validation
 
+## In progress: logical attribute members
+
+The clean `3017f7a` repeated-structure replay passes 18 unique Windows processes
+across six original/evolved Bases. The latest resource adds fields, a property,
+and a method to an already-native carrier. Twelve latest/skipped runs require
+the `repeated-structural-evolution` execution receipt. This is selected capability
+evidence, not the full 220-case differential or performance qualification.
+
+The subsequent clean `9e6d5d5` Attribute fixture adds a named field, named property,
+and constructor overload to an existing Attribute type. CLR assertions pass,
+but the Unity 2021 evolved Base crashes with access violation `0xc0000005`
+after the named-field receipt. The archived failure is
+`artifacts/dhe-evolution-20260908/replay-attribute-members/report.json` relative
+to the workspace. Original-generation runs pass; the newer Unity 2022 and
+Tuanjie Bases were not reached. Preserve all failed inputs and archived binaries.
+
+Logical PropertyInfo objects are not elements of the physical Base property
+array. The candidate preserves physical slots and encodes logical slots in a
+suffix beginning at `property_count`; all three engine attribute readers decode
+that suffix. Tuanjie's physical lazy-property setup remains unchanged. Added
+Attribute constructors are canonicalized through the homologous logical method
+map. These maps are prepared before the existing DHE publication boundary; no
+new mutable cache, object layout change, or post-publication write is introduced.
+
+The runtime contract is `dhe-runtime-v9` with `logical-attribute-members-v1`.
+MV stays `DHEMETA1`, schema 1. The C# compatibility scan considers the complete
+current assembly set, including inherited/cross-assembly property declarations.
+Eleven exploratory tests pass, and resource generation rejects the three
+affected evolved v8 Bases while retaining the three compatible original Bases.
+Rejecting a resource is a safety gate, not implementation of the missing ability.
+
+Native compilation/CTest and new Windows Bases have not yet verified this fix.
+They must use clean locked commits, real headers on all three engines, and the
+same repeated/Attribute resources, requiring named-field, named-property and
+constructor-overload receipts. Native repairs require a new experimental Base;
+old Base identities must not be relabeled or overwritten. Formal branches,
+Installer tags, released packages, and CAT remain unchanged.
+
 ## Latest checkpoint: September 8
 
 Runtime contract v8 now has six real Windows Bases: original and structurally
