@@ -43,6 +43,7 @@ endif()
 add_executable(hybridclr_native_tests
     hybridclr_native_tests.cpp
     native_runtime_stubs.cpp
+    "${HYBRIDCLR_RUNTIME_ROOT}/os/FastReaderReaderWriterLock.cpp"
     "${HYBRIDCLR_TEST_SOURCE_ROOT}/Il2CppCompatibleDef.cpp"
     ${HYBRIDCLR_DHE_SOURCES}
     "${HYBRIDCLR_TEST_SOURCE_ROOT}/interpreter/Instruction.cpp"

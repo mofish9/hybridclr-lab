@@ -10,6 +10,7 @@ namespace hybridclr
 namespace native_test
 {
     void SetAOTMetadataAvailable(bool available);
+    void SetDheSupplementalMethod(const MethodInfo* method);
     InvokerMethod GetInterpreterInvoker();
     Il2CppMethodPointer GetInterpreterMethodPointer();
     void PauseNextAOTMetadataQuery();

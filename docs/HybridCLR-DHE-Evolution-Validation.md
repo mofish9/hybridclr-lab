@@ -228,3 +228,11 @@ public alias has a Base class but is absent from the Base method-token map, so
 recognizes supplemental aliases through their method image, including inflations.
 It declares `supplemental-method-generic-invocation-v1` under runtime contract v5.
 The exact updated candidate must repeat native and real Player gates.
+
+The native metadata fixture previously returned address 1 for an available
+homologous image. The supplemental-image virtual query exposed that invalid
+stand-in. It now returns an actual minimal derived image and uses the real engine
+reader/writer lock implementation. Unused metadata operations abort. Additional
+assertions cover supplemental definitions/inflations, absent supplemental mapping,
+and unchanged methods remaining native. This fixes the fixture without bypassing
+the production dispatch check.

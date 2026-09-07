@@ -658,6 +658,23 @@ namespace
         hybridclr::native_test::SetAOTMetadataAvailable(true);
         CHECK(hybridclr::metadata::MetadataModule::IsImplementedByInterpreter(&changed));
         CHECK(!hybridclr::metadata::MetadataModule::IsImplementedByInterpreter(&unchanged));
+        MethodInfo supplemental{};
+        supplemental.klass = klass;
+        supplemental.token = 0x0600ffff;
+        CHECK(!hybridclr::dhe::IsChangedMethod(&supplemental));
+        CHECK(!hybridclr::metadata::MetadataModule::IsImplementedByInterpreter(&supplemental));
+        hybridclr::native_test::SetDheSupplementalMethod(&supplemental);
+        CHECK(hybridclr::metadata::MetadataModule::IsImplementedByInterpreter(&supplemental));
+        Il2CppGenericMethod supplementalGeneric{};
+        supplementalGeneric.methodDefinition = &supplemental;
+        MethodInfo inflatedSupplemental{};
+        inflatedSupplemental.klass = klass;
+        inflatedSupplemental.is_inflated = true;
+        inflatedSupplemental.genericMethod = &supplementalGeneric;
+        CHECK(hybridclr::metadata::MetadataModule::IsImplementedByInterpreter(&inflatedSupplemental));
+        CHECK(!hybridclr::metadata::MetadataModule::IsImplementedByInterpreter(&unchanged));
+        hybridclr::native_test::SetDheSupplementalMethod(nullptr);
+        CHECK(!hybridclr::metadata::MetadataModule::IsImplementedByInterpreter(&inflatedSupplemental));
         hybridclr::native_test::SetAOTMetadataAvailable(false);
 
 		// A later unresolved token must roll back preparation of an earlier token

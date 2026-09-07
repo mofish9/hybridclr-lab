@@ -12,6 +12,7 @@
 #include "C/Baselib_Thread.h"
 
 #include "utils/Memory.h"
+#include "gc/GarbageCollector.h"
 #include "vm/Assembly.h"
 #include "vm/Class.h"
 #include "vm/Exception.h"
@@ -266,6 +267,12 @@ namespace vm
 		return nullptr;
     }
 
+    void Assembly::GetAllAssemblies(AssemblyVector& assemblies)
+    {
+        for (const DheResolverRecord& resolver : s_dheResolvers)
+            assemblies.push_back(resolver.assembly);
+    }
+
     const Il2CppAssembly* Assembly::GetLoadedAssembly(const char*)
     {
         return nullptr;
@@ -344,10 +351,25 @@ namespace interpreter
 Il2CppRuntimeStats il2cpp_runtime_stats = {{ 0 }};
 Il2CppDefaults il2cpp_defaults = {};
 
+void il2cpp::gc::GarbageCollector::FreeFixed(void* memory)
+{
+    // No GC-backed cache entries are allocated by the standalone image fixture.
+    if (memory) std::abort();
+}
+
 namespace hybridclr
 {
+namespace
+{
+    std::atomic<const MethodInfo*> s_supplementalMethod{nullptr};
+}
 namespace native_test
 {
+    void SetDheSupplementalMethod(const MethodInfo* method)
+    {
+        s_supplementalMethod.store(method, std::memory_order_release);
+    }
+
     void SetAOTMetadataAvailable(bool available)
     {
         s_aotMetadataAvailable.store(available, std::memory_order_release);
@@ -432,6 +454,33 @@ namespace native_test
 
 namespace metadata
 {
+#if __has_include("hybridclr/DheRuntime.h")
+    class TestAotImage final : public AOTHomologousImage
+    {
+    public:
+        const Il2CppType* ReadTypeFromResolutionScope(uint32_t, uint32_t, uint32_t) override { std::abort(); }
+        const Il2CppType* GetModuleIl2CppType(uint32_t, uint32_t, uint32_t, bool) override { std::abort(); }
+        const Il2CppType* GetIl2CppTypeFromRawTypeDefIndex(uint32_t) override { std::abort(); }
+        Il2CppGenericContainer* GetGenericContainerByRawIndex(uint32_t) override { std::abort(); }
+        Il2CppGenericContainer* GetGenericContainerByTypeDefRawIndex(int32_t) override { std::abort(); }
+        const Il2CppMethodDefinition* GetMethodDefinitionFromRawIndex(uint32_t) override { std::abort(); }
+        MethodBody* GetMethodBody(uint32_t) override { std::abort(); }
+        void ReadFieldRefInfoFromFieldDefToken(uint32_t, FieldRefInfo&) override { std::abort(); }
+        void InitRuntimeMetadatas() override { std::abort(); }
+        Image* GetSupplementalMethodImage(const MethodInfo* method) override
+        {
+            if (method->is_inflated) method = method->genericMethod->methodDefinition;
+            return method == s_supplementalMethod.load(std::memory_order_acquire) ? this : nullptr;
+        }
+    };
+
+    const Il2CppType* Image::ReadTypeFromResolutionScope(uint32_t, uint32_t, uint32_t) { std::abort(); }
+    const Il2CppType* AOTHomologousImage::GetModuleIl2CppType(uint32_t, uint32_t, uint32_t, bool) { std::abort(); }
+
+    // Construct before any per-test resolver fixture is installed.
+    static TestAotImage s_testAotImage;
+#endif
+
     AOTHomologousImage* AOTHomologousImage::FindImageByAssembly(const Il2CppAssembly*)
     {
 		{
@@ -452,7 +501,11 @@ namespace metadata
 			s_aotMetadataQueryPaused = false;
 			s_resumeAotMetadataQuery = false;
 		}
+#if __has_include("hybridclr/DheRuntime.h")
+        return available ? &s_testAotImage : nullptr;
+#else
 		return available ? reinterpret_cast<AOTHomologousImage*>(1) : nullptr;
+#endif
     }
 }
 
