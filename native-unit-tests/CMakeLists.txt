@@ -28,6 +28,13 @@ else()
     set(HYBRIDCLR_TEST_HAS_ADVANCED_OPTIMIZATION_OPCODES 0)
 endif()
 
+file(READ "${HYBRIDCLR_TEST_SOURCE_ROOT}/interpreter/MemoryUtil.h" HYBRIDCLR_MEMORY_UTIL_HEADER)
+if (HYBRIDCLR_MEMORY_UTIL_HEADER MATCHES "CopyIndexedStackArguments")
+    set(HYBRIDCLR_TEST_HAS_INDEXED_STACK_ARGUMENTS 1)
+else()
+    set(HYBRIDCLR_TEST_HAS_INDEXED_STACK_ARGUMENTS 0)
+endif()
+
 if (HYBRIDCLR_TEST_EXPECT_DHE)
     if (NOT EXISTS "${HYBRIDCLR_TEST_SOURCE_ROOT}/DheRuntime.cpp" OR
         NOT EXISTS "${HYBRIDCLR_TEST_SOURCE_ROOT}/DheRuntime.h")
@@ -71,6 +78,7 @@ add_library(hybridclr_runtime_api_compile_gate OBJECT
 )
 
 add_library(hybridclr_interpreter_compile_gate OBJECT
+    "${HYBRIDCLR_TEST_SOURCE_ROOT}/interpreter/InterpreterModule.cpp"
     "${HYBRIDCLR_TEST_SOURCE_ROOT}/interpreter/Interpreter_Execute.cpp"
     "${HYBRIDCLR_TEST_SOURCE_ROOT}/transform/TransformContext.cpp"
 )
@@ -116,6 +124,9 @@ function(configure_hybridclr_target target)
     endif()
     if (HYBRIDCLR_TEST_HAS_ADVANCED_OPTIMIZATION_OPCODES)
         target_compile_definitions(${target} PRIVATE HYBRIDCLR_LAB_HAS_ADVANCED_OPTIMIZATION_OPCODES=1)
+    endif()
+    if (HYBRIDCLR_TEST_HAS_INDEXED_STACK_ARGUMENTS)
+        target_compile_definitions(${target} PRIVATE HYBRIDCLR_LAB_HAS_INDEXED_STACK_ARGUMENTS=1)
     endif()
     target_include_directories(${target} PRIVATE
         "${HYBRIDCLR_RUNTIME_ROOT}"

@@ -1056,6 +1056,75 @@ namespace
         CHECK(std::all_of(destination.begin(), destination.end(), [](uint8_t value) { return value == 0; }));
     }
 
+#if HYBRIDCLR_LAB_HAS_INDEXED_STACK_ARGUMENTS
+    void TestIndexedStackArguments()
+    {
+        using namespace hybridclr::interpreter;
+        std::array<StackObject, 32> source{};
+        std::array<StackObject, 32> packed{};
+        for (size_t i = 0; i < source.size(); ++i) source[i].u64 = 100 + i;
+        const MethodArgDesc scalar{false, LocationDataType::U8, 1};
+        const MethodArgDesc structure{false, LocationDataType::S_N, 3};
+
+        // NewValueTypeVar lays out arguments, the value buffer, then this.
+        MethodArgDesc constructorArgs[] = {scalar, scalar, scalar};
+        uint16_t constructorIndices[] = {3, 0, 1};
+        source[0].i32 = 5;
+        source[1].i32 = 7;
+        source[3].ptr = &source[2];
+        InterpMethodInfo method{};
+        method.args = constructorArgs;
+        method.argCount = 3;
+        method.argStackObjectSize = 3;
+        CopyIndexedStackArguments(packed.data(), source.data(), constructorIndices, method);
+        CHECK(packed[0].ptr == &source[2]);
+        CHECK(packed[1].i32 == 5 && packed[2].i32 == 7);
+        CHECK(source[4].i32 != packed[1].i32); // The former contiguous shortcut reads this slot.
+
+        // Copy whole structs in declaration order, including repeated sources.
+        MethodArgDesc mixedArgs[] = {scalar, structure, scalar, structure};
+        uint16_t mixedIndices[] = {20, 10, 2, 10};
+        method.args = mixedArgs;
+        method.argCount = 4;
+        method.argStackObjectSize = 8;
+        CopyIndexedStackArguments(packed.data(), source.data(), mixedIndices, method);
+        CHECK(packed[0].u64 == source[20].u64);
+        CHECK(std::memcmp(packed.data() + 1, source.data() + 10, 3 * sizeof(StackObject)) == 0);
+        CHECK(packed[4].u64 == source[2].u64);
+        CHECK(std::memcmp(packed.data() + 5, source.data() + 10, 3 * sizeof(StackObject)) == 0);
+        const auto beforeReturn = packed;
+        std::memset(source.data() + 10, 0, 3 * sizeof(StackObject));
+        CHECK(std::memcmp(packed.data(), beforeReturn.data(), 8 * sizeof(StackObject)) == 0);
+
+        // Byrefs are pointer values, not copies of the referenced storage.
+        int32_t referenced = 11;
+        source[8].ptr = &referenced;
+        MethodArgDesc refArgs[] = {scalar, scalar};
+        uint16_t refIndices[] = {8, 8};
+        method.args = refArgs;
+        method.argCount = 2;
+        method.argStackObjectSize = 2;
+        CopyIndexedStackArguments(packed.data(), source.data(), refIndices, method);
+        CHECK(packed[0].ptr == &referenced && packed[1].ptr == &referenced);
+        *static_cast<int32_t*>(packed[0].ptr) = 17;
+        CHECK(*static_cast<int32_t*>(packed[1].ptr) == 17 && referenced == 17);
+
+        // Large arguments take the bulk-copy path; no fixed slot limit is assumed.
+        MethodArgDesc largeArgs[] = {{false, LocationDataType::S_N, 20}};
+        uint16_t largeIndices[] = {7};
+        method.args = largeArgs;
+        method.argCount = 1;
+        method.argStackObjectSize = 20;
+        CopyIndexedStackArguments(packed.data(), source.data(), largeIndices, method);
+        CHECK(std::memcmp(packed.data(), source.data() + 7, 20 * sizeof(StackObject)) == 0);
+
+        method = {};
+        packed[0].u64 = 0x12345678;
+        CopyIndexedStackArguments(packed.data(), nullptr, nullptr, method);
+        CHECK(packed[0].u64 == 0x12345678);
+    }
+#endif
+
     void TestBasicBlockSplitting()
     {
         using namespace hybridclr;
@@ -1726,6 +1795,9 @@ int main()
     TestOpcodeDecode();
     TestTemporaryMemoryArena();
     TestCopyHelpers();
+#if HYBRIDCLR_LAB_HAS_INDEXED_STACK_ARGUMENTS
+    TestIndexedStackArguments();
+#endif
     TestBasicBlockSplitting();
 #if HYBRIDCLR_LAB_HAS_INSTRUCTION_COMBINER
     TestInstructionCombiner();

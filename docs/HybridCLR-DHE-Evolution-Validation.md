@@ -1,5 +1,33 @@
 # DHE evolution implementation and validation
 
+## In progress: indexed interpreter bridge arguments
+
+The cold `381a51d` full matrix completes 220 observations in each of 18 processes
+on six archived Bases, but remains failed. Type-only and field-only pre-touch
+also fail on all six Bases; constructor-only pre-touch passes all six interpreted
+runs. Those passing diagnostic runs are not cold qualification.
+
+`Managed2NativeCallByReflectionInvoke` currently passes the first indexed slot
+directly to `Interpreter::Execute` after a method becomes interpreted. This
+incorrectly assumes contiguous invocation arguments. `NewValueTypeVar` places
+its receiver after the explicit arguments and value buffer. A first constructor
+call can change the method implementation flag after its caller was transformed,
+so the next call takes that shortcut with noncontiguous arguments.
+
+The repair gathers each argument using its index and transformed slot count into
+separate storage, preserving receiver/byref values and multi-slot structs. The
+caller's interpreter frame remains live and GC-rooted until the callee has copied
+the gathered arguments. No method publication, object layout, or ABI changes are
+required. Native tests cover this argument contract; the compile matrix must also
+compile InterpreterModule.cpp, which was previously absent from its object gates.
+The existing unmodified cold case and golden remain the Player regression.
+
+Acceptance requires all three real-header compile/CTest profiles and fresh-Base
+cold Player runs, with no constructor pre-touch or inline padding. The other
+generic-fallback and AOT exception differences remain independent open failures.
+This repair requires a new native Base identity; archived Bases and historical
+reports are retained unchanged. It is not full DHE or mobile qualification.
+
 ## In progress: full managed differential
 
 The complete first retained-AOT run now records 220 cases and four differences:
