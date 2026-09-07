@@ -31,6 +31,19 @@ checks["supplemental-generic-invocation-old-runtime-rejected"] = !ResourceUpdate
     ResourceUpdateCompatibility.RuntimeProtocol, "dhe-runtime-v4",
     ResourceUpdateCompatibility.KnownRuntimeCapabilities.Where(value => value != "supplemental-method-generic-invocation-v1"),
     comparison.RequiredRuntimeCapabilities);
+checks["unresolved-generic-stubs-capability-required"] = comparison.RequiredRuntimeCapabilities
+    .Contains("supplemental-generic-unresolved-stubs-v1");
+string[] v6Capabilities = ResourceUpdateCompatibility.KnownRuntimeCapabilities
+    .Where(value => value != "supplemental-generic-unresolved-stubs-v1").ToArray();
+checks["unresolved-generic-stubs-old-runtime-rejected"] = !ResourceUpdateCompatibility.CanExecuteUpdate(
+    ResourceUpdateCompatibility.RuntimeProtocol, "dhe-runtime-v6", v6Capabilities,
+    comparison.RequiredRuntimeCapabilities);
+ResourceUpdateCompatibility unity2021 = ResourceUpdateCompatibility.Analyze(before, after,
+    usesUnresolvedCallStubs: false);
+checks["unity2021-existing-generic-capability-retained"] = unity2021.Compatible &&
+    !unity2021.RequiredRuntimeCapabilities.Contains("supplemental-generic-unresolved-stubs-v1") &&
+    ResourceUpdateCompatibility.CanExecuteUpdate(ResourceUpdateCompatibility.RuntimeProtocol,
+        "dhe-runtime-v6", v6Capabilities, unity2021.RequiredRuntimeCapabilities);
 checks["new-type-base-reference-old-runtime-rejected"] = !ResourceUpdateCompatibility.CanExecuteUpdate(
     ResourceUpdateCompatibility.RuntimeProtocol, "dhe-runtime-v3",
     ResourceUpdateCompatibility.KnownRuntimeCapabilities.Where(value => value != "supplemental-type-base-references-v1"),

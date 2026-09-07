@@ -298,3 +298,31 @@ GetFiles(). Both paths are checked in their actual Editors.
 Explicit input lists are tested with assemblies in different directories and
 without a staging directory. No static input cache or framework-directory guess
 is used. This changes Editor preparation only, not the v6 native runtime contract.
+
+## Missing generic implementation behind an unresolved call stub
+
+The fresh Unity 2022 and Tuanjie Base workflows now pass, including their no-op
+AOT Players. Their paths are `base-linker-u22-verified` and
+`base-linker-tuanjie-verified` under the existing evolution artifact root.
+The common declaration resource set passes offline checks for these Bases and
+the existing Unity 2021 Base. Actual execution on Unity 2022 nevertheless fails
+at reflection invocation of the added generic method: `loadError=OK`, followed
+by an ExecutionEngineException for missing AOT code. The failed replay and
+Tuanjie probe remain under `replay-three-engine-declarations` and
+`player-unresolved-stubs-tuanjie.json`. Neither archive is changed.
+
+Unity 2022/Tuanjie fill a missing generic implementation with unresolved call
+stubs before selecting interpreter fallback. A non-null stub hid the original
+absence of AOT code. The candidate checks the original method-pointer record,
+as the Unity 2021 path already does. It does not downgrade valid native FGS
+invokers or change allocation, metadata locks, or publication order. Correct
+reflection and direct invocation, with unchanged methods remaining AOT, are
+the primary acceptance criteria; performance claims remain pending.
+
+Runtime contract `dhe-runtime-v7` advertises
+`supplemental-generic-unresolved-stubs-v1`. The resource compatibility check
+requires it for added generic methods on existing types for Unity 2022 and
+Tuanjie, but does not unnecessarily reject the already-capable Unity 2021 Base.
+Unknown engine contexts require it conservatively. Seventeen standalone
+compatibility checks pass. Native matrix, real Player execution on newly built
+Bases, and exact-identity replay are required before positive qualification.

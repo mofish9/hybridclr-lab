@@ -1,0 +1,33 @@
+{
+  "labRoot": "..",
+  "toolAssembly": "../../../artifacts/dhe-evolution-20260908/host-windows/HybridCLR.DheTool.dll",
+  "outputRoot": "../../../artifacts/dhe-evolution-20260908/replay-three-engine-declarations",
+  "updates": [
+    "../../../artifacts/dhe-evolution-20260908/resource-initial-three-engine",
+    "../../../artifacts/dhe-evolution-20260908/resource-expanded-three-engine"
+  ],
+  "timeoutSeconds": 120,
+  "bases": [
+    {
+      "label": "u21-consecutive",
+      "playerRoot": "../../../artifacts/dhe-evolution-20260908/base-declarations-u21/player",
+      "buildIdentity": "../../../artifacts/dhe-evolution-20260908/base-declarations-u21/build-identity.json"
+    },
+    {
+      "label": "u22-consecutive",
+      "playerRoot": "../../../artifacts/dhe-evolution-20260908/base-linker-u22-verified/player",
+      "buildIdentity": "../../../artifacts/dhe-evolution-20260908/base-linker-u22-verified/build-identity.json"
+    },
+    {
+      "label": "tuanjie-consecutive",
+      "playerRoot": "../../../artifacts/dhe-evolution-20260908/base-linker-tuanjie-verified/player",
+      "buildIdentity": "../../../artifacts/dhe-evolution-20260908/base-linker-tuanjie-verified/build-identity.json"
+    },
+    {
+      "label": "u21-skipped",
+      "playerRoot": "../../../artifacts/dhe-evolution-20260908/base-declarations-u21/player",
+      "buildIdentity": "../../../artifacts/dhe-evolution-20260908/base-declarations-u21/build-identity.json",
+      "skipFirstUpdate": true
+    }
+  ]
+}

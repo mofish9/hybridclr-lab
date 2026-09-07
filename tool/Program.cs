@@ -1211,7 +1211,8 @@ internal static partial class Program
                     continue;
                 }
                 var compatibility = ResourceUpdateCompatibility.Analyze(baselineSnapshot,
-                    currentSnapshot, currentVariant.AddressTakenFields);
+                    currentSnapshot, currentVariant.AddressTakenFields,
+                    usesUnresolvedCallStubs: baseEngineWorkflow != "Unity2021Standard");
                 requiredRuntimeCapabilities.UnionWith(
                     compatibility.RequiredRuntimeCapabilities);
                 var missingGuards = compatibility.GuardRequiredMethods.Where(method =>
