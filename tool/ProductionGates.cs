@@ -4366,15 +4366,21 @@ internal static partial class Program
     private static bool RunArchivedNativeManifestResolutionRegression(string regressionRoot)
     {
         string root = Path.Combine(regressionRoot, "archived-native-resolution");
+        string sourceRoot = Path.Combine(regressionRoot,
+            "archived-native-resolution-source");
         string nativeRoot = Path.Combine(root, "native");
         string provenanceRoot = Path.Combine(root, "provenance");
         Directory.CreateDirectory(nativeRoot);
         Directory.CreateDirectory(provenanceRoot);
+        Directory.CreateDirectory(sourceRoot);
 
         string workflowPath = Path.Combine(root, "player-workflow-report.json");
         string normalizedPath = Path.Combine(nativeRoot, "dhe-native-manifest.json");
         string immutablePath = Path.Combine(provenanceRoot,
             "native-manifest.original.bin");
+        string sourceNativePath = Path.Combine(sourceRoot,
+            "dhe-native-manifest.json");
+        string identityPath = Path.Combine(root, "build-identity.json");
         string sourcePreflightPath = Path.Combine(root, "source-preflight.json");
         string cleanCheckoutPath = Path.Combine(root, "clean-checkout.json");
         string toolchainGatePath = Path.Combine(root, "toolchain-gate.json");
@@ -4386,16 +4392,22 @@ internal static partial class Program
             pathSemantics = "archive-relative-v1",
             normalized = true,
         });
-        WriteJson(immutablePath, new
+        WriteJson(sourceNativePath, new
         {
             schemaVersion = 1,
             resolverVersion = 3,
             pathSemantics = "workspace-absolute-v1",
         });
+        WriteJson(identityPath, new
+        {
+            schemaVersion = 1,
+            format = "hybridclr.dhe-build-identity.json",
+            nativeManifestPath = "native/dhe-native-manifest.json",
+        });
         foreach (string path in new[]
                  { sourcePreflightPath, cleanCheckoutPath, toolchainGatePath, runtimeSourcePath })
             WriteJson(path, new { schemaVersion = 1, passed = true });
-        string immutableHash = Sha256File(immutablePath);
+        string immutableHash = Sha256File(sourceNativePath);
         WriteJson(workflowPath, new
         {
             schemaVersion = 1,
@@ -4407,6 +4419,7 @@ internal static partial class Program
             toolchainGate = "toolchain-gate.json",
             runtimeSource = "provenance/runtime-manifest.json",
         });
+        BindArchivedNativeIdentity(root, sourceNativePath);
         string archiveManifestPath = Path.Combine(root, "dhe-archive-manifest.json");
         var archiveFiles = Directory.GetFiles(root, "*", SearchOption.AllDirectories)
             .Where(path => !Path.GetFullPath(path).Equals(archiveManifestPath,
@@ -4435,6 +4448,13 @@ internal static partial class Program
         });
 
         JsonElement workflow = ReadJson<JsonElement>(workflowPath);
+        JsonElement identity = ReadJson<JsonElement>(identityPath);
+        bool normalizedReferencePreserved = string.Equals(
+            GetString(workflow, "nativeManifest"),
+            "native/dhe-native-manifest.json", StringComparison.Ordinal) &&
+            string.Equals(GetString(identity, "nativeManifestPath"),
+                "provenance/native-manifest.original.bin",
+                StringComparison.Ordinal);
         bool archiveValidated = ValidateBaseArchiveForWorkflow(workflowPath)
             ?.Equals(archiveManifestPath, StringComparison.OrdinalIgnoreCase) == true;
         bool resolved = ResolveBaseWorkflowNativeManifest(workflow, workflowPath)
@@ -4471,8 +4491,8 @@ internal static partial class Program
         {
             archiveTamperRejected = true;
         }
-        return archiveValidated && resolved && referencesResolved && tamperRejected &&
-            archiveTamperRejected;
+        return normalizedReferencePreserved && archiveValidated && resolved &&
+            referencesResolved && tamperRejected && archiveTamperRejected;
     }
 
     private static bool RunLegacySinglePayloadSelectionRegression()

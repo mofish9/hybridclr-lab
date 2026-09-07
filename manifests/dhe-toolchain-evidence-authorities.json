@@ -80,6 +80,12 @@
       "packageId": "5af090eca274468623a7b4e8bab3ceeb669f378f7293bfeb3d1498c69ba7d960",
       "sourceHead": "84acc00b33b6277239c4f52a8dab14e572900497",
       "sourceTree": "78dbaf3e35c388529808ef3a8844e58b60298bf9"
+    },
+    {
+      "toolchainVersion": "0.1.32",
+      "packageId": "8cbaad0764f4c265d05bfe61527677714ab6d2b78c62295a5684ef1ed563faa9",
+      "sourceHead": "34b26c445005e911bb5a289d43a492f5d6ca8192",
+      "sourceTree": "c819206a0aca61ec7e1d07b18e7421a700425c1f"
     }
   ]
 }
