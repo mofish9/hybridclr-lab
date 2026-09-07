@@ -19,6 +19,12 @@ checks["reference-evolution-capability-required"] = comparison.RequiredRuntimeCa
     .Contains("assembly-reference-evolution-v1");
 checks["new-type-base-reference-capability-required"] = comparison.RequiredRuntimeCapabilities
     .Contains("supplemental-type-base-references-v1");
+checks["supplemental-generic-invocation-capability-required"] = comparison.RequiredRuntimeCapabilities
+    .Contains("supplemental-method-generic-invocation-v1");
+checks["supplemental-generic-invocation-old-runtime-rejected"] = !ResourceUpdateCompatibility.CanExecuteUpdate(
+    ResourceUpdateCompatibility.RuntimeProtocol, "dhe-runtime-v4",
+    ResourceUpdateCompatibility.KnownRuntimeCapabilities.Where(value => value != "supplemental-method-generic-invocation-v1"),
+    comparison.RequiredRuntimeCapabilities);
 checks["new-type-base-reference-old-runtime-rejected"] = !ResourceUpdateCompatibility.CanExecuteUpdate(
     ResourceUpdateCompatibility.RuntimeProtocol, "dhe-runtime-v3",
     ResourceUpdateCompatibility.KnownRuntimeCapabilities.Where(value => value != "supplemental-type-base-references-v1"),

@@ -217,3 +217,14 @@ requires `supplemental-type-base-references-v1`; existing Bases lacking this fix
 cannot be relabeled as capable. Runtime contract advances to `dhe-runtime-v4`, but
 the MV wire format and stable identities are unchanged. Native and Player reruns
 on this exact candidate remain required.
+
+That candidate passed all three native profiles with real Editor headers. A fresh
+Unity 2021 Base and resource update then passed new-type identity, ordinary added
+method invocation, method/parameter attributes, and generic definition/attribute
+identity. Execution next failed at reflection invocation of
+`AddedAttributedGenericMethod<string>` with a missing AOT implementation. Its
+public alias has a Base class but is absent from the Base method-token map, so
+`IsImplementedByInterpreter` incorrectly returned false. The candidate now also
+recognizes supplemental aliases through their method image, including inflations.
+It declares `supplemental-method-generic-invocation-v1` under runtime contract v5.
+The exact updated candidate must repeat native and real Player gates.

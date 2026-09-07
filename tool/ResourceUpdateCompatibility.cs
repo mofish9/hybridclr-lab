@@ -4,7 +4,7 @@ internal sealed class ResourceUpdateCompatibility
 {
 	public const string Policy = "dhe-proven-safe-subset-v1";
 	public const string RuntimeProtocol = "dhe-runtime-protocol-v1";
-    public const string CurrentNativeRuntimeContract = "dhe-runtime-v4";
+    public const string CurrentNativeRuntimeContract = "dhe-runtime-v5";
     public static readonly string[] KnownRuntimeCapabilities =
     {
 		"aot-guard-v1",
@@ -26,6 +26,7 @@ internal sealed class ResourceUpdateCompatibility
         "supplemental-method-custom-attributes-v1",
         "assembly-reference-evolution-v1",
         "supplemental-type-base-references-v1",
+        "supplemental-method-generic-invocation-v1",
         "supplemental-nested-types-v1",
         "supplemental-top-level-types-v1",
     };
@@ -210,6 +211,9 @@ internal sealed class ResourceUpdateCompatibility
         if (added.Any(method => method.HasCustomAttributes &&
                 baselineTypes.ContainsKey(method.DeclaringTypeStableId)))
             requiredCapabilities.Add("supplemental-method-custom-attributes-v1");
+        if (added.Any(method => (method.GenericParameterCount != 0 || method.DeclaringTypeGenericParameterCount != 0) &&
+                baselineTypes.ContainsKey(method.DeclaringTypeStableId)))
+            requiredCapabilities.Add("supplemental-method-generic-invocation-v1");
         if (addedFields.Any(field => baselineTypes.ContainsKey(field.DeclaringTypeStableId) &&
                 !field.IsStatic))
             requiredCapabilities.Add("supplemental-existing-type-instance-fields-v1");

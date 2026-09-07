@@ -27,6 +27,10 @@ MonoBehaviour:
   - HybridCLR.ManagedCases
   - HybridCLR.MetadataStress
   - HybridCLR.CrossAssemblyDerived
+  dhePreserveAotAssemblies:
+  - mscorlib
+  - System
+  - System.Core
   preserveHotUpdateAssemblies: []
   hotUpdateDllCompileOutputRootDir: HybridCLRData/HotUpdateDlls
   externalHotUpdateAssembliyDirs:
