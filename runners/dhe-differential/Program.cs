@@ -9,9 +9,11 @@ if (args.Length == 2 && args[0] == "inspect")
     Console.WriteLine(JsonSerializer.Serialize(DheDifferentialEvidence.Read(args[1]), new JsonSerializerOptions { WriteIndented = true }));
     return 0;
 }
-if (args.Length == 3 && args[0] == "instrument")
+if (args.Length >= 3 && args[0] == "instrument")
 {
-    DheDifferentialInstrumentation.Generate(args[1], args[2]);
+    if (args.Length > 4 || (args.Length == 4 && args[3] != "--prevent-inlining"))
+        throw new ArgumentException("Optional instrumentation argument: --prevent-inlining.");
+    DheDifferentialInstrumentation.Generate(args[1], args[2], args.Length == 4);
     return 0;
 }
 if (args.Length != 6 || args[0] != "reference")

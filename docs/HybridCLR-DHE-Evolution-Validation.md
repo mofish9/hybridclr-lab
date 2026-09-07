@@ -26,6 +26,16 @@ methods report changed in these interpreted runs. This is a newly exposed
 correctness defect, not passing full-suite evidence. Raw observations and failed
 run hashes are retained in `replay-full-differential-complete`.
 
+The diagnostic resource confirms `ExecutionEngineException` for missing AOT
+instantiations of `ReflectionMethods.Echo<int>` and `ReflectionBox<int>..ctor` on
+Unity 2021. DHE currently suppresses unchanged-method interpreter eligibility,
+even when that generic instantiation has no native implementation.
+
+To isolate the nested generic/ref failure, the instrumenter can additionally
+prefix 64 NOP bytes to every case-assembly method. This exceeds the archived
+test Bases' default 32-byte inline budget without changing declarations or
+golden values. It is a diagnostic variant only, not a production workaround.
+
 The next gate executes the complete existing 220-case manifest after DHE
 registration, through a resource-only fixture entry on the archived Windows
 Bases. No new Player entry or native runtime change is required for the harness.

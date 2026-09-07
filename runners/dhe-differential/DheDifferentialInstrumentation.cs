@@ -7,7 +7,7 @@ namespace HybridCLR.Lab;
 
 internal static class DheDifferentialInstrumentation
 {
-    public static void Generate(string sourceRoot, string outputRoot)
+    public static void Generate(string sourceRoot, string outputRoot, bool preventInlining = false)
     {
         sourceRoot = Path.GetFullPath(sourceRoot);
         outputRoot = Path.GetFullPath(outputRoot);
@@ -46,6 +46,10 @@ internal static class DheDifferentialInstrumentation
             }
             else
                 prefix.AddRange(new[] { Instruction.Create(OpCodes.Ldc_I4_0), Instruction.Create(OpCodes.Pop) });
+            // Archived test Bases use the default 32-byte inline limit. Padding
+            // isolates inlining without changing declarations or expected values.
+            if (preventInlining)
+                prefix.AddRange(Enumerable.Range(0, 64).Select(_ => Instruction.Create(OpCodes.Nop)));
             method.Body.SimplifyBranches();
             for (int index = 0; index < prefix.Count; index++) method.Body.Instructions.Insert(index, prefix[index]);
             method.Body.OptimizeBranches();
@@ -99,6 +103,7 @@ internal static class DheDifferentialInstrumentation
             format = "hybridclr.dhe-differential-instrumentation.json", schemaVersion = 1,
             source, sourceSha256 = DheDifferentialEvidence.Hash(source), destination,
             destinationSha256 = DheDifferentialEvidence.Hash(destination), modified,
+            inlinePaddingBytes = preventInlining ? 64 : 0,
             relocatedConstantDataFields = relocatedData.OrderBy(value => value, StringComparer.Ordinal),
             scope = "Correctness instrumentation only; not performance evidence",
         }, new JsonSerializerOptions { WriteIndented = true }));

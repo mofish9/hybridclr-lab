@@ -1,10 +1,10 @@
 {
   "labRoot": "..",
   "toolAssembly": "../../../artifacts/dhe-evolution-20260908/host-full-differential/HybridCLR.DheTool.dll",
-  "outputRoot": "../../../artifacts/dhe-evolution-20260908/replay-full-differential-diagnostics",
+  "outputRoot": "../../../artifacts/dhe-evolution-20260908/replay-full-differential-no-inline",
   "updates": [
     "../../../artifacts/dhe-evolution-20260908/resource-full-suite-diagnostics-aot",
-    "../../../artifacts/dhe-evolution-20260908/resource-full-suite-diagnostics-interpreted"
+    "../../../artifacts/dhe-evolution-20260908/resource-full-suite-no-inline-interpreted"
   ],
   "referenceResults": [
     "../../../artifacts/dhe-evolution-20260908/reference-full-suite-diagnostics-first.json",
@@ -88,7 +88,7 @@
   "differentialGolden": "test-golden.json",
   "differentialReferences": [
     "../../../artifacts/dhe-evolution-20260908/differential-reference-diagnostics-aot.bin",
-    "../../../artifacts/dhe-evolution-20260908/differential-reference-diagnostics-interpreted.bin"
+    "../../../artifacts/dhe-evolution-20260908/differential-reference-no-inline-interpreted.bin"
   ],
   "requireInterpretedCaseEntries": [false, true]
 }
