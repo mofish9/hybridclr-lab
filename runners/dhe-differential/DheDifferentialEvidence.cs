@@ -105,7 +105,13 @@ internal static class DheDifferentialEvidence
         Require(actual.NativeDiagnostics, "Player lacks native DHE method-state evidence.");
         string identityPath = referencePath + ".identity.json";
         using var identity = JsonDocument.Parse(File.ReadAllText(identityPath));
-        Require(identity.RootElement.GetProperty("inputSha256").GetString() == Hash(currentAssembly) &&
+        Require(identity.RootElement.GetProperty("format").GetString() == "hybridclr.dhe-differential-reference.json" &&
+            identity.RootElement.GetProperty("schemaVersion").GetInt32() == 1 &&
+            identity.RootElement.GetProperty("passed").GetBoolean() &&
+            identity.RootElement.GetProperty("caseCount").GetInt32() == reference.Cases.Length &&
+            identity.RootElement.GetProperty("manifestSha256").GetString() == Hash(manifestPath) &&
+            identity.RootElement.GetProperty("goldenSha256").GetString() == Hash(goldenPath) &&
+            identity.RootElement.GetProperty("inputSha256").GetString() == Hash(currentAssembly) &&
             identity.RootElement.GetProperty("resultSha256").GetString() == Hash(referencePath),
             "CLR reference is not bound to the exact shipped current assembly and result.");
         var current = MetaVersionSnapshot.Create(currentAssembly);
