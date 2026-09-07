@@ -16,6 +16,14 @@ internal sealed class MetaVersionSnapshot
     public string AssemblyName { get; private init; } = "";
     public string AssemblySha256 { get; private init; } = "";
     public string AssemblyMetadataVersion { get; private init; } = "";
+    [JsonIgnore]
+    public string AssemblyNonReferenceMetadataVersion { get; private init; } = "";
+    [JsonIgnore]
+    public IReadOnlyDictionary<string, string> AssemblyReferences { get; private init; } =
+        new Dictionary<string, string>();
+    [JsonIgnore]
+    public IReadOnlyDictionary<string, string> TypeReferenceScopes { get; private init; } =
+        new Dictionary<string, string>();
     public MetaVersionType[] Types { get; private init; } = Array.Empty<MetaVersionType>();
     public MetaVersionField[] Fields { get; private init; } = Array.Empty<MetaVersionField>();
     public MetaVersionMethod[] Methods { get; private init; } = Array.Empty<MetaVersionMethod>();
@@ -50,6 +58,14 @@ internal sealed class MetaVersionSnapshot
             AssemblySha256 = FileSha256(assemblyPath),
             AssemblyMetadataVersion = Hash("dhe-assembly-metadata\n" +
                 StableAssemblyShape(module)),
+            AssemblyNonReferenceMetadataVersion = Hash("dhe-assembly-nonreference-metadata\n" +
+                StableAssemblyShape(module, false)),
+            AssemblyReferences = module.GetAssemblyRefs().ToDictionary(reference => reference.Name.String,
+                reference => reference.FullName, StringComparer.OrdinalIgnoreCase),
+            TypeReferenceScopes = module.GetTypeRefs().GroupBy(type => type.FullName, StringComparer.Ordinal)
+                .ToDictionary(group => group.Key, group => string.Join("\n", group.Select(type =>
+                    type.DefinitionAssembly?.FullName ?? "").Distinct(StringComparer.Ordinal)
+                    .OrderBy(scope => scope, StringComparer.Ordinal)), StringComparer.Ordinal),
             Types = types,
             Fields = fields,
             Methods = methods,
@@ -159,7 +175,7 @@ internal sealed class MetaVersionSnapshot
             Hash("dhe-method-noncustom-metadata\n" +
                 StableMethodMetadataWithoutOwnAttributes(method)),
             Hash("dhe-method-custom-attributes\n" + Attributes(method.CustomAttributes)),
-            method.CustomAttributes.Count != 0,
+            method.CustomAttributes.Count != 0 || method.ParamDefs.Any(parameter => parameter.CustomAttributes.Count != 0),
             method.IsVirtual, method.IsConstructor, method.DeclaringType?.IsInterface == true);
     }
 
@@ -472,7 +488,7 @@ internal sealed class MetaVersionSnapshot
             BytesHash(security.GetBlob()), Attributes(security.CustomAttributes)))
             .OrderBy(value => value, StringComparer.Ordinal));
 
-    private static string StableAssemblyShape(ModuleDef module)
+    private static string StableAssemblyShape(ModuleDef module, bool includeReferences = true)
     {
         AssemblyDef? assembly = module.Assembly;
         string assemblyShape = assembly == null ? "" : string.Join("|", assembly.FullName,
@@ -480,8 +496,8 @@ internal sealed class MetaVersionSnapshot
             ((uint)assembly.HashAlgorithm).ToString("x8"),
             assembly.PublicKey?.ToString() ?? "", Attributes(assembly.CustomAttributes),
             DeclSecurities(assembly.DeclSecurities));
-        string references = string.Join(",", module.GetAssemblyRefs().Select(reference =>
-            reference.FullName).OrderBy(value => value, StringComparer.Ordinal));
+        string references = includeReferences ? string.Join(",", module.GetAssemblyRefs().Select(reference =>
+            reference.FullName).OrderBy(value => value, StringComparer.Ordinal)) : "";
         string resources = string.Join(",", module.Resources.Select(resource => string.Join(":",
             resource.Name.String, ((uint)resource.Attributes).ToString("x8"), resource.ResourceType,
             resource is EmbeddedResource embedded ? BytesHash(embedded.CreateReader().ToArray()) :

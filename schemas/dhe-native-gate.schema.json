@@ -20,6 +20,8 @@
     "externalTreeSha256": { "type": ["string", "null"], "pattern": "^[0-9a-fA-F]{64}$" },
     "nativeExitCode": { "type": "integer" },
     "surrogateHeadersAllowed": { "type": "boolean" },
+    "surrogateExternalHeadersUsed": { "type": "boolean" },
+    "fullGenericSharingTests": { "type": "boolean" },
     "log": { "type": "string", "minLength": 1 },
     "errors": { "type": "array", "items": { "type": "string" } }
   }

@@ -4,7 +4,7 @@ using System.Runtime.CompilerServices;
 namespace HybridCLR.Lab.ManagedCasesAot
 {
 #if DHE_STRUCTURE_CURRENT
-    [AttributeUsage(AttributeTargets.Class | AttributeTargets.Method | AttributeTargets.Field)]
+    [AttributeUsage(AttributeTargets.Class | AttributeTargets.Method | AttributeTargets.Field | AttributeTargets.Parameter)]
     public sealed class DheMetadataMarkerAttribute : Attribute
     {
         public DheMetadataMarkerAttribute(int value, string label)
@@ -256,10 +256,16 @@ namespace HybridCLR.Lab.ManagedCasesAot
 
 #if DHE_EVOLUTION_CURRENT
         [DheMetadataMarker(2201, "added-method")]
-        public int AddedAttributedMethod(int value) => value + 2200;
+        public int AddedAttributedMethod([DheMetadataMarker(2203, "added-parameter")] int value) => value + 2200;
 
         [DheMetadataMarker(2202, "added-generic-method")]
-        public T AddedAttributedGenericMethod<T>(T value) => value;
+        public T AddedAttributedGenericMethod<T>([DheMetadataMarker(2204, "generic-parameter")] T value)
+        {
+            AddedInstanceCounter = 2204;
+            if (AddedInstanceCounter != 2204 || InstanceStable(2) != 6)
+                throw new InvalidOperationException("DHE added generic method lost its logical Base context.");
+            return value;
+        }
 
         public async System.Threading.Tasks.Task<int> AddedAsyncMethod(int value)
         {

@@ -152,3 +152,21 @@ uses the declaring class image. Generic definitions/inflations and parameter
 attributes must be considered together. A plain removal of the offline check is
 not the implementation. New assembly references require a separate identity and
 dependency review rather than treating the entire AssemblyRef table as immutable.
+
+## Supplemental method metadata implementation
+
+The next candidate keeps object layout, virtual slots, and calling conventions
+unchanged. It resolves the metadata image for supplemental method aliases and
+inflated definitions without replacing their logical declaring class. Engine
+reflection uses that image for instantiated attributes, raw attribute data,
+IsDefined, and parameter attributes. Parameter metadata lookup follows the
+method definition rather than the declaring class. The same tests run on each
+engine; Unity 2021 cache APIs and Unity 2022/Tuanjie reader APIs are separate hooks.
+
+Reference-list evolution is distinct from assembly identity or declaration
+changes. Added/removed references may be exposed through the current image only
+after verifying dependency availability; changing the identity of a retained
+reference remains rejected. Base MV and current MV wire format are unchanged.
+New runtime capabilities are required for these features so old runtimes cannot
+be relabeled as compatible. Both changes remain under the existing registration
+publication/lifetime rules and require no new mutable cache or object sidecar.

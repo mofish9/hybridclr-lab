@@ -75,6 +75,9 @@ add_library(hybridclr_interpreter_compile_gate OBJECT
 )
 
 add_library(hybridclr_engine_reflection_compile_gate OBJECT
+    "${HYBRIDCLR_RUNTIME_ROOT}/vm/Reflection.cpp"
+    "${HYBRIDCLR_RUNTIME_ROOT}/vm/GlobalMetadata.cpp"
+    "${HYBRIDCLR_RUNTIME_ROOT}/vm/Assembly.cpp"
     "${HYBRIDCLR_RUNTIME_ROOT}/vm/Image.cpp"
     "${HYBRIDCLR_RUNTIME_ROOT}/vm/Class.cpp"
     "${HYBRIDCLR_RUNTIME_ROOT}/vm/Field.cpp"

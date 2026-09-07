@@ -4,7 +4,7 @@ internal sealed class ResourceUpdateCompatibility
 {
 	public const string Policy = "dhe-proven-safe-subset-v1";
 	public const string RuntimeProtocol = "dhe-runtime-protocol-v1";
-    public const string CurrentNativeRuntimeContract = "dhe-runtime-v2";
+    public const string CurrentNativeRuntimeContract = "dhe-runtime-v3";
     public static readonly string[] KnownRuntimeCapabilities =
     {
 		"aot-guard-v1",
@@ -23,6 +23,8 @@ internal sealed class ResourceUpdateCompatibility
 		"removed-types-v1",
 		"logical-existing-type-properties-events-v1",
 		"logical-existing-member-custom-attributes-v1",
+        "supplemental-method-custom-attributes-v1",
+        "assembly-reference-evolution-v1",
         "supplemental-nested-types-v1",
         "supplemental-top-level-types-v1",
     };
@@ -78,9 +80,23 @@ internal sealed class ResourceUpdateCompatibility
                 StringComparison.Ordinal))
             unsupported.Add("assembly-name-change:" + baseline.AssemblyName + "->" +
                 current.AssemblyName);
-        if (!string.Equals(baseline.AssemblyMetadataVersion,
-                current.AssemblyMetadataVersion, StringComparison.OrdinalIgnoreCase))
+        if (!string.Equals(baseline.AssemblyNonReferenceMetadataVersion,
+                current.AssemblyNonReferenceMetadataVersion, StringComparison.OrdinalIgnoreCase))
             unsupported.Add("assembly-or-module-metadata-change:" + baseline.AssemblyName);
+        foreach (var reference in baseline.AssemblyReferences)
+        {
+            if (current.AssemblyReferences.TryGetValue(reference.Key, out string? currentIdentity) &&
+                !string.Equals(reference.Value, currentIdentity, StringComparison.Ordinal))
+                unsupported.Add("existing-assembly-reference-identity-change:" + reference.Key);
+        }
+        // Full type names alone do not distinguish two assemblies defining the
+        // same type. Do not let reference evolution silently retarget old AOT IL.
+        foreach (var type in baseline.TypeReferenceScopes)
+        {
+            if (current.TypeReferenceScopes.TryGetValue(type.Key, out string? currentScope) &&
+                !string.Equals(type.Value, currentScope, StringComparison.Ordinal))
+                unsupported.Add("existing-type-reference-scope-change:" + type.Key);
+        }
 
         MetaVersionMethod[] changed = baseline.Methods.Where(method =>
             currentMethods.TryGetValue(method.StableId, out MetaVersionMethod? currentMethod) &&
@@ -141,8 +157,6 @@ internal sealed class ResourceUpdateCompatibility
         {
             if (!baselineTypes.TryGetValue(method.DeclaringTypeStableId, out MetaVersionType? declaringType))
                 continue;
-			if (method.HasCustomAttributes)
-				unsupported.Add("added-method-custom-attributes-on-existing-type:" + method.Identity);
             if (declaringType.IsInterface || method.DeclaringTypeIsInterface)
                 unsupported.Add("added-method-on-existing-interface:" + method.Identity);
             else if (method.IsVirtual || (method.Flags & (2u | 4u)) != 0)
@@ -189,6 +203,12 @@ internal sealed class ResourceUpdateCompatibility
             "single-current-multibase-v1",
             "atomic-multi-assembly-registration-v1",
         };
+        if (!new HashSet<string>(baseline.AssemblyReferences.Values, StringComparer.Ordinal)
+                .SetEquals(current.AssemblyReferences.Values))
+            requiredCapabilities.Add("assembly-reference-evolution-v1");
+        if (added.Any(method => method.HasCustomAttributes &&
+                baselineTypes.ContainsKey(method.DeclaringTypeStableId)))
+            requiredCapabilities.Add("supplemental-method-custom-attributes-v1");
         if (addedFields.Any(field => baselineTypes.ContainsKey(field.DeclaringTypeStableId) &&
                 !field.IsStatic))
             requiredCapabilities.Add("supplemental-existing-type-instance-fields-v1");

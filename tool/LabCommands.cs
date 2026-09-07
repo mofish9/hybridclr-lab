@@ -606,6 +606,10 @@ internal static class LabCommands
         var unityVersion = engine.TryGetProperty("unityVersionNumber", out var unityValue) && unityValue.TryGetInt32(out var unityNumber) ? unityNumber : 20220362;
         var tuanjieVersion = engine.TryGetProperty("tuanjieVersionNumber", out var tuanjieValue) && tuanjieValue.TryGetInt32(out var tuanjieNumber) ? tuanjieNumber : 0;
         var fgs = runtimeManifest.TryGetProperty("fullGenericSharingDiagnostics", out var fgsValue) && fgsValue.ValueKind == JsonValueKind.True;
+        string workflowId = StringProperty(runtimeManifest, "engineWorkflow");
+        JsonElement workflow = ReadJson(Path.Combine(lab, "manifests/runtime-workflows.json"))
+            .GetProperty("workflows").EnumerateArray().Single(item => StringProperty(item, "id") == workflowId);
+        fgs |= StringProperty(workflow, "fullGenericSharing") == "required";
         var expectDhe = runtimeManifest.TryGetProperty("dheEnabled", out var dheValue) && dheValue.ValueKind == JsonValueKind.True;
         var platform = OperatingSystem.IsWindows() ? "Windows" : "OSX";
         var args = new List<string> { "-S", source, "-B", build, "-DHYBRIDCLR_RUNTIME_ROOT=" + runtime, "-DIL2CPP_EXTERNAL=" + external,
@@ -616,14 +620,27 @@ internal static class LabCommands
         if (cli.Optional("generator") is { Length: > 0 } generator) { args.Add("-G"); args.Add(generator); }
         var cmake = ResolveExecutable("cmake");
         var ctest = ResolveExecutable("ctest", Path.Combine(Path.GetDirectoryName(cmake) ?? string.Empty, "ctest" + (OperatingSystem.IsWindows() ? ".exe" : string.Empty)));
-        RunProcess(cmake, args, lab);
-        RunProcess(cmake, new[] { "--build", build, "--config", configuration, "--parallel" }, lab);
-        RunProcess(ctest, new[] { "--test-dir", build, "-C", configuration, "--output-on-failure" }, lab);
-        var surrogateHeadersAllowed = cli.Has("allowsurrogateexternalheaders");
         var logPath = Path.Combine(build, "native-test.log");
-        WriteText(logPath, "CMake build and CTest completed successfully.\n");
+        var nativeLog = new StringBuilder();
+        void Step(string executable, IEnumerable<string> arguments)
+        {
+            string[] values = arguments.ToArray();
+            var result = RunProcess(executable, values, lab, false, false);
+            nativeLog.AppendLine(executable + " " + JsonSerializer.Serialize(values));
+            nativeLog.AppendLine(result.stdout).AppendLine(result.stderr);
+            WriteText(logPath, nativeLog.ToString());
+            if (result.exitCode != 0)
+                throw new InvalidOperationException("Native step exited with " + result.exitCode + ". See " + logPath);
+        }
+        Step(cmake, args);
+        Step(cmake, new[] { "--build", build, "--config", configuration, "--parallel" });
+        Step(ctest, new[] { "--test-dir", build, "-C", configuration, "--output-on-failure" });
+        var surrogateHeadersAllowed = cli.Has("allowsurrogateexternalheaders");
+        bool surrogateExternalHeadersUsed = runtimeManifest.GetProperty("externalHeaders")
+            .GetProperty("surrogate").GetBoolean();
         var runtimeManifestPath = Path.Combine(runtimeRoot, "runtime-manifest.json");
-        WriteJson(Path.Combine(build, "native-gate.json"), new { schemaVersion = 1, format = "hybridclr.dhe-native-gate.json", passed = true, mergeReady = !(runtimeManifest.TryGetProperty("externalHeaders", out var headers) && headers.TryGetProperty("surrogate", out var surrogateValue) && surrogateValue.ValueKind == JsonValueKind.True), profile, configuration, runtimeRoot = runtime, runtimeManifest = runtimeManifestPath, runtimeManifestSha256 = Sha256File(runtimeManifestPath), runtimeTreeSha256 = TreeHash(runtime), externalTreeSha256 = TreeHash(external), nativeExitCode = 0, surrogateHeadersAllowed, log = logPath, errors = Array.Empty<string>(), generatedAtUtc = DateTimeOffset.UtcNow });
+        WriteJson(Path.Combine(build, "native-gate.json"), new { schemaVersion = 1, format = "hybridclr.dhe-native-gate.json", passed = true, mergeReady = !surrogateExternalHeadersUsed, profile, configuration, fullGenericSharingTests = fgs, runtimeRoot = runtime, runtimeManifest = runtimeManifestPath, runtimeManifestSha256 = Sha256File(runtimeManifestPath), runtimeTreeSha256 = TreeHash(runtime), externalTreeSha256 = TreeHash(external), nativeExitCode = 0, surrogateHeadersAllowed, surrogateExternalHeadersUsed, log = logPath, errors = Array.Empty<string>(), generatedAtUtc = DateTimeOffset.UtcNow });
+        Console.WriteLine(profile + " native compile/CTest passed; FGS tests=" + fgs + "; log=" + logPath);
         return 0;
     }
 

@@ -1157,6 +1157,12 @@ internal static partial class Program
             var baseAotNameSet = new HashSet<string>(baseAotAssemblyNames,
                 StringComparer.OrdinalIgnoreCase);
             var unsupported = new List<string>();
+            foreach (MetaVersionSnapshot snapshot in currentVariant.Snapshots.Values)
+            {
+                unsupported.AddRange(snapshot.AssemblyReferences.Keys.Where(reference =>
+                        !baseAotNameSet.Contains(reference) && !currentNameSet.Contains(reference))
+                    .Select(reference => "current-reference-unavailable:" + snapshot.AssemblyName + ":" + reference));
+            }
             if (!baseAotNameSet.IsSupersetOf(baselineNameSet))
                 throw new DheException(
                     "Base DHE assembly set is not a subset of the complete AOT inventory: " +
