@@ -143,17 +143,17 @@ internal sealed class MetaVersionSnapshot
             Hash("dhe-type-static-fields\n" + StableStaticFieldShape(type)),
             type.IsInterface, type.DeclaringType != null,
             string.Equals(type.Name.String, "<PrivateImplementationDetails>",
-                StringComparison.Ordinal), LocalReferencedTypes(type));
+                StringComparison.Ordinal), LocalReferencedTypes(type), LocalReferencedTypes(type, false));
     }
 
-    private static string[] LocalReferencedTypes(TypeDef type)
+    private static string[] LocalReferencedTypes(TypeDef type, bool includeBodies = true)
     {
         var names = new HashSet<string>(StringComparer.Ordinal);
         void AddType(ITypeDefOrRef? reference)
         {
             if (reference is TypeSpec spec) { AddSignature(spec.TypeSig); return; }
-            if (reference?.DefinitionAssembly?.Name == type.Module.Assembly.Name)
-                names.Add(reference.FullName);
+            if (reference != null && reference.DefinitionAssembly?.Name == type.Module.Assembly.Name)
+                names!.Add(reference.FullName);
         }
         void AddSignature(TypeSig? signature)
         {
@@ -172,13 +172,47 @@ internal sealed class MetaVersionSnapshot
             AddSignature(signature.RetType);
             foreach (TypeSig parameter in signature.Params) AddSignature(parameter);
         }
+        void AddArgument(CAArgument argument)
+        {
+            AddSignature(argument.Type);
+            if (argument.Value is TypeSig signature) AddSignature(signature);
+            else if (argument.Value is ITypeDefOrRef reference) AddType(reference);
+            else if (argument.Value is IList<CAArgument> arguments)
+                foreach (CAArgument item in arguments) AddArgument(item);
+        }
+        void AddAttributes(IEnumerable<CustomAttribute> attributes)
+        {
+            foreach (CustomAttribute attribute in attributes)
+            {
+                AddType(attribute.AttributeType);
+                foreach (CAArgument argument in attribute.ConstructorArguments) AddArgument(argument);
+                foreach (CANamedArgument argument in attribute.NamedArguments) AddArgument(argument.Argument);
+            }
+        }
+        void AddConstraints(IEnumerable<GenericParam> parameters)
+        {
+            foreach (GenericParam parameter in parameters)
+                foreach (GenericParamConstraint constraint in parameter.GenericParamConstraints)
+                    AddType(constraint.Constraint);
+        }
         AddType(type.BaseType);
+        AddAttributes(type.CustomAttributes);
+        AddConstraints(type.GenericParameters);
         foreach (InterfaceImpl implementation in type.Interfaces) AddType(implementation.Interface);
-        foreach (FieldDef field in type.Fields) AddSignature(field.FieldType);
+        foreach (FieldDef field in type.Fields)
+        {
+            AddSignature(field.FieldType);
+            AddAttributes(field.CustomAttributes);
+        }
+        foreach (PropertyDef property in type.Properties) AddAttributes(property.CustomAttributes);
+        foreach (EventDef item in type.Events) AddAttributes(item.CustomAttributes);
         foreach (MethodDef method in type.Methods)
         {
             AddMethod(method.MethodSig);
-            if (!method.HasBody) continue;
+            AddConstraints(method.GenericParameters);
+            AddAttributes(method.CustomAttributes);
+            foreach (ParamDef parameter in method.ParamDefs) AddAttributes(parameter.CustomAttributes);
+            if (!includeBodies || !method.HasBody) continue;
             foreach (Local local in method.Body.Variables) AddSignature(local.Type);
             foreach (ExceptionHandler handler in method.Body.ExceptionHandlers) AddType(handler.CatchType);
             foreach (Instruction instruction in method.Body.Instructions)
@@ -620,7 +654,8 @@ internal sealed record MetaVersionType(string Identity, string StableId, string 
     [property: JsonIgnore] bool IsInterface,
     [property: JsonIgnore] bool IsNested,
     [property: JsonIgnore] bool IsPrivateImplementationDetails,
-    [property: JsonIgnore] string[] LocalReferencedTypeNames);
+    [property: JsonIgnore] string[] LocalReferencedTypeNames,
+    [property: JsonIgnore] string[] LocalDeclarationReferencedTypeNames);
 
 internal sealed record MetaVersionMethod(string Identity, string StableId, string Version,
     string DeclaringTypeStableId, uint Token, uint Flags, string Name, string DeclaringType,

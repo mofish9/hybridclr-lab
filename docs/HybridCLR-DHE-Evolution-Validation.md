@@ -247,3 +247,29 @@ updates plus an independent skipped-first-update run: three unique processes,
 current capable Base, not the older six-Base matrix for these new features.
 See `reports/dhe-evolution-capabilities-windows.md` for exact source/artifact
 identity, file-size costs, failure history, and remaining gates.
+
+## Declaration identity regression
+
+The extended CLR fixture passes, but the unchanged v5 Unity 2021 Base rejects all
+five declaration assertions at runtime: method parameters/return types, fields,
+generic field arguments, inheritance, and custom attribute Type arguments.
+The update passed offline compatibility and loaded successfully with 109 changed
+methods; see `artifacts/dhe-evolution-20260908/player-declarations-u21.json` at
+the workspace root. This is a reproduced correctness failure, not a passing gate.
+
+The candidate splits homologous type mapping from member/class construction.
+DHE fallback images bind local TypeDef references after allocating their raw
+definitions, before initializing signatures, parents, generic constraints or
+layouts. Raw Current definitions remain available for supplemental storage and
+logical aliases; their physical classes are not replaced with Base classes.
+Attribute Type arguments are canonicalized including arrays and generic types.
+Ordinary interpreter images and non-DHE supplemental loads keep their reference
+behavior. The mapping is immutable before existing metadata publication; no new
+post-publication mutation or independent lock is introduced.
+
+The offline declaration-reference scan requires
+`supplemental-type-declarations-v1` under runtime contract `dhe-runtime-v6`.
+It does not change the MV wire format or stable identities. A v5 Base remains a
+negative regression input and cannot receive this native fix through resources.
+The candidate must pass real-header native tests and new Windows Base/Current
+runs before it supplies positive evidence.

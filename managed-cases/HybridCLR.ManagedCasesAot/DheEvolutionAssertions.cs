@@ -1,5 +1,6 @@
 #if DHE_EVOLUTION_CURRENT
 using System;
+using System.Collections.Generic;
 using System.Linq;
 using System.Reflection;
 using System.Runtime.CompilerServices;
@@ -50,6 +51,56 @@ namespace HybridCLR.Lab.ManagedCasesAot
             Require(type.Assembly.GetReferencedAssemblies().Any(assembly => assembly.Name == "System.Core") ||
                 type.Assembly.GetReferencedAssemblies().Any(assembly => assembly.Name == "netstandard"),
                 "current assembly reference reflection");
+            ValidateDeclarations(instance);
+        }
+
+        private static void ValidateDeclarations(DheDemoCalculator instance)
+        {
+            var errors = new List<string>();
+            void Check(string name, Action action)
+            {
+                try { action(); }
+                catch (Exception exception) { errors.Add(name + ": " + exception.Message); }
+            }
+            Check("method-signature", () =>
+            {
+                MethodInfo method = typeof(DheEvolutionCarrier).GetMethod(nameof(DheEvolutionCarrier.Echo));
+                Require(method.ReturnType == typeof(DheDemoCalculator) &&
+                    method.GetParameters()[0].ParameterType == typeof(DheDemoCalculator), "new method signature identity");
+                Require(ReferenceEquals(method.Invoke(null, new object[] { instance }), instance), "new method Base argument invocation");
+                var callback = (Func<DheDemoCalculator, DheDemoCalculator>)Delegate.CreateDelegate(
+                    typeof(Func<DheDemoCalculator, DheDemoCalculator>), method);
+                Require(ReferenceEquals(callback(instance), instance), "new method Base argument delegate");
+            });
+            Check("field-type", () =>
+            {
+                var carrier = new DheEvolutionCarrier();
+                FieldInfo field = typeof(DheEvolutionCarrier).GetField(nameof(DheEvolutionCarrier.Value));
+                Require(field.FieldType == typeof(DheDemoCalculator), "new field type identity");
+                field.SetValue(carrier, instance);
+                Require(ReferenceEquals(carrier.Value, instance), "new field Base object assignment");
+            });
+            Check("generic-field-type", () =>
+            {
+                FieldInfo field = typeof(DheEvolutionCarrier).GetField(nameof(DheEvolutionCarrier.Values));
+                Require(field.FieldType == typeof(List<DheDemoCalculator>), "new generic field type identity");
+                var carrier = new DheEvolutionCarrier();
+                field.SetValue(carrier, new List<DheDemoCalculator> { instance });
+                Require(ReferenceEquals(carrier.Values[0], instance), "new generic field assignment");
+            });
+            Check("inheritance", () =>
+            {
+                Require(typeof(DheEvolutionDerived).BaseType == typeof(DheDemoCalculator), "new type Base parent identity");
+                object derived = new DheEvolutionDerived();
+                Require(derived is DheDemoCalculator && ((DheDemoCalculator)derived).InstanceStable(3) == 9,
+                    "new derived type Base cast and call");
+            });
+            Check("attribute-type-argument", () =>
+            {
+                var marker = typeof(DheEvolutionCarrier).GetCustomAttribute<DheEvolutionTypeMarkerAttribute>();
+                Require(marker.Value == typeof(DheDemoCalculator), "new attribute Base type argument");
+            });
+            Require(errors.Count == 0, "new type declarations: " + string.Join("; ", errors));
         }
 
         private static object Invoke(MethodInfo method, object instance, object[] arguments)
@@ -94,5 +145,22 @@ namespace HybridCLR.Lab.ManagedCasesAot
             if (!value) throw new InvalidOperationException("DHE evolution failed: " + name);
         }
     }
+
+    [AttributeUsage(AttributeTargets.Class)]
+    public sealed class DheEvolutionTypeMarkerAttribute : Attribute
+    {
+        public DheEvolutionTypeMarkerAttribute(Type value) { Value = value; }
+        public Type Value { get; }
+    }
+
+    [DheEvolutionTypeMarker(typeof(DheDemoCalculator))]
+    public sealed class DheEvolutionCarrier
+    {
+        public DheDemoCalculator Value = null!;
+        public List<DheDemoCalculator> Values = null!;
+        public static DheDemoCalculator Echo(DheDemoCalculator value) => value;
+    }
+
+    public sealed class DheEvolutionDerived : DheDemoCalculator { }
 }
 #endif

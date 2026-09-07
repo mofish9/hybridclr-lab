@@ -4,7 +4,7 @@ internal sealed class ResourceUpdateCompatibility
 {
 	public const string Policy = "dhe-proven-safe-subset-v1";
 	public const string RuntimeProtocol = "dhe-runtime-protocol-v1";
-    public const string CurrentNativeRuntimeContract = "dhe-runtime-v5";
+    public const string CurrentNativeRuntimeContract = "dhe-runtime-v6";
     public static readonly string[] KnownRuntimeCapabilities =
     {
 		"aot-guard-v1",
@@ -26,6 +26,7 @@ internal sealed class ResourceUpdateCompatibility
         "supplemental-method-custom-attributes-v1",
         "assembly-reference-evolution-v1",
         "supplemental-type-base-references-v1",
+        "supplemental-type-declarations-v1",
         "supplemental-method-generic-invocation-v1",
         "supplemental-nested-types-v1",
         "supplemental-top-level-types-v1",
@@ -235,6 +236,8 @@ internal sealed class ResourceUpdateCompatibility
         var baseTypeNames = new HashSet<string>(baseline.Types.Select(type => type.Identity), StringComparer.Ordinal);
         if (addedTypes.Any(type => type.LocalReferencedTypeNames.Any(baseTypeNames.Contains)))
             requiredCapabilities.Add("supplemental-type-base-references-v1");
+        if (addedTypes.Any(type => type.LocalDeclarationReferencedTypeNames.Any(baseTypeNames.Contains)))
+            requiredCapabilities.Add("supplemental-type-declarations-v1");
         if (HasSignatureReplacement(removed, added))
             requiredCapabilities.Add("existing-type-method-signature-replacement-v1");
         if (changedTypes.Any(type => currentTypes.TryGetValue(type.StableId,
