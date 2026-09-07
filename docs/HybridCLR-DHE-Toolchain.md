@@ -348,6 +348,35 @@ Do not relocate that registry independently from the Base archive topology named
 its relative paths. The registry copy below `resource/audit/` authenticates the
 published Base set but is not an operational path index.
 
+After the one-time resource build, use `resource-release-qualify` to remove the
+manual per-Base stage/run/evidence loop. Start from
+`templates/dhe-resource-release-qualification-config.json` and invoke:
+
+```text
+dotnet HybridCLR.DheTool.dll resource-release-qualify \
+  -Config C:/project/ProjectSettings/DHE/dhe-resource-release-qualification-config.json \
+  -Root C:/project/Tools/HybridCLRDhe
+```
+
+The config must name the exact resource candidate, the same SHA-256-pinned
+channel snapshot used by `resource-release-build`, and exactly one runner for
+every active Base. A `process` runner supplies a test Player copy, immutable
+build identity and Base workflow, direct executable, working directory, and an
+argument array. `{result}` and `{log}` are standalone argument tokens replaced
+without shell parsing. The command stages the selected payload, starts the
+Player, verifies configured immutable Player files before and after execution,
+and emits canonical resource Player evidence.
+
+Use a `prequalified` runner when Android, iOS, or another remote CI job already
+produced a complete `hybridclr.dhe-resource-player-workflow.json`. The aggregate
+host revalidates that report and its historical package authority; it does not
+treat a remotely supplied result as weaker evidence. Process and prequalified
+runners may be combined in one config. Success requires exact active-Base
+coverage and emits `dhe-resource-release-gate.json`; `channel-state promote`
+remains a separate compare-and-swap approval step. A failed qualification may
+retain per-Base diagnostic files, but removes its top-level passing summary and
+promotion gate.
+
 Release qualification must execute that exact continuation on every active Base.
 `regression -ResourceUpdateRoot <previous> -ResourceUpdateRoot2 <candidate>` binds
 the complete `-WorkflowChangedRoots` Player set to the candidate manifest and

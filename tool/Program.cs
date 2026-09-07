@@ -61,6 +61,10 @@ internal static partial class Program
         "resource-release-build-onboarding-all-base-staging",
         "resource-release-build-reuse-all-base-staging",
         "resource-release-build-protected-release",
+        "resource-release-qualify-prequalified",
+        "resource-release-qualify-exact-coverage",
+        "resource-release-qualify-process-contract",
+        "resource-release-qualify-stale-snapshot-rejected",
         "resource-base-registry", "base-registry-builder",
         "base-registry-build-configuration-tamper-rejected",
         "base-registry-lineage", "base-registry-implicit-removal-rejected",
@@ -151,6 +155,7 @@ internal static partial class Program
                 "batch" => Batch(cli),
                 "base-registry" => BuildBaseRegistry(cli),
                 "resource-release-build" => ResourceReleaseBuild(cli),
+                "resource-release-qualify" => ResourceReleaseQualify(cli),
                 "resource-update" => ResourceUpdate(cli),
                 "stage-resource-update" => StageResourceUpdate(cli),
                 "android-device-smoke" => AndroidDeviceSmoke(cli),
@@ -4222,7 +4227,8 @@ internal static partial class Program
 
     private static void PrintHelp() => Console.WriteLine(string.Join(Environment.NewLine,
         "HybridCLR DHE C# tool",
-        "Commands: version, mv, batch, base-registry, resource-release-build, resource-update, " +
+        "Commands: version, mv, batch, base-registry, resource-release-build, " +
+        "resource-release-qualify, resource-update, " +
         "stage-resource-update, android-device-smoke, resource-player-evidence, " +
         "resource-release-gate, " +
         "channel-state, baseline-manifest, aot-metadata-manifest, preflight, workflow, " +
@@ -4239,6 +4245,9 @@ internal static partial class Program
         "Resource release build accepts one config-relative JSON document with -Config, " +
         "uses -SchemasRoot (or <Root>/schemas), and replaces an existing output only with " +
         "-ForceOutput.",
+        "Resource release qualify accepts one config-relative JSON document with -Config, " +
+        "stages and directly starts every process runner, accepts authenticated distributed " +
+        "prequalified reports, and emits one exact-coverage aggregate gate.",
         "Release resource update accepts a protected -ChannelSnapshot, or the legacy " +
         "explicit ledger arguments. Registry revision 2 or later also requires " +
         "-PreviousBaseRegistry when its Base set changes.",

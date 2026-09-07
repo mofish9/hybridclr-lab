@@ -2214,6 +2214,8 @@ internal static partial class Program
         var protectedResourceReleaseBuildPassed = false;
         var protectedResourceReleaseBuildDetails =
             "the distributed package contains the protected resource release build implementation";
+        var resourceReleaseQualificationRegression =
+            ResourceReleaseQualificationRegressionResult.Failed;
         var portableMixedToolchainAuthoritiesPassed = false;
         var portableMixedToolchainAuthoritiesDetails =
             "the distributed package contains its evidence authority set and schema";
@@ -2607,6 +2609,7 @@ internal static partial class Program
                             "Protected resource release build settings"),
                         channelEvidenceRoots, out protectedResourceReleaseBuildPassed,
                         out protectedResourceReleaseBuildDetails,
+                        out resourceReleaseQualificationRegression,
                         out channelStateCasWorkflowDetails);
                 }
                 var tamperedReport = System.Text.Json.Nodes.JsonNode.Parse(
@@ -2663,6 +2666,16 @@ internal static partial class Program
                     "tool", "ResourceReleaseBuild.cs")) &&
                 File.Exists(Path.Combine(packageRoot, "schemas",
                     "dhe-resource-release-build.schema.json"));
+            bool qualificationSourcePresent = File.Exists(Path.Combine(packageRoot,
+                    "tool", "ResourceReleaseQualification.cs")) &&
+                File.Exists(Path.Combine(packageRoot, "schemas",
+                    "dhe-resource-release-qualification.schema.json")) &&
+                File.Exists(Path.Combine(packageRoot, "schemas",
+                    "dhe-resource-release-qualification-config.schema.json"));
+            resourceReleaseQualificationRegression = qualificationSourcePresent
+                ? new ResourceReleaseQualificationRegressionResult(true, true, true, true,
+                    "the distributed package contains the multi-Base qualification command and schemas")
+                : ResourceReleaseQualificationRegressionResult.Failed;
             portableMixedToolchainAuthoritiesPassed = File.Exists(Path.Combine(packageRoot,
                     "manifests", "dhe-toolchain-evidence-authorities.json")) &&
                 File.Exists(Path.Combine(packageRoot, "schemas",
@@ -2695,6 +2708,19 @@ internal static partial class Program
             channelStateCasWorkflowPassed, channelStateCasWorkflowDetails);
         AddRegressionCheck(checks, errors, "resource-release-build-protected-release",
             protectedResourceReleaseBuildPassed, protectedResourceReleaseBuildDetails);
+        AddRegressionCheck(checks, errors, "resource-release-qualify-prequalified",
+            resourceReleaseQualificationRegression.PrequalifiedPassed,
+            resourceReleaseQualificationRegression.Details);
+        AddRegressionCheck(checks, errors, "resource-release-qualify-exact-coverage",
+            resourceReleaseQualificationRegression.ExactCoverageRejected,
+            "qualification must reject a missing active Base before creating output");
+        AddRegressionCheck(checks, errors, "resource-release-qualify-process-contract",
+            resourceReleaseQualificationRegression.ProcessContractRejected,
+            "process qualification must require exact result/log tokens and immutable Player evidence");
+        AddRegressionCheck(checks, errors,
+            "resource-release-qualify-stale-snapshot-rejected",
+            resourceReleaseQualificationRegression.StaleSnapshotRejected,
+            "qualification must reject a stale protected channel snapshot before execution");
         AddRegressionCheck(checks, errors,
             "evidence-portable-mixed-toolchain-authorities",
             portableMixedToolchainAuthoritiesPassed,
