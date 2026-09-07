@@ -1,6 +1,14 @@
 # DHE evolution implementation and validation
 
-## In progress: unchanged generic methods without AOT code
+## Latest checkpoint: unchanged generic methods without AOT code
+
+The `a57999e` runtime and three updated GenericMethod hooks repair the reproduced
+Unity 2021 missing-AOT reflection failures. The clean `33c2278` replay executes
+nine Windows processes on three fresh v11 Bases. All six interpreted runs pass
+220/220 with zero differences and 220 entry receipts each. Every retained-AOT run
+now has only the same two remaining exception differences: `divide_by_zero_catch`
+and `invalid_cast_catch`. The overall gate remains failed. All three real-header
+compile/CTest gates pass. See `reports/dhe-evolution-missing-aot-generics-windows.md`.
 
 The indexed-argument repair leaves two Unity 2021 reflection failures because
 an unchanged generic definition can be instantiated without generated native
@@ -31,7 +39,7 @@ of a null unchanged AOT pointer; it must fall through to ordinary interpreter
 preparation. The regression now calls that public path. Failed logs remain under
 `native-missing-aot-generics`; the corrected gates use a fresh output directory.
 
-## Latest checkpoint: indexed interpreter bridge arguments
+## Previous checkpoint: indexed interpreter bridge arguments
 
 HybridCLR `25b4d9f` fixes the reproduced indexed-argument corruption. The clean
 `ce2f2e8` replay runs nine cold Windows processes on three fresh v10 Bases. All
