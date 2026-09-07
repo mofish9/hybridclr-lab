@@ -54,7 +54,11 @@ namespace HybridCLR.Lab
                     // avoids running the normal suite in the same process.
                     return;
                 }
-                if (string.Equals(labMode, "benchmark", StringComparison.Ordinal))
+                if (string.Equals(labMode, "aot-exceptions", StringComparison.Ordinal))
+                {
+                    exitCode = ExecuteAotExceptionControl() ? 0 : 1;
+                }
+                else if (string.Equals(labMode, "benchmark", StringComparison.Ordinal))
                 {
                     BenchmarkRun benchmarkRun = ExecuteBenchmark();
                     WriteBenchmarkResult(benchmarkRun);
@@ -86,6 +90,74 @@ namespace HybridCLR.Lab
             }
 
             Application.Quit(exitCode);
+        }
+
+        private static bool ExecuteAotExceptionControl()
+        {
+            string output = GetArgument("-labResult");
+            if (string.IsNullOrWhiteSpace(output) || File.Exists(output))
+                throw new InvalidDataException("AOT control requires a new -labResult path.");
+            Assembly assembly = AppDomain.CurrentDomain.GetAssemblies().Single(item =>
+                item.GetName().Name == "HybridCLR.ManagedCases");
+            Type registry = assembly.GetType("HybridCLR.Lab.ManagedCases.CaseRegistry", true);
+            string[] methods = { "NullReferenceCatch", "InvalidCastCatch", "DivideByZeroCatch", "IndexOutOfRangeCatch" };
+            string[] expected = { "null", "cast", "divide", "index" };
+            var report = new AotExceptionControlReport
+            {
+                unityVersion = Application.unityVersion,
+                processId = Process.GetCurrentProcess().Id,
+                assembly = assembly.FullName,
+                cases = new AotExceptionControlCase[methods.Length],
+                passed = true,
+            };
+            // The DHE runner only owns labMode=dhe. This path invokes methods
+            // already in AOT without touching any resource or metadata loader.
+            for (int index = 0; index < methods.Length; index++)
+            {
+                var result = new AotExceptionControlCase { method = methods[index], expected = expected[index] };
+                report.cases[index] = result;
+                try
+                {
+                    MethodInfo method = registry.GetMethod(methods[index], BindingFlags.NonPublic | BindingFlags.Static)
+                        ?? throw new MissingMethodException(registry.FullName, methods[index]);
+                    object observation = method.Invoke(null, null);
+                    result.actual = (string)observation.GetType().GetProperty("ReturnValue").GetValue(observation);
+                    result.sideEffect = (string)observation.GetType().GetProperty("SideEffect").GetValue(observation);
+                    result.passed = result.actual == result.expected && result.sideEffect == string.Empty;
+                }
+                catch (Exception exception)
+                {
+                    result.error = exception.ToString();
+                }
+                report.passed &= result.passed;
+            }
+            Directory.CreateDirectory(Path.GetDirectoryName(Path.GetFullPath(output)));
+            WriteAllTextAtomic(output, JsonUtility.ToJson(report, true));
+            Debug.Log("[HybridCLR Lab] Unregistered AOT exception control: " + report.passed);
+            return report.passed;
+        }
+
+        [Serializable]
+        private sealed class AotExceptionControlReport
+        {
+            public string format = "hybridclr.aot-exception-control.json";
+            public int schemaVersion = 1;
+            public string unityVersion;
+            public int processId;
+            public string assembly;
+            public bool passed;
+            public AotExceptionControlCase[] cases;
+        }
+
+        [Serializable]
+        private sealed class AotExceptionControlCase
+        {
+            public string method;
+            public string expected;
+            public string actual;
+            public string sideEffect;
+            public string error;
+            public bool passed;
         }
 
         private static TestRun Execute()

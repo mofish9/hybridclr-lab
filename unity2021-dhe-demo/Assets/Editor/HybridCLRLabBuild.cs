@@ -81,6 +81,50 @@ namespace HybridCLR.Lab.Editor
             GenerateProjectArtifacts();
         }
 
+        public static void BuildAotExceptionControl()
+        {
+            string output = GetArgument("-labBuildPath");
+            string baseline = GetArgument("-labAotControlBaseline");
+            if (string.IsNullOrWhiteSpace(output) || string.IsNullOrWhiteSpace(baseline) ||
+                !Directory.Exists(baseline))
+                throw new ArgumentException("AOT control requires -labBuildPath and -labAotControlBaseline.");
+            string outputRoot = Path.GetDirectoryName(Path.GetFullPath(output));
+            if (Directory.Exists(outputRoot) && Directory.EnumerateFileSystemEntries(outputRoot).Any())
+                throw new IOException("AOT control output must be new or empty: " + outputRoot);
+            if (!bool.TryParse(GetArgument("-labAotDivideByZeroChecks"), out bool divideChecks))
+                throw new ArgumentException("-labAotDivideByZeroChecks must be true or false.");
+            ConfigureSettings();
+            EnsureBuildTarget();
+            EnsureBuildScene();
+            if (GetBuildTarget() != BuildTarget.StandaloneWindows64)
+                throw new ArgumentException("This AOT control is currently Windows-only.");
+            string previousArgs = PlayerSettings.GetAdditionalIl2CppArgs() ?? string.Empty;
+            const string checkOption = "--enable-divide-by-zero-check";
+            if (previousArgs.Contains(checkOption))
+                throw new InvalidDataException("AOT control requires no preexisting divide-check override.");
+            try
+            {
+                string compilerArgs = previousArgs + (divideChecks ? " " + checkOption : string.Empty);
+                PlayerSettings.SetAdditionalIl2CppArgs(compilerArgs);
+                Debug.Log("[HybridCLR Lab] AOT control compiler args: " + compilerArgs);
+                AssetDatabase.Refresh(ImportAssetOptions.ForceSynchronousImport);
+                DheBuildPipeline.BuildPlayer(new DhePlayerBuildOptions
+                {
+                    Target = GetBuildTarget(),
+                    BaselineAotRoot = Path.GetFullPath(baseline),
+                    Scenes = new[] { ScenePath },
+                    OutputPath = Path.GetFullPath(output),
+                    BuildOptions = BuildOptions.CleanBuildCache,
+                    // No finalizer: compile the original IL without DHE guards.
+                    CleanBuild = false,
+                });
+            }
+            finally
+            {
+                PlayerSettings.SetAdditionalIl2CppArgs(previousArgs);
+            }
+        }
+
         [MenuItem("HybridCLR Lab/Build Player Only")]
         public static void BuildPlayerOnly()
         {
