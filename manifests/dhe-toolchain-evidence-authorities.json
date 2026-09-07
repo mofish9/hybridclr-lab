@@ -92,6 +92,12 @@
       "packageId": "1293dc857990633be5ac13d735d0e9012cc06c10923ddaf9cd8b247b6f63d3b7",
       "sourceHead": "bfa74fddc86a61c220aa743b1348231380c8592b",
       "sourceTree": "d550479fa2ec318ae9c22abc6f14904ffd2efa11"
+    },
+    {
+      "toolchainVersion": "0.1.34",
+      "packageId": "80b3d477927eb7018268f0e9951086ae1b59a4b2fbea0ffb5c006ad2ed481eb5",
+      "sourceHead": "00ef0b4d765f1f45801f98d35c20fa2a9757e308",
+      "sourceTree": "9de93f9d3b9d6bf36c17a88e31ac78c731449d9e"
     }
   ]
 }

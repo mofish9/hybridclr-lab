@@ -976,12 +976,14 @@ internal static partial class Program
         IReadOnlyCollection<string> evidenceToolchainRoots,
         out bool protectedResourceReleaseBuildPassed,
         out string protectedResourceReleaseBuildDetails,
+        out ResourceReleasePlanRegressionResult planningRegression,
         out ResourceReleaseQualificationRegressionResult qualificationRegression,
         out string details)
     {
         protectedResourceReleaseBuildPassed = false;
         protectedResourceReleaseBuildDetails =
             "protected resource release build did not complete";
+        planningRegression = ResourceReleasePlanRegressionResult.Failed;
         qualificationRegression = ResourceReleaseQualificationRegressionResult.Failed;
         details = "protected channel snapshot, adoption, promotion, and CAS validated";
         try
@@ -1051,6 +1053,10 @@ internal static partial class Program
                     previousLedger.Sha256, StringComparison.OrdinalIgnoreCase))
                 throw new DheException("Adopted channel snapshot is inconsistent.");
 
+            planningRegression = RunResourceReleasePlanningRegression(
+                regressionRoot, candidateUpdateRoot, adoptedSnapshotPath,
+                adoptedSnapshotSha256, reports, authorityRoot, authorityPackageId,
+                schemaRoot, evidenceToolchainRoots);
             qualificationRegression = RunResourceReleaseQualificationRegression(
                 regressionRoot, candidateUpdateRoot, adoptedSnapshotPath,
                 adoptedSnapshotSha256, reports, authorityRoot, authorityPackageId,

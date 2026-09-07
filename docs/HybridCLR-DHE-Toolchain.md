@@ -348,9 +348,26 @@ Do not relocate that registry independently from the Base archive topology named
 its relative paths. The registry copy below `resource/audit/` authenticates the
 published Base set but is not an operational path index.
 
-After the one-time resource build, use `resource-release-qualify` to remove the
-manual per-Base stage/run/evidence loop. Start from
-`templates/dhe-resource-release-qualification-config.json` and invoke:
+After the one-time resource build, projects with a maintained Base runner
+catalog should run `resource-release-plan` to generate the complete
+qualification config:
+
+```text
+dotnet HybridCLR.DheTool.dll resource-release-plan \
+  -Config C:/project/ProjectSettings/DHE/dhe-resource-release-plan-config.json \
+  -Root C:/project/Tools/HybridCLRDhe
+```
+
+The catalog is updated only when the active Base registry changes. Normal
+resource releases reuse it; the planner binds it to the candidate registry and
+fails unless it exactly covers every active Base. See
+`HybridCLR-DHE-Resource-Release-Planning-Design.md` for process and external
+platform report templates.
+
+Then use `resource-release-qualify` to remove the manual per-Base
+stage/run/evidence loop. The planner output is the preferred config. For manual
+operation, start from `templates/dhe-resource-release-qualification-config.json`
+and invoke:
 
 ```text
 dotnet HybridCLR.DheTool.dll resource-release-qualify \

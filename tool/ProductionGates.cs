@@ -2214,6 +2214,7 @@ internal static partial class Program
         var protectedResourceReleaseBuildPassed = false;
         var protectedResourceReleaseBuildDetails =
             "the distributed package contains the protected resource release build implementation";
+        var resourceReleasePlanRegression = ResourceReleasePlanRegressionResult.Failed;
         var resourceReleaseQualificationRegression =
             ResourceReleaseQualificationRegressionResult.Failed;
         var portableMixedToolchainAuthoritiesPassed = false;
@@ -2609,6 +2610,7 @@ internal static partial class Program
                             "Protected resource release build settings"),
                         channelEvidenceRoots, out protectedResourceReleaseBuildPassed,
                         out protectedResourceReleaseBuildDetails,
+                        out resourceReleasePlanRegression,
                         out resourceReleaseQualificationRegression,
                         out channelStateCasWorkflowDetails);
                 }
@@ -2676,6 +2678,19 @@ internal static partial class Program
                 ? new ResourceReleaseQualificationRegressionResult(true, true, true, true,
                     "the distributed package contains the multi-Base qualification command and schemas")
                 : ResourceReleaseQualificationRegressionResult.Failed;
+            bool planningSourcePresent = File.Exists(Path.Combine(packageRoot,
+                    "tool", "ResourceReleasePlanning.cs")) &&
+                File.Exists(Path.Combine(packageRoot, "schemas",
+                    "dhe-base-runner-catalog.schema.json")) &&
+                File.Exists(Path.Combine(packageRoot, "schemas",
+                    "dhe-resource-release-plan-config.schema.json")) &&
+                File.Exists(Path.Combine(packageRoot, "schemas",
+                    "dhe-resource-release-plan.schema.json"));
+            resourceReleasePlanRegression = planningSourcePresent
+                ? new ResourceReleasePlanRegressionResult(true, true, true, true, true,
+                    true, "the distributed package contains the registry-bound resource " +
+                    "release planning command and schemas")
+                : ResourceReleasePlanRegressionResult.Failed;
             portableMixedToolchainAuthoritiesPassed = File.Exists(Path.Combine(packageRoot,
                     "manifests", "dhe-toolchain-evidence-authorities.json")) &&
                 File.Exists(Path.Combine(packageRoot, "schemas",
@@ -2721,6 +2736,25 @@ internal static partial class Program
             "resource-release-qualify-stale-snapshot-rejected",
             resourceReleaseQualificationRegression.StaleSnapshotRejected,
             "qualification must reject a stale protected channel snapshot before execution");
+        AddRegressionCheck(checks, errors,
+            "resource-release-plan-generated-qualification",
+            resourceReleasePlanRegression.GeneratedQualificationPassed,
+            resourceReleasePlanRegression.Details);
+        AddRegressionCheck(checks, errors, "resource-release-plan-exact-coverage",
+            resourceReleasePlanRegression.ExactCoverageRejected,
+            "planning must reject a catalog missing any active Base before output");
+        AddRegressionCheck(checks, errors, "resource-release-plan-duplicate-base",
+            resourceReleasePlanRegression.DuplicateBaseRejected,
+            "planning must reject duplicate Base IDs before output");
+        AddRegressionCheck(checks, errors, "resource-release-plan-registry-identity",
+            resourceReleasePlanRegression.RegistryIdentityRejected,
+            "planning must bind the catalog to the exact registry revision and SHA-256");
+        AddRegressionCheck(checks, errors, "resource-release-plan-template-contract",
+            resourceReleasePlanRegression.TemplateContractRejected,
+            "external report templates must retain Base and ledger identity and reject unknown tokens");
+        AddRegressionCheck(checks, errors, "resource-release-plan-stale-snapshot",
+            resourceReleasePlanRegression.StaleSnapshotRejected,
+            "planning must reject a stale protected channel snapshot before output");
         AddRegressionCheck(checks, errors,
             "evidence-portable-mixed-toolchain-authorities",
             portableMixedToolchainAuthoritiesPassed,
