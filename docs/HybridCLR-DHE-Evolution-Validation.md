@@ -32,6 +32,9 @@ affected evolved v8 Bases while retaining the three compatible original Bases.
 Rejecting a resource is a safety gate, not implementation of the missing ability.
 
 Native compilation/CTest and new Windows Bases have not yet verified this fix.
+The first Unity 2021 native build exposed a nonexistent image-classification
+macro in the new constructor resolver. HybridCLR `82e6829` uses the existing
+`IsInterpreterImage` API; the failed `native-logical-attributes` log is retained.
 They must use clean locked commits, real headers on all three engines, and the
 same repeated/Attribute resources, requiring named-field, named-property and
 constructor-overload receipts. Native repairs require a new experimental Base;
