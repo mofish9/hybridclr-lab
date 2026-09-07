@@ -1,6 +1,13 @@
 # DHE evolution implementation and validation
 
-## In progress: logical attribute members
+## Latest checkpoint: logical attribute members
+
+The clean `8de07cb` replay passes 18 Windows processes across three original v8
+Bases and three repaired, already-evolved v9 Bases. Both common resource releases
+and skipped updates pass; the latest release requires all four evolution receipts.
+All three real-header native gates and new Base/no-op workflows also pass. See
+`reports/dhe-evolution-logical-attributes-windows.md` for exact identities and
+remaining work. This closes the reproduced Attribute failure, not the full goal.
 
 The clean `3017f7a` repeated-structure replay passes 18 unique Windows processes
 across six original/evolved Bases. The latest resource adds fields, a property,
@@ -31,7 +38,7 @@ Eleven exploratory tests pass, and resource generation rejects the three
 affected evolved v8 Bases while retaining the three compatible original Bases.
 Rejecting a resource is a safety gate, not implementation of the missing ability.
 
-Native compilation/CTest and new Windows Bases have not yet verified this fix.
+The initial native and fixture failures below were resolved before that replay.
 The first Unity 2021 native build exposed a nonexistent image-classification
 macro in the new constructor resolver. HybridCLR `82e6829` uses the existing
 `IsInterpreterImage` API; the failed `native-logical-attributes` log is retained.
@@ -45,13 +52,13 @@ no assertions are removed or bypassed.
 Unity 2021 and Unity 2022 then pass compile/CTest. Tuanjie's fixture requires a
 const PropertyInfo pointer array, matching its real header; that test declaration
 is corrected before the final three-profile run. No production layout changes.
-They must use clean locked commits, real headers on all three engines, and the
-same repeated/Attribute resources, requiring named-field, named-property and
-constructor-overload receipts. Native repairs require a new experimental Base;
+The final gates use clean locked commits and real headers on all three engines;
+resource replays require named-field, named-property and constructor-overload
+receipts. Native repairs require a new experimental Base;
 old Base identities must not be relabeled or overwritten. Formal branches,
 Installer tags, released packages, and CAT remain unchanged.
 
-## Latest checkpoint: September 8
+## Previous checkpoint: managed generations
 
 Runtime contract v8 now has six real Windows Bases: original and structurally
 evolved managed generations on each of the three engines. The clean `03ac677`
