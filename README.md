@@ -24,12 +24,12 @@ Its formal entry points, generated-output boundary, and complete four-assembly
 Player evidence are documented in
 `docs/HybridCLR-DHE-Toolchain.md`,
 `docs/HybridCLR-DHE-Workflow-Review.md` and
-`docs/HybridCLR-DHE-Formal-Project-Validation.md`. Toolchain `0.1.32` is the
+`docs/HybridCLR-DHE-Formal-Project-Validation.md`. Toolchain `0.1.33` is the
 current conditionally accepted source and three-engine Windows release; its exact
 evidence and remaining platform gates are recorded in
-`docs/HybridCLR-DHE-Opt4-Release-0.1.32.md`. Toolchains `0.1.18`, `0.1.20`,
+`docs/HybridCLR-DHE-Opt4-Release-0.1.33.md`. Toolchains `0.1.18`, `0.1.20`,
 `0.1.21`, `0.1.22`, `0.1.23`, `0.1.24`, `0.1.25`, `0.1.26`, `0.1.27`,
-`0.1.28`, `0.1.29`, `0.1.30`, and `0.1.31`
+`0.1.28`, `0.1.29`, `0.1.30`, `0.1.31`, and `0.1.32`
 are retained as historical evidence. Projects must install an
 authenticated package whose manifest has `releaseReady=true` and pin its exact
 package ID.
@@ -132,13 +132,13 @@ added to the seven-Base registry in one successor build; one revision 4 payload
 then passed all ten Windows Players and advanced the protected lab channel with
 exact ten-Base coverage. See
 `docs/HybridCLR-DHE-Opt4-Post-Release-Ten-Base-Lifecycle.md`.
-The current release line is `HybridCLRDhe-0.1.32-opt4.24`, Package ID
-`8cbaad0764f4c265d05bfe61527677714ab6d2b78c62295a5684ef1ed563faa9`. It includes the
-portable evidence-root and relocated-registry fixes after the ten-Base onboarding
-run, resolves portable aggregate authority without trusting archived placeholder
-paths, and its clean source regression passes `153/153` checks across ten changed
-Base Players, one no-op Base, and the Unity 2021, Unity 2022, and Tuanjie 2022
-resolver matrix. It retains the Android APK overlay/device gate and
+The current release line is `HybridCLRDhe-0.1.33-opt4.25`, Package ID
+`1293dc857990633be5ac13d735d0e9012cc06c10923ddaf9cd8b247b6f63d3b7`. It preserves
+the normalized portable native manifest for archived workflow evidence while
+keeping the immutable original manifest bound to the Base build identity. Its
+clean source regression passes `153/153` checks across ten changed Base Players,
+one no-op Base, and the Unity 2021, Unity 2022, and Tuanjie 2022 resolver matrix.
+It retains the Android APK overlay/device gate and
 cross-target staging contract, and includes a target-independent iOS Xcode-export
 artifact gate. The iOS gate validates the exported `.xcodeproj`, `project.pbxproj`,
 `Classes`, `Libraries`, `Data`, and a canonical directory hash before evidence is
@@ -146,10 +146,11 @@ accepted; it does not claim Xcode link, signing, device, or performance evidence
 Android ARM64 device, iOS/macOS/Xcode execution, and production performance or
 memory gates remain incomplete; Windows evidence must not be presented as those
 target results.
-The subsequent r6 and r7 runs derived consecutive current payloads without
-rebuilding any Base; r7 reused registry revision 6 and staged the update for all
-nine Bases. See
-`docs/HybridCLR-DHE-Opt4-Post-Release-R7-Consecutive-Cross-Target.md`.
+The formal revision 7 run retained ten historical Bases, onboarded three new
+revision 6 Bases built by the three real Editors, and promoted one resource head
+after all 13 Windows Players passed. Each new Base identified exactly two changed
+methods while unchanged dispatch remained AOT. See
+`docs/HybridCLR-DHE-Opt4-Release-0.1.33.md`.
 Base identity now also binds `engineWorkflow` and `il2cppCodeGeneration`.
 Unity 2021 is locked to `OptimizeSpeed`; Unity 2022 FGS and Tuanjie 2022 FGS
 are locked to `OptimizeSize`. Base evidence created before these fields existed
