@@ -1,14 +1,14 @@
 {
   "labRoot": "..",
   "toolAssembly": "../../../artifacts/dhe-evolution-20260908/host-full-differential/HybridCLR.DheTool.dll",
-  "outputRoot": "../../../artifacts/dhe-evolution-20260908/replay-full-differential-complete",
+  "outputRoot": "../../../artifacts/dhe-evolution-20260908/replay-full-differential-diagnostics",
   "updates": [
-    "../../../artifacts/dhe-evolution-20260908/resource-full-suite-exceptions-aot",
-    "../../../artifacts/dhe-evolution-20260908/resource-full-suite-exceptions-interpreted"
+    "../../../artifacts/dhe-evolution-20260908/resource-full-suite-diagnostics-aot",
+    "../../../artifacts/dhe-evolution-20260908/resource-full-suite-diagnostics-interpreted"
   ],
   "referenceResults": [
-    "../../../artifacts/dhe-evolution-20260908/reference-full-suite-exceptions-first.json",
-    "../../../artifacts/dhe-evolution-20260908/reference-full-suite-exceptions-latest.json"
+    "../../../artifacts/dhe-evolution-20260908/reference-full-suite-diagnostics-first.json",
+    "../../../artifacts/dhe-evolution-20260908/reference-full-suite-diagnostics-latest.json"
   ],
   "evolutionCheckRequirements": [
     ["repeated-structural-evolution", "named-attribute-field", "named-attribute-property", "attribute-constructor-overload"],
@@ -87,8 +87,8 @@
   "differentialManifest": "test-manifest.json",
   "differentialGolden": "test-golden.json",
   "differentialReferences": [
-    "../../../artifacts/dhe-evolution-20260908/differential-reference-exceptions-aot.bin",
-    "../../../artifacts/dhe-evolution-20260908/differential-reference-exceptions-interpreted.bin"
+    "../../../artifacts/dhe-evolution-20260908/differential-reference-diagnostics-aot.bin",
+    "../../../artifacts/dhe-evolution-20260908/differential-reference-diagnostics-interpreted.bin"
   ],
   "requireInterpretedCaseEntries": [false, true]
 }

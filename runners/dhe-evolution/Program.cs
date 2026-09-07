@@ -113,13 +113,8 @@ internal static class Program
                     "CLR reference lacks required observations.");
                 Require(observableGenerations.Add(observations.GetProperty("addResult").GetInt32()),
                     "Consecutive resources must expose different observable generations.");
-                referenceRecords.Add(new
-                {
-                    update = index + 1,
-                    path = references[index],
-                    sha256 = Hash(references[index]),
-                    observations
-                });
+                referenceRecords.Add(new { update = index + 1, path = references[index],
+                    sha256 = Hash(references[index]), observations });
             }
             var configuredIds = config.Bases.Select(item => Read(Resolve(item.BuildIdentity))
                 .GetProperty("baseId").GetString()!).ToHashSet(StringComparer.OrdinalIgnoreCase);
@@ -338,25 +333,15 @@ internal static class Program
         }
         File.WriteAllText(Path.Combine(output, "report.json"), JsonSerializer.Serialize(new
         {
-            format = "hybridclr.dhe-evolution-smoke.json",
-            schemaVersion = 1,
-            generatedAtUtc = DateTimeOffset.UtcNow,
-            passed = errors.Count == 0,
+            format = "hybridclr.dhe-evolution-smoke.json", schemaVersion = 1,
+            generatedAtUtc = DateTimeOffset.UtcNow, passed = errors.Count == 0,
             scope = "Windows structural resource replay; not production qualification",
             distinctBaseCount,
-            baseGenerations,
-            requiredStructuralBaseGenerations = config.RequireStructuralBaseGenerations,
-            sourceHead,
-            sourceTree,
-            sourceChanges,
-            runnerSha256 = Hash(typeof(Program).Assembly.Location),
+            baseGenerations, requiredStructuralBaseGenerations = config.RequireStructuralBaseGenerations,
+            sourceHead, sourceTree, sourceChanges, runnerSha256 = Hash(typeof(Program).Assembly.Location),
             referenceRecords,
-            toolSha256 = Hash(tool),
-            configSha256 = Hash(configPath),
-            requiredChecks = RequiredChecks,
-            results,
-            failedRuns,
-            errors,
+            toolSha256 = Hash(tool), configSha256 = Hash(configPath), requiredChecks = RequiredChecks,
+            results, failedRuns, errors,
         }, JsonOptions));
         return errors.Count == 0 ? 0 : 1;
     }
@@ -366,11 +351,8 @@ internal static class Program
     {
         var start = new ProcessStartInfo(executable)
         {
-            WorkingDirectory = directory,
-            UseShellExecute = false,
-            CreateNoWindow = true,
-            RedirectStandardOutput = true,
-            RedirectStandardError = true,
+            WorkingDirectory = directory, UseShellExecute = false, CreateNoWindow = true,
+            RedirectStandardOutput = true, RedirectStandardError = true,
         };
         foreach (string argument in arguments) start.ArgumentList.Add(argument);
         start.Environment.Remove("HYBRIDCLR_DHE_DIFFERENTIAL_RESULT");

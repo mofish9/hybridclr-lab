@@ -16,6 +16,16 @@ to exercise both paths and every configured Base, retaining failed artifacts
 and keeping the entire gate failed. Any immutable Base-file change stops replay.
 This is diagnostic coverage, not a relaxation of the 220-case acceptance gate.
 
+The clean `dfb67d8` complete replay executes all 18 processes on six archived
+Bases, with 220 observations per process and no immutable-file changes. All runs
+fail qualification: both unused throwing operations disagree on all three
+engines' retained-AOT paths; generic reflection additionally fails on Unity 2021.
+Every interpreted run has one different failure, `generic_nested_combo`, returning
+an unstable integer instead of the expected swapped value. All 220 callback
+methods report changed in these interpreted runs. This is a newly exposed
+correctness defect, not passing full-suite evidence. Raw observations and failed
+run hashes are retained in `replay-full-differential-complete`.
+
 The next gate executes the complete existing 220-case manifest after DHE
 registration, through a resource-only fixture entry on the archived Windows
 Bases. No new Player entry or native runtime change is required for the harness.
