@@ -423,3 +423,16 @@ constructor overloads, currently rejected layouts/interfaces/generic fields,
 member-level AOT availability, and the full 220-case DHE differential remain
 unfinished. Native/mobile/performance qualifications are not inferred from this
 Windows correctness replay.
+
+## Next structural generation
+
+The next fixture extends DheEvolutionCarrier, which is absent from original
+Bases but already native in evolved Bases. It adds fields, a property and a
+method, with direct/reflection/delegate calls and a reference-field GC check
+whose allocating helper does not retain the payload. Every prior declaration
+assertion remains enabled. Existing six Base archives and native capabilities
+are fixed inputs; only current resources change. Correctness and immutable-file
+hashes are the acceptance gate, with separate Unity 2021 supplemental-metadata
+and Unity 2022/Tuanjie FGS runs. Attribute named members and new constructor
+overloads are the following separate regression surface. No native fix or
+performance result is presumed by this fixture change.

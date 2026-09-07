@@ -157,7 +157,42 @@ namespace HybridCLR.Lab.ManagedCasesAot
                 Require(derived is GenericVirtualOperation<IntOperationStruct> operation &&
                     operation.Apply(new IntOperationStruct(), 3) == 106, "new generic parent cast and virtual call");
             });
+            Check("repeated-structural-evolution", () =>
+            {
+                var carrier = new DheEvolutionCarrier();
+                FieldInfo revision = typeof(DheEvolutionCarrier).GetField(nameof(DheEvolutionCarrier.Revision));
+                PropertyInfo property = typeof(DheEvolutionCarrier).GetProperty(nameof(DheEvolutionCarrier.RevisionProperty));
+                MethodInfo method = typeof(DheEvolutionCarrier).GetMethod(nameof(DheEvolutionCarrier.ReadRevision));
+                Require(revision.DeclaringType == typeof(DheEvolutionCarrier) &&
+                    property.DeclaringType == typeof(DheEvolutionCarrier) && method.DeclaringType == typeof(DheEvolutionCarrier),
+                    "second-generation member identities");
+                Require(carrier.Revision == 0 && (int)revision.GetValue(carrier) == 0,
+                    "second-generation field default");
+                revision.SetValue(carrier, 41);
+                Require(carrier.ReadRevision() == 41 && (int)method.Invoke(carrier, null) == 41,
+                    "second-generation field and method calls");
+                property.SetValue(carrier, 7);
+                Func<int> callback = carrier.ReadRevision;
+                var reflected = (Func<int>)Delegate.CreateDelegate(typeof(Func<int>), carrier, method);
+                Require(callback() == 4007 && reflected() == 4007 &&
+                    (int)property.GetValue(carrier) == 4007, "second-generation property and delegates");
+                WeakReference payload = StoreRepeatedPayload(carrier);
+                GC.Collect();
+                GC.WaitForPendingFinalizers();
+                GC.Collect();
+                Require(payload.IsAlive && ReferenceEquals(payload.Target, carrier.RevisionPayload) &&
+                    ((byte[])carrier.RevisionPayload)[0] == 73, "second-generation sidecar GC retention");
+            });
             Require(errors.Count == 0, "new type declarations: " + string.Join("; ", errors));
+        }
+
+        [MethodImpl(MethodImplOptions.NoInlining)]
+        private static WeakReference StoreRepeatedPayload(DheEvolutionCarrier carrier)
+        {
+            var payload = new byte[37];
+            payload[0] = 73;
+            carrier.RevisionPayload = payload;
+            return new WeakReference(payload);
         }
 
         private static object Invoke(MethodInfo method, object instance, object[] arguments)
@@ -215,6 +250,10 @@ namespace HybridCLR.Lab.ManagedCasesAot
     [DheEvolutionTypeMarker(typeof(DheDemoCalculator[,]))]
     public sealed class DheEvolutionCarrier
     {
+        public int Revision;
+        public object RevisionPayload = null!;
+        public int RevisionProperty { get => Revision; set => Revision = value + 4000; }
+        public int ReadRevision() => Revision;
         public DheDemoCalculator Value = null!;
         public List<DheDemoCalculator> Values = null!;
         public DheDemoCalculator[] Vector = null!;
