@@ -112,6 +112,15 @@ foreach (string field in DheObservedResults.Fields)
 }
 checks["non-numeric-observation-rejected"] = Rejects(() => DheObservedResults.Validate(expectedObservation,
     JsonSerializer.Deserialize<JsonElement>("{\"addResult\":\"102\",\"stableResult\":4,\"addViaStableResult\":104}")));
+string evidencePath = Path.Combine(output, "evolution-checks.ids");
+checks["absent-evolution-receipt-rejected"] = Rejects(() => DheEvolutionEvidence.Validate(evidencePath,
+    new[] { "repeated-structural-evolution" }));
+File.WriteAllLines(evidencePath, new[] { "method-signature", "method-signature" });
+checks["old-evolution-checks-insufficient"] = Rejects(() => DheEvolutionEvidence.Validate(evidencePath,
+    new[] { "repeated-structural-evolution" }));
+File.AppendAllLines(evidencePath, new[] { "repeated-structural-evolution" });
+checks["evolution-receipt-required-checks-accepted"] = DheEvolutionEvidence.Validate(evidencePath,
+    new[] { "repeated-structural-evolution" }).Length == 2;
 bool passed = checks.Values.All(value => value);
 File.WriteAllText(Path.Combine(output, "report.json"), JsonSerializer.Serialize(new
 {

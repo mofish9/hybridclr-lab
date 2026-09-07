@@ -8,6 +8,7 @@
     <Compile Include="../../MetaVersion.cs" Link="MetaVersion.cs" />
     <Compile Include="../../ManagedCaseVariants.cs" Link="ManagedCaseVariants.cs" />
     <Compile Include="../../../runners/dhe-evolution/DheObservedResults.cs" Link="DheObservedResults.cs" />
+    <Compile Include="../../../runners/dhe-evolution/DheEvolutionEvidence.cs" Link="DheEvolutionEvidence.cs" />
     <Compile Include="../../../unity2021-dhe-demo/Assets/Runtime/DheFixturePolicy.cs" Link="DheFixturePolicy.cs" />
     <Reference Include="dnlib"><HintPath>../../dnlib.dll</HintPath></Reference>
   </ItemGroup>

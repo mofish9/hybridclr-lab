@@ -55,6 +55,11 @@ internal static class Program
             "Each resource update requires one matching CLR reference result.");
         Require(!config.RequireStructuralBaseGenerations || references.Length == updates.Length,
             "Structural generation qualification requires observable CLR results for every update.");
+        string[][] checkRequirements = config.EvolutionCheckRequirements ?? Array.Empty<string[]>();
+        Require(checkRequirements.Length == 0 || (checkRequirements.Length == updates.Length &&
+            checkRequirements.All(checks => checks != null && checks.Distinct(StringComparer.Ordinal).Count() == checks.Length &&
+                checks.All(check => Regex.IsMatch(check, "^[a-z0-9-]+$")))),
+            "Evolution check requirements must match the updates and contain unique check names.");
         if (updates.Length < 2 || config.Bases.Length < 2 || config.TimeoutSeconds < 1 ||
             config.TimeoutSeconds > 600 || config.Bases.Select(item => item.Label).Distinct().Count() != config.Bases.Length)
             throw new InvalidDataException("Replay requires multiple updates, unique Base labels, and a bounded timeout.");
@@ -141,11 +146,15 @@ internal static class Program
                     string stagePath = Path.Combine(runRoot, "stage.json");
                     string resultPath = Path.Combine(runRoot, "player.json");
                     string logPath = Path.Combine(runRoot, "player.log");
+                    string evolutionEvidencePath = Path.Combine(runRoot, "evolution-checks.ids");
                     await Run("dotnet", new[] { tool, "stage-resource-update", "-UpdateRoot", updates[index],
                         "-AssetRoot", assets, "-BaseBuildIdentity", identityPath,
                         "-ImmutableFiles", string.Join(',', immutableFiles), "-Output", stagePath }, lab, config.TimeoutSeconds);
                     ProcessResult process = await Run(executable, new[] { "-batchmode", "-nographics", "-labMode", "dhe",
-                        "-labTarget", "StandaloneWindows64", "-labResult", resultPath, "-logFile", logPath }, playerRoot, config.TimeoutSeconds);
+                        "-labTarget", "StandaloneWindows64", "-labResult", resultPath, "-logFile", logPath }, playerRoot, config.TimeoutSeconds,
+                        new Dictionary<string, string> { ["HYBRIDCLR_DHE_EVOLUTION_EVIDENCE"] = evolutionEvidencePath });
+                    string[] requiredEvolutionChecks = checkRequirements.Length == 0 ? Array.Empty<string>() : checkRequirements[index];
+                    string[] executedEvolutionChecks = DheEvolutionEvidence.Validate(evolutionEvidencePath, requiredEvolutionChecks);
                     JsonElement result = Read(resultPath);
                     if (references.Length != 0)
                         DheObservedResults.Validate(Read(references[index]).GetProperty("observations"), result);
@@ -228,6 +237,9 @@ internal static class Program
                         baseContainsStructuralFixture = baseGenerations[baseId], immutableFileCount = immutableFiles.Length,
                         immutableHashes = originalHashes, passed = true,
                         referenceValidated = references.Length != 0,
+                        requiredEvolutionChecks, executedEvolutionChecks,
+                        evolutionEvidencePath,
+                        evolutionEvidenceSha256 = File.Exists(evolutionEvidencePath) ? Hash(evolutionEvidencePath) : null,
                         mainObservations = DheObservedResults.Fields.ToDictionary(name => name,
                             name => result.GetProperty(name).GetInt32()),
                     });
@@ -260,7 +272,7 @@ internal static class Program
     }
 
     private static async Task<ProcessResult> Run(string executable, IEnumerable<string> arguments,
-        string directory, int timeoutSeconds)
+        string directory, int timeoutSeconds, IReadOnlyDictionary<string, string>? environment = null)
     {
         var start = new ProcessStartInfo(executable)
         {
@@ -268,6 +280,8 @@ internal static class Program
             RedirectStandardOutput = true, RedirectStandardError = true,
         };
         foreach (string argument in arguments) start.ArgumentList.Add(argument);
+        if (environment != null)
+            foreach (var entry in environment) start.Environment[entry.Key] = entry.Value;
         using Process process = Process.Start(start) ?? throw new InvalidOperationException("Process start failed.");
         var watch = Stopwatch.StartNew();
         Task<string> stdout = process.StandardOutput.ReadToEndAsync();
@@ -312,7 +326,8 @@ internal static class Program
         if (!condition) throw new InvalidDataException(message);
     }
     private sealed record Config(string LabRoot, string ToolAssembly, string OutputRoot, string[] Updates, Base[] Bases,
-        int TimeoutSeconds = 120, bool RequireStructuralBaseGenerations = false, string[]? ReferenceResults = null);
+        int TimeoutSeconds = 120, bool RequireStructuralBaseGenerations = false, string[]? ReferenceResults = null,
+        string[][]? EvolutionCheckRequirements = null);
     private sealed record Base(string Label, string PlayerRoot, string BuildIdentity, bool SkipFirstUpdate = false);
     private sealed record ProcessResult(int Id, int ExitCode, long ElapsedMilliseconds, string Text);
 }

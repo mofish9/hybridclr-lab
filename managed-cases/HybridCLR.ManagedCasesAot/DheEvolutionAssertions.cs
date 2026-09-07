@@ -1,6 +1,7 @@
 #if DHE_EVOLUTION_CURRENT
 using System;
 using System.Collections.Generic;
+using System.IO;
 using System.Linq;
 using System.Reflection;
 using System.Runtime.CompilerServices;
@@ -59,7 +60,12 @@ namespace HybridCLR.Lab.ManagedCasesAot
             var errors = new List<string>();
             void Check(string name, Action action)
             {
-                try { action(); }
+                try
+                {
+                    action();
+                    string evidencePath = Environment.GetEnvironmentVariable("HYBRIDCLR_DHE_EVOLUTION_EVIDENCE");
+                    if (!string.IsNullOrEmpty(evidencePath)) File.AppendAllText(evidencePath, name + "\n");
+                }
                 catch (Exception exception) { errors.Add(name + ": " + exception.Message); }
             }
             Check("method-signature", () =>
