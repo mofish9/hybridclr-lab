@@ -12,22 +12,25 @@ namespace HybridCLR.Lab.ManagedCasesAot
         public static void Validate(DheDemoCalculator instance)
         {
             Type type = typeof(DheDemoCalculator);
+            Require(type == instance.GetType(), "new type resolves existing Base type");
             MethodInfo method = type.GetMethod(nameof(DheDemoCalculator.AddedAttributedMethod)) ??
                 throw new MissingMethodException(type.FullName, nameof(DheDemoCalculator.AddedAttributedMethod));
             Require(method.DeclaringType == type, "added method identity");
             Require(instance.AddedAttributedMethod(5) == 2205 &&
-                (int)method.Invoke(instance, new object[] { 5 }) == 2205, "added method calls");
+                (int)Invoke(method, instance, new object[] { 5 }) == 2205, "added method calls");
             ValidateMarker(method, 2201, "added-method");
             ValidateParameter(method, 2203, "added-parameter");
 
             MethodInfo generic = type.GetMethod(nameof(DheDemoCalculator.AddedAttributedGenericMethod));
             ValidateMarker(generic, 2202, "added-generic-method");
             MethodInfo inflated = generic.MakeGenericMethod(typeof(string));
+            Require(inflated.DeclaringType == type && inflated.GetGenericMethodDefinition() == generic,
+                "inflated supplemental method identity");
             ValidateMarker(inflated, 2202, "added-generic-method");
             ValidateParameter(generic, 2204, "generic-parameter");
             ValidateParameter(inflated, 2204, "generic-parameter");
             Require(instance.AddedAttributedGenericMethod("direct") == "direct" &&
-                (string)inflated.Invoke(instance, new object[] { "reflection" }) == "reflection",
+                (string)Invoke(inflated, instance, new object[] { "reflection" }) == "reflection",
                 "added generic method calls");
 
             MethodInfo asyncMethod = type.GetMethod(nameof(DheDemoCalculator.AddedAsyncMethod));
@@ -35,7 +38,7 @@ namespace HybridCLR.Lab.ManagedCasesAot
             Require(asyncAttribute != null && asyncAttribute.StateMachineType.DeclaringType == type,
                 "added async state machine attribute");
             Require(instance.AddedAsyncMethod(5).GetAwaiter().GetResult() == 2305 &&
-                ((Task<int>)asyncMethod.Invoke(instance, new object[] { 6 })).GetAwaiter().GetResult() == 2306,
+                ((Task<int>)Invoke(asyncMethod, instance, new object[] { 6 })).GetAwaiter().GetResult() == 2306,
                 "added async completion");
 
             MethodInfo iterator = type.GetMethod(nameof(DheDemoCalculator.AddedIteratorMethod));
@@ -47,6 +50,16 @@ namespace HybridCLR.Lab.ManagedCasesAot
             Require(type.Assembly.GetReferencedAssemblies().Any(assembly => assembly.Name == "System.Core") ||
                 type.Assembly.GetReferencedAssemblies().Any(assembly => assembly.Name == "netstandard"),
                 "current assembly reference reflection");
+        }
+
+        private static object Invoke(MethodInfo method, object instance, object[] arguments)
+        {
+            try { return method.Invoke(instance, arguments); }
+            catch (Exception exception)
+            {
+                throw new InvalidOperationException("DHE evolution invocation failed: " + method.Name +
+                    "; declaring type matches target=" + (method.DeclaringType == instance.GetType()), exception);
+            }
         }
 
         private static void ValidateParameter(MethodInfo method, int value, string label)

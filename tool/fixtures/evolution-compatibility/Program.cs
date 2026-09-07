@@ -17,6 +17,12 @@ checks["method-attributes-capability-required"] = comparison.RequiredRuntimeCapa
     .Contains("supplemental-method-custom-attributes-v1");
 checks["reference-evolution-capability-required"] = comparison.RequiredRuntimeCapabilities
     .Contains("assembly-reference-evolution-v1");
+checks["new-type-base-reference-capability-required"] = comparison.RequiredRuntimeCapabilities
+    .Contains("supplemental-type-base-references-v1");
+checks["new-type-base-reference-old-runtime-rejected"] = !ResourceUpdateCompatibility.CanExecuteUpdate(
+    ResourceUpdateCompatibility.RuntimeProtocol, "dhe-runtime-v3",
+    ResourceUpdateCompatibility.KnownRuntimeCapabilities.Where(value => value != "supplemental-type-base-references-v1"),
+    comparison.RequiredRuntimeCapabilities);
 checks["old-runtime-capabilities-rejected"] = !ResourceUpdateCompatibility.CanExecuteUpdate(
     ResourceUpdateCompatibility.RuntimeProtocol, "dhe-runtime-v2",
     ResourceUpdateCompatibility.KnownRuntimeCapabilities.Where(value => value != "supplemental-method-custom-attributes-v1" &&

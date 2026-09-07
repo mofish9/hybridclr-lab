@@ -198,3 +198,22 @@ An archived Base cannot gain stripped native APIs through a resource update.
 The latest parameter-attribute evolution DLL also passed the eight offline
 compatibility tests. Remaining work includes member-level AOT availability checks,
 actual evolution Player execution, and broader future external-API preservation.
+
+## New type bodies referencing existing Base types
+
+The future-API-preserving Base built and passed its no-op Player gate. The same
+evolution update then advanced beyond missing APIs, but failed reflection invocation
+of `AddedAttributedMethod`: the method's declaring type did not match the Base
+instance. A diagnostic fixture confirms the failing call is ordinary, not generic.
+Its caller is a newly added type. That type's body used the hidden current image,
+so `typeof(DheDemoCalculator)` resolved to a second hidden class rather than the
+public Base class. The previous body resolver explicitly excluded wholly new types.
+
+The runtime candidate routes all bodies from its own supplemental image through
+the merged view. It leaves unrelated interpreter images and ordinary AOT metadata
+unchanged. The fixture now checks exact typeof/object identity and generic method
+definition identity. Offline local type references determine whether an added type
+requires `supplemental-type-base-references-v1`; existing Bases lacking this fix
+cannot be relabeled as capable. Runtime contract advances to `dhe-runtime-v4`, but
+the MV wire format and stable identities are unchanged. Native and Player reruns
+on this exact candidate remain required.

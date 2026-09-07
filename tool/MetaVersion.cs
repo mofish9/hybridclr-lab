@@ -143,7 +143,62 @@ internal sealed class MetaVersionSnapshot
             Hash("dhe-type-static-fields\n" + StableStaticFieldShape(type)),
             type.IsInterface, type.DeclaringType != null,
             string.Equals(type.Name.String, "<PrivateImplementationDetails>",
-                StringComparison.Ordinal));
+                StringComparison.Ordinal), LocalReferencedTypes(type));
+    }
+
+    private static string[] LocalReferencedTypes(TypeDef type)
+    {
+        var names = new HashSet<string>(StringComparer.Ordinal);
+        void AddType(ITypeDefOrRef? reference)
+        {
+            if (reference is TypeSpec spec) { AddSignature(spec.TypeSig); return; }
+            if (reference?.DefinitionAssembly?.Name == type.Module.Assembly.Name)
+                names.Add(reference.FullName);
+        }
+        void AddSignature(TypeSig? signature)
+        {
+            if (signature is TypeDefOrRefSig reference) AddType(reference.TypeDefOrRef);
+            if (signature is GenericInstSig generic)
+            {
+                AddSignature(generic.GenericType);
+                foreach (TypeSig argument in generic.GenericArguments) AddSignature(argument);
+            }
+            if (signature?.Next != null) AddSignature(signature.Next);
+            if (signature is FnPtrSig pointer) AddMethod(pointer.MethodSig);
+        }
+        void AddMethod(MethodSig? signature)
+        {
+            if (signature == null) return;
+            AddSignature(signature.RetType);
+            foreach (TypeSig parameter in signature.Params) AddSignature(parameter);
+        }
+        AddType(type.BaseType);
+        foreach (InterfaceImpl implementation in type.Interfaces) AddType(implementation.Interface);
+        foreach (FieldDef field in type.Fields) AddSignature(field.FieldType);
+        foreach (MethodDef method in type.Methods)
+        {
+            AddMethod(method.MethodSig);
+            if (!method.HasBody) continue;
+            foreach (Local local in method.Body.Variables) AddSignature(local.Type);
+            foreach (ExceptionHandler handler in method.Body.ExceptionHandlers) AddType(handler.CatchType);
+            foreach (Instruction instruction in method.Body.Instructions)
+            {
+                if (instruction.Operand is ITypeDefOrRef reference) AddType(reference);
+                else if (instruction.Operand is IMethod called)
+                {
+                    AddType(called.DeclaringType);
+                    AddMethod(called.MethodSig);
+                    if (called is MethodSpec spec)
+                        foreach (TypeSig argument in spec.GenericInstMethodSig.GenericArguments) AddSignature(argument);
+                }
+                else if (instruction.Operand is IField field)
+                {
+                    AddType(field.DeclaringType);
+                    AddSignature(field.FieldSig?.Type);
+                }
+            }
+        }
+        return names.OrderBy(name => name, StringComparer.Ordinal).ToArray();
     }
 
 	private static MetaVersionMethod CreateMethod(MethodDef method, string declaringTypeStableId,
@@ -564,7 +619,8 @@ internal sealed record MetaVersionType(string Identity, string StableId, string 
     [property: JsonIgnore] string StaticFieldVersion,
     [property: JsonIgnore] bool IsInterface,
     [property: JsonIgnore] bool IsNested,
-    [property: JsonIgnore] bool IsPrivateImplementationDetails);
+    [property: JsonIgnore] bool IsPrivateImplementationDetails,
+    [property: JsonIgnore] string[] LocalReferencedTypeNames);
 
 internal sealed record MetaVersionMethod(string Identity, string StableId, string Version,
     string DeclaringTypeStableId, uint Token, uint Flags, string Name, string DeclaringType,
