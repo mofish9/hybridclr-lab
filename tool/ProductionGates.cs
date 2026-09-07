@@ -2351,16 +2351,24 @@ internal static partial class Program
                         };
                     }
 
-                    string authorityGatePath = ResolveEvidencePath(GetString(
-                            changedReports[0].Report, "toolchainGate"),
-                        Path.GetDirectoryName(changedReports[0].Path)!,
-                        "Resource release aggregate authority gate");
-                    JsonElement authorityGate = ReadJson<JsonElement>(authorityGatePath);
-                    string authorityRoot = RequireDirectory(GetString(authorityGate,
-                            "packageRoot") ?? string.Empty,
-                        "Resource release aggregate authority package");
-                    string authorityPackageId = GetString(changedReports[0].Report,
+                    var authorityReport = changedReports.FirstOrDefault(item =>
+                        !string.IsNullOrWhiteSpace(GetString(item.Report,
+                            "baseArchiveManifest")));
+                    if (authorityReport.Report.ValueKind == JsonValueKind.Undefined)
+                        authorityReport = changedReports[0];
+                    string authorityPackageId = GetString(authorityReport.Report,
                         "expectedToolchainPackageId") ?? string.Empty;
+                    string authorityRoot = ResolveManagedEvidenceContractRoot(
+                        authorityReport.Report, authorityReport.Path,
+                        authenticatedEvidenceToolchains.Values);
+                    bool portableAuthorityResolved = string.IsNullOrWhiteSpace(
+                            GetString(authorityReport.Report, "baseArchiveManifest")) ||
+                        InspectPackage(authorityRoot, authorityPackageId, true).Passed;
+                    AddRegressionCheck(checks, errors,
+                        "resource-release-aggregate-portable-authority",
+                        portableAuthorityResolved,
+                        "aggregate qualification must resolve a portable Base archive's " +
+                        "Release authority from authenticated package roots");
                     string[] SelectAggregateEvidenceToolchainRoots(
                         IEnumerable<(JsonElement Report, string Path)> inputs)
                     {

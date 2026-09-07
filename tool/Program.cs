@@ -76,6 +76,7 @@ internal static partial class Program
         "resource-player-release-ledger-binding",
         "resource-player-consecutive-release-head",
         "resource-release-aggregate-gate",
+        "resource-release-aggregate-portable-authority",
         "channel-state-cas-workflow",
         "evidence-portable-mixed-toolchain-authorities",
         "evidence-immediate-predecessor-authorized",
