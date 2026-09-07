@@ -38,6 +38,10 @@ macro in the new constructor resolver. HybridCLR `82e6829` uses the existing
 The next build compiled the runtime but rejected aggregate initialization of
 Il2CppClass's zero-length vtable in the test fixture. The fixture now uses the
 existing calloc allocation pattern with scoped ownership; both failed logs remain.
+CTest then reached a preexisting incomplete resolver image: Image construction
+enumerates registered assemblies, whose fixture image omitted nameNoExt. Both
+resolver images now carry real image names. The failed CTest log is preserved;
+no assertions are removed or bypassed.
 They must use clean locked commits, real headers on all three engines, and the
 same repeated/Attribute resources, requiring named-field, named-property and
 constructor-overload receipts. Native repairs require a new experimental Base;

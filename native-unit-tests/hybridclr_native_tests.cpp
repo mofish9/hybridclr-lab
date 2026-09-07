@@ -562,6 +562,8 @@ namespace
         image.assembly = &assembly;
         klass->image = &image;
 		assembly.aname.name = "DheNativeResolver";
+		image.name = "DheNativeResolver.dll";
+		image.nameNoExt = assembly.aname.name;
 		assembly.image = &image;
 		klass->name = "DheNativeType";
 		klass->namespaze = "";
@@ -715,6 +717,8 @@ namespace
 			return;
 		}
 		secondAssembly.aname.name = "DheNativeResolver.Second";
+		secondImage.name = "DheNativeResolver.Second.dll";
+		secondImage.nameNoExt = secondAssembly.aname.name;
 		secondAssembly.image = &secondImage;
 		secondImage.assembly = &secondAssembly;
 		secondKlass->image = &secondImage;
