@@ -4,15 +4,15 @@
 
 Toolchain 0.1.32 is the current Release line for the DHE workflow. The
 immutable C# package is
-`C:/hybridclr_optimize/releases/HybridCLRDhe-0.1.32-opt4.23`. Its Package ID is
-`d22b37ed90d5e25d164ed046dfff4d63c4ef74120b6012b05dbe0c8982db8528`.
+`C:/hybridclr_optimize/releases/HybridCLRDhe-0.1.32-opt4.24`. Its Package ID is
+`8cbaad0764f4c265d05bfe61527677714ab6d2b78c62295a5684ef1ed563faa9`.
 
 The package records `mode=Release`, `releaseReady=true`, 105 authenticated
 files, and the following source identity:
 
-- source commit: `81f96f0581916e5baa420a1ffee70c87fe47b015`;
-- source tree: `218e6ccb49be9328e24948636680f430ac99ab1b`;
-- package manifest SHA-256: `6baab97a2bc42166993c9d7de5fbe2c8ac4efe9eea03953f20e8b15760a9e883`.
+- source commit: `34b26c445005e911bb5a289d43a492f5d6ca8192`;
+- source tree: `c819206a0aca61ec7e1d07b18e7421a700425c1f`;
+- package manifest SHA-256: `6e69367d117fed8c56bab62023f96282118b282d2f0b759b23ce17ccc0ed2907`.
 
 The package contains no PowerShell, batch, command, or shell launcher. The
 workflow host and project adapters are C# and can be invoked by the Unity
@@ -27,7 +27,7 @@ Editor on Windows, macOS, and the corresponding CI agents.
 | il2cpp_plus Unity 2022 | `optimize/unity2022-v8.11.0` | `60322744721410e79203155fc455be4232c3df4b` | `v2022-8.11.0-opt4.1` |
 | il2cpp_plus Tuanjie 2022 | `optimize/tuanjie-1.10-v8.13.0` | `52968ad6c88416f212d09d919b9a1b6afdc8a53b` | `v2022-tuanjie-8.13.0-opt4.1` |
 | hybridclr_unity | `optimize/v8.13.0` | `18abd01ca9847f06a64bde3cc9fc9e24a1b63d10` | none by policy |
-| DHE tool source | `optimize/dhe-android-device-v8.13.0` | `81f96f0581916e5baa420a1ffee70c87fe47b015` | none |
+| DHE tool source | `optimize/dhe-android-device-v8.13.0` | `34b26c445005e911bb5a289d43a492f5d6ca8192` | none |
 
 No runtime or Unity package source changed in this release. Runtime tags are
 immutable and the Unity package remains a maintenance branch without a package
@@ -35,16 +35,18 @@ opt tag.
 
 ## Formal qualification
 
-The clean source regression passed 152/152 checks. It covers the MetaVersion
+The clean source regression passed 153/153 checks. It covers the MetaVersion
 compatibility contract, consecutive current derivation, archive and provenance
 binding, three-engine resolver/native matrix, resource release gate, protected
 channel CAS behavior, Android overlay contracts, and the target-independent iOS
-Xcode export structure gate.
+Xcode export structure gate. The added check resolves the aggregate release
+authority from the authenticated package set when the selected Base evidence is
+a portable archive whose embedded package path is only a placeholder.
 
 - Regression report SHA-256:
-  `5d422f1060fcd85fa5c74fdfd8b2a01131a9ee3608ecc155f7fadc08038fd90f`.
+  `59b8058feea0327de5624e9c9859d8df68318c7720fcaa2caa265b5d273717e2`.
 - Release evidence SHA-256:
-  `f7e1ff8b3e004dc3a2ded51922cb8af3df7101bb6cc4a45945d2486bbd40586b`.
+  `25631727e3d9b54bdf82ffc32c0543fbf8b74f726db6d5ce25f30873a0c452ed`.
 - Schema, package verification, and doctor gates passed for the exact package
   identity above.
 
@@ -56,8 +58,10 @@ interpreter entries.
 
 ## Post-release revision 6
 
-Using the released package, a new `current-next` payload was derived from the
-authenticated revision 5 current set without rebuilding any Base Player. The
+Using the immutable predecessor package `HybridCLRDhe-0.1.32-opt4.23`, a new
+`current-next` payload was derived from the authenticated revision 5 current set
+without rebuilding any Base Player. Package `opt4.24` revalidated this complete
+result during its 153-check release regression. The
 revision 6 resource update selected `windows` and `android` payload variants,
 retained all ten active Bases, and passed compatibility and schema validation.
 
@@ -101,10 +105,13 @@ Windows results must not be presented as Android or iOS production evidence.
 
 ## Rollback
 
-Pin the immutable package `HybridCLRDhe-0.1.32-opt4.23` and its Package ID for
-tool rollback. Do not rewrite an already promoted channel head. Application
-rollback is a new forward resource revision derived from the actual protected
-head; the revision 6 state and its content-addressed artifact remain immutable.
+For tool rollback, pin the immutable predecessor
+`HybridCLRDhe-0.1.32-opt4.23`, Package ID
+`d22b37ed90d5e25d164ed046dfff4d63c4ef74120b6012b05dbe0c8982db8528`.
+Do not rewrite an already promoted channel head. Application rollback is a new
+forward resource revision derived from the actual protected head; the revision
+6 state and its content-addressed artifact remain immutable.
 
-Earlier 0.1.32 package directories, including `opt4.17`, are retained as
-historical audit records only and must not be selected by a project.
+Earlier 0.1.32 package directories are retained immutably for audit and existing
+pins. New project installs must select `opt4.24` by its exact Package ID; do not
+select a package by directory name or toolchain version alone.

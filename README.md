@@ -132,9 +132,11 @@ added to the seven-Base registry in one successor build; one revision 4 payload
 then passed all ten Windows Players and advanced the protected lab channel with
 exact ten-Base coverage. See
 `docs/HybridCLR-DHE-Opt4-Post-Release-Ten-Base-Lifecycle.md`.
-The current release line is `HybridCLRDhe-0.1.32-opt4.23`. It includes the
+The current release line is `HybridCLRDhe-0.1.32-opt4.24`, Package ID
+`8cbaad0764f4c265d05bfe61527677714ab6d2b78c62295a5684ef1ed563faa9`. It includes the
 portable evidence-root and relocated-registry fixes after the ten-Base onboarding
-run, and its clean source regression passes `152/152` checks across ten changed
+run, resolves portable aggregate authority without trusting archived placeholder
+paths, and its clean source regression passes `153/153` checks across ten changed
 Base Players, one no-op Base, and the Unity 2021, Unity 2022, and Tuanjie 2022
 resolver matrix. It retains the Android APK overlay/device gate and
 cross-target staging contract, and includes a target-independent iOS Xcode-export
