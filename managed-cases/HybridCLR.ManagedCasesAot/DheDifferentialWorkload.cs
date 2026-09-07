@@ -112,10 +112,16 @@ namespace HybridCLR.Lab.ManagedCasesAot
                     foreach (Type type in new[] { pair, nested })
                     {
                         writer.WriteLine(type.FullName);
-                        writer.WriteLine("size=" + Marshal.SizeOf(Activator.CreateInstance(type)));
                         foreach (FieldInfo field in type.GetFields())
+                        {
+                            MethodInfo offset = field.GetType().GetMethod("GetFieldOffset",
+                                BindingFlags.Instance | BindingFlags.NonPublic);
                             writer.WriteLine(field.Name + " type=" + field.FieldType.FullName +
-                                " offset=" + Marshal.OffsetOf(type, field.Name).ToInt64());
+                                (offset == null ? " marshaledOffset=" + Marshal.OffsetOf(type, field.Name).ToInt64()
+                                    : " managedOffset=" + offset.Invoke(field, null)));
+                        }
+                        try { writer.WriteLine("marshaledSize=" + Marshal.SizeOf(Activator.CreateInstance(type))); }
+                        catch (ArgumentException exception) { writer.WriteLine("marshaledSizeUnavailable=" + exception.Message); }
                     }
                     object first = Activator.CreateInstance(pair, new object[] { 2, 3 });
                     object second = Activator.CreateInstance(pair, new object[] { 5, 7 });

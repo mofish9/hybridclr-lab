@@ -1,14 +1,14 @@
 {
   "labRoot": "..",
   "toolAssembly": "../../../artifacts/dhe-evolution-20260908/host-full-differential/HybridCLR.DheTool.dll",
-  "outputRoot": "../../../artifacts/dhe-evolution-20260908/replay-full-differential-layout",
+  "outputRoot": "../../../artifacts/dhe-evolution-20260908/replay-full-differential-fields",
   "updates": [
-    "../../../artifacts/dhe-evolution-20260908/resource-full-suite-layout-aot",
-    "../../../artifacts/dhe-evolution-20260908/resource-full-suite-layout-interpreted"
+    "../../../artifacts/dhe-evolution-20260908/resource-full-suite-fields-aot",
+    "../../../artifacts/dhe-evolution-20260908/resource-full-suite-fields-interpreted"
   ],
   "referenceResults": [
-    "../../../artifacts/dhe-evolution-20260908/reference-full-suite-layout-first.json",
-    "../../../artifacts/dhe-evolution-20260908/reference-full-suite-layout-latest.json"
+    "../../../artifacts/dhe-evolution-20260908/reference-full-suite-fields-first.json",
+    "../../../artifacts/dhe-evolution-20260908/reference-full-suite-fields-latest.json"
   ],
   "evolutionCheckRequirements": [
     ["repeated-structural-evolution", "named-attribute-field", "named-attribute-property", "attribute-constructor-overload"],
@@ -87,8 +87,8 @@
   "differentialManifest": "test-manifest.json",
   "differentialGolden": "test-golden.json",
   "differentialReferences": [
-    "../../../artifacts/dhe-evolution-20260908/differential-reference-layout-aot.bin",
-    "../../../artifacts/dhe-evolution-20260908/differential-reference-layout-interpreted.bin"
+    "../../../artifacts/dhe-evolution-20260908/differential-reference-fields-aot.bin",
+    "../../../artifacts/dhe-evolution-20260908/differential-reference-fields-interpreted.bin"
   ],
   "requireInterpretedCaseEntries": [false, true]
 }
