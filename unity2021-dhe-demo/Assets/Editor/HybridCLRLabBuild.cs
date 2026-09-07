@@ -102,8 +102,30 @@ namespace HybridCLR.Lab.Editor
             const string checkOption = "--enable-divide-by-zero-check";
             if (previousArgs.Contains(checkOption))
                 throw new InvalidDataException("AOT control requires no preexisting divide-check override.");
+            string compilerPatch = GetArgument("-labAotCompilerPatch");
+            string localCompiler = Path.Combine(HybridCLR.Editor.SettingsUtil.LocalIl2CppDir,
+                "build", "deploy", "Unity.IL2CPP.dll");
+            byte[] originalCompiler = null;
+            string originalCompilerHash = null;
             try
             {
+                if (!string.IsNullOrWhiteSpace(compilerPatch))
+                {
+                    CompilerControlPatch patch = JsonUtility.FromJson<CompilerControlPatch>(
+                        File.ReadAllText(compilerPatch + ".patch.json"));
+                    if (patch == null || patch.format != "hybridclr.dhe-aot-codegen-patch.json" ||
+                        patch.inputSha256 != FileSha256(localCompiler) || patch.outputSha256 != FileSha256(compilerPatch) ||
+                        patch.dataModelSha256 != FileSha256(Path.Combine(Path.GetDirectoryName(localCompiler), "Unity.IL2CPP.DataModel.dll")))
+                        throw new InvalidDataException("AOT control compiler patch identity mismatch.");
+                    originalCompiler = File.ReadAllBytes(localCompiler);
+                    originalCompilerHash = patch.inputSha256;
+                    string backupPath = Path.Combine(Path.GetDirectoryName(outputRoot), "original-Unity.IL2CPP.dll");
+                    Directory.CreateDirectory(Path.GetDirectoryName(backupPath));
+                    using (var backup = new FileStream(backupPath, FileMode.CreateNew, FileAccess.Write))
+                        backup.Write(originalCompiler, 0, originalCompiler.Length);
+                    File.Copy(compilerPatch, localCompiler, true);
+                    Debug.Log("[HybridCLR Lab] AOT control compiler: " + patch.outputSha256 + "; backup: " + backupPath);
+                }
                 string compilerArgs = previousArgs + (divideChecks ? " " + checkOption : string.Empty);
                 PlayerSettings.SetAdditionalIl2CppArgs(compilerArgs);
                 Debug.Log("[HybridCLR Lab] AOT control compiler args: " + compilerArgs);
@@ -121,8 +143,37 @@ namespace HybridCLR.Lab.Editor
             }
             finally
             {
-                PlayerSettings.SetAdditionalIl2CppArgs(previousArgs);
+                try
+                {
+                    if (originalCompiler != null)
+                    {
+                        File.WriteAllBytes(localCompiler, originalCompiler);
+                        if (FileSha256(localCompiler) != originalCompilerHash)
+                            throw new IOException("AOT control could not restore the original local compiler.");
+                        Debug.Log("[HybridCLR Lab] Restored local compiler: " + originalCompilerHash);
+                    }
+                }
+                finally
+                {
+                    PlayerSettings.SetAdditionalIl2CppArgs(previousArgs);
+                }
             }
+        }
+
+        [Serializable]
+        private sealed class CompilerControlPatch
+        {
+            public string format;
+            public string inputSha256;
+            public string outputSha256;
+            public string dataModelSha256;
+        }
+
+        private static string FileSha256(string path)
+        {
+            using (var hash = System.Security.Cryptography.SHA256.Create())
+            using (var stream = File.OpenRead(path))
+                return BitConverter.ToString(hash.ComputeHash(stream)).Replace("-", string.Empty).ToLowerInvariant();
         }
 
         [MenuItem("HybridCLR Lab/Build Player Only")]

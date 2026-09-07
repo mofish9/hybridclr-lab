@@ -35,3 +35,21 @@ The rollback boundary is the lab-only runner/build entry. Runtime/package
 sources, archived Players, resources, failed evidence and Installer selection
 remain unchanged. A compiler hypothesis is not a repair until the control and
 the original cold differential have been executed.
+
+## Compiler experiment
+
+The ordinary Unity 2021 AOT control reproduces both differences. Enabling
+divide checks repairs division but leaves scalar unboxing omitted. The next
+lab-only experiment uses dnlib to change Code.Pop emission to evaluate the
+discarded expression as `(void)(expression);`. It does not rewrite test IL,
+golden, generated C++, native runtime source, or the installed Editor compiler.
+The patcher requires an explicit input SHA, a new output, and the exact dispatch
+shape; all other compiler method bodies and assembly references must remain
+unchanged. Already patched or unknown inputs fail closed. No compiler binary
+is distributed or added to source control.
+
+This addresses the compiler's general discard behavior, not a test-name-based
+special case. Actual conversion/Player tests must check pure values, reference
+values, unboxing, exceptions and existing exception-handler stack pops. Default
+and divide-check-only controls remain negative evidence. Native/compiler repair
+integration and the full DHE/multi-Base replay are separate subsequent gates.
