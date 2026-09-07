@@ -312,7 +312,7 @@ internal static class Program
         if (!condition) throw new InvalidDataException(message);
     }
     private sealed record Config(string LabRoot, string ToolAssembly, string OutputRoot, string[] Updates, Base[] Bases,
-        int TimeoutSeconds = 120, bool RequireStructuralBaseGenerations = false, string[] ReferenceResults = null);
+        int TimeoutSeconds = 120, bool RequireStructuralBaseGenerations = false, string[]? ReferenceResults = null);
     private sealed record Base(string Label, string PlayerRoot, string BuildIdentity, bool SkipFirstUpdate = false);
     private sealed record ProcessResult(int Id, int ExitCode, long ElapsedMilliseconds, string Text);
 }
