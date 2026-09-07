@@ -551,6 +551,8 @@ namespace HybridCLR.Lab
                 capabilityGenericVirtualResult = capability.genericVirtualResult,
                 structuralExpected = structural.expected,
                 structuralDispatchExpected = structuralDispatchExpected,
+                stableMethodChanged = stableChanged,
+                instanceStableMethodChanged = instanceStableChanged,
                 structuralLegacyProbes = structural.legacyProbes,
                 structuralPassed = structural.passed,
                 structuralError = structural.error,
@@ -2163,6 +2165,8 @@ namespace HybridCLR.Lab
             public int capabilityGenericVirtualResult;
             public bool structuralExpected;
             public bool structuralDispatchExpected;
+            public bool stableMethodChanged;
+            public bool instanceStableMethodChanged;
             public DheFixturePolicy.LegacyProbeResult[] structuralLegacyProbes;
             public bool structuralPassed;
             public string structuralError;

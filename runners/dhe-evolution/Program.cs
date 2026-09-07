@@ -139,8 +139,23 @@ internal static class Program
                         DheFixturePolicy.Calculator + "::Stable|System.Int32 (System.Int32)");
                     bool instanceStableChanged = DheFixturePolicy.MethodChanged(baseMv, currentMv,
                         DheFixturePolicy.Calculator + "::InstanceStable|System.Int32 (System.Int32)");
+                    bool staticStableMatches;
+                    if (result.TryGetProperty("stableMethodChanged", out JsonElement actualStable))
+                    {
+                        staticStableMatches = actualStable.GetBoolean() == stableChanged &&
+                            result.GetProperty("instanceStableMethodChanged").GetBoolean() == instanceStableChanged;
+                    }
+                    else
+                    {
+                        // Archived reports name a different AOT control "unchangedMethod".
+                        // Their changed caller records Stable's actual dispatch explicitly.
+                        bool callerChanged = DheFixturePolicy.MethodChanged(baseMv, currentMv,
+                            DheFixturePolicy.Calculator + "::AddViaStable|System.Int32 (System.Int32)");
+                        staticStableMatches = callerChanged && result.GetProperty("changedCallingUnchangedMethod").GetString() ==
+                            (stableChanged ? "interpreter + interpreter callee" : "interpreter + AOT callee");
+                    }
                     Require(result.GetProperty("structuralDispatchExpected").GetBoolean() == (stableChanged || instanceStableChanged) &&
-                        result.GetProperty("unchangedMethod").GetString() == (stableChanged ? "interpreter" : "aot") &&
+                        staticStableMatches &&
                         result.GetProperty("unchangedInstanceMethod").GetString() == (instanceStableChanged ? "interpreter" : "aot"),
                         "Stable dispatch disagrees with actual Base/Current MV.");
                     DheFixturePolicy.LegacyProbeResult[] legacyEvidence;
