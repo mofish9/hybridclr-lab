@@ -1,6 +1,23 @@
 # DHE evolution implementation and validation
 
-## Latest checkpoint: unchanged generic methods without AOT code
+## Latest checkpoint: AOT compiler exception controls
+
+Unregistered, unguarded Unity 2021 AOT reproduces the two remaining exception
+differences with unchanged method IL. The supported divide-check option repairs
+division; a lab-only C# compiler patch restores evaluation of discarded scalar
+unboxing expressions. The repaired control passes four exception cases on each
+of Unity 2021, Unity 2022 and Tuanjie Windows. All three compiler patch suites
+pass nine positive/negative checks. Original Editor compilers remain untouched;
+project-local compiler copies were restored and rehashed after each build.
+See `reports/dhe-evolution-aot-exceptions-windows.md` for exact identities.
+
+This is not a full DHE pass. The v11 cold 220-case replay remains failed and
+unchanged. Package-owned compiler/workflow integration, broader code-generation
+regressions and fresh DHE/multi-generation replay are the next gates; all wider
+evolution and performance/memory requirements still apply. No formal source,
+runtime tag, Installer selection, resource channel or CAT project changed.
+
+## Previous checkpoint: unchanged generic methods without AOT code
 
 The `a57999e` runtime and three updated GenericMethod hooks repair the reproduced
 Unity 2021 missing-AOT reflection failures. The clean `33c2278` replay executes
