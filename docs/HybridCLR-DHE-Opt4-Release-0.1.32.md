@@ -2,14 +2,21 @@
 
 ## Status
 
-Toolchain 0.1.32 closes two defects found while extending one protected resource
-channel from seven to ten immutable Base Players. The released C# package is
-`C:/hybridclr_optimize/releases/HybridCLRDhe-0.1.32-opt4.17`. Its Package ID is
-`5cee1f8aeda8e23576572a63ec0a1fd2a68104f327b2296ec3b4c8a9c518c964`.
+Toolchain 0.1.32 is the current Release line for the DHE workflow. The
+immutable C# package is
+`C:/hybridclr_optimize/releases/HybridCLRDhe-0.1.32-opt4.23`. Its Package ID is
+`d22b37ed90d5e25d164ed046dfff4d63c4ef74120b6012b05dbe0c8982db8528`.
 
-The package records `mode=Release`, `releaseReady=true`, 102 authenticated files,
-41 commands, source commit `e5208f38dae4ee625da9ce0a0990d26af5d6f6f0`, and
-tree `f8e5cf2b0e8276f2b15351b8c2fcbdbd55dcace1`.
+The package records `mode=Release`, `releaseReady=true`, 105 authenticated
+files, and the following source identity:
+
+- source commit: `81f96f0581916e5baa420a1ffee70c87fe47b015`;
+- source tree: `218e6ccb49be9328e24948636680f430ac99ab1b`;
+- package manifest SHA-256: `6baab97a2bc42166993c9d7de5fbe2c8ac4efe9eea03953f20e8b15760a9e883`.
+
+The package contains no PowerShell, batch, command, or shell launcher. The
+workflow host and project adapters are C# and can be invoked by the Unity
+Editor on Windows, macOS, and the corresponding CI agents.
 
 ## Locked sources
 
@@ -20,86 +27,84 @@ tree `f8e5cf2b0e8276f2b15351b8c2fcbdbd55dcace1`.
 | il2cpp_plus Unity 2022 | `optimize/unity2022-v8.11.0` | `60322744721410e79203155fc455be4232c3df4b` | `v2022-8.11.0-opt4.1` |
 | il2cpp_plus Tuanjie 2022 | `optimize/tuanjie-1.10-v8.13.0` | `52968ad6c88416f212d09d919b9a1b6afdc8a53b` | `v2022-tuanjie-8.13.0-opt4.1` |
 | hybridclr_unity | `optimize/v8.13.0` | `18abd01ca9847f06a64bde3cc9fc9e24a1b63d10` | none by policy |
-| DHE tool source | `optimize/dhe-consecutive-current-v8.13.0` | `e5208f38dae4ee625da9ce0a0990d26af5d6f6f0` | none |
+| DHE tool source | `optimize/dhe-android-device-v8.13.0` | `81f96f0581916e5baa420a1ffee70c87fe47b015` | none |
 
-No runtime or Unity package source changed. No runtime or package tag was created.
-The 0.1.31 package identity was added to the authenticated historical authority
-set so its Base archives remain usable after upgrading the release host.
-
-## Consecutive current generation
-
-The lab-only `current-next` variant can be applied repeatedly to the previous
-authenticated current assembly set. It increments generation constants while
-preserving assembly/module identity and metadata shape. The old `current-base2`
-name remains an alias for compatibility.
-
-The constructor transformation no longer removes a `ret` instruction that may
-already be a branch target. On later generations it locates and updates the
-existing sentinel. Regression requires each consecutive derivation to remain
-compatible, change exactly two method bodies, introduce no metadata drift, and
-reject overflow.
-
-## Portable Base archives
-
-New archives point their workflow directly at the immutable original native
-manifest. Existing 0.1.31 archives are accepted only after their archive manifest
-is revalidated and its immutable native record matches the Base registry hash.
-
-`resource-player-evidence` now resolves archive-relative source preflight, clean
-checkout, toolchain gate, runtime manifest, and native manifest references before
-writing evidence outside the archive. It records the archive manifest and its
-SHA-256. Qualification recomputes the complete archive file set and then checks
-the recorded runtime lock, engine workflow, source commit/tree identities,
-non-surrogate header identity, and exact Release package. Missing, extra,
-relocated-without-authority, or tampered archive content fails closed.
+No runtime or Unity package source changed in this release. Runtime tags are
+immutable and the Unity package remains a maintenance branch without a package
+opt tag.
 
 ## Formal qualification
 
-The clean regression passed 143/143 checks with `sourceClean=true`, six historical
-changed Base reports, one no-op report, all 13 historical authority packages, and
-three real Editor resolver reports. The two new mandatory checks cover consecutive
-current derivation and archive-bound native/provenance resolution with tamper
-rejection.
+The clean source regression passed 152/152 checks. It covers the MetaVersion
+compatibility contract, consecutive current derivation, archive and provenance
+binding, three-engine resolver/native matrix, resource release gate, protected
+channel CAS behavior, Android overlay contracts, and the target-independent iOS
+Xcode export structure gate.
 
-- Regression SHA-256:
-  `6e5d0e7a8aa2e7b3023b80382c7f486908de2f70f8bcc3f282555a439aeb80b0`.
+- Regression report SHA-256:
+  `5d422f1060fcd85fa5c74fdfd8b2a01131a9ee3608ecc155f7fadc08038fd90f`.
 - Release evidence SHA-256:
-  `58c5c6acc82397552e5d9733beff37ff7f9f5daa8eaedd632e31c12d76de25cd`.
-- Package manifest SHA-256:
-  `18216a5118adb606ed38e8d09c8b75fb6d6b6ccee8f5a4da173436735f8219c5`.
-- Verify, doctor, schema gate, and post-build verify SHA-256:
-  `8f2a64de8fff6ad1277a95b6316afe5dcea2409d678a3c4c0f9d75a675457256`,
-  `2b3b1a3dbd119541b8e8cafda7a22db16b59fbc57889aa2d2f282369110fc24d`,
-  `868babb7947ad25bf6246e26ac141247b6a11ea126384b16ae7820080d8c981b`,
-  and `be5c696d675b18d8ff03662d3f2f05466115d07a81282e092bed2c11b1ab0c1c`.
+  `f7e1ff8b3e004dc3a2ded51922cb8af3df7101bb6cc4a45945d2486bbd40586b`.
+- Schema, package verification, and doctor gates passed for the exact package
+  identity above.
 
-The distributed source was compiled with output and intermediate directories
-outside the immutable package. Compilation had zero warnings and zero errors,
-and package verification passed afterward.
+The Windows qualification set includes ten changed Base Player reports, one
+no-op report, and the Unity 2021, Unity 2022, and Tuanjie 2022 resolver/native
+roles. All managed reports retain both AOT and interpreter dispatch where the
+payload changes methods; the no-op report proves positive AOT dispatch with no
+interpreter entries.
 
-The runtime/native repositories did not change. Their locked three-engine native
-reports remain historical evidence for the same commits; they were not rerun as
-new runtime results. They report real Editor headers, no surrogate headers,
-`passed=true`, `mergeReady=true`, and CTest 1/1.
+## Post-release revision 6
+
+Using the released package, a new `current-next` payload was derived from the
+authenticated revision 5 current set without rebuilding any Base Player. The
+revision 6 resource update selected `windows` and `android` payload variants,
+retained all ten active Bases, and passed compatibility and schema validation.
+
+- resource update root:
+  `C:/hybridclr_optimize/artifacts/resume-release6-resource-20260907`;
+- resource revision: `6`;
+- parent ledger SHA-256:
+  `3281696217b977644c423402d52c6d4b151f939315c9716f6deefddf7fbd926d`;
+- revision 6 ledger SHA-256:
+  `24f6f3a81af3437f53478a8452f77663ca6f54621c3970b37c24255c52f3318f`;
+- current assembly-set SHA-256:
+  `6f4cae92afa11386dd118e10cdca43d4e93e0442c3882c202212434a42413ea7`;
+- payload variant-set SHA-256:
+  `e3fd59f17d7b00b8c33c2191dc2491a93d1db9108a9246f5e1f6132582122d7c`;
+- aggregate gate SHA-256:
+  `e49293f7263a075d158bcf7fa1df77fc94dbb477709110f5a11f15d290d47998`.
+
+All ten Windows Base Players started and generated a passing
+`resource-player-workflow-report.json`. The protected lab channel advanced to
+revision 6 by CAS promotion; the promoted snapshot SHA-256 is
+`2b4ebfb2d2be6f016c1e9bc20c9680e5ea3cc9251d173c379917ad1a84821dc5`, and the
+new channel head SHA-256 is
+`353fcfbb7b173e1da6460cf1d141e5615ea786f71beaa9c2b5618db7609562ef`.
+This proves that one subsequent hotfix payload can serve multiple Base
+generations and all three engine workflows without rebuilding the old Players.
 
 ## Remaining gates
 
-- Windows Editor/Player evidence is not Android ARM64 or iOS device evidence.
-- Android/iOS correctness, PSS/RSS, tail latency, temperature, and weak-core gates
-  remain incomplete.
-- macOS filesystem behavior and Xcode generation, link, signing, and device
-  execution remain untested.
-- CAT still requires its own Base registry, all-hotfix build, catalog staging,
-  one Player/device run per active Base, and performance/memory gates.
-- Existing value-type layout, inheritance/interface/vtable, ABI, GC, and other
-  unsupported shape changes remain fail closed and require a new Base Player.
+- Android ARM64 still lacks device correctness, PSS/RSS, thermal, weak-core,
+  and tail-latency evidence.
+- iOS/macOS lacks Xcode generation/link/signing, IPA, device, and performance
+  evidence. The current iOS check is export-structure integrity only.
+- CAT still requires its own all-hotfix assembly registry, Base archives,
+  catalog staging, one Player/device run per active Base, and production
+  performance/memory gates.
+- Value-type layout, inheritance/interface/vtable, unsupported ABI, GC, P/Invoke,
+  and other unsupported declaration changes remain fail-closed and require a new
+  Base Player.
+
+Windows results must not be presented as Android or iOS production evidence.
 
 ## Rollback
 
-For tool operations, pin the previous immutable package
-`HybridCLRDhe-0.1.31-opt4.16` and its Package ID. Do not delete or rewrite an
-already published channel head; application rollback is a new forward resource
-revision from the actual protected head. The pre-release package that exposed the
-archive-relative defect is retained only as
-`dhe-toolchain-0.1.32-opt4.17-failed-archive-relative-paths` and is not an
-authorized release.
+Pin the immutable package `HybridCLRDhe-0.1.32-opt4.23` and its Package ID for
+tool rollback. Do not rewrite an already promoted channel head. Application
+rollback is a new forward resource revision derived from the actual protected
+head; the revision 6 state and its content-addressed artifact remain immutable.
+
+Earlier 0.1.32 package directories, including `opt4.17`, are retained as
+historical audit records only and must not be selected by a project.
