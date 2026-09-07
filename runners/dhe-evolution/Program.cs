@@ -301,7 +301,7 @@ internal static class Program
                         string error = item.Label + " update " + (index + 1) + ": " + exception;
                         errors.Add(error);
                         var artifacts = new[] { stagePath, resultPath, logPath, differentialPath,
-                            differentialPath + ".exceptions.log", evolutionEvidencePath }
+                            differentialPath + ".exceptions.log", differentialPath + ".layout.log", evolutionEvidencePath }
                             .Where(File.Exists).ToDictionary(path => path, Hash);
                         bool immutable = originalHashes.All(pair => File.Exists(pair.Key) && Hash(pair.Key) == pair.Value);
                         failedRuns.Add(new

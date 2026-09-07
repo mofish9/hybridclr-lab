@@ -6,6 +6,7 @@ using System.Collections.Generic;
 using System.IO;
 using System.Linq;
 using System.Reflection;
+using System.Runtime.InteropServices;
 using System.Text;
 
 namespace HybridCLR.Lab.ManagedCasesAot
@@ -40,6 +41,7 @@ namespace HybridCLR.Lab.ManagedCasesAot
             MethodInfo aotCount = api == null ? null : api.GetMethod("GetDifferentialAotEntryCount");
             if (api != null && (changed == null || interpreterCount == null || aotCount == null))
                 throw new MissingMethodException("DHE diagnostic API is incomplete.");
+            WriteLayoutDiagnostics(cases, path + ".layout.log");
 
             using (var stream = new FileStream(path, FileMode.CreateNew, FileAccess.Write, FileShare.Read))
             using (var writer = new BinaryWriter(stream, new UTF8Encoding(false)))
@@ -94,6 +96,39 @@ namespace HybridCLR.Lab.ManagedCasesAot
                     }
                 }
                 writer.Write(0x454e4f44);
+            }
+        }
+
+        private static void WriteLayoutDiagnostics(Assembly cases, string path)
+        {
+            using (var writer = new StreamWriter(new FileStream(path, FileMode.CreateNew,
+                FileAccess.Write, FileShare.Read), new UTF8Encoding(false)))
+            {
+                try
+                {
+                    Type definition = cases.GetType("HybridCLR.Lab.ManagedCases.CaseRegistry+Pair`1", true);
+                    Type pair = definition.MakeGenericType(typeof(int));
+                    Type nested = definition.MakeGenericType(pair);
+                    foreach (Type type in new[] { pair, nested })
+                    {
+                        writer.WriteLine(type.FullName);
+                        writer.WriteLine("size=" + Marshal.SizeOf(Activator.CreateInstance(type)));
+                        foreach (FieldInfo field in type.GetFields())
+                            writer.WriteLine(field.Name + " type=" + field.FieldType.FullName +
+                                " offset=" + Marshal.OffsetOf(type, field.Name).ToInt64());
+                    }
+                    object first = Activator.CreateInstance(pair, new object[] { 2, 3 });
+                    object second = Activator.CreateInstance(pair, new object[] { 5, 7 });
+                    object outer = Activator.CreateInstance(nested, new[] { first, second });
+                    foreach (FieldInfo outerField in nested.GetFields())
+                        foreach (FieldInfo innerField in pair.GetFields())
+                            writer.WriteLine(outerField.Name + "." + innerField.Name + "=" +
+                                innerField.GetValue(outerField.GetValue(outer)));
+                }
+                catch (Exception exception)
+                {
+                    writer.WriteLine(exception.ToString());
+                }
             }
         }
 

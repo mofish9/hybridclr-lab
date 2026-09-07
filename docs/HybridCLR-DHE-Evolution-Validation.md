@@ -36,6 +36,12 @@ prefix 64 NOP bytes to every case-assembly method. This exceeds the archived
 test Bases' default 32-byte inline budget without changing declarations or
 golden values. It is a diagnostic variant only, not a production workaround.
 
+The clean `8d04137` no-inline replay still fails the same nested generic case
+on all six Bases. No inlining fix is justified by that experiment. The next
+resource adds a separate layout diagnostic for `Pair<int>` and `Pair<Pair<int>>`,
+including size, field offsets/types, and reflected construction. Golden values
+and the original failing case body remain unchanged.
+
 The next gate executes the complete existing 220-case manifest after DHE
 registration, through a resource-only fixture entry on the archived Windows
 Bases. No new Player entry or native runtime change is required for the harness.
