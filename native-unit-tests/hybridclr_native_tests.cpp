@@ -678,7 +678,8 @@ namespace
         CHECK(!hybridclr::metadata::MetadataModule::IsImplementedByInterpreter(&missingAot, true));
         hybridclr::native_test::SetAOTMetadataAvailable(true);
 
-        CHECK(hybridclr::InitAndGetInterpreterDirectlyCallMethodPointerSlow(&missingAot) ==
+        CHECK(hybridclr::PrepareInterpreterManaged2NativeCall(&missingAot));
+        CHECK(hybridclr::GetInterpreterInvokerMethodPointer(&missingAot) ==
             hybridclr::native_test::GetInterpreterMethodPointer());
         CHECK(missingAot.isInterpterImpl);
         CHECK(hybridclr::metadata::MetadataModule::IsImplementedByInterpreter(&missingAot));
@@ -695,7 +696,6 @@ namespace
         missingFgs.genericMethod = &unchangedGeneric;
         missingFgs.methodPointer = DummyMethodPointer;
         missingFgs.has_full_generic_sharing_signature = true;
-        missingFgs.indirect_call_via_invokers = true;
         missingFgs.hasFullGenericSharingAotInvoker = false;
         CHECK(hybridclr::PrepareFullGenericSharingMethod(&missingFgs));
         CHECK(missingFgs.isInterpterImpl);
@@ -711,7 +711,6 @@ namespace
         availableFgs.methodPointer = DummyMethodPointer;
         availableFgs.invoker_method = DummyInvoker;
         availableFgs.has_full_generic_sharing_signature = true;
-        availableFgs.indirect_call_via_invokers = true;
         availableFgs.hasFullGenericSharingAotInvoker = true;
         CHECK(hybridclr::PrepareFullGenericSharingMethod(&availableFgs));
         CHECK(!availableFgs.isInterpterImpl);

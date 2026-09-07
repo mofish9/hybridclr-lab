@@ -23,6 +23,14 @@ claims are allowed. Native fixes get fresh Base identities; archived v10 and
 earlier Players remain unchanged. Full managed evolution, concurrency/ABI and
 performance/memory qualification remain the broader objective.
 
+The first native attempt passes Unity 2021 but finds two Unity 2021-only field
+assignments in the new FGS fixture on Unity 2022. Those unused assignments are
+removed, matching the existing FGS tests' cross-engine shape. Production review
+also identifies the public managed-to-native preparation path's early rejection
+of a null unchanged AOT pointer; it must fall through to ordinary interpreter
+preparation. The regression now calls that public path. Failed logs remain under
+`native-missing-aot-generics`; the corrected gates use a fresh output directory.
+
 ## Latest checkpoint: indexed interpreter bridge arguments
 
 HybridCLR `25b4d9f` fixes the reproduced indexed-argument corruption. The clean
