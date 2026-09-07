@@ -1,0 +1,14 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <OutputType>Exe</OutputType>
+    <TargetFramework>net6.0</TargetFramework>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <Nullable>enable</Nullable>
+  </PropertyGroup>
+  <ItemGroup>
+    <Compile Include="../../../runners/dhe-differential/DheDifferentialEvidence.cs" Link="DheDifferentialEvidence.cs" />
+    <Compile Include="../../MetaVersion.cs" Link="MetaVersion.cs" />
+    <Compile Include="../../../unity2021-dhe-demo/Assets/Runtime/DheFixturePolicy.cs" Link="DheFixturePolicy.cs" />
+    <Reference Include="dnlib"><HintPath>../../dnlib.dll</HintPath></Reference>
+  </ItemGroup>
+</Project>

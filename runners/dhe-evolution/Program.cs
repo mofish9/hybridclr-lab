@@ -51,6 +51,13 @@ internal static class Program
         string lab = Resolve(config.LabRoot);
         string[] updates = config.Updates.Select(Resolve).ToArray();
         string[] references = (config.ReferenceResults ?? Array.Empty<string>()).Select(Resolve).ToArray();
+        string[] differentialReferences = (config.DifferentialReferences ?? Array.Empty<string>()).Select(Resolve).ToArray();
+        bool[] interpretedEntries = config.RequireInterpretedCaseEntries ?? Array.Empty<bool>();
+        bool differentialRequested = differentialReferences.Length != 0 || interpretedEntries.Length != 0 ||
+            config.DifferentialManifest != null || config.DifferentialGolden != null;
+        Require(!differentialRequested || (differentialReferences.Length == updates.Length &&
+            interpretedEntries.Length == updates.Length && !string.IsNullOrWhiteSpace(config.DifferentialManifest) &&
+            !string.IsNullOrWhiteSpace(config.DifferentialGolden)), "Full differential configuration is incomplete.");
         Require(references.Length == 0 || references.Length == updates.Length,
             "Each resource update requires one matching CLR reference result.");
         Require(!config.RequireStructuralBaseGenerations || references.Length == updates.Length,
@@ -147,12 +154,20 @@ internal static class Program
                     string resultPath = Path.Combine(runRoot, "player.json");
                     string logPath = Path.Combine(runRoot, "player.log");
                     string evolutionEvidencePath = Path.Combine(runRoot, "evolution-checks.ids");
+                    string differentialPath = Path.Combine(runRoot, "differential.bin");
+                    string caseEntryRoot = Path.Combine(runRoot, "case-entries");
                     await Run("dotnet", new[] { tool, "stage-resource-update", "-UpdateRoot", updates[index],
                         "-AssetRoot", assets, "-BaseBuildIdentity", identityPath,
                         "-ImmutableFiles", string.Join(',', immutableFiles), "-Output", stagePath }, lab, config.TimeoutSeconds);
+                    var environment = new Dictionary<string, string> { ["HYBRIDCLR_DHE_EVOLUTION_EVIDENCE"] = evolutionEvidencePath };
+                    if (differentialReferences.Length != 0)
+                    {
+                        environment["HYBRIDCLR_DHE_DIFFERENTIAL_RESULT"] = differentialPath;
+                        if (interpretedEntries[index]) environment["HYBRIDCLR_DHE_CASE_ENTRIES"] = caseEntryRoot;
+                    }
                     ProcessResult process = await Run(executable, new[] { "-batchmode", "-nographics", "-labMode", "dhe",
                         "-labTarget", "StandaloneWindows64", "-labResult", resultPath, "-logFile", logPath }, playerRoot, config.TimeoutSeconds,
-                        new Dictionary<string, string> { ["HYBRIDCLR_DHE_EVOLUTION_EVIDENCE"] = evolutionEvidencePath });
+                        environment);
                     string[] requiredEvolutionChecks = checkRequirements.Length == 0 ? Array.Empty<string>() : checkRequirements[index];
                     string[] executedEvolutionChecks = DheEvolutionEvidence.Validate(evolutionEvidencePath, requiredEvolutionChecks);
                     JsonElement result = Read(resultPath);
@@ -174,6 +189,17 @@ internal static class Program
                         value.GetProperty("variantId").GetString() == result.GetProperty("selectedPayloadVariantId").GetString());
                     JsonElement mainAssembly = variant.GetProperty("assemblies").EnumerateArray().Single(value =>
                         value.GetProperty("assemblyName").GetString() == "HybridCLR.ManagedCasesAot");
+                    object? differential = null;
+                    if (differentialReferences.Length != 0)
+                    {
+                        JsonElement caseAssembly = variant.GetProperty("assemblies").EnumerateArray().Single(value =>
+                            value.GetProperty("assemblyName").GetString() == "HybridCLR.ManagedCases");
+                        string caseDll = Path.Combine(updates[index], caseAssembly.GetProperty("dll").GetString()!);
+                        differential = DheDifferentialEvidence.Validate(differentialReferences[index], differentialPath,
+                            Resolve(config.DifferentialManifest!), Resolve(config.DifferentialGolden!), caseDll,
+                            File.ReadAllBytes(Path.Combine(embeddedBase, "HybridCLR.ManagedCases.mv.bytes")),
+                            caseEntryRoot, interpretedEntries[index]);
+                    }
                     var currentMv = DheFixtureMetaVersion.Read(File.ReadAllBytes(Path.Combine(updates[index],
                         mainAssembly.GetProperty("currentMetaVersion").GetString()!)), "HybridCLR.ManagedCasesAot");
                     bool stableChanged = DheFixturePolicy.MethodChanged(baseMv, currentMv,
@@ -237,6 +263,7 @@ internal static class Program
                         baseContainsStructuralFixture = baseGenerations[baseId], immutableFileCount = immutableFiles.Length,
                         immutableHashes = originalHashes, passed = true,
                         referenceValidated = references.Length != 0,
+                        differential,
                         requiredEvolutionChecks, executedEvolutionChecks,
                         evolutionEvidencePath,
                         evolutionEvidenceSha256 = File.Exists(evolutionEvidencePath) ? Hash(evolutionEvidencePath) : null,
@@ -280,6 +307,9 @@ internal static class Program
             RedirectStandardOutput = true, RedirectStandardError = true,
         };
         foreach (string argument in arguments) start.ArgumentList.Add(argument);
+        start.Environment.Remove("HYBRIDCLR_DHE_DIFFERENTIAL_RESULT");
+        start.Environment.Remove("HYBRIDCLR_DHE_CASE_ENTRIES");
+        start.Environment.Remove("HYBRIDCLR_DHE_EVOLUTION_EVIDENCE");
         if (environment != null)
             foreach (var entry in environment) start.Environment[entry.Key] = entry.Value;
         using Process process = Process.Start(start) ?? throw new InvalidOperationException("Process start failed.");
@@ -327,7 +357,8 @@ internal static class Program
     }
     private sealed record Config(string LabRoot, string ToolAssembly, string OutputRoot, string[] Updates, Base[] Bases,
         int TimeoutSeconds = 120, bool RequireStructuralBaseGenerations = false, string[]? ReferenceResults = null,
-        string[][]? EvolutionCheckRequirements = null);
+        string[][]? EvolutionCheckRequirements = null, string[]? DifferentialReferences = null,
+        bool[]? RequireInterpretedCaseEntries = null, string? DifferentialManifest = null, string? DifferentialGolden = null);
     private sealed record Base(string Label, string PlayerRoot, string BuildIdentity, bool SkipFirstUpdate = false);
     private sealed record ProcessResult(int Id, int ExitCode, long ElapsedMilliseconds, string Text);
 }

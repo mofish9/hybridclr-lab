@@ -1,5 +1,28 @@
 # DHE evolution implementation and validation
 
+## In progress: full managed differential
+
+The next gate executes the complete existing 220-case manifest after DHE
+registration, through a resource-only fixture entry on the archived Windows
+Bases. No new Player entry or native runtime change is required for the harness.
+The primary metric is exact case/metadata/return/side-effect/exception agreement
+with both the same current DLL on CLR and the tracked golden contract.
+
+Two resource variants distinguish retained AOT case bodies from interpreted case
+bodies. The latter gives each managed case-assembly body a semantic no-op marker,
+and its delegate entry methods also emit stable-ID execution receipts. This is
+test instrumentation, never production-equivalent performance evidence. Native
+IsDifferentialMethodChanged observations must agree with the actual Base/current
+MV, and every interpreted case entry must have its own execution receipt.
+
+The fixture emits a bounded, versioned BinaryWriter record stream, avoiding a
+new Unity or JSON serialization dependency in the hot-update assembly. A missing,
+partial, stale, duplicate or mismatched result must fail the external C# gate.
+Each actual Player process has new output paths and an overall timeout; a partial
+record identifies the case reached before a crash or hang. Existing Base archives
+and prior reports remain unchanged. Three-engine Windows results stay separate
+from Android/iOS and performance/memory qualification.
+
 ## Latest checkpoint: logical attribute members
 
 The clean `8de07cb` replay passes 18 Windows processes across three original v8

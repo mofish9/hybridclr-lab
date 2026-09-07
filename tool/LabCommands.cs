@@ -190,11 +190,12 @@ internal static class LabCommands
             (isCurrent
                 ? $"artifacts/managed-cases-{variant}/{target}"
                 : $"artifacts/managed-cases/{target}"));
-        var aotOutput = ResolvePath(lab, isCurrent
+        var aotOutput = ResolvePath(lab, cli.Optional("aotoutputroot") ?? (isCurrent
             ? $"artifacts/managed-cases-{variant}-aot/{target}"
             : variant.Equals("base2", StringComparison.OrdinalIgnoreCase)
                 ? $"artifacts/managed-cases-base2-aot/{target}"
-                : $"artifacts/managed-cases-aot/{target}");
+                : $"artifacts/managed-cases-aot/{target}"));
+        RequireSeparateTrees(output, aotOutput);
         if (isDerivedCurrent)
         {
             var seedRoot = RequireDirectory(cli.Require("seedcurrentroot"));

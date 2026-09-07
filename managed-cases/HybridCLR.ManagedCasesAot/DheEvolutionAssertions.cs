@@ -53,6 +53,7 @@ namespace HybridCLR.Lab.ManagedCasesAot
                 type.Assembly.GetReferencedAssemblies().Any(assembly => assembly.Name == "netstandard"),
                 "current assembly reference reflection");
             ValidateDeclarations(instance);
+            DheDifferentialWorkload.RunIfRequested();
         }
 
         private static void ValidateDeclarations(DheDemoCalculator instance)
