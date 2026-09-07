@@ -594,7 +594,7 @@ namespace native_test
         PropertyInfo physical[2]{};
         PropertyInfo logical[3]{};
 #if UNITY_ENGINE_TUANJIE
-        PropertyInfo* physicalPointers[] = { physical, physical + 1 };
+        const PropertyInfo* physicalPointers[] = { physical, physical + 1 };
         klass.properties = physicalPointers;
 #else
         klass.properties = physical;

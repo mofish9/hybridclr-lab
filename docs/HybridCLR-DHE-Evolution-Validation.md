@@ -42,6 +42,9 @@ CTest then reached a preexisting incomplete resolver image: Image construction
 enumerates registered assemblies, whose fixture image omitted nameNoExt. Both
 resolver images now carry real image names. The failed CTest log is preserved;
 no assertions are removed or bypassed.
+Unity 2021 and Unity 2022 then pass compile/CTest. Tuanjie's fixture requires a
+const PropertyInfo pointer array, matching its real header; that test declaration
+is corrected before the final three-profile run. No production layout changes.
 They must use clean locked commits, real headers on all three engines, and the
 same repeated/Attribute resources, requiring named-field, named-property and
 constructor-overload receipts. Native repairs require a new experimental Base;
