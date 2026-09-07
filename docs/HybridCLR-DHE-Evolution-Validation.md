@@ -1,15 +1,28 @@
 # DHE evolution implementation and validation
 
-## In progress: indexed interpreter bridge arguments
+## Latest checkpoint: indexed interpreter bridge arguments
+
+HybridCLR `25b4d9f` fixes the reproduced indexed-argument corruption. The clean
+`ce2f2e8` replay runs nine cold Windows processes on three fresh v10 Bases. All
+six interpreted runs pass 220 cases, zero differences and 220 entry receipts
+each, including skipped updates. The three retained-AOT runs still fail: four
+differences on Unity 2021 and two each on Unity 2022 and Tuanjie. The overall
+gate remains failed. See `reports/dhe-evolution-indexed-arguments-windows.md`.
+
+All three real-header compile/CTest gates pass, now including InterpreterModule.cpp.
+The resource DLL/MV bytes and golden are unchanged from the previous cold matrix;
+there is no constructor pre-touch or inline padding. The six historical Bases'
+60 immutable archive files were rehashed against the retained failed report and
+are unchanged. Runtime identity is `dhe-runtime-v10`; MV remains schema 1.
 
 The cold `381a51d` full matrix completes 220 observations in each of 18 processes
 on six archived Bases, but remains failed. Type-only and field-only pre-touch
 also fail on all six Bases; constructor-only pre-touch passes all six interpreted
 runs. Those passing diagnostic runs are not cold qualification.
 
-`Managed2NativeCallByReflectionInvoke` currently passes the first indexed slot
+`Managed2NativeCallByReflectionInvoke` previously passed the first indexed slot
 directly to `Interpreter::Execute` after a method becomes interpreted. This
-incorrectly assumes contiguous invocation arguments. `NewValueTypeVar` places
+incorrectly assuming contiguous invocation arguments. `NewValueTypeVar` places
 its receiver after the explicit arguments and value buffer. A first constructor
 call can change the method implementation flag after its caller was transformed,
 so the next call takes that shortcut with noncontiguous arguments.
