@@ -189,6 +189,42 @@ namespace HybridCLR.Lab.ManagedCasesAot
                 Require(payload.IsAlive && ReferenceEquals(payload.Target, carrier.RevisionPayload) &&
                     ((byte[])carrier.RevisionPayload)[0] == 73, "second-generation sidecar GC retention");
             });
+            Check("named-attribute-field", () =>
+            {
+                Type target = typeof(DheNamedFieldTarget);
+                var marker = target.GetCustomAttribute<DheMetadataMarkerAttribute>();
+                Require(marker != null && marker.Value == 5101 && marker.Label == "named-field" && marker.Order == 31,
+                    "named attribute field instance");
+                CustomAttributeNamedArgument argument = target.GetCustomAttributesData()
+                    .Single(data => data.AttributeType == typeof(DheMetadataMarkerAttribute)).NamedArguments.Single();
+                Require(argument.IsField && argument.MemberName == nameof(DheMetadataMarkerAttribute.Order) &&
+                    argument.MemberInfo.DeclaringType == typeof(DheMetadataMarkerAttribute) &&
+                    (int)argument.TypedValue.Value == 31, "named attribute field metadata");
+            });
+            Check("named-attribute-property", () =>
+            {
+                Type target = typeof(DheNamedPropertyTarget);
+                var marker = target.GetCustomAttribute<DheMetadataMarkerAttribute>();
+                Require(marker != null && marker.Value == 5102 && marker.Label == "named-property" && marker.Note == "revision-note",
+                    "named attribute property instance");
+                CustomAttributeNamedArgument argument = target.GetCustomAttributesData()
+                    .Single(data => data.AttributeType == typeof(DheMetadataMarkerAttribute)).NamedArguments.Single();
+                Require(!argument.IsField && argument.MemberName == nameof(DheMetadataMarkerAttribute.Note) &&
+                    argument.MemberInfo.DeclaringType == typeof(DheMetadataMarkerAttribute) &&
+                    (string)argument.TypedValue.Value == "revision-note", "named attribute property metadata");
+            });
+            Check("attribute-constructor-overload", () =>
+            {
+                Type target = typeof(DheOverloadedAttributeTarget);
+                var marker = target.GetCustomAttribute<DheMetadataMarkerAttribute>();
+                Require(marker != null && marker.Value == 5103 && marker.Label == "overloaded-constructor",
+                    "new attribute constructor instance");
+                CustomAttributeData data = target.GetCustomAttributesData()
+                    .Single(attribute => attribute.AttributeType == typeof(DheMetadataMarkerAttribute));
+                Require(data.Constructor.DeclaringType == typeof(DheMetadataMarkerAttribute) &&
+                    data.Constructor.GetParameters().Length == 1 && data.ConstructorArguments.Count == 1 &&
+                    (int)data.ConstructorArguments[0].Value == 5103, "new attribute constructor metadata");
+            });
             Require(errors.Count == 0, "new type declarations: " + string.Join("; ", errors));
         }
 
@@ -274,6 +310,12 @@ namespace HybridCLR.Lab.ManagedCasesAot
     }
 
     public sealed class DheEvolutionDerived : DheDemoCalculator { }
+    [DheMetadataMarker(5101, "named-field", Order = 31)]
+    public sealed class DheNamedFieldTarget { }
+    [DheMetadataMarker(5102, "named-property", Note = "revision-note")]
+    public sealed class DheNamedPropertyTarget { }
+    [DheMetadataMarker(5103)]
+    public sealed class DheOverloadedAttributeTarget { }
     public sealed class DheEvolutionGenericDerived : GenericVirtualOperation<IntOperationStruct> { }
     public sealed class DheEvolutionConstrained<T> where T : DheDemoCalculator
     {

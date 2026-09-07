@@ -15,6 +15,11 @@ namespace HybridCLR.Lab.ManagedCasesAot
 
         public int Value { get; }
         public string Label { get; }
+#if DHE_EVOLUTION_CURRENT
+        public int Order;
+        public string Note { get; set; } = string.Empty;
+        public DheMetadataMarkerAttribute(int value) : this(value, "overloaded-constructor") { }
+#endif
     }
 #endif
 
