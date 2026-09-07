@@ -1,0 +1,33 @@
+{
+  "labRoot": "..",
+  "toolAssembly": "../../../artifacts/dhe-evolution-20260908/host-logical-attributes-frozen/HybridCLR.DheTool.dll",
+  "outputRoot": "../../../artifacts/dhe-evolution-20260908/replay-logical-attributes-u21",
+  "updates": [
+    "../../../artifacts/dhe-evolution-20260908/resource-logical-attributes-first-u21",
+    "../../../artifacts/dhe-evolution-20260908/resource-logical-attributes-u21"
+  ],
+  "referenceResults": [
+    "../../../artifacts/dhe-evolution-20260908/reference-logical-attribute-first.json",
+    "../../../artifacts/dhe-evolution-20260908/reference-logical-attribute-latest.json"
+  ],
+  "evolutionCheckRequirements": [
+    ["repeated-structural-evolution"],
+    ["repeated-structural-evolution", "named-attribute-field", "named-attribute-property", "attribute-constructor-overload"]
+  ],
+  "requireStructuralBaseGenerations": false,
+  "timeoutSeconds": 120,
+  "bases": [
+    {
+      "label": "u21-evolved-consecutive",
+      "playerRoot": "../../../artifacts/dhe-evolution-20260908/base-logical-attributes-u21/player",
+      "buildIdentity": "../../../artifacts/dhe-evolution-20260908/base-logical-attributes-u21/build-identity.json",
+      "skipFirstUpdate": false
+    },
+    {
+      "label": "u21-evolved-skipped",
+      "playerRoot": "../../../artifacts/dhe-evolution-20260908/base-logical-attributes-u21/player",
+      "buildIdentity": "../../../artifacts/dhe-evolution-20260908/base-logical-attributes-u21/build-identity.json",
+      "skipFirstUpdate": true
+    }
+  ]
+}
