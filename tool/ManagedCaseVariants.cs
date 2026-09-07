@@ -8,7 +8,8 @@ internal static class ManagedCaseVariants
     internal static void WriteBase2CurrentAssembly(string source, string destination)
         => WriteNextCurrentAssembly(source, destination);
 
-    internal static void WriteNextCurrentAssembly(string source, string destination)
+    internal static void WriteNextCurrentAssembly(string source, string destination,
+        bool advanceObservableResult = false)
     {
         source = Path.GetFullPath(source);
         destination = Path.GetFullPath(destination);
@@ -64,6 +65,26 @@ internal static class ManagedCaseVariants
                 Instruction.Create(OpCodes.Stsfld, touchValue));
         }
         constructor.Body.OptimizeBranches();
+
+        if (advanceObservableResult)
+        {
+            MethodDef add = calculatorType.Methods.Single(method => method.Name == "Add" &&
+                method.IsStatic && method.Parameters.Count == 1);
+            if (add.MethodSig.RetType.ElementType != ElementType.I4 || add.Body == null ||
+                add.Body.ExceptionHandlers.Count != 0)
+                throw new InvalidOperationException("Unexpected observable generation fixture.");
+            foreach (Instruction ret in add.Body.Instructions.Where(instruction =>
+                         instruction.OpCode == OpCodes.Ret).ToArray())
+            {
+                // Keep branch targets pointing at the start of the increment.
+                ret.OpCode = OpCodes.Ldc_I4_1;
+                ret.Operand = null;
+                int index = add.Body.Instructions.IndexOf(ret);
+                add.Body.Instructions.Insert(index + 1, Instruction.Create(OpCodes.Add));
+                add.Body.Instructions.Insert(index + 2, Instruction.Create(OpCodes.Ret));
+            }
+            add.Body.OptimizeBranches();
+        }
 
         Directory.CreateDirectory(Path.GetDirectoryName(destination)!);
         module.Write(destination);

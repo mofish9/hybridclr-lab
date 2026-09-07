@@ -178,6 +178,8 @@ internal static class LabCommands
         var isEvolution = variant.Equals("evolution", StringComparison.OrdinalIgnoreCase);
         var isDerivedCurrent = variant.Equals("current-next", StringComparison.OrdinalIgnoreCase) ||
             variant.Equals("current-base2", StringComparison.OrdinalIgnoreCase);
+        if (cli.Has("advanceobservableresult") && !isDerivedCurrent)
+            throw new InvalidOperationException("AdvanceObservableResult requires a derived current variant.");
         var isCurrent = variant.Equals("current", StringComparison.OrdinalIgnoreCase) ||
             isDerivedCurrent ||
             variant.Equals("structural", StringComparison.OrdinalIgnoreCase) || isEvolution;
@@ -210,7 +212,8 @@ internal static class LabCommands
                 var source = Path.Combine(seedRoot, assemblyName + ".dll");
                 var destination = Path.Combine(output, assemblyName + ".dll");
                 if (assemblyName == "HybridCLR.ManagedCasesAot")
-                    ManagedCaseVariants.WriteNextCurrentAssembly(source, destination);
+                    ManagedCaseVariants.WriteNextCurrentAssembly(source, destination,
+                        cli.Has("advanceobservableresult"));
                 else
                     CopyRequired(source, destination);
             }

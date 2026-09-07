@@ -1,10 +1,14 @@
 {
   "labRoot": "..",
   "toolAssembly": "../../../artifacts/dhe-evolution-20260908/host-attribute-constructors/HybridCLR.DheTool.dll",
-  "outputRoot": "../../../artifacts/dhe-evolution-20260908/replay-structural-generations",
+  "outputRoot": "../../../artifacts/dhe-evolution-20260908/replay-structural-generations-observed",
   "updates": [
-    "../../../artifacts/dhe-evolution-20260908/resource-generations-next",
-    "../../../artifacts/dhe-evolution-20260908/resource-generations-latest"
+    "../../../artifacts/dhe-evolution-20260908/resource-observed-next",
+    "../../../artifacts/dhe-evolution-20260908/resource-observed-latest"
+  ],
+  "referenceResults": [
+    "../../../artifacts/dhe-evolution-20260908/reference-observed-next.json",
+    "../../../artifacts/dhe-evolution-20260908/reference-observed-latest.json"
   ],
   "requireStructuralBaseGenerations": true,
   "timeoutSeconds": 120,

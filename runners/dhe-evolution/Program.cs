@@ -50,6 +50,11 @@ internal static class Program
         string tool = Resolve(config.ToolAssembly);
         string lab = Resolve(config.LabRoot);
         string[] updates = config.Updates.Select(Resolve).ToArray();
+        string[] references = (config.ReferenceResults ?? Array.Empty<string>()).Select(Resolve).ToArray();
+        Require(references.Length == 0 || references.Length == updates.Length,
+            "Each resource update requires one matching CLR reference result.");
+        Require(!config.RequireStructuralBaseGenerations || references.Length == updates.Length,
+            "Structural generation qualification requires observable CLR results for every update.");
         if (updates.Length < 2 || config.Bases.Length < 2 || config.TimeoutSeconds < 1 ||
             config.TimeoutSeconds > 600 || config.Bases.Select(item => item.Label).Distinct().Count() != config.Bases.Length)
             throw new InvalidDataException("Replay requires multiple updates, unique Base labels, and a bounded timeout.");
@@ -71,8 +76,33 @@ internal static class Program
         int distinctBaseCount = 0;
         var processIds = new HashSet<int>();
         var baseGenerations = new Dictionary<string, bool>(StringComparer.OrdinalIgnoreCase);
+        var referenceRecords = new List<object>();
         try
         {
+            var observableGenerations = new HashSet<int>();
+            for (int index = 0; index < references.Length; index++)
+            {
+                JsonElement reference = Read(references[index]);
+                JsonElement manifest = Read(Path.Combine(updates[index], "dhe-resource-update.json"));
+                Require(reference.GetProperty("passed").GetBoolean() &&
+                    reference.GetProperty("format").GetString() == "hybridclr.dhe-capability-reference.json",
+                    "Missing passing CLR reference result.");
+                foreach (JsonElement variant in manifest.GetProperty("payloadVariants").EnumerateArray())
+                {
+                    JsonElement main = variant.GetProperty("assemblies").EnumerateArray().Single(value =>
+                        value.GetProperty("assemblyName").GetString() == "HybridCLR.ManagedCasesAot");
+                    Require(string.Equals(reference.GetProperty("inputSha256").GetString(),
+                        main.GetProperty("dllSha256").GetString(), StringComparison.OrdinalIgnoreCase),
+                        "CLR reference does not execute the exact current DLL.");
+                }
+                JsonElement observations = reference.GetProperty("observations");
+                Require(DheObservedResults.Fields.All(name => observations.TryGetProperty(name, out _)),
+                    "CLR reference lacks required observations.");
+                Require(observableGenerations.Add(observations.GetProperty("addResult").GetInt32()),
+                    "Consecutive resources must expose different observable generations.");
+                referenceRecords.Add(new { update = index + 1, path = references[index],
+                    sha256 = Hash(references[index]), observations });
+            }
             var configuredIds = config.Bases.Select(item => Read(Resolve(item.BuildIdentity))
                 .GetProperty("baseId").GetString()!).ToHashSet(StringComparer.OrdinalIgnoreCase);
             distinctBaseCount = configuredIds.Count;
@@ -117,6 +147,8 @@ internal static class Program
                     ProcessResult process = await Run(executable, new[] { "-batchmode", "-nographics", "-labMode", "dhe",
                         "-labTarget", "StandaloneWindows64", "-labResult", resultPath, "-logFile", logPath }, playerRoot, config.TimeoutSeconds);
                     JsonElement result = Read(resultPath);
+                    if (references.Length != 0)
+                        DheObservedResults.Validate(Read(references[index]).GetProperty("observations"), result);
                     Require(processIds.Add(process.Id), "Player process IDs must be unique.");
                     Require(result.GetProperty("target").GetString() == "StandaloneWindows64" &&
                         result.GetProperty("engineWorkflow").GetString() == identity.GetProperty("engineWorkflow").GetString(),
@@ -195,6 +227,9 @@ internal static class Program
                         skippedAssertionCount = legacyEvidence.Count(probe => !probe.applicable), legacyEvidence,
                         baseContainsStructuralFixture = baseGenerations[baseId], immutableFileCount = immutableFiles.Length,
                         immutableHashes = originalHashes, passed = true,
+                        referenceValidated = references.Length != 0,
+                        mainObservations = DheObservedResults.Fields.ToDictionary(name => name,
+                            name => result.GetProperty(name).GetInt32()),
                     });
                     Console.WriteLine(item.Label + " update " + (index + 1) + ": " +
                         (mandatoryChecks.Length + 1 + legacyEvidence.Count(probe => probe.applicable)) + " checks passed, " +
@@ -218,6 +253,7 @@ internal static class Program
             distinctBaseCount,
             baseGenerations, requiredStructuralBaseGenerations = config.RequireStructuralBaseGenerations,
             sourceHead, sourceTree, sourceChanges, runnerSha256 = Hash(typeof(Program).Assembly.Location),
+            referenceRecords,
             toolSha256 = Hash(tool), configSha256 = Hash(configPath), requiredChecks = RequiredChecks, results, errors,
         }, JsonOptions));
         return errors.Count == 0 ? 0 : 1;
@@ -276,7 +312,7 @@ internal static class Program
         if (!condition) throw new InvalidDataException(message);
     }
     private sealed record Config(string LabRoot, string ToolAssembly, string OutputRoot, string[] Updates, Base[] Bases,
-        int TimeoutSeconds = 120, bool RequireStructuralBaseGenerations = false);
+        int TimeoutSeconds = 120, bool RequireStructuralBaseGenerations = false, string[] ReferenceResults = null);
     private sealed record Base(string Label, string PlayerRoot, string BuildIdentity, bool SkipFirstUpdate = false);
     private sealed record ProcessResult(int Id, int ExitCode, long ElapsedMilliseconds, string Text);
 }

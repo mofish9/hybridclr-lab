@@ -1,4 +1,5 @@
 using System.Text.Json;
+using System.Runtime.Loader;
 using HybridCLR.DheTool;
 using HybridCLR.Lab;
 
@@ -70,6 +71,47 @@ checks["mv-truncation-rejected"] = Rejects(() => DheFixtureMetaVersion.Read(afte
 checks["mv-identity-rejected"] = Rejects(() => DheFixtureMetaVersion.Read(after.ToBinary(), "WrongAssembly"));
 checks["missing-current-method-rejected"] = Rejects(() => DheFixturePolicy.MethodChanged(current, current, "Missing"));
 Directory.CreateDirectory(output);
+string nextPath = Path.Combine(output, "next.dll");
+string latestPath = Path.Combine(output, "latest.dll");
+string defaultPath = Path.Combine(output, "default.dll");
+ManagedCaseVariants.WriteNextCurrentAssembly(Path.GetFullPath(args[1]), nextPath, true);
+ManagedCaseVariants.WriteNextCurrentAssembly(nextPath, latestPath, true);
+ManagedCaseVariants.WriteNextCurrentAssembly(Path.GetFullPath(args[1]), defaultPath);
+int ReadAdd(string path)
+{
+    var context = new AssemblyLoadContext(Guid.NewGuid().ToString(), isCollectible: true);
+    try
+    {
+        var assembly = context.LoadFromAssemblyPath(Path.GetFullPath(path));
+        return Convert.ToInt32(assembly.GetType(DheFixturePolicy.Calculator, true)!
+            .GetMethod("Add")!.Invoke(null, new object[] { 1 }));
+    }
+    finally { context.Unload(); }
+}
+int seedValue = ReadAdd(args[1]);
+checks["observable-next-advances-clr-result"] = ReadAdd(nextPath) == seedValue + 1;
+checks["observable-latest-advances-clr-result"] = ReadAdd(latestPath) == seedValue + 2;
+checks["default-generator-preserves-observed-result"] = ReadAdd(defaultPath) == seedValue;
+var latestMv = MetaVersionSnapshot.Create(latestPath);
+checks["observable-variant-preserves-declarations"] = after.Types.Select(type => type.StableId)
+    .SequenceEqual(latestMv.Types.Select(type => type.StableId)) &&
+    after.Fields.Select(field => field.StableId).SequenceEqual(latestMv.Fields.Select(field => field.StableId)) &&
+    after.Methods.Select(method => method.StableId).SequenceEqual(latestMv.Methods.Select(method => method.StableId));
+JsonElement expectedObservation = JsonSerializer.Deserialize<JsonElement>("{\"addResult\":102,\"stableResult\":4,\"addViaStableResult\":104}");
+DheObservedResults.Validate(expectedObservation, expectedObservation);
+checks["equal-observations-accepted"] = true;
+foreach (string field in DheObservedResults.Fields)
+{
+    var wrong = JsonSerializer.Deserialize<Dictionary<string, int>>(expectedObservation.GetRawText())!;
+    wrong[field]--;
+    checks["stale-observation-rejected-" + field] = Rejects(() => DheObservedResults.Validate(expectedObservation,
+        JsonSerializer.SerializeToElement(wrong)));
+    wrong.Remove(field);
+    checks["missing-observation-rejected-" + field] = Rejects(() => DheObservedResults.Validate(expectedObservation,
+        JsonSerializer.SerializeToElement(wrong)));
+}
+checks["non-numeric-observation-rejected"] = Rejects(() => DheObservedResults.Validate(expectedObservation,
+    JsonSerializer.Deserialize<JsonElement>("{\"addResult\":\"102\",\"stableResult\":4,\"addViaStableResult\":104}")));
 bool passed = checks.Values.All(value => value);
 File.WriteAllText(Path.Combine(output, "report.json"), JsonSerializer.Serialize(new
 {
