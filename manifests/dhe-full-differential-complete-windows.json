@@ -1,0 +1,94 @@
+{
+  "labRoot": "..",
+  "toolAssembly": "../../../artifacts/dhe-evolution-20260908/host-full-differential/HybridCLR.DheTool.dll",
+  "outputRoot": "../../../artifacts/dhe-evolution-20260908/replay-full-differential-complete",
+  "updates": [
+    "../../../artifacts/dhe-evolution-20260908/resource-full-suite-exceptions-aot",
+    "../../../artifacts/dhe-evolution-20260908/resource-full-suite-exceptions-interpreted"
+  ],
+  "referenceResults": [
+    "../../../artifacts/dhe-evolution-20260908/reference-full-suite-exceptions-first.json",
+    "../../../artifacts/dhe-evolution-20260908/reference-full-suite-exceptions-latest.json"
+  ],
+  "evolutionCheckRequirements": [
+    ["repeated-structural-evolution", "named-attribute-field", "named-attribute-property", "attribute-constructor-overload"],
+    ["repeated-structural-evolution", "named-attribute-field", "named-attribute-property", "attribute-constructor-overload"]
+  ],
+  "requireStructuralBaseGenerations": true,
+  "timeoutSeconds": 300,
+  "bases": [
+    {
+      "label": "u21-original-consecutive",
+      "playerRoot": "../../../artifacts/dhe-evolution-20260908/base-attribute-original-u21/player",
+      "buildIdentity": "../../../artifacts/dhe-evolution-20260908/base-attribute-original-u21/build-identity.json"
+    },
+    {
+      "label": "u21-original-skipped",
+      "playerRoot": "../../../artifacts/dhe-evolution-20260908/base-attribute-original-u21/player",
+      "buildIdentity": "../../../artifacts/dhe-evolution-20260908/base-attribute-original-u21/build-identity.json",
+      "skipFirstUpdate": true
+    },
+    {
+      "label": "u22-original-consecutive",
+      "playerRoot": "../../../artifacts/dhe-evolution-20260908/base-attribute-original-u22/player",
+      "buildIdentity": "../../../artifacts/dhe-evolution-20260908/base-attribute-original-u22/build-identity.json"
+    },
+    {
+      "label": "u22-original-skipped",
+      "playerRoot": "../../../artifacts/dhe-evolution-20260908/base-attribute-original-u22/player",
+      "buildIdentity": "../../../artifacts/dhe-evolution-20260908/base-attribute-original-u22/build-identity.json",
+      "skipFirstUpdate": true
+    },
+    {
+      "label": "tuanjie-original-consecutive",
+      "playerRoot": "../../../artifacts/dhe-evolution-20260908/base-attribute-original-tuanjie/player",
+      "buildIdentity": "../../../artifacts/dhe-evolution-20260908/base-attribute-original-tuanjie/build-identity.json"
+    },
+    {
+      "label": "tuanjie-original-skipped",
+      "playerRoot": "../../../artifacts/dhe-evolution-20260908/base-attribute-original-tuanjie/player",
+      "buildIdentity": "../../../artifacts/dhe-evolution-20260908/base-attribute-original-tuanjie/build-identity.json",
+      "skipFirstUpdate": true
+    },
+    {
+      "label": "u21-evolved-consecutive",
+      "playerRoot": "../../../artifacts/dhe-evolution-20260908/base-logical-attributes-u21/player",
+      "buildIdentity": "../../../artifacts/dhe-evolution-20260908/base-logical-attributes-u21/build-identity.json"
+    },
+    {
+      "label": "u21-evolved-skipped",
+      "playerRoot": "../../../artifacts/dhe-evolution-20260908/base-logical-attributes-u21/player",
+      "buildIdentity": "../../../artifacts/dhe-evolution-20260908/base-logical-attributes-u21/build-identity.json",
+      "skipFirstUpdate": true
+    },
+    {
+      "label": "u22-evolved-consecutive",
+      "playerRoot": "../../../artifacts/dhe-evolution-20260908/base-logical-attributes-u22/player",
+      "buildIdentity": "../../../artifacts/dhe-evolution-20260908/base-logical-attributes-u22/build-identity.json"
+    },
+    {
+      "label": "u22-evolved-skipped",
+      "playerRoot": "../../../artifacts/dhe-evolution-20260908/base-logical-attributes-u22/player",
+      "buildIdentity": "../../../artifacts/dhe-evolution-20260908/base-logical-attributes-u22/build-identity.json",
+      "skipFirstUpdate": true
+    },
+    {
+      "label": "tuanjie-evolved-consecutive",
+      "playerRoot": "../../../artifacts/dhe-evolution-20260908/base-logical-attributes-tuanjie/player",
+      "buildIdentity": "../../../artifacts/dhe-evolution-20260908/base-logical-attributes-tuanjie/build-identity.json"
+    },
+    {
+      "label": "tuanjie-evolved-skipped",
+      "playerRoot": "../../../artifacts/dhe-evolution-20260908/base-logical-attributes-tuanjie/player",
+      "buildIdentity": "../../../artifacts/dhe-evolution-20260908/base-logical-attributes-tuanjie/build-identity.json",
+      "skipFirstUpdate": true
+    }
+  ],
+  "differentialManifest": "test-manifest.json",
+  "differentialGolden": "test-golden.json",
+  "differentialReferences": [
+    "../../../artifacts/dhe-evolution-20260908/differential-reference-exceptions-aot.bin",
+    "../../../artifacts/dhe-evolution-20260908/differential-reference-exceptions-interpreted.bin"
+  ],
+  "requireInterpretedCaseEntries": [false, true]
+}

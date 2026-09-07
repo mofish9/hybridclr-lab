@@ -2,6 +2,20 @@
 
 ## In progress: full managed differential
 
+The complete first retained-AOT run now records 220 cases and four differences:
+`divide_by_zero_catch`, `invalid_cast_catch`, `reflection_make_generic_method`,
+and `reflection_make_generic_type`. All four report unchanged native methods.
+The generated Unity 2021 C++ currently available omits the unused division and
+unboxing operations, but it is not yet proven to identify the cause in the
+archived Base. Generic reflection still needs its inner exception diagnosed.
+The original golden and failed result remain unchanged.
+
+The next harness records full exception chains in a separate diagnostic file
+after sampling the case counters. Replay continues after individual failures
+to exercise both paths and every configured Base, retaining failed artifacts
+and keeping the entire gate failed. Any immutable Base-file change stops replay.
+This is diagnostic coverage, not a relaxation of the 220-case acceptance gate.
+
 The next gate executes the complete existing 220-case manifest after DHE
 registration, through a resource-only fixture entry on the archived Windows
 Bases. No new Player entry or native runtime change is required for the harness.

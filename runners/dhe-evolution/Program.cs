@@ -84,6 +84,7 @@ internal static class Program
         string sourceTree = (await Run("git", new[] { "-C", lab, "rev-parse", "HEAD^{tree}" }, lab, 30)).Text.Trim();
         string sourceChanges = (await Run("git", new[] { "-C", lab, "status", "--porcelain" }, lab, 30)).Text.Trim();
         var results = new List<object>();
+        var failedRuns = new List<object>();
         var errors = new List<string>();
         int distinctBaseCount = 0;
         var processIds = new HashSet<int>();
@@ -112,8 +113,13 @@ internal static class Program
                     "CLR reference lacks required observations.");
                 Require(observableGenerations.Add(observations.GetProperty("addResult").GetInt32()),
                     "Consecutive resources must expose different observable generations.");
-                referenceRecords.Add(new { update = index + 1, path = references[index],
-                    sha256 = Hash(references[index]), observations });
+                referenceRecords.Add(new
+                {
+                    update = index + 1,
+                    path = references[index],
+                    sha256 = Hash(references[index]),
+                    observations
+                });
             }
             var configuredIds = config.Bases.Select(item => Read(Resolve(item.BuildIdentity))
                 .GetProperty("baseId").GetString()!).ToHashSet(StringComparer.OrdinalIgnoreCase);
@@ -156,123 +162,169 @@ internal static class Program
                     string evolutionEvidencePath = Path.Combine(runRoot, "evolution-checks.ids");
                     string differentialPath = Path.Combine(runRoot, "differential.bin");
                     string caseEntryRoot = Path.Combine(runRoot, "case-entries");
-                    await Run("dotnet", new[] { tool, "stage-resource-update", "-UpdateRoot", updates[index],
+                    ProcessResult? attempt = null;
+                    try
+                    {
+                        await Run("dotnet", new[] { tool, "stage-resource-update", "-UpdateRoot", updates[index],
                         "-AssetRoot", assets, "-BaseBuildIdentity", identityPath,
                         "-ImmutableFiles", string.Join(',', immutableFiles), "-Output", stagePath }, lab, config.TimeoutSeconds);
-                    var environment = new Dictionary<string, string> { ["HYBRIDCLR_DHE_EVOLUTION_EVIDENCE"] = evolutionEvidencePath };
-                    if (differentialReferences.Length != 0)
-                    {
-                        environment["HYBRIDCLR_DHE_DIFFERENTIAL_RESULT"] = differentialPath;
-                        if (interpretedEntries[index]) environment["HYBRIDCLR_DHE_CASE_ENTRIES"] = caseEntryRoot;
-                    }
-                    ProcessResult process = await Run(executable, new[] { "-batchmode", "-nographics", "-labMode", "dhe",
-                        "-labTarget", "StandaloneWindows64", "-labResult", resultPath, "-logFile", logPath }, playerRoot, config.TimeoutSeconds,
-                        environment);
-                    string[] requiredEvolutionChecks = checkRequirements.Length == 0 ? Array.Empty<string>() : checkRequirements[index];
-                    string[] executedEvolutionChecks = DheEvolutionEvidence.Validate(evolutionEvidencePath, requiredEvolutionChecks);
-                    JsonElement result = Read(resultPath);
-                    if (references.Length != 0)
-                        DheObservedResults.Validate(Read(references[index]).GetProperty("observations"), result);
-                    Require(processIds.Add(process.Id), "Player process IDs must be unique.");
-                    Require(result.GetProperty("target").GetString() == "StandaloneWindows64" &&
-                        result.GetProperty("engineWorkflow").GetString() == identity.GetProperty("engineWorkflow").GetString(),
-                        "Player platform/engine does not match the archived Base.");
-                    var legacyNames = DheFixturePolicy.LegacyProbes.Select(probe => probe.Check).ToHashSet(StringComparer.Ordinal);
-                    string[] mandatoryChecks = RequiredChecks.Where(name => !legacyNames.Contains(name) &&
-                        name != "structuralDispatchExpected").ToArray();
-                    string[] failed = mandatoryChecks.Where(name => !result.TryGetProperty(name, out JsonElement value) ||
-                        value.ValueKind != JsonValueKind.True).ToArray();
-                    Require(failed.Length == 0, item.Label + ": missing/false checks: " + string.Join(",", failed));
-                    Require(result.GetProperty("selectedBaseId").GetString() == baseId, "Player selected the wrong Base.");
-                    JsonElement manifest = Read(Path.Combine(updates[index], "dhe-resource-update.json"));
-                    JsonElement variant = manifest.GetProperty("payloadVariants").EnumerateArray().Single(value =>
-                        value.GetProperty("variantId").GetString() == result.GetProperty("selectedPayloadVariantId").GetString());
-                    JsonElement mainAssembly = variant.GetProperty("assemblies").EnumerateArray().Single(value =>
-                        value.GetProperty("assemblyName").GetString() == "HybridCLR.ManagedCasesAot");
-                    object? differential = null;
-                    if (differentialReferences.Length != 0)
-                    {
-                        JsonElement caseAssembly = variant.GetProperty("assemblies").EnumerateArray().Single(value =>
-                            value.GetProperty("assemblyName").GetString() == "HybridCLR.ManagedCases");
-                        string caseDll = Path.Combine(updates[index], caseAssembly.GetProperty("dll").GetString()!);
-                        differential = DheDifferentialEvidence.Validate(differentialReferences[index], differentialPath,
-                            Resolve(config.DifferentialManifest!), Resolve(config.DifferentialGolden!), caseDll,
-                            File.ReadAllBytes(Path.Combine(embeddedBase, "HybridCLR.ManagedCases.mv.bytes")),
-                            caseEntryRoot, interpretedEntries[index]);
-                    }
-                    var currentMv = DheFixtureMetaVersion.Read(File.ReadAllBytes(Path.Combine(updates[index],
-                        mainAssembly.GetProperty("currentMetaVersion").GetString()!)), "HybridCLR.ManagedCasesAot");
-                    bool stableChanged = DheFixturePolicy.MethodChanged(baseMv, currentMv,
-                        DheFixturePolicy.Calculator + "::Stable|System.Int32 (System.Int32)");
-                    bool instanceStableChanged = DheFixturePolicy.MethodChanged(baseMv, currentMv,
-                        DheFixturePolicy.Calculator + "::InstanceStable|System.Int32 (System.Int32)");
-                    bool staticStableMatches;
-                    if (result.TryGetProperty("stableMethodChanged", out JsonElement actualStable))
-                    {
-                        staticStableMatches = actualStable.GetBoolean() == stableChanged &&
-                            result.GetProperty("instanceStableMethodChanged").GetBoolean() == instanceStableChanged;
-                    }
-                    else
-                    {
-                        // Archived reports name a different AOT control "unchangedMethod".
-                        // Their changed caller records Stable's actual dispatch explicitly.
-                        bool callerChanged = DheFixturePolicy.MethodChanged(baseMv, currentMv,
-                            DheFixturePolicy.Calculator + "::AddViaStable|System.Int32 (System.Int32)");
-                        staticStableMatches = callerChanged && result.GetProperty("changedCallingUnchangedMethod").GetString() ==
-                            (stableChanged ? "interpreter + interpreter callee" : "interpreter + AOT callee");
-                    }
-                    Require(result.GetProperty("structuralDispatchExpected").GetBoolean() == (stableChanged || instanceStableChanged) &&
-                        staticStableMatches &&
-                        result.GetProperty("unchangedInstanceMethod").GetString() == (instanceStableChanged ? "interpreter" : "aot"),
-                        "Stable dispatch disagrees with actual Base/Current MV.");
-                    DheFixturePolicy.LegacyProbeResult[] legacyEvidence;
-                    if (result.TryGetProperty("structuralLegacyProbes", out JsonElement probes) && probes.ValueKind == JsonValueKind.Array)
-                    {
-                        legacyEvidence = JsonSerializer.Deserialize<DheFixturePolicy.LegacyProbeResult[]>(probes.GetRawText(), JsonOptions)!;
-                        DheFixturePolicy.ValidateLegacyEvidence(baseMv, currentMv, legacyEvidence);
-                        Require(legacyEvidence.All(probe => result.GetProperty(probe.check).GetBoolean() == probe.passed),
-                            "Flat legacy check disagrees with its execution evidence.");
-                    }
-                    else
-                    {
-                        Require(DheFixturePolicy.LegacyProbes.All(probe => baseMv.methods.ContainsKey(probe.StableId) &&
-                            !currentMv.methods.ContainsKey(probe.StableId) && result.GetProperty(probe.Check).GetBoolean()),
-                            "Archived Player lacks applicable legacy probe evidence.");
-                        legacyEvidence = DheFixturePolicy.LegacyProbes.Select(probe => new DheFixturePolicy.LegacyProbeResult
+                        var environment = new Dictionary<string, string> { ["HYBRIDCLR_DHE_EVOLUTION_EVIDENCE"] = evolutionEvidencePath };
+                        if (differentialReferences.Length != 0)
                         {
-                            check = probe.Check, methodStableId = probe.StableId, applicable = true,
-                            executed = true, passed = true, reason = "removed-from-base",
-                        }).ToArray();
+                            environment["HYBRIDCLR_DHE_DIFFERENTIAL_RESULT"] = differentialPath;
+                            if (interpretedEntries[index]) environment["HYBRIDCLR_DHE_CASE_ENTRIES"] = caseEntryRoot;
+                        }
+                        ProcessResult process = await Run(executable, new[] { "-batchmode", "-nographics", "-labMode", "dhe",
+                        "-labTarget", "StandaloneWindows64", "-labResult", resultPath, "-logFile", logPath }, playerRoot, config.TimeoutSeconds,
+                            environment);
+                        attempt = process;
+                        Require(processIds.Add(process.Id), "Player process IDs must be unique.");
+                        string[] requiredEvolutionChecks = checkRequirements.Length == 0 ? Array.Empty<string>() : checkRequirements[index];
+                        string[] executedEvolutionChecks = DheEvolutionEvidence.Validate(evolutionEvidencePath, requiredEvolutionChecks);
+                        JsonElement result = Read(resultPath);
+                        if (references.Length != 0)
+                            DheObservedResults.Validate(Read(references[index]).GetProperty("observations"), result);
+                        Require(result.GetProperty("target").GetString() == "StandaloneWindows64" &&
+                            result.GetProperty("engineWorkflow").GetString() == identity.GetProperty("engineWorkflow").GetString(),
+                            "Player platform/engine does not match the archived Base.");
+                        var legacyNames = DheFixturePolicy.LegacyProbes.Select(probe => probe.Check).ToHashSet(StringComparer.Ordinal);
+                        string[] mandatoryChecks = RequiredChecks.Where(name => !legacyNames.Contains(name) &&
+                            name != "structuralDispatchExpected").ToArray();
+                        string[] failed = mandatoryChecks.Where(name => !result.TryGetProperty(name, out JsonElement value) ||
+                            value.ValueKind != JsonValueKind.True).ToArray();
+                        Require(failed.Length == 0, item.Label + ": missing/false checks: " + string.Join(",", failed));
+                        Require(result.GetProperty("selectedBaseId").GetString() == baseId, "Player selected the wrong Base.");
+                        JsonElement manifest = Read(Path.Combine(updates[index], "dhe-resource-update.json"));
+                        JsonElement variant = manifest.GetProperty("payloadVariants").EnumerateArray().Single(value =>
+                            value.GetProperty("variantId").GetString() == result.GetProperty("selectedPayloadVariantId").GetString());
+                        JsonElement mainAssembly = variant.GetProperty("assemblies").EnumerateArray().Single(value =>
+                            value.GetProperty("assemblyName").GetString() == "HybridCLR.ManagedCasesAot");
+                        object? differential = null;
+                        if (differentialReferences.Length != 0)
+                        {
+                            JsonElement caseAssembly = variant.GetProperty("assemblies").EnumerateArray().Single(value =>
+                                value.GetProperty("assemblyName").GetString() == "HybridCLR.ManagedCases");
+                            string caseDll = Path.Combine(updates[index], caseAssembly.GetProperty("dll").GetString()!);
+                            differential = DheDifferentialEvidence.Validate(differentialReferences[index], differentialPath,
+                                Resolve(config.DifferentialManifest!), Resolve(config.DifferentialGolden!), caseDll,
+                                File.ReadAllBytes(Path.Combine(embeddedBase, "HybridCLR.ManagedCases.mv.bytes")),
+                                caseEntryRoot, interpretedEntries[index]);
+                        }
+                        var currentMv = DheFixtureMetaVersion.Read(File.ReadAllBytes(Path.Combine(updates[index],
+                            mainAssembly.GetProperty("currentMetaVersion").GetString()!)), "HybridCLR.ManagedCasesAot");
+                        bool stableChanged = DheFixturePolicy.MethodChanged(baseMv, currentMv,
+                            DheFixturePolicy.Calculator + "::Stable|System.Int32 (System.Int32)");
+                        bool instanceStableChanged = DheFixturePolicy.MethodChanged(baseMv, currentMv,
+                            DheFixturePolicy.Calculator + "::InstanceStable|System.Int32 (System.Int32)");
+                        bool staticStableMatches;
+                        if (result.TryGetProperty("stableMethodChanged", out JsonElement actualStable))
+                        {
+                            staticStableMatches = actualStable.GetBoolean() == stableChanged &&
+                                result.GetProperty("instanceStableMethodChanged").GetBoolean() == instanceStableChanged;
+                        }
+                        else
+                        {
+                            // Archived reports name a different AOT control "unchangedMethod".
+                            // Their changed caller records Stable's actual dispatch explicitly.
+                            bool callerChanged = DheFixturePolicy.MethodChanged(baseMv, currentMv,
+                                DheFixturePolicy.Calculator + "::AddViaStable|System.Int32 (System.Int32)");
+                            staticStableMatches = callerChanged && result.GetProperty("changedCallingUnchangedMethod").GetString() ==
+                                (stableChanged ? "interpreter + interpreter callee" : "interpreter + AOT callee");
+                        }
+                        Require(result.GetProperty("structuralDispatchExpected").GetBoolean() == (stableChanged || instanceStableChanged) &&
+                            staticStableMatches &&
+                            result.GetProperty("unchangedInstanceMethod").GetString() == (instanceStableChanged ? "interpreter" : "aot"),
+                            "Stable dispatch disagrees with actual Base/Current MV.");
+                        DheFixturePolicy.LegacyProbeResult[] legacyEvidence;
+                        if (result.TryGetProperty("structuralLegacyProbes", out JsonElement probes) && probes.ValueKind == JsonValueKind.Array)
+                        {
+                            legacyEvidence = JsonSerializer.Deserialize<DheFixturePolicy.LegacyProbeResult[]>(probes.GetRawText(), JsonOptions)!;
+                            DheFixturePolicy.ValidateLegacyEvidence(baseMv, currentMv, legacyEvidence);
+                            Require(legacyEvidence.All(probe => result.GetProperty(probe.check).GetBoolean() == probe.passed),
+                                "Flat legacy check disagrees with its execution evidence.");
+                        }
+                        else
+                        {
+                            Require(DheFixturePolicy.LegacyProbes.All(probe => baseMv.methods.ContainsKey(probe.StableId) &&
+                                !currentMv.methods.ContainsKey(probe.StableId) && result.GetProperty(probe.Check).GetBoolean()),
+                                "Archived Player lacks applicable legacy probe evidence.");
+                            legacyEvidence = DheFixturePolicy.LegacyProbes.Select(probe => new DheFixturePolicy.LegacyProbeResult
+                            {
+                                check = probe.Check,
+                                methodStableId = probe.StableId,
+                                applicable = true,
+                                executed = true,
+                                passed = true,
+                                reason = "removed-from-base",
+                            }).ToArray();
+                        }
+                        Require(result.GetProperty("selectedPayloadCurrentAssemblySetSha256").GetString() ==
+                            variant.GetProperty("currentAssemblySetSha256").GetString(), "Player selected the wrong current payload.");
+                        Require(result.GetProperty("interpreterEntryCount").GetInt32() > 0 &&
+                            result.GetProperty("aotEntryCount").GetInt32() > 0, "Both execution paths must be exercised.");
+                        Require(originalHashes.All(pair => Hash(pair.Key) == pair.Value), "Player modified immutable Base files.");
+                        results.Add(new
+                        {
+                            label = item.Label,
+                            baseId,
+                            update = index + 1,
+                            skippedFirstUpdate = item.SkipFirstUpdate,
+                            process.Id,
+                            process.ExitCode,
+                            process.ElapsedMilliseconds,
+                            resultPath,
+                            resultSha256 = Hash(resultPath),
+                            logPath,
+                            logSha256 = Hash(logPath),
+                            stagePath,
+                            stageSha256 = Hash(stagePath),
+                            manifestSha256 = Hash(Path.Combine(updates[index], "dhe-resource-update.json")),
+                            currentAssemblySetSha256 = manifest.GetProperty("currentAssemblySetSha256").GetString(),
+                            changedMethodCount = result.GetProperty("changedMethodCount").GetInt32(),
+                            assertionCount = mandatoryChecks.Length + 1 + legacyEvidence.Count(probe => probe.applicable),
+                            skippedAssertionCount = legacyEvidence.Count(probe => !probe.applicable),
+                            legacyEvidence,
+                            baseContainsStructuralFixture = baseGenerations[baseId],
+                            immutableFileCount = immutableFiles.Length,
+                            immutableHashes = originalHashes,
+                            passed = true,
+                            referenceValidated = references.Length != 0,
+                            differential,
+                            requiredEvolutionChecks,
+                            executedEvolutionChecks,
+                            evolutionEvidencePath,
+                            evolutionEvidenceSha256 = File.Exists(evolutionEvidencePath) ? Hash(evolutionEvidencePath) : null,
+                            mainObservations = DheObservedResults.Fields.ToDictionary(name => name,
+                                name => result.GetProperty(name).GetInt32()),
+                        });
+                        Console.WriteLine(item.Label + " update " + (index + 1) + ": " +
+                            (mandatoryChecks.Length + 1 + legacyEvidence.Count(probe => probe.applicable)) + " checks passed, " +
+                            legacyEvidence.Count(probe => !probe.applicable) + " not applicable");
                     }
-                    Require(result.GetProperty("selectedPayloadCurrentAssemblySetSha256").GetString() ==
-                        variant.GetProperty("currentAssemblySetSha256").GetString(), "Player selected the wrong current payload.");
-                    Require(result.GetProperty("interpreterEntryCount").GetInt32() > 0 &&
-                        result.GetProperty("aotEntryCount").GetInt32() > 0, "Both execution paths must be exercised.");
-                    Require(originalHashes.All(pair => Hash(pair.Key) == pair.Value), "Player modified immutable Base files.");
-                    results.Add(new
+                    catch (Exception exception)
                     {
-                        label = item.Label, baseId, update = index + 1, skippedFirstUpdate = item.SkipFirstUpdate,
-                        process.Id, process.ExitCode, process.ElapsedMilliseconds,
-                        resultPath, resultSha256 = Hash(resultPath), logPath, logSha256 = Hash(logPath),
-                        stagePath, stageSha256 = Hash(stagePath),
-                        manifestSha256 = Hash(Path.Combine(updates[index], "dhe-resource-update.json")),
-                        currentAssemblySetSha256 = manifest.GetProperty("currentAssemblySetSha256").GetString(),
-                        changedMethodCount = result.GetProperty("changedMethodCount").GetInt32(),
-                        assertionCount = mandatoryChecks.Length + 1 + legacyEvidence.Count(probe => probe.applicable),
-                        skippedAssertionCount = legacyEvidence.Count(probe => !probe.applicable), legacyEvidence,
-                        baseContainsStructuralFixture = baseGenerations[baseId], immutableFileCount = immutableFiles.Length,
-                        immutableHashes = originalHashes, passed = true,
-                        referenceValidated = references.Length != 0,
-                        differential,
-                        requiredEvolutionChecks, executedEvolutionChecks,
-                        evolutionEvidencePath,
-                        evolutionEvidenceSha256 = File.Exists(evolutionEvidencePath) ? Hash(evolutionEvidencePath) : null,
-                        mainObservations = DheObservedResults.Fields.ToDictionary(name => name,
-                            name => result.GetProperty(name).GetInt32()),
-                    });
-                    Console.WriteLine(item.Label + " update " + (index + 1) + ": " +
-                        (mandatoryChecks.Length + 1 + legacyEvidence.Count(probe => probe.applicable)) + " checks passed, " +
-                        legacyEvidence.Count(probe => !probe.applicable) + " not applicable");
+                        string error = item.Label + " update " + (index + 1) + ": " + exception;
+                        errors.Add(error);
+                        var artifacts = new[] { stagePath, resultPath, logPath, differentialPath,
+                            differentialPath + ".exceptions.log", evolutionEvidencePath }
+                            .Where(File.Exists).ToDictionary(path => path, Hash);
+                        bool immutable = originalHashes.All(pair => File.Exists(pair.Key) && Hash(pair.Key) == pair.Value);
+                        failedRuns.Add(new
+                        {
+                            label = item.Label,
+                            baseId,
+                            update = index + 1,
+                            skippedFirstUpdate = item.SkipFirstUpdate,
+                            process = attempt,
+                            passed = false,
+                            error,
+                            artifacts,
+                            immutableFilesUnchanged = immutable,
+                            immutableHashes = originalHashes
+                        });
+                        Console.Error.WriteLine(item.Label + " update " + (index + 1) + ": " + exception.Message);
+                        Require(immutable, "Stop replay: failed run modified immutable Base files.");
+                    }
                 }
             }
             if (config.RequireStructuralBaseGenerations)
@@ -286,14 +338,25 @@ internal static class Program
         }
         File.WriteAllText(Path.Combine(output, "report.json"), JsonSerializer.Serialize(new
         {
-            format = "hybridclr.dhe-evolution-smoke.json", schemaVersion = 1,
-            generatedAtUtc = DateTimeOffset.UtcNow, passed = errors.Count == 0,
+            format = "hybridclr.dhe-evolution-smoke.json",
+            schemaVersion = 1,
+            generatedAtUtc = DateTimeOffset.UtcNow,
+            passed = errors.Count == 0,
             scope = "Windows structural resource replay; not production qualification",
             distinctBaseCount,
-            baseGenerations, requiredStructuralBaseGenerations = config.RequireStructuralBaseGenerations,
-            sourceHead, sourceTree, sourceChanges, runnerSha256 = Hash(typeof(Program).Assembly.Location),
+            baseGenerations,
+            requiredStructuralBaseGenerations = config.RequireStructuralBaseGenerations,
+            sourceHead,
+            sourceTree,
+            sourceChanges,
+            runnerSha256 = Hash(typeof(Program).Assembly.Location),
             referenceRecords,
-            toolSha256 = Hash(tool), configSha256 = Hash(configPath), requiredChecks = RequiredChecks, results, errors,
+            toolSha256 = Hash(tool),
+            configSha256 = Hash(configPath),
+            requiredChecks = RequiredChecks,
+            results,
+            failedRuns,
+            errors,
         }, JsonOptions));
         return errors.Count == 0 ? 0 : 1;
     }
@@ -303,8 +366,11 @@ internal static class Program
     {
         var start = new ProcessStartInfo(executable)
         {
-            WorkingDirectory = directory, UseShellExecute = false, CreateNoWindow = true,
-            RedirectStandardOutput = true, RedirectStandardError = true,
+            WorkingDirectory = directory,
+            UseShellExecute = false,
+            CreateNoWindow = true,
+            RedirectStandardOutput = true,
+            RedirectStandardError = true,
         };
         foreach (string argument in arguments) start.ArgumentList.Add(argument);
         start.Environment.Remove("HYBRIDCLR_DHE_DIFFERENTIAL_RESULT");

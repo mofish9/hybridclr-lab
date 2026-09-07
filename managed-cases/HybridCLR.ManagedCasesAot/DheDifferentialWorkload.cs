@@ -43,6 +43,8 @@ namespace HybridCLR.Lab.ManagedCasesAot
 
             using (var stream = new FileStream(path, FileMode.CreateNew, FileAccess.Write, FileShare.Read))
             using (var writer = new BinaryWriter(stream, new UTF8Encoding(false)))
+            using (var diagnostics = new StreamWriter(new FileStream(path + ".exceptions.log",
+                FileMode.CreateNew, FileAccess.Write, FileShare.Read), new UTF8Encoding(false)))
             {
                 writer.Write(Encoding.ASCII.GetBytes("DHESUITE"));
                 writer.Write(1);
@@ -69,12 +71,14 @@ namespace HybridCLR.Lab.ManagedCasesAot
                     int beforeAot = Counter(aotCount);
                     object observation = null;
                     string exceptionType = null;
+                    Exception observedException = null;
                     try { observation = callback.DynamicInvoke(); }
                     catch (Exception exception)
                     {
                         Exception original = exception is TargetInvocationException invocation && invocation.InnerException != null
                             ? invocation.InnerException : exception;
                         exceptionType = original.GetType().FullName;
+                        observedException = exception;
                     }
                     WriteNullable(writer, observation == null ? null : (string)Property(observation, "ReturnValue"));
                     WriteNullable(writer, observation == null ? null : (string)Property(observation, "SideEffect"));
@@ -82,6 +86,12 @@ namespace HybridCLR.Lab.ManagedCasesAot
                     writer.Write(Counter(interpreterCount) - beforeInterpreter);
                     writer.Write(Counter(aotCount) - beforeAot);
                     writer.Flush();
+                    if (observedException != null)
+                    {
+                        diagnostics.WriteLine((string)Property(definition, "Id"));
+                        diagnostics.WriteLine(observedException.ToString());
+                        diagnostics.Flush();
+                    }
                 }
                 writer.Write(0x454e4f44);
             }
