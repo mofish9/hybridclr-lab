@@ -4,6 +4,11 @@ using System.Text.Json;
 using HybridCLR.Lab;
 using HybridCLR.Lab.ManagedCasesAot;
 
+if (args.Length == 2 && args[0] == "inspect")
+{
+    Console.WriteLine(JsonSerializer.Serialize(DheDifferentialEvidence.Read(args[1]), new JsonSerializerOptions { WriteIndented = true }));
+    return 0;
+}
 if (args.Length == 3 && args[0] == "instrument")
 {
     DheDifferentialInstrumentation.Generate(args[1], args[2]);

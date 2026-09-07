@@ -57,12 +57,41 @@ internal static class DheDifferentialInstrumentation
         module.Write(destination);
         MetaVersionSnapshot after = MetaVersionSnapshot.Create(destination);
         var afterMethods = after.Methods.ToDictionary(method => method.StableId);
+        using var rewritten = ModuleDefMD.Load(destination);
+        var originalFields = module.GetTypes().SelectMany(type => type.Fields).ToDictionary(field => field.FullName);
+        var rewrittenFields = rewritten.GetTypes().SelectMany(type => type.Fields).ToDictionary(field => field.FullName);
+        // The PE writer relocates RVA blobs. Require identical compiler data
+        // bytes and declarations; keep the real output RVA and MV unchanged.
+        var relocatedData = new HashSet<string>(StringComparer.Ordinal);
+        foreach (var field in before.Fields.Where(field => after.Fields.Any(next => next.StableId == field.StableId && next.Version != field.Version)))
+        {
+            FieldDef left = originalFields.Values.Single(value => value.MDToken.Raw == field.Token);
+            if (rewrittenFields.TryGetValue(left.FullName, out FieldDef? right) &&
+                left.DeclaringType.Name == "<PrivateImplementationDetails>" && left.IsStatic && right.IsStatic &&
+                left.HasFieldRVA && right.HasFieldRVA && left.Attributes == right.Attributes &&
+                left.FieldOffset == right.FieldOffset && left.FieldSig.ToString() == right.FieldSig.ToString() &&
+                !left.HasConstant && !right.HasConstant && left.MarshalType == null && right.MarshalType == null &&
+                left.CustomAttributes.Count == 0 && right.CustomAttributes.Count == 0 &&
+                left.InitialValue != null && right.InitialValue != null && left.InitialValue.SequenceEqual(right.InitialValue))
+                relocatedData.Add(field.StableId);
+        }
+        bool fieldsMatch = before.Fields.Length == after.Fields.Length && before.Fields.All(field =>
+            after.Fields.Any(next => next.StableId == field.StableId &&
+                (next.Version == field.Version || relocatedData.Contains(field.StableId))));
         if (before.Methods.Length != after.Methods.Length || before.Methods.Any(method =>
                 !afterMethods.TryGetValue(method.StableId, out var next) ||
                 method.NonCustomMetadataVersion != next.NonCustomMetadataVersion ||
                 (changedIds.Contains(method.StableId) && method.BodyVersion == next.BodyVersion)) ||
-            !before.Fields.Select(field => (field.StableId, field.Version)).SequenceEqual(after.Fields.Select(field => (field.StableId, field.Version))))
-            throw new InvalidDataException("Instrumentation changed declarations or failed to change a body.");
+            !fieldsMatch)
+        {
+            var methodErrors = before.Methods.Where(method => !afterMethods.TryGetValue(method.StableId, out var next) ||
+                method.NonCustomMetadataVersion != next.NonCustomMetadataVersion ||
+                (changedIds.Contains(method.StableId) && method.BodyVersion == next.BodyVersion)).Select(method => method.Identity);
+            var fieldErrors = before.Fields.Where(field => !after.Fields.Any(next => next.StableId == field.StableId &&
+                (next.Version == field.Version || relocatedData.Contains(field.StableId)))).Select(field => field.Identity);
+            throw new InvalidDataException("Instrumentation changed declarations or failed to change a body: " +
+                string.Join("; ", methodErrors.Concat(fieldErrors).Take(12)));
+        }
         foreach (string name in new[] { "HybridCLR.ManagedCasesAot", "HybridCLR.CrossAssemblyDerived", "HybridCLR.MetadataStress" })
             File.Copy(Path.Combine(sourceRoot, name + ".dll"), Path.Combine(outputRoot, name + ".dll"));
         File.WriteAllText(Path.Combine(outputRoot, "dhe-differential-instrumentation.json"), JsonSerializer.Serialize(new
@@ -70,6 +99,7 @@ internal static class DheDifferentialInstrumentation
             format = "hybridclr.dhe-differential-instrumentation.json", schemaVersion = 1,
             source, sourceSha256 = DheDifferentialEvidence.Hash(source), destination,
             destinationSha256 = DheDifferentialEvidence.Hash(destination), modified,
+            relocatedConstantDataFields = relocatedData.OrderBy(value => value, StringComparer.Ordinal),
             scope = "Correctness instrumentation only; not performance evidence",
         }, new JsonSerializerOptions { WriteIndented = true }));
         Console.WriteLine("Instrumented managed method bodies: " + changedIds.Count);

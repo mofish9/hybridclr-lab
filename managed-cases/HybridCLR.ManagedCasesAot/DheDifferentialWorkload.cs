@@ -30,7 +30,9 @@ namespace HybridCLR.Lab.ManagedCasesAot
                 assembly.GetName().Name == "HybridCLR.ManagedCases");
             Type registry = cases.GetType("HybridCLR.Lab.ManagedCases.CaseRegistry", true);
             var definitions = ((IEnumerable)registry.GetProperty("All").GetValue(null, null))
-                .Cast<object>().OrderBy(value => (string)Property(value, "Id"), StringComparer.Ordinal).ToArray();
+                .Cast<object>().OrderBy(value => (string)Property(value, "Layer"), StringComparer.Ordinal)
+                .ThenBy(value => (string)Property(value, "Category"), StringComparer.Ordinal)
+                .ThenBy(value => (string)Property(value, "Id"), StringComparer.Ordinal).ToArray();
             Type api = AppDomain.CurrentDomain.GetAssemblies().Select(assembly =>
                 assembly.GetType("HybridCLR.RuntimeApi", false)).FirstOrDefault(type => type != null);
             MethodInfo changed = api == null ? null : api.GetMethod("IsDifferentialMethodChanged");

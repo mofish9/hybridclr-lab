@@ -23,6 +23,13 @@ record identifies the case reached before a crash or hang. Existing Base archive
 and prior reports remain unchanged. Three-engine Windows results stay separate
 from Android/iOS and performance/memory qualification.
 
+Initial harness checks exposed its ordering mismatch with the existing manifest
+generator (layer, category, ID), and constant-data RVA relocation after IL
+instrumentation. Ordering now matches the original generator. The instrumentation
+verifier checks unchanged compiler-data bytes and field declarations while leaving
+the output's actual RVA and MV intact. An exploratory CLR run now matches all 220
+golden cases, and the interpreted variant changes 554 managed method bodies.
+
 ## Latest checkpoint: logical attribute members
 
 The clean `8de07cb` replay passes 18 Windows processes across three original v8
