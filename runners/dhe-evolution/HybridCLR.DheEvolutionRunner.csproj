@@ -4,4 +4,7 @@
     <TargetFramework>net6.0</TargetFramework>
     <ImplicitUsings>enable</ImplicitUsings>
   </PropertyGroup>
+  <ItemGroup>
+    <Compile Include="../../unity2021-dhe-demo/Assets/Runtime/DheFixturePolicy.cs" Link="DheFixturePolicy.cs" />
+  </ItemGroup>
 </Project>

@@ -2,6 +2,7 @@ using System.Diagnostics;
 using System.Security.Cryptography;
 using System.Text.Json;
 using System.Text.RegularExpressions;
+using HybridCLR.Lab;
 
 internal static class Program
 {
@@ -9,6 +10,7 @@ internal static class Program
     {
         PropertyNameCaseInsensitive = true,
         WriteIndented = true,
+        IncludeFields = true,
     };
 
     private static readonly string[] RequiredChecks =
@@ -67,6 +69,8 @@ internal static class Program
         var results = new List<object>();
         var errors = new List<string>();
         int distinctBaseCount = 0;
+        var processIds = new HashSet<int>();
+        var baseGenerations = new Dictionary<string, bool>(StringComparer.OrdinalIgnoreCase);
         try
         {
             var configuredIds = config.Bases.Select(item => Read(Resolve(item.BuildIdentity))
@@ -97,6 +101,9 @@ internal static class Program
                     .Concat(Directory.GetFiles(embeddedBase, "*", SearchOption.AllDirectories))
                     .Append(identityPath).ToArray();
                 var originalHashes = immutableFiles.ToDictionary(path => path, Hash);
+                var baseMv = DheFixtureMetaVersion.Read(File.ReadAllBytes(Path.Combine(embeddedBase,
+                    "HybridCLR.ManagedCasesAot.mv.bytes")), "HybridCLR.ManagedCasesAot");
+                baseGenerations[baseId] = DheFixturePolicy.HasStructuralFixture(baseMv);
                 for (int index = item.SkipFirstUpdate ? 1 : 0; index < updates.Length; index++)
                 {
                     string runRoot = Path.Combine(baseRoot, "update-" + (index + 1));
@@ -110,16 +117,53 @@ internal static class Program
                     ProcessResult process = await Run(executable, new[] { "-batchmode", "-nographics", "-labMode", "dhe",
                         "-labTarget", "StandaloneWindows64", "-labResult", resultPath, "-logFile", logPath }, playerRoot, config.TimeoutSeconds);
                     JsonElement result = Read(resultPath);
+                    Require(processIds.Add(process.Id), "Player process IDs must be unique.");
                     Require(result.GetProperty("target").GetString() == "StandaloneWindows64" &&
                         result.GetProperty("engineWorkflow").GetString() == identity.GetProperty("engineWorkflow").GetString(),
                         "Player platform/engine does not match the archived Base.");
-                    string[] failed = RequiredChecks.Where(name => !result.TryGetProperty(name, out JsonElement value) ||
+                    var legacyNames = DheFixturePolicy.LegacyProbes.Select(probe => probe.Check).ToHashSet(StringComparer.Ordinal);
+                    string[] mandatoryChecks = RequiredChecks.Where(name => !legacyNames.Contains(name) &&
+                        name != "structuralDispatchExpected").ToArray();
+                    string[] failed = mandatoryChecks.Where(name => !result.TryGetProperty(name, out JsonElement value) ||
                         value.ValueKind != JsonValueKind.True).ToArray();
                     Require(failed.Length == 0, item.Label + ": missing/false checks: " + string.Join(",", failed));
                     Require(result.GetProperty("selectedBaseId").GetString() == baseId, "Player selected the wrong Base.");
                     JsonElement manifest = Read(Path.Combine(updates[index], "dhe-resource-update.json"));
+                    JsonElement variant = manifest.GetProperty("payloadVariants").EnumerateArray().Single(value =>
+                        value.GetProperty("variantId").GetString() == result.GetProperty("selectedPayloadVariantId").GetString());
+                    JsonElement mainAssembly = variant.GetProperty("assemblies").EnumerateArray().Single(value =>
+                        value.GetProperty("assemblyName").GetString() == "HybridCLR.ManagedCasesAot");
+                    var currentMv = DheFixtureMetaVersion.Read(File.ReadAllBytes(Path.Combine(updates[index],
+                        mainAssembly.GetProperty("currentMetaVersion").GetString()!)), "HybridCLR.ManagedCasesAot");
+                    bool stableChanged = DheFixturePolicy.MethodChanged(baseMv, currentMv,
+                        DheFixturePolicy.Calculator + "::Stable|System.Int32 (System.Int32)");
+                    bool instanceStableChanged = DheFixturePolicy.MethodChanged(baseMv, currentMv,
+                        DheFixturePolicy.Calculator + "::InstanceStable|System.Int32 (System.Int32)");
+                    Require(result.GetProperty("structuralDispatchExpected").GetBoolean() == (stableChanged || instanceStableChanged) &&
+                        result.GetProperty("unchangedMethod").GetString() == (stableChanged ? "interpreter" : "aot") &&
+                        result.GetProperty("unchangedInstanceMethod").GetString() == (instanceStableChanged ? "interpreter" : "aot"),
+                        "Stable dispatch disagrees with actual Base/Current MV.");
+                    DheFixturePolicy.LegacyProbeResult[] legacyEvidence;
+                    if (result.TryGetProperty("structuralLegacyProbes", out JsonElement probes) && probes.ValueKind == JsonValueKind.Array)
+                    {
+                        legacyEvidence = JsonSerializer.Deserialize<DheFixturePolicy.LegacyProbeResult[]>(probes.GetRawText(), JsonOptions)!;
+                        DheFixturePolicy.ValidateLegacyEvidence(baseMv, currentMv, legacyEvidence);
+                        Require(legacyEvidence.All(probe => result.GetProperty(probe.check).GetBoolean() == probe.passed),
+                            "Flat legacy check disagrees with its execution evidence.");
+                    }
+                    else
+                    {
+                        Require(DheFixturePolicy.LegacyProbes.All(probe => baseMv.methods.ContainsKey(probe.StableId) &&
+                            !currentMv.methods.ContainsKey(probe.StableId) && result.GetProperty(probe.Check).GetBoolean()),
+                            "Archived Player lacks applicable legacy probe evidence.");
+                        legacyEvidence = DheFixturePolicy.LegacyProbes.Select(probe => new DheFixturePolicy.LegacyProbeResult
+                        {
+                            check = probe.Check, methodStableId = probe.StableId, applicable = true,
+                            executed = true, passed = true, reason = "removed-from-base",
+                        }).ToArray();
+                    }
                     Require(result.GetProperty("selectedPayloadCurrentAssemblySetSha256").GetString() ==
-                        manifest.GetProperty("currentAssemblySetSha256").GetString(), "Player selected the wrong current payload.");
+                        variant.GetProperty("currentAssemblySetSha256").GetString(), "Player selected the wrong current payload.");
                     Require(result.GetProperty("interpreterEntryCount").GetInt32() > 0 &&
                         result.GetProperty("aotEntryCount").GetInt32() > 0, "Both execution paths must be exercised.");
                     Require(originalHashes.All(pair => Hash(pair.Key) == pair.Value), "Player modified immutable Base files.");
@@ -132,12 +176,19 @@ internal static class Program
                         manifestSha256 = Hash(Path.Combine(updates[index], "dhe-resource-update.json")),
                         currentAssemblySetSha256 = manifest.GetProperty("currentAssemblySetSha256").GetString(),
                         changedMethodCount = result.GetProperty("changedMethodCount").GetInt32(),
-                        assertionCount = RequiredChecks.Length, immutableFileCount = immutableFiles.Length,
+                        assertionCount = mandatoryChecks.Length + 1 + legacyEvidence.Count(probe => probe.applicable),
+                        skippedAssertionCount = legacyEvidence.Count(probe => !probe.applicable), legacyEvidence,
+                        baseContainsStructuralFixture = baseGenerations[baseId], immutableFileCount = immutableFiles.Length,
                         immutableHashes = originalHashes, passed = true,
                     });
-                    Console.WriteLine(item.Label + " update " + (index + 1) + ": " + RequiredChecks.Length + " checks passed");
+                    Console.WriteLine(item.Label + " update " + (index + 1) + ": " +
+                        (mandatoryChecks.Length + 1 + legacyEvidence.Count(probe => probe.applicable)) + " checks passed, " +
+                        legacyEvidence.Count(probe => !probe.applicable) + " not applicable");
                 }
             }
+            if (config.RequireStructuralBaseGenerations)
+                Require(baseGenerations.Values.Contains(false) && baseGenerations.Values.Contains(true),
+                    "Replay must include an original Base and a Base already containing structural evolution.");
         }
         catch (Exception exception)
         {
@@ -150,6 +201,7 @@ internal static class Program
             generatedAtUtc = DateTimeOffset.UtcNow, passed = errors.Count == 0,
             scope = "Windows structural resource replay; not production qualification",
             distinctBaseCount,
+            baseGenerations, requiredStructuralBaseGenerations = config.RequireStructuralBaseGenerations,
             sourceHead, sourceTree, sourceChanges, runnerSha256 = Hash(typeof(Program).Assembly.Location),
             toolSha256 = Hash(tool), configSha256 = Hash(configPath), requiredChecks = RequiredChecks, results, errors,
         }, JsonOptions));
@@ -208,7 +260,8 @@ internal static class Program
     {
         if (!condition) throw new InvalidDataException(message);
     }
-    private sealed record Config(string LabRoot, string ToolAssembly, string OutputRoot, string[] Updates, Base[] Bases, int TimeoutSeconds = 120);
+    private sealed record Config(string LabRoot, string ToolAssembly, string OutputRoot, string[] Updates, Base[] Bases,
+        int TimeoutSeconds = 120, bool RequireStructuralBaseGenerations = false);
     private sealed record Base(string Label, string PlayerRoot, string BuildIdentity, bool SkipFirstUpdate = false);
     private sealed record ProcessResult(int Id, int ExitCode, long ElapsedMilliseconds, string Text);
 }

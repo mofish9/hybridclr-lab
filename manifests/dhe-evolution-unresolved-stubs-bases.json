@@ -1,0 +1,36 @@
+{
+  "schemaVersion": 1,
+  "format": "hybridclr.dhe-base-registry.json",
+  "pathSemantics": "registry-relative-v1",
+  "registryId": "dhe-evolution-unresolved-stubs-windows",
+  "revision": 1,
+  "bases": [
+    {
+      "baseId": "92d1d85025741a27e529b596de6f56957fdfb52111d810057de6ff23dbb528cd",
+      "engineWorkflow": "Unity2021Standard",
+      "label": "u21-declarations",
+      "baselineRoot": "../../../artifacts/dhe-evolution-20260908/base-declarations-u21/baseline",
+      "nativeManifest": "../../../artifacts/dhe-evolution-20260908/base-declarations-u21/native/dhe-native-manifest.json",
+      "buildIdentity": "../../../artifacts/dhe-evolution-20260908/base-declarations-u21/build-identity.json",
+      "aotMetadataRoot": "../../../artifacts/dhe-evolution-20260908/base-declarations-u21/aot-metadata-root"
+    },
+    {
+      "baseId": "180f874890596d8abe9452e8de7a424650449164c960f30755bf7fbc9b51c79c",
+      "engineWorkflow": "Unity2022Fgs",
+      "label": "u22-declarations",
+      "baselineRoot": "../../../artifacts/dhe-evolution-20260908/base-unresolved-stubs-u22/baseline",
+      "nativeManifest": "../../../artifacts/dhe-evolution-20260908/base-unresolved-stubs-u22/native/dhe-native-manifest.json",
+      "buildIdentity": "../../../artifacts/dhe-evolution-20260908/base-unresolved-stubs-u22/build-identity.json",
+      "aotMetadataRoot": null
+    },
+    {
+      "baseId": "7c48ccc61151458345f9ec09b587879cc54b17d38a734c6460fd8f50e1c307e4",
+      "engineWorkflow": "Tuanjie2022Fgs",
+      "label": "tuanjie-declarations",
+      "baselineRoot": "../../../artifacts/dhe-evolution-20260908/base-unresolved-stubs-tuanjie/baseline",
+      "nativeManifest": "../../../artifacts/dhe-evolution-20260908/base-unresolved-stubs-tuanjie/native/dhe-native-manifest.json",
+      "buildIdentity": "../../../artifacts/dhe-evolution-20260908/base-unresolved-stubs-tuanjie/build-identity.json",
+      "aotMetadataRoot": null
+    }
+  ]
+}

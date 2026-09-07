@@ -1,0 +1,33 @@
+{
+  "labRoot": "..",
+  "toolAssembly": "../../../artifacts/dhe-evolution-20260908/host-unresolved-stubs/HybridCLR.DheTool.dll",
+  "outputRoot": "../../../artifacts/dhe-evolution-20260908/replay-unresolved-stubs",
+  "updates": [
+    "../../../artifacts/dhe-evolution-20260908/resource-initial-unresolved-stubs",
+    "../../../artifacts/dhe-evolution-20260908/resource-expanded-unresolved-stubs"
+  ],
+  "timeoutSeconds": 120,
+  "bases": [
+    {
+      "label": "u21-consecutive",
+      "playerRoot": "../../../artifacts/dhe-evolution-20260908/base-declarations-u21/player",
+      "buildIdentity": "../../../artifacts/dhe-evolution-20260908/base-declarations-u21/build-identity.json"
+    },
+    {
+      "label": "u22-consecutive",
+      "playerRoot": "../../../artifacts/dhe-evolution-20260908/base-unresolved-stubs-u22/player",
+      "buildIdentity": "../../../artifacts/dhe-evolution-20260908/base-unresolved-stubs-u22/build-identity.json"
+    },
+    {
+      "label": "tuanjie-consecutive",
+      "playerRoot": "../../../artifacts/dhe-evolution-20260908/base-unresolved-stubs-tuanjie/player",
+      "buildIdentity": "../../../artifacts/dhe-evolution-20260908/base-unresolved-stubs-tuanjie/build-identity.json"
+    },
+    {
+      "label": "u21-skipped",
+      "playerRoot": "../../../artifacts/dhe-evolution-20260908/base-declarations-u21/player",
+      "buildIdentity": "../../../artifacts/dhe-evolution-20260908/base-declarations-u21/build-identity.json",
+      "skipFirstUpdate": true
+    }
+  ]
+}

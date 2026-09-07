@@ -326,3 +326,31 @@ Tuanjie, but does not unnecessarily reject the already-capable Unity 2021 Base.
 Unknown engine contexts require it conservatively. Seventeen standalone
 compatibility checks pass. Native matrix, real Player execution on newly built
 Bases, and exact-identity replay are required before positive qualification.
+
+All three real-header native profiles pass on the frozen runtime source above.
+New Unity 2022 and Tuanjie Bases also pass the original and expanded declaration
+updates. `replay-unresolved-stubs/report.json` records seven successful Windows
+processes with 48 original assertions each and unchanged Base files. It includes
+the unchanged capable Unity 2021 Base and its skipped-update process. The replay
+ran while the separate generation-aware Demo work was dirty; it is exploratory,
+not the final clean-source replay. Those Bases still share the original managed
+fixture generation.
+
+## Generation-aware Demo validation
+
+The Demo previously assumed every Base contains the removed legacy APIs and
+every type change invalidates Stable. Its current fixture selection also skipped
+the structural assertions when those types already existed in a newer Base.
+The candidate derives fixture presence and Stable dispatch from the actual MV,
+and compiles each direct legacy AOT probe only if the exact Base DLL contains
+its method identity. It never compiles obsolete calls into an evolved Base.
+
+Each legacy probe reports applicability, execution, outcome, reason, and stable
+method identity. The replay runner independently checks those records against
+the archived Base MV and the selected Current MV. Inapplicable probes are not
+passed assertions. Old archived Players remain usable only when all their
+legacy checks are actually applicable and pass. The runner can require both an
+original Base and a Base already containing structural evolution, and checks
+unique process IDs. Twenty-one standalone positive/negative tests cover these
+decisions. Actual evolved Base builds and old/new shared-release replay remain
+required; these tests alone do not prove runtime evolution.

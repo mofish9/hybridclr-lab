@@ -9,6 +9,7 @@ using UnityEditor;
 using UnityEditor.Build;
 using UnityEditor.Build.Reporting;
 using UnityEngine;
+using dnlib.DotNet;
 
 namespace HybridCLR.Lab.Editor
 {
@@ -184,7 +185,7 @@ namespace HybridCLR.Lab.Editor
                 // final build must reuse those exact Bee inputs.
                 CleanBuild = scriptsOnly,
                 Scenes = new[] { "Assets/Scenes/HybridCLRLab.unity" },
-                BuildPlayerCallback = options => BuildPipeline.BuildPlayer(options),
+                BuildPlayerCallback = options => BuildWithBaseProbes(options, baselineRoot),
                 NativeFinalizeOptions = scriptsOnly ? null : CreateNativeFinalizeOptions(outputRoot, true),
                 AndroidArtifactLogPath = scriptsOnly ? null :
                     Path.Combine(outputRoot, "native", "android-artifact.log"),
@@ -212,6 +213,20 @@ namespace HybridCLR.Lab.Editor
             {
                 RunStandaloneSmoke(playerPath, outputRoot);
             }
+        }
+
+        private static BuildReport BuildWithBaseProbes(BuildPlayerOptions options, string baselineRoot)
+        {
+            using (var module = ModuleDefMD.Load(Path.Combine(baselineRoot, "HybridCLR.ManagedCasesAot.dll")))
+            {
+                var identities = new HashSet<string>(module.GetTypes().SelectMany(type => type.Methods)
+                    .Select(method => method.DeclaringType.FullName + "::" + method.Name + "|" + method.MethodSig),
+                    StringComparer.Ordinal);
+                options.extraScriptingDefines = (options.extraScriptingDefines ?? Array.Empty<string>())
+                    .Concat(DheFixturePolicy.LegacyProbes.Where(probe => identities.Contains(probe.Identity))
+                        .Select(probe => probe.Define)).Distinct(StringComparer.Ordinal).ToArray();
+            }
+            return BuildPipeline.BuildPlayer(options);
         }
 
         private static DheNativeFinalizeOptions CreateNativeFinalizeOptions(

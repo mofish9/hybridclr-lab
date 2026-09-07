@@ -61,6 +61,123 @@
     "aotEntryCount": { "type": "integer", "minimum": 0 },
     "structuralExpected": { "type": "boolean" },
     "structuralDispatchExpected": { "type": "boolean" },
+    "structuralLegacyProbes": {
+      "type": [
+        "array",
+        "null"
+      ],
+      "minItems": 8,
+      "maxItems": 8,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "check",
+          "methodStableId",
+          "applicable",
+          "executed",
+          "passed",
+          "reason",
+          "error"
+        ],
+        "properties": {
+          "check": {
+            "enum": [
+              "structuralRemovedMethodGuardValidated",
+              "structuralRemovedFieldGuardValidated",
+              "structuralRemovedPropertyGuardValidated",
+              "structuralReplacedPropertyGuardValidated",
+              "structuralRemovedEventGuardValidated",
+              "structuralReplacedEventGuardValidated",
+              "structuralRemovedTypeGuardValidated",
+              "structuralOldSignatureGuardValidated"
+            ]
+          },
+          "methodStableId": {
+            "type": "string",
+            "pattern": "^[0-9a-fA-F]{64}$"
+          },
+          "applicable": {
+            "type": "boolean"
+          },
+          "executed": {
+            "type": "boolean"
+          },
+          "passed": {
+            "type": "boolean"
+          },
+          "reason": {
+            "type": "string"
+          },
+          "error": {
+            "type": [
+              "string",
+              "null"
+            ]
+          }
+        },
+        "allOf": [
+          {
+            "if": {
+              "properties": {
+                "applicable": {
+                  "const": true
+                }
+              }
+            },
+            "then": {
+              "properties": {
+                "executed": {
+                  "const": true
+                },
+                "passed": {
+                  "const": true
+                },
+                "reason": {
+                  "const": "removed-from-base"
+                },
+                "error": {
+                  "anyOf": [
+                    {
+                      "const": ""
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ]
+                }
+              }
+            },
+            "else": {
+              "properties": {
+                "executed": {
+                  "const": false
+                },
+                "passed": {
+                  "const": false
+                },
+                "reason": {
+                  "enum": [
+                    "absent-from-base",
+                    "retained-in-current"
+                  ]
+                },
+                "error": {
+                  "anyOf": [
+                    {
+                      "const": ""
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ]
+                }
+              }
+            }
+          }
+        ]
+      }
+    },
     "structuralPassed": { "type": "boolean" },
     "structuralError": { "type": ["string", "null"] },
     "structuralExistingEntryResult": { "type": "integer" },
@@ -166,28 +283,90 @@
             "structuralAddedInstanceFieldReflectionValueValidated": { "const": true },
             "structuralAddedInstanceFieldGcValidated": { "const": true },
             "structuralRemovedMethodHidden": { "const": true },
-            "structuralRemovedMethodGuardValidated": { "const": true },
             "structuralRemovedFieldsHidden": { "const": true },
-            "structuralRemovedFieldGuardValidated": { "const": true },
             "structuralFieldSignatureReplacementVisible": { "const": true },
             "structuralFieldSignatureReplacementRoundTripValidated": { "const": true },
             "structuralLogicalPropertiesValidated": { "const": true },
             "structuralLogicalPropertyRoundTripValidated": { "const": true },
             "structuralLogicalEventsValidated": { "const": true },
             "structuralLogicalEventRoundTripValidated": { "const": true },
-            "structuralRemovedPropertyGuardValidated": { "const": true },
-            "structuralReplacedPropertyGuardValidated": { "const": true },
-            "structuralRemovedEventGuardValidated": { "const": true },
-            "structuralReplacedEventGuardValidated": { "const": true },
             "structuralRemovedTypeHidden": { "const": true },
             "structuralRemovedTypeEnumerationHidden": { "const": true },
-            "structuralRemovedTypeGuardValidated": { "const": true },
             "structuralOldSignatureHidden": { "const": true },
-            "structuralOldSignatureGuardValidated": { "const": true },
             "structuralNewSignatureFound": { "const": true },
             "structuralAssemblyEnumerationValidated": { "const": true },
             "structuralTypeAssemblyMatchesBase": { "const": true }
-          }
+          },
+          "allOf": [
+            {
+              "if": {
+                "required": [
+                  "structuralLegacyProbes"
+                ],
+                "properties": {
+                  "structuralLegacyProbes": {
+                    "type": "array"
+                  }
+                }
+              },
+              "then": {
+                "properties": {
+                  "structuralRemovedMethodGuardValidated": {
+                    "type": "boolean"
+                  },
+                  "structuralRemovedFieldGuardValidated": {
+                    "type": "boolean"
+                  },
+                  "structuralRemovedPropertyGuardValidated": {
+                    "type": "boolean"
+                  },
+                  "structuralReplacedPropertyGuardValidated": {
+                    "type": "boolean"
+                  },
+                  "structuralRemovedEventGuardValidated": {
+                    "type": "boolean"
+                  },
+                  "structuralReplacedEventGuardValidated": {
+                    "type": "boolean"
+                  },
+                  "structuralRemovedTypeGuardValidated": {
+                    "type": "boolean"
+                  },
+                  "structuralOldSignatureGuardValidated": {
+                    "type": "boolean"
+                  }
+                }
+              },
+              "else": {
+                "properties": {
+                  "structuralRemovedMethodGuardValidated": {
+                    "const": true
+                  },
+                  "structuralRemovedFieldGuardValidated": {
+                    "const": true
+                  },
+                  "structuralRemovedPropertyGuardValidated": {
+                    "const": true
+                  },
+                  "structuralReplacedPropertyGuardValidated": {
+                    "const": true
+                  },
+                  "structuralRemovedEventGuardValidated": {
+                    "const": true
+                  },
+                  "structuralReplacedEventGuardValidated": {
+                    "const": true
+                  },
+                  "structuralRemovedTypeGuardValidated": {
+                    "const": true
+                  },
+                  "structuralOldSignatureGuardValidated": {
+                    "const": true
+                  }
+                }
+              }
+            }
+          ]
         }
       },
       {

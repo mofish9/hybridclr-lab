@@ -11,6 +11,7 @@ using ManagedCasesSecondary = HybridCLR.Lab.ManagedCases;
 using MetadataStressSecondary = HybridCLR.Lab.MetadataStress.DheSecondaryCases;
 using CrossAssemblySecondary = HybridCLR.Lab.CrossAssemblyDerived.CrossAssemblyLazyVTableProbe;
 using UnityEngine;
+using MetaVersionInfo = HybridCLR.Lab.DheFixtureMetaVersion;
 
 namespace HybridCLR.Lab
 {
@@ -326,19 +327,16 @@ namespace HybridCLR.Lab
             int mainInterpreterEntryCount = RuntimeApi.GetDifferentialInterpreterEntryCount();
             int mainAotBridgeCallCount = RuntimeApi.GetDifferentialAotBridgeCallCount();
             int mainAotEntryCount = RuntimeApi.GetDifferentialAotEntryCount();
-            // Keep the full additions fixture gate separate from dispatch
-            // classification. A current payload may remove members or evolve a
-            // type without containing the optional additions fixture; that
-            // still changes Stable dispatch, but must not require reflection
-            // assertions for types that are absent from the payload.
-            bool structuralExpected = HasStructuralAdditions(mainLoaded.baseMetaVersion,
-                mainLoaded.currentMetaVersion);
-            bool structuralDispatchExpected = HasStructuralChanges(mainLoaded.baseMetaVersion,
-                mainLoaded.currentMetaVersion);
+            bool structuralExpected = DheFixturePolicy.HasStructuralFixture(mainLoaded.currentMetaVersion);
+            bool stableExpectedChanged = DheFixturePolicy.MethodChanged(mainLoaded.baseMetaVersion,
+                mainLoaded.currentMetaVersion, DheFixturePolicy.Calculator + "::Stable|System.Int32 (System.Int32)");
+            bool instanceStableExpectedChanged = DheFixturePolicy.MethodChanged(mainLoaded.baseMetaVersion,
+                mainLoaded.currentMetaVersion, DheFixturePolicy.Calculator + "::InstanceStable|System.Int32 (System.Int32)");
+            bool structuralDispatchExpected = stableExpectedChanged || instanceStableExpectedChanged;
             CapabilityDirectRun directCapability = ExecuteCapabilityDirect(structuralExpected);
             CapabilityRun capability = ExecuteCapabilityReflection(structuralExpected);
             StructuralRun structural = ExecuteStructural(mainLoaded.assembly, structuralExpected,
-                directCapability.genericContainerResult);
+                directCapability.genericContainerResult, mainLoaded.baseMetaVersion, mainLoaded.currentMetaVersion);
             long metadataStressResult = ExecuteMetadataStress(loadedAssemblies);
             int managedSecondaryReflectionResult = ExecuteSecondaryChanged(
                 loadedAssemblies, "HybridCLR.ManagedCases",
@@ -445,12 +443,11 @@ namespace HybridCLR.Lab
                 noOpMultiAssemblyValidated && noOpCapabilityDirectValidated &&
                 noOpCapabilityReflectionValidated && mainInterpreterEntryCount == 0 &&
                 mainAotEntryCount > 0;
-            bool stableDispatchValidated = structuralDispatchExpected
-				? stableChanged && instanceStableChanged
-				: !stableChanged && !instanceStableChanged;
+            bool stableDispatchValidated = stableChanged == stableExpectedChanged &&
+                instanceStableChanged == instanceStableExpectedChanged;
             bool representativeChanged = addChanged || multiBaseProbeChanged;
             bool changedBehaviorValidated = changedMethodCount == 0
-                ? noOpAotBehaviorValidated && newHotfixValidated
+                ? noOpAotBehaviorValidated && structural.passed && newHotfixValidated
                 : (representativeChanged && !identityUnchangedChanged && stableDispatchValidated &&
                     mainBehaviorConsistencyValidated && capabilityConsistencyValidated &&
                     multiAssemblyConsistencyValidated && mainInterpreterEntryCount > 0 &&
@@ -554,6 +551,7 @@ namespace HybridCLR.Lab
                 capabilityGenericVirtualResult = capability.genericVirtualResult,
                 structuralExpected = structural.expected,
                 structuralDispatchExpected = structuralDispatchExpected,
+                structuralLegacyProbes = structural.legacyProbes,
                 structuralPassed = structural.passed,
                 structuralError = structural.error,
                 structuralExistingEntryResult = structural.existingEntryResult,
@@ -920,7 +918,7 @@ namespace HybridCLR.Lab
         }
 
         private static StructuralRun ExecuteStructural(Assembly assembly, bool expected,
-            int existingEntryResult)
+            int existingEntryResult, MetaVersionInfo baseline, MetaVersionInfo current)
         {
             StructuralRun result = new StructuralRun
             {
@@ -1118,25 +1116,6 @@ namespace HybridCLR.Lab
 					Activator.CreateInstance(calculator), new object[] { 3 }));
 				result.newSignatureResult = Convert.ToInt32(newSignature.Invoke(
 					Activator.CreateInstance(calculator), new object[] { 3L }));
-				var legacyObject = new DheDemoCalculator();
-#if HYBRIDCLR_DHE_BASE_PLAYER
-				try
-				{
-					legacyObject.RemovedLegacyMethod(3);
-				}
-				catch (MissingMethodException)
-				{
-					result.removedMethodGuardValidated = true;
-				}
-				try
-				{
-					legacyObject.ReadRemovedFields();
-				}
-				catch (MissingMethodException)
-				{
-					result.removedFieldGuardValidated = true;
-				}
-#endif
 				if (result.fieldSignatureReplacementVisible)
 				{
 					object evolvedObject = Activator.CreateInstance(calculator);
@@ -1206,58 +1185,17 @@ namespace HybridCLR.Lab
 					result.logicalEventRoundTripValidated = addedRoundTrip &&
 						result.logicalEvolvedEventTouchValue == 1870;
 				}
-#if HYBRIDCLR_DHE_BASE_PLAYER
-				try
-				{
-					_ = legacyObject.RemovedProperty;
-				}
-				catch (MissingMethodException)
-				{
-					result.removedPropertyGuardValidated = true;
-				}
-				try
-				{
-					_ = legacyObject.EvolvedProperty;
-				}
-				catch (MissingMethodException)
-				{
-					result.replacedPropertyGuardValidated = true;
-				}
-				try
-				{
-					Action<int> removedHandler = _ => { };
-					legacyObject.RemovedEvent += removedHandler;
-				}
-				catch (MissingMethodException)
-				{
-					result.removedEventGuardValidated = true;
-				}
-				try
-				{
-					Action<int> replacedHandler = _ => { };
-					legacyObject.EvolvedEvent += replacedHandler;
-				}
-				catch (MissingMethodException)
-				{
-					result.replacedEventGuardValidated = true;
-				}
-				try
-				{
-					_ = new DheRemovedReferenceType(3);
-				}
-				catch (MissingMethodException)
-				{
-					result.removedTypeGuardValidated = true;
-				}
-				try
-				{
-					legacyObject.SignatureMigrated(3);
-				}
-				catch (MissingMethodException)
-				{
-					result.oldSignatureGuardValidated = true;
-				}
-#endif
+                result.legacyProbes = ExecuteLegacyProbes(baseline, current);
+                DheFixturePolicy.ValidateLegacyEvidence(baseline, current, result.legacyProbes);
+                bool LegacyPassed(string check) => result.legacyProbes.Single(probe => probe.check == check).passed;
+                result.removedMethodGuardValidated = LegacyPassed("structuralRemovedMethodGuardValidated");
+                result.removedFieldGuardValidated = LegacyPassed("structuralRemovedFieldGuardValidated");
+                result.removedPropertyGuardValidated = LegacyPassed("structuralRemovedPropertyGuardValidated");
+                result.replacedPropertyGuardValidated = LegacyPassed("structuralReplacedPropertyGuardValidated");
+                result.removedEventGuardValidated = LegacyPassed("structuralRemovedEventGuardValidated");
+                result.replacedEventGuardValidated = LegacyPassed("structuralReplacedEventGuardValidated");
+                result.removedTypeGuardValidated = LegacyPassed("structuralRemovedTypeGuardValidated");
+                result.oldSignatureGuardValidated = LegacyPassed("structuralOldSignatureGuardValidated");
 				object instanceFieldObject = Activator.CreateInstance(calculator);
 				object defaultStruct = addedInstanceStruct.GetValue(instanceFieldObject);
 				result.addedInstanceFieldDefaultValueValidated =
@@ -1316,20 +1254,17 @@ namespace HybridCLR.Lab
 					result.addedInstanceFieldReflectionResult == 1212 &&
 					result.addedInstanceFieldReflectionValueValidated &&
 					result.addedInstanceFieldGcValidated && result.removedMethodHidden &&
-					result.removedMethodGuardValidated && result.removedFieldsHidden &&
-					result.removedFieldGuardValidated && result.removedTypeHidden &&
+                    result.legacyProbes.All(probe => !probe.applicable || probe.executed && probe.passed) &&
+                    result.removedFieldsHidden && result.removedTypeHidden &&
 					result.fieldSignatureReplacementVisible &&
 					result.fieldSignatureReplacementRoundTripValidated &&
 					result.logicalPropertiesValidated &&
 					result.logicalPropertyRoundTripValidated &&
 					result.logicalEventsValidated && result.logicalEventRoundTripValidated &&
-					result.removedPropertyGuardValidated &&
-					result.replacedPropertyGuardValidated &&
-					result.removedEventGuardValidated && result.replacedEventGuardValidated &&
 					result.currentMemberDirectResult == 3163 &&
-					result.removedTypeEnumerationHidden && result.removedTypeGuardValidated &&
+                    result.removedTypeEnumerationHidden &&
 					result.oldSignatureHidden &&
-					result.oldSignatureGuardValidated && result.newSignatureFound &&
+                    result.newSignatureFound &&
 					result.newSignatureResult == 1303;
             }
             catch (Exception exception)
@@ -1337,6 +1272,38 @@ namespace HybridCLR.Lab
                 result.error = exception.ToString();
             }
             return result;
+        }
+
+        private static DheFixturePolicy.LegacyProbeResult[] ExecuteLegacyProbes(
+            MetaVersionInfo baseline, MetaVersionInfo current)
+        {
+            var callbacks = new Dictionary<string, Action>(StringComparer.Ordinal);
+            var instance = new DheDemoCalculator();
+#if HYBRIDCLR_DHE_BASE_PLAYER && DHE_PROBE_REMOVED_METHOD
+            callbacks.Add("structuralRemovedMethodGuardValidated", () => instance.RemovedLegacyMethod(3));
+#endif
+#if HYBRIDCLR_DHE_BASE_PLAYER && DHE_PROBE_REMOVED_FIELD
+            callbacks.Add("structuralRemovedFieldGuardValidated", () => instance.ReadRemovedFields());
+#endif
+#if HYBRIDCLR_DHE_BASE_PLAYER && DHE_PROBE_REMOVED_PROPERTY
+            callbacks.Add("structuralRemovedPropertyGuardValidated", () => { _ = instance.RemovedProperty; });
+#endif
+#if HYBRIDCLR_DHE_BASE_PLAYER && DHE_PROBE_REPLACED_PROPERTY
+            callbacks.Add("structuralReplacedPropertyGuardValidated", () => { _ = instance.EvolvedProperty; });
+#endif
+#if HYBRIDCLR_DHE_BASE_PLAYER && DHE_PROBE_REMOVED_EVENT
+            callbacks.Add("structuralRemovedEventGuardValidated", () => { instance.RemovedEvent += _ => { }; });
+#endif
+#if HYBRIDCLR_DHE_BASE_PLAYER && DHE_PROBE_REPLACED_EVENT
+            callbacks.Add("structuralReplacedEventGuardValidated", () => { instance.EvolvedEvent += (int _) => { }; });
+#endif
+#if HYBRIDCLR_DHE_BASE_PLAYER && DHE_PROBE_REMOVED_TYPE
+            callbacks.Add("structuralRemovedTypeGuardValidated", () => { _ = new DheRemovedReferenceType(3); });
+#endif
+#if HYBRIDCLR_DHE_BASE_PLAYER && DHE_PROBE_OLD_SIGNATURE
+            callbacks.Add("structuralOldSignatureGuardValidated", () => instance.SignatureMigrated(3));
+#endif
+            return DheFixturePolicy.RunLegacyProbes(baseline, current, callbacks);
         }
 
         private static CapabilityRun ExecuteCapabilityReflection(bool structuralExpected)
@@ -1761,87 +1728,8 @@ namespace HybridCLR.Lab
             return difference == 0;
         }
 
-        private static MetaVersionInfo ParseMetaVersion(byte[] bytes, string expectedAssemblyName)
-        {
-            if (bytes == null || bytes.Length < 60 ||
-                !string.Equals(System.Text.Encoding.ASCII.GetString(bytes, 0, 8),
-                    "DHEMETA1", StringComparison.Ordinal) || BitConverter.ToUInt32(bytes, 8) != 1)
-                throw new InvalidDataException("DHE MetaVersion header is invalid for " +
-                    expectedAssemblyName + ".");
-            int nameSize = checked((int)BitConverter.ToUInt32(bytes, 16));
-            int typeCount = checked((int)BitConverter.ToUInt32(bytes, 20));
-            int methodCount = checked((int)BitConverter.ToUInt32(bytes, 24));
-            long expectedSize = 60L + nameSize + 72L * typeCount + 104L * methodCount;
-            if (nameSize <= 0 || expectedSize != bytes.Length)
-                throw new InvalidDataException("DHE MetaVersion size is invalid for " +
-                    expectedAssemblyName + ".");
-            string assemblyName = System.Text.Encoding.UTF8.GetString(bytes, 60, nameSize);
-            if (!string.Equals(assemblyName, expectedAssemblyName, StringComparison.Ordinal))
-                throw new InvalidDataException("DHE MetaVersion assembly identity mismatch: " +
-                    assemblyName + "/" + expectedAssemblyName + ".");
-            var types = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
-            int typeOffset = checked(60 + nameSize);
-            for (int index = 0; index < typeCount; index++)
-            {
-                int offset = checked(typeOffset + index * 72);
-                string stableId = ToHex(Slice(bytes, offset, 32));
-                string version = ToHex(Slice(bytes, offset + 32, 32));
-                if (types.ContainsKey(stableId))
-                    throw new InvalidDataException("DHE MetaVersion has a duplicate type stable ID.");
-                types.Add(stableId, version);
-            }
-            var methods = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
-            int methodOffset = checked(60 + nameSize + 72 * typeCount);
-            for (int index = 0; index < methodCount; index++)
-            {
-                int offset = checked(methodOffset + index * 104);
-                string stableId = ToHex(Slice(bytes, offset, 32));
-                string version = ToHex(Slice(bytes, offset + 32, 32));
-                if (methods.ContainsKey(stableId))
-                    throw new InvalidDataException("DHE MetaVersion has a duplicate method stable ID.");
-                methods.Add(stableId, version);
-            }
-            return new MetaVersionInfo
-            {
-                assemblyHash = Slice(bytes, 28, 32),
-                types = types,
-                methods = methods,
-            };
-        }
-
-        private static int CountAddedTypes(MetaVersionInfo baseline,
-            MetaVersionInfo current) => current.types.Keys.Count(id =>
-                !baseline.types.ContainsKey(id));
-
-        private static int CountAddedMethods(MetaVersionInfo baseline,
-            MetaVersionInfo current) => current.methods.Keys.Count(id =>
-                !baseline.methods.ContainsKey(id));
-
-        private static int CountRemovedTypes(MetaVersionInfo baseline,
-            MetaVersionInfo current) => baseline.types.Keys.Count(id =>
-                !current.types.ContainsKey(id));
-
-        private static int CountRemovedMethods(MetaVersionInfo baseline,
-            MetaVersionInfo current) => baseline.methods.Keys.Count(id =>
-                !current.methods.ContainsKey(id));
-
-        private static int CountChangedTypes(MetaVersionInfo baseline,
-            MetaVersionInfo current) => baseline.types.Count(item =>
-                current.types.TryGetValue(item.Key, out string version) &&
-                !string.Equals(item.Value, version, StringComparison.OrdinalIgnoreCase));
-
-        private static bool HasStructuralChanges(MetaVersionInfo baseline,
-            MetaVersionInfo current) =>
-            CountAddedTypes(baseline, current) > 0 ||
-            CountRemovedTypes(baseline, current) > 0 ||
-            CountChangedTypes(baseline, current) > 0 ||
-            CountAddedMethods(baseline, current) > 0 ||
-            CountRemovedMethods(baseline, current) > 0;
-
-        private static bool HasStructuralAdditions(MetaVersionInfo baseline,
-            MetaVersionInfo current) =>
-            CountAddedTypes(baseline, current) > 0 ||
-            CountAddedMethods(baseline, current) > 0;
+        private static MetaVersionInfo ParseMetaVersion(byte[] bytes, string expectedAssemblyName) =>
+            DheFixtureMetaVersion.Read(bytes, expectedAssemblyName);
 
         private static int CountChangedMethods(MetaVersionInfo baseline,
             MetaVersionInfo current)
@@ -1921,13 +1809,6 @@ namespace HybridCLR.Lab
             public string currentMetaVersion;
             public string baseMetaVersion;
             public string currentMetaVersionSha256;
-        }
-
-        private sealed class MetaVersionInfo
-        {
-            public byte[] assemblyHash;
-            public Dictionary<string, string> types;
-            public Dictionary<string, string> methods;
         }
 
         private sealed class LoadedDheAssembly
@@ -2072,6 +1953,7 @@ namespace HybridCLR.Lab
             public bool expected;
             public bool passed;
             public string error;
+            public DheFixturePolicy.LegacyProbeResult[] legacyProbes;
             public int existingEntryResult;
             public bool addedReferenceTypeFound;
             public bool addedGenericTypeFound;
@@ -2281,6 +2163,7 @@ namespace HybridCLR.Lab
             public int capabilityGenericVirtualResult;
             public bool structuralExpected;
             public bool structuralDispatchExpected;
+            public DheFixturePolicy.LegacyProbeResult[] structuralLegacyProbes;
             public bool structuralPassed;
             public string structuralError;
             public int structuralExistingEntryResult;
