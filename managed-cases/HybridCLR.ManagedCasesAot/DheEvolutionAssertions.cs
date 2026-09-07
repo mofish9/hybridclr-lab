@@ -97,8 +97,65 @@ namespace HybridCLR.Lab.ManagedCasesAot
             });
             Check("attribute-type-argument", () =>
             {
-                var marker = typeof(DheEvolutionCarrier).GetCustomAttribute<DheEvolutionTypeMarkerAttribute>();
-                Require(marker.Value == typeof(DheDemoCalculator), "new attribute Base type argument");
+                Type[] expected = { typeof(DheDemoCalculator), typeof(List<DheDemoCalculator[]>), typeof(DheDemoCalculator[,]) };
+                Type[] actual = typeof(DheEvolutionCarrier).GetCustomAttributes<DheEvolutionTypeMarkerAttribute>()
+                    .Select(marker => marker.Value).ToArray();
+                Require(actual.Length == expected.Length && expected.All(actual.Contains), "new attribute Base type arguments");
+                Type[] raw = typeof(DheEvolutionCarrier).GetCustomAttributesData()
+                    .Where(attribute => attribute.AttributeType == typeof(DheEvolutionTypeMarkerAttribute))
+                    .Select(attribute => (Type)attribute.ConstructorArguments[0].Value).ToArray();
+                Require(raw.Length == expected.Length && expected.All(raw.Contains), "new raw attribute Base type arguments");
+            });
+            Check("array-declarations", () =>
+            {
+                var carrier = new DheEvolutionCarrier();
+                FieldInfo vector = typeof(DheEvolutionCarrier).GetField(nameof(DheEvolutionCarrier.Vector));
+                FieldInfo matrix = typeof(DheEvolutionCarrier).GetField(nameof(DheEvolutionCarrier.Matrix));
+                Require(vector.FieldType == typeof(DheDemoCalculator[]) &&
+                    matrix.FieldType == typeof(DheDemoCalculator[,]), "new array field type identities");
+                vector.SetValue(carrier, new[] { instance });
+                matrix.SetValue(carrier, new[,] { { instance } });
+                Require(ReferenceEquals(carrier.Vector[0], instance) && ReferenceEquals(carrier.Matrix[0, 0], instance),
+                    "new array field assignments");
+            });
+            Check("ref-out-signature", () =>
+            {
+                MethodInfo method = typeof(DheEvolutionCarrier).GetMethod(nameof(DheEvolutionCarrier.Move));
+                Require(method.GetParameters().All(parameter => parameter.ParameterType == typeof(DheDemoCalculator).MakeByRefType()),
+                    "new ref/out parameter type identities");
+                object[] arguments = { instance, null! };
+                method.Invoke(null, arguments);
+                Require(arguments[0] == null && ReferenceEquals(arguments[1], instance), "new ref/out reflection invocation");
+                var callback = (DheEvolutionMove)Delegate.CreateDelegate(typeof(DheEvolutionMove), method);
+                DheDemoCalculator source = instance;
+                callback(ref source, out DheDemoCalculator target);
+                Require(source == null && ReferenceEquals(target, instance), "new ref/out delegate invocation");
+            });
+            Check("interface-and-constrained-call", () =>
+            {
+                Require(typeof(DheEvolutionOperation).GetInterfaces().Contains(typeof(IIntOperation)), "new type Base interface identity");
+                object operation = new DheEvolutionOperation();
+                Require(operation is IIntOperation && ((IIntOperation)operation).Apply(3) == 3003 &&
+                    DheCapabilityCases.GenericConstrained(new DheEvolutionOperation(), 3) == 3103,
+                    "new implementation Base interface and constrained calls");
+            });
+            Check("generic-constraint", () =>
+            {
+                Type parameter = typeof(DheEvolutionConstrained<>).GetGenericArguments().Single();
+                Require(parameter.GetGenericParameterConstraints().Single() == typeof(DheDemoCalculator), "new generic type Base constraint");
+                MethodInfo method = typeof(DheEvolutionCarrier).GetMethod(nameof(DheEvolutionCarrier.GenericEcho));
+                Require(method.GetGenericArguments().Single().GetGenericParameterConstraints().Single() == typeof(DheDemoCalculator),
+                    "new generic method Base constraint");
+                Require(ReferenceEquals(method.MakeGenericMethod(typeof(DheDemoCalculator)).Invoke(null, new object[] { instance }), instance) &&
+                    ReferenceEquals(new DheEvolutionConstrained<DheDemoCalculator>().Echo(instance), instance), "new constrained generic calls");
+            });
+            Check("generic-inheritance", () =>
+            {
+                Require(typeof(DheEvolutionGenericDerived).BaseType == typeof(GenericVirtualOperation<IntOperationStruct>),
+                    "new type generic Base parent identity");
+                object derived = new DheEvolutionGenericDerived();
+                Require(derived is GenericVirtualOperation<IntOperationStruct> operation &&
+                    operation.Apply(new IntOperationStruct(), 3) == 106, "new generic parent cast and virtual call");
             });
             Require(errors.Count == 0, "new type declarations: " + string.Join("; ", errors));
         }
@@ -146,7 +203,7 @@ namespace HybridCLR.Lab.ManagedCasesAot
         }
     }
 
-    [AttributeUsage(AttributeTargets.Class)]
+    [AttributeUsage(AttributeTargets.Class, AllowMultiple = true)]
     public sealed class DheEvolutionTypeMarkerAttribute : Attribute
     {
         public DheEvolutionTypeMarkerAttribute(Type value) { Value = value; }
@@ -154,13 +211,33 @@ namespace HybridCLR.Lab.ManagedCasesAot
     }
 
     [DheEvolutionTypeMarker(typeof(DheDemoCalculator))]
+    [DheEvolutionTypeMarker(typeof(List<DheDemoCalculator[]>))]
+    [DheEvolutionTypeMarker(typeof(DheDemoCalculator[,]))]
     public sealed class DheEvolutionCarrier
     {
         public DheDemoCalculator Value = null!;
         public List<DheDemoCalculator> Values = null!;
+        public DheDemoCalculator[] Vector = null!;
+        public DheDemoCalculator[,] Matrix = null!;
         public static DheDemoCalculator Echo(DheDemoCalculator value) => value;
+        public static T GenericEcho<T>(T value) where T : DheDemoCalculator => value;
+        public static void Move(ref DheDemoCalculator source, out DheDemoCalculator target)
+        {
+            target = source;
+            source = null!;
+        }
     }
 
     public sealed class DheEvolutionDerived : DheDemoCalculator { }
+    public sealed class DheEvolutionGenericDerived : GenericVirtualOperation<IntOperationStruct> { }
+    public sealed class DheEvolutionConstrained<T> where T : DheDemoCalculator
+    {
+        public T Echo(T value) => value;
+    }
+    public sealed class DheEvolutionOperation : IIntOperation
+    {
+        public int Apply(int value) => value + 3000;
+    }
+    public delegate void DheEvolutionMove(ref DheDemoCalculator source, out DheDemoCalculator target);
 }
 #endif
