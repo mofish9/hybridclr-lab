@@ -1,5 +1,28 @@
 # DHE evolution implementation and validation
 
+## In progress: unchanged generic methods without AOT code
+
+The indexed-argument repair leaves two Unity 2021 reflection failures because
+an unchanged generic definition can be instantiated without generated native
+code. Method-change status is not proof of AOT implementation availability.
+
+The next candidate passes explicit missing-AOT information from GenericMethod's
+original method-pointer lookup into interpreter eligibility. It also allows the
+existing slow call-pointer initialization and missing-invoker FGS preparation to
+select IL when no usable AOT implementation exists. Already-interpreted methods
+remain interpreted; unchanged methods with usable native code remain AOT.
+Ordinary supplemental metadata behavior must not change.
+
+Native regressions cover available/missing AOT, absent metadata, generic
+inflation, cached call-pointer initialization and FGS invoker fallback. All three
+engine hooks use their real headers and existing metadata/publication locks;
+no MethodInfo layout, new cache or new publication field is introduced. The
+primary Player gate is the unchanged cold 220-case suite, with explicit generic
+reflection and native-retention checks. No pre-touch, golden edits or performance
+claims are allowed. Native fixes get fresh Base identities; archived v10 and
+earlier Players remain unchanged. Full managed evolution, concurrency/ABI and
+performance/memory qualification remain the broader objective.
+
 ## Latest checkpoint: indexed interpreter bridge arguments
 
 HybridCLR `25b4d9f` fixes the reproduced indexed-argument corruption. The clean

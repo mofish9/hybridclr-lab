@@ -42,6 +42,13 @@ if (HYBRIDCLR_TEST_EXPECT_DHE)
     endif()
 endif()
 
+file(READ "${HYBRIDCLR_TEST_SOURCE_ROOT}/metadata/MetadataModule.h" HYBRIDCLR_METADATA_MODULE_HEADER)
+if (HYBRIDCLR_METADATA_MODULE_HEADER MATCHES "aotImplementationMissing")
+    set(HYBRIDCLR_TEST_HAS_MISSING_AOT_FALLBACK 1)
+else()
+    set(HYBRIDCLR_TEST_HAS_MISSING_AOT_FALLBACK 0)
+endif()
+
 set(HYBRIDCLR_DHE_SOURCES)
 if (EXISTS "${HYBRIDCLR_TEST_SOURCE_ROOT}/DheRuntime.cpp")
     list(APPEND HYBRIDCLR_DHE_SOURCES "${HYBRIDCLR_TEST_SOURCE_ROOT}/DheRuntime.cpp")
@@ -127,6 +134,9 @@ function(configure_hybridclr_target target)
     endif()
     if (HYBRIDCLR_TEST_HAS_INDEXED_STACK_ARGUMENTS)
         target_compile_definitions(${target} PRIVATE HYBRIDCLR_LAB_HAS_INDEXED_STACK_ARGUMENTS=1)
+    endif()
+    if (HYBRIDCLR_TEST_HAS_MISSING_AOT_FALLBACK)
+        target_compile_definitions(${target} PRIVATE HYBRIDCLR_LAB_HAS_MISSING_AOT_FALLBACK=1)
     endif()
     target_include_directories(${target} PRIVATE
         "${HYBRIDCLR_RUNTIME_ROOT}"

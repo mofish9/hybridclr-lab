@@ -660,6 +660,64 @@ namespace
         hybridclr::native_test::SetAOTMetadataAvailable(true);
         CHECK(hybridclr::metadata::MetadataModule::IsImplementedByInterpreter(&changed));
         CHECK(!hybridclr::metadata::MetadataModule::IsImplementedByInterpreter(&unchanged));
+#if HYBRIDCLR_LAB_HAS_MISSING_AOT_FALLBACK
+        Il2CppGenericMethod unchangedGeneric{};
+        unchangedGeneric.methodDefinition = &unchanged;
+        MethodInfo missingAot{};
+        missingAot.name = "UnchangedGeneric";
+        missingAot.klass = klass;
+        missingAot.token = unchanged.token;
+        missingAot.flags = unchanged.flags;
+        missingAot.is_inflated = true;
+        missingAot.genericMethod = &unchangedGeneric;
+        CHECK(!hybridclr::dhe::IsChangedMethod(&missingAot));
+        CHECK(!hybridclr::metadata::MetadataModule::IsImplementedByInterpreter(&missingAot));
+        CHECK(hybridclr::metadata::MetadataModule::IsImplementedByInterpreter(&missingAot, true));
+        CHECK(!missingAot.isInterpterImpl); // Eligibility must not publish method state.
+        hybridclr::native_test::SetAOTMetadataAvailable(false);
+        CHECK(!hybridclr::metadata::MetadataModule::IsImplementedByInterpreter(&missingAot, true));
+        hybridclr::native_test::SetAOTMetadataAvailable(true);
+
+        CHECK(hybridclr::InitAndGetInterpreterDirectlyCallMethodPointerSlow(&missingAot) ==
+            hybridclr::native_test::GetInterpreterMethodPointer());
+        CHECK(missingAot.isInterpterImpl);
+        CHECK(hybridclr::metadata::MetadataModule::IsImplementedByInterpreter(&missingAot));
+        CHECK(!hybridclr::dhe::IsChangedMethod(&missingAot));
+        CHECK(!hybridclr::metadata::MetadataModule::IsImplementedByInterpreter(&unchanged, false));
+
+#if HYBRIDCLR_LAB_FGS_TESTS
+        MethodInfo missingFgs{};
+        missingFgs.name = "UnchangedGeneric";
+        missingFgs.klass = klass;
+        missingFgs.token = unchanged.token;
+        missingFgs.flags = unchanged.flags;
+        missingFgs.is_inflated = true;
+        missingFgs.genericMethod = &unchangedGeneric;
+        missingFgs.methodPointer = DummyMethodPointer;
+        missingFgs.has_full_generic_sharing_signature = true;
+        missingFgs.indirect_call_via_invokers = true;
+        missingFgs.hasFullGenericSharingAotInvoker = false;
+        CHECK(hybridclr::PrepareFullGenericSharingMethod(&missingFgs));
+        CHECK(missingFgs.isInterpterImpl);
+        CHECK(missingFgs.invoker_method == hybridclr::native_test::GetInterpreterInvoker());
+
+        MethodInfo availableFgs{};
+        availableFgs.name = "UnchangedGeneric";
+        availableFgs.klass = klass;
+        availableFgs.token = unchanged.token;
+        availableFgs.flags = unchanged.flags;
+        availableFgs.is_inflated = true;
+        availableFgs.genericMethod = &unchangedGeneric;
+        availableFgs.methodPointer = DummyMethodPointer;
+        availableFgs.invoker_method = DummyInvoker;
+        availableFgs.has_full_generic_sharing_signature = true;
+        availableFgs.indirect_call_via_invokers = true;
+        availableFgs.hasFullGenericSharingAotInvoker = true;
+        CHECK(hybridclr::PrepareFullGenericSharingMethod(&availableFgs));
+        CHECK(!availableFgs.isInterpterImpl);
+        CHECK(availableFgs.methodPointer == DummyMethodPointer && availableFgs.invoker_method == DummyInvoker);
+#endif
+#endif
         MethodInfo supplemental{};
         supplemental.klass = klass;
         supplemental.token = 0x0600ffff;
