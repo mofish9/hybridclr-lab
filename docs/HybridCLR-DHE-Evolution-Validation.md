@@ -1,6 +1,21 @@
 # DHE evolution implementation and validation
 
-## Latest checkpoint: package compiler integration and cold differential
+## Latest checkpoint: same-runtime original/evolved cold differential
+
+The clean `7e35687` replay passes 18 cold Windows processes on six Bases: original
+and structurally evolved managed generations for all three engines, using the
+same frozen native/package implementation. Every process executes the complete
+220-case suite with zero differences. Both common resources and skipped updates
+pass; 792 structural assertions pass, 72 legacy probes are explicitly inapplicable,
+and all immutable-file checks hold. See
+`reports/dhe-evolution-compiler-generations-windows.md` for exact identities.
+
+This closes the current mixed-generation cold-suite gate. It does not implement
+the still-rejected generic-field, field-address, interface/vtable or layout
+changes, establish performance/memory benefits, or qualify Android/iOS. The next
+capability work targets fields added to an existing generic reference type.
+
+## Previous checkpoint: package compiler integration and cold differential
 
 The package-owned C# compiler transaction is integrated at `2c04c24`. Its
 33 transaction tests and nine compiler-patch tests pass separately on all three
