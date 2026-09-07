@@ -24,12 +24,12 @@ Its formal entry points, generated-output boundary, and complete four-assembly
 Player evidence are documented in
 `docs/HybridCLR-DHE-Toolchain.md`,
 `docs/HybridCLR-DHE-Workflow-Review.md` and
-`docs/HybridCLR-DHE-Formal-Project-Validation.md`. Toolchain `0.1.33` is the
+`docs/HybridCLR-DHE-Formal-Project-Validation.md`. Toolchain `0.1.34` is the
 current conditionally accepted source and three-engine Windows release; its exact
 evidence and remaining platform gates are recorded in
-`docs/HybridCLR-DHE-Opt4-Release-0.1.33.md`. Toolchains `0.1.18`, `0.1.20`,
+`docs/HybridCLR-DHE-Opt4-Release-0.1.34.md`. Toolchains `0.1.18`, `0.1.20`,
 `0.1.21`, `0.1.22`, `0.1.23`, `0.1.24`, `0.1.25`, `0.1.26`, `0.1.27`,
-`0.1.28`, `0.1.29`, `0.1.30`, `0.1.31`, and `0.1.32`
+`0.1.28`, `0.1.29`, `0.1.30`, `0.1.31`, `0.1.32`, and `0.1.33`
 are retained as historical evidence. Projects must install an
 authenticated package whose manifest has `releaseReady=true` and pin its exact
 package ID.
@@ -132,25 +132,31 @@ added to the seven-Base registry in one successor build; one revision 4 payload
 then passed all ten Windows Players and advanced the protected lab channel with
 exact ten-Base coverage. See
 `docs/HybridCLR-DHE-Opt4-Post-Release-Ten-Base-Lifecycle.md`.
-The current release line is `HybridCLRDhe-0.1.33-opt4.25`, Package ID
+The preceding release line is `HybridCLRDhe-0.1.33-opt4.25`, Package ID
 `1293dc857990633be5ac13d735d0e9012cc06c10923ddaf9cd8b247b6f63d3b7`. It preserves
 the normalized portable native manifest for archived workflow evidence while
 keeping the immutable original manifest bound to the Base build identity. Its
 clean source regression passes `153/153` checks across ten changed Base Players,
 one no-op Base, and the Unity 2021, Unity 2022, and Tuanjie 2022 resolver matrix.
-It retains the Android APK overlay/device gate and
-cross-target staging contract, and includes a target-independent iOS Xcode-export
-artifact gate. The iOS gate validates the exported `.xcodeproj`, `project.pbxproj`,
-`Classes`, `Libraries`, `Data`, and a canonical directory hash before evidence is
-accepted; it does not claim Xcode link, signing, device, or performance evidence.
-Android ARM64 device, iOS/macOS/Xcode execution, and production performance or
-memory gates remain incomplete; Windows evidence must not be presented as those
-target results.
-The formal revision 7 run retained ten historical Bases, onboarded three new
+Its formal revision 7 run retained ten historical Bases, onboarded three new
 revision 6 Bases built by the three real Editors, and promoted one resource head
 after all 13 Windows Players passed. Each new Base identified exactly two changed
 methods while unchanged dispatch remained AOT. See
 `docs/HybridCLR-DHE-Opt4-Release-0.1.33.md`.
+The current release line is `HybridCLRDhe-0.1.34-opt4.26`, Package ID
+`80b3d477927eb7018268f0e9951086ae1b59a4b2fbea0ffb5c006ad2ed481eb5`.
+Its C# `resource-release-qualify` command replaces the manual per-Base
+stage/Player/evidence loop with one exact-coverage operation. Direct `process`
+runners start local Players without a shell; `prequalified` runners revalidate
+complete reports returned by Android, iOS, or other external jobs. The clean
+source regression passes `157/157` checks. The formal package then started 13
+distinct Windows Player processes, covered all active Bases and all three engine
+workflows, and promoted the protected channel from revision 7 to revision 8.
+It retains the Android APK overlay/device gate and cross-target staging contract,
+and includes a target-independent iOS Xcode-export artifact gate. Android ARM64
+device, iOS/macOS/Xcode execution, and production performance or memory gates
+remain incomplete; Windows evidence must not be presented as those target results.
+See `docs/HybridCLR-DHE-Opt4-Release-0.1.34.md`.
 Base identity now also binds `engineWorkflow` and `il2cppCodeGeneration`.
 Unity 2021 is locked to `OptimizeSpeed`; Unity 2022 FGS and Tuanjie 2022 FGS
 are locked to `OptimizeSize`. Base evidence created before these fields existed
