@@ -1,5 +1,15 @@
 # DHE evolution implementation and validation
 
+## Latest checkpoint: September 8
+
+Runtime contract v8 now has six real Windows Bases: original and structurally
+evolved managed generations on each of the three engines. The clean `03ac677`
+replay passes 18 consecutive/skipped resource runs, with exact-current-DLL CLR
+observations and immutable Base hashes. See
+`reports/dhe-evolution-generations-windows.md` for identities, the corrected
+no-op report-schema failure, and remaining scope. Earlier sections below are
+the historical investigation, not claims about the latest qualification.
+
 ## Objective
 
 Compile all configured hot-update assemblies into each Base Player, then update
@@ -70,7 +80,7 @@ rollback of native code. Resource rollback must be a forward resource release.
 - [x] Create an isolated candidate worktree without changing formal releases.
 - [x] Reproduce structural updates on existing Windows Base Players.
 - [ ] Fix uncovered failures and expand realistic evolution coverage.
-- [x] Verify the six selected old/new Bases and consecutive/skipped structural updates with one payload.
+- [x] Verify original/evolved managed Bases on all three engines with common consecutive/skipped updates and independent CLR observations.
 - [ ] Freeze, review, and prepare the verified Android project handoff.
 
 ## First replay and reproducibility repairs
@@ -388,3 +398,28 @@ when a local constructor's type already belongs to Base. This includes
 compiler-generated Nullable/Embedded attributes, not just business marker types.
 Consequently earlier candidate Bases can be missing this capability even when
 their narrower declaration smoke passed. They cannot be relabeled as fixed.
+
+The v8 evolved no-op Players subsequently passed on all three engines. New v8
+original-generation Players also passed, but their enclosing workflows failed
+because the report schema required eight deletion probes even when no structural
+fixture existed. The fix permits an empty probe array for that no-op shape while
+still requiring exactly eight records for a structural report. Fifteen schema
+regressions pass; original failed workflow reports are retained, with corrected
+schema gates written separately. No Base was rebuilt to repair this schema.
+
+Both generations then consumed two resource-only updates and independently
+skipped the first update on every engine. An initial 18-process pass used only
+the existing internal generation marker. Review found that its value was not
+exported in the Player report, so a second fixture advances an observable Add
+result. The CLR executes the exact shipped DLL; the replay checks its hash and
+three observed values against every Player. All 18 runs pass at clean source
+`03ac677`, with Add returning 102 then 103. Thirty-three generation/observation
+tests include stale, missing, and malformed result rejection.
+
+This closes the selected mixed-generation lifecycle checkpoint, not the full
+goal. The evolved Base receives three method-body changes in these updates;
+additional structural changes after that evolved Base, named attribute members,
+constructor overloads, currently rejected layouts/interfaces/generic fields,
+member-level AOT availability, and the full 220-case DHE differential remain
+unfinished. Native/mobile/performance qualifications are not inferred from this
+Windows correctness replay.
