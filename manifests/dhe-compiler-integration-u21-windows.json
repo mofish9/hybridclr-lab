@@ -1,0 +1,53 @@
+{
+  "labRoot": "..",
+  "toolAssembly": "../../../artifacts/dhe-evolution-20260908/host-compiler-integration/HybridCLR.DheTool.dll",
+  "outputRoot": "../../../artifacts/dhe-evolution-20260908/replay-compiler-integration-u21",
+  "updates": [
+    "../../../artifacts/dhe-evolution-20260908/resource-compiler-integration-u21-aot",
+    "../../../artifacts/dhe-evolution-20260908/resource-compiler-integration-u21-interpreted"
+  ],
+  "referenceResults": [
+    "../../../artifacts/dhe-evolution-20260908/reference-full-suite-cold-first.json",
+    "../../../artifacts/dhe-evolution-20260908/reference-full-suite-cold-latest.json"
+  ],
+  "evolutionCheckRequirements": [
+    [
+      "repeated-structural-evolution",
+      "named-attribute-field",
+      "named-attribute-property",
+      "attribute-constructor-overload"
+    ],
+    [
+      "repeated-structural-evolution",
+      "named-attribute-field",
+      "named-attribute-property",
+      "attribute-constructor-overload"
+    ]
+  ],
+  "requireStructuralBaseGenerations": false,
+  "layoutDiagnostics": "after",
+  "timeoutSeconds": 300,
+  "bases": [
+    {
+      "label": "u21-consecutive",
+      "playerRoot": "../../../artifacts/dhe-evolution-20260908/base-compiler-integration-u21/player",
+      "buildIdentity": "../../../artifacts/dhe-evolution-20260908/base-compiler-integration-u21/build-identity.json"
+    },
+    {
+      "label": "u21-skipped",
+      "playerRoot": "../../../artifacts/dhe-evolution-20260908/base-compiler-integration-u21/player",
+      "buildIdentity": "../../../artifacts/dhe-evolution-20260908/base-compiler-integration-u21/build-identity.json",
+      "skipFirstUpdate": true
+    }
+  ],
+  "differentialManifest": "test-manifest.json",
+  "differentialGolden": "test-golden.json",
+  "differentialReferences": [
+    "../../../artifacts/dhe-evolution-20260908/differential-reference-cold-aot.bin",
+    "../../../artifacts/dhe-evolution-20260908/differential-reference-cold-interpreted.bin"
+  ],
+  "requireInterpretedCaseEntries": [
+    false,
+    true
+  ]
+}
