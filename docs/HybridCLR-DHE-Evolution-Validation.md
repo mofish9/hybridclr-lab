@@ -354,3 +354,37 @@ original Base and a Base already containing structural evolution, and checks
 unique process IDs. Twenty-one standalone positive/negative tests cover these
 decisions. Actual evolved Base builds and old/new shared-release replay remain
 required; these tests alone do not prove runtime evolution.
+
+The corrected replay runner at clean source `2c17392` passes all seven original
+Base runs; see `replay-engine-capabilities-frozen/report.json`. The initial
+runner revision confused the unrelated AOT control with Stable; its failed
+report is retained under `replay-unresolved-stubs-frozen`. New reports expose
+the two Stable classifications explicitly. Archived reports must prove the
+static Stable classification through their changed-caller record.
+
+## Evolved Base attribute identity regression
+
+The generation-aware Demo builds an evolved Base on all three Windows engines,
+but each actual no-op Player fails the custom attribute assertion inside
+`DheEvolutionAssertions.ValidateMarker`. `changedMethodCount=0`,
+`noOpAotBehaviorValidated=true`, and `structuralPassed=false`; the overall
+workflow correctly fails. The three preserved roots are `base-evolved-u21`,
+`base-evolved-u22`, and `base-evolved-tuanjie`. They are negative regression
+inputs, not qualified Base generations.
+
+Custom attribute data conversion resolved a local constructor from hidden
+Current MethodDefs, even when the attribute class already existed in Base.
+The candidate resolves constructor references through the homologous image
+before serializing their method indexes. This leaves ordinary interpreter and
+non-DHE supplemental images unchanged, adds no post-publication mutation, and
+retains the existing cache lock/publication sequence. The MV wire format does
+not change. Native compile/CTest and both legacy/evolved Player shapes must be
+rerun before qualification; named attribute members and added constructor
+overloads also need dedicated coverage.
+
+Runtime contract `dhe-runtime-v8` declares `homologous-attribute-constructors-v1`.
+Offline analysis reads actual CustomAttribute rows and requires that capability
+when a local constructor's type already belongs to Base. This includes
+compiler-generated Nullable/Embedded attributes, not just business marker types.
+Consequently earlier candidate Bases can be missing this capability even when
+their narrower declaration smoke passed. They cannot be relabeled as fixed.

@@ -29,6 +29,8 @@ internal sealed class MetaVersionSnapshot
     public MetaVersionMethod[] Methods { get; private init; } = Array.Empty<MetaVersionMethod>();
     [JsonIgnore]
     public string[] AddressTakenFieldIdentities { get; private init; } = Array.Empty<string>();
+    [JsonIgnore]
+    public string[] LocalAttributeConstructorTypeNames { get; private init; } = Array.Empty<string>();
 
     public static MetaVersionSnapshot Create(string assemblyPath)
     {
@@ -71,7 +73,22 @@ internal sealed class MetaVersionSnapshot
             Methods = methods,
             AddressTakenFieldIdentities = addressTakenFields.OrderBy(value => value,
                 StringComparer.Ordinal).ToArray(),
+            LocalAttributeConstructorTypeNames = ReadLocalAttributeConstructorTypes(module),
         };
+    }
+
+    private static string[] ReadLocalAttributeConstructorTypes(ModuleDefMD module)
+    {
+        var names = new HashSet<string>(StringComparer.Ordinal);
+        uint count = module.Metadata.TablesStream.CustomAttributeTable.Rows;
+        for (uint row = 1; row <= count; row++)
+        {
+            ITypeDefOrRef type = module.ReadCustomAttribute(row)?.Constructor?.DeclaringType ??
+                throw new InvalidDataException("Custom attribute constructor is missing.");
+            if (type.DefinitionAssembly?.FullName == module.Assembly.FullName)
+                names.Add(type.FullName);
+        }
+        return names.OrderBy(value => value, StringComparer.Ordinal).ToArray();
     }
 
     public object ToJson(string assemblyPath) => new

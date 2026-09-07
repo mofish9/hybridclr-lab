@@ -40,10 +40,25 @@ checks["unresolved-generic-stubs-old-runtime-rejected"] = !ResourceUpdateCompati
     comparison.RequiredRuntimeCapabilities);
 ResourceUpdateCompatibility unity2021 = ResourceUpdateCompatibility.Analyze(before, after,
     usesUnresolvedCallStubs: false);
-checks["unity2021-existing-generic-capability-retained"] = unity2021.Compatible &&
+checks["unity2021-does-not-require-unresolved-stub-fix"] = unity2021.Compatible &&
     !unity2021.RequiredRuntimeCapabilities.Contains("supplemental-generic-unresolved-stubs-v1") &&
     ResourceUpdateCompatibility.CanExecuteUpdate(ResourceUpdateCompatibility.RuntimeProtocol,
-        "dhe-runtime-v6", v6Capabilities, unity2021.RequiredRuntimeCapabilities);
+        ResourceUpdateCompatibility.CurrentNativeRuntimeContract, v6Capabilities, unity2021.RequiredRuntimeCapabilities);
+checks["local-attribute-constructor-types-scanned"] = after.LocalAttributeConstructorTypeNames
+    .Contains("HybridCLR.Lab.ManagedCasesAot.DheMetadataMarkerAttribute");
+checks["external-attribute-constructors-not-local"] = !after.LocalAttributeConstructorTypeNames
+    .Contains("System.Runtime.CompilerServices.AsyncStateMachineAttribute");
+checks["compiler-generated-base-attributes-also-require-fix"] =
+    after.LocalAttributeConstructorTypeNames.Contains("System.Runtime.CompilerServices.NullableAttribute") &&
+    before.Types.Any(type => type.Identity == "System.Runtime.CompilerServices.NullableAttribute") &&
+    comparison.RequiredRuntimeCapabilities.Contains("homologous-attribute-constructors-v1");
+ResourceUpdateCompatibility evolvedNoOp = ResourceUpdateCompatibility.Analyze(after, after);
+checks["evolved-base-attribute-capability-required"] = evolvedNoOp.Compatible &&
+    evolvedNoOp.RequiredRuntimeCapabilities.Contains("homologous-attribute-constructors-v1");
+checks["evolved-base-old-attribute-runtime-rejected"] = !ResourceUpdateCompatibility.CanExecuteUpdate(
+    ResourceUpdateCompatibility.RuntimeProtocol, "dhe-runtime-v7",
+    ResourceUpdateCompatibility.KnownRuntimeCapabilities.Where(value => value != "homologous-attribute-constructors-v1"),
+    evolvedNoOp.RequiredRuntimeCapabilities);
 checks["new-type-base-reference-old-runtime-rejected"] = !ResourceUpdateCompatibility.CanExecuteUpdate(
     ResourceUpdateCompatibility.RuntimeProtocol, "dhe-runtime-v3",
     ResourceUpdateCompatibility.KnownRuntimeCapabilities.Where(value => value != "supplemental-type-base-references-v1"),
@@ -53,7 +68,7 @@ checks["old-runtime-capabilities-rejected"] = !ResourceUpdateCompatibility.CanEx
     ResourceUpdateCompatibility.KnownRuntimeCapabilities.Where(value => value != "supplemental-method-custom-attributes-v1" &&
         value != "assembly-reference-evolution-v1"), comparison.RequiredRuntimeCapabilities);
 ResourceUpdateCompatibility noOp = ResourceUpdateCompatibility.Analyze(before, before);
-checks["noop-retains-old-runtime-support"] = noOp.Compatible &&
+checks["noop-does-not-require-new-method-capabilities"] = noOp.Compatible &&
     ResourceUpdateCompatibility.CanExecuteUpdate(ResourceUpdateCompatibility.RuntimeProtocol, "dhe-runtime-v2",
         ResourceUpdateCompatibility.KnownRuntimeCapabilities.Where(value => value != "supplemental-method-custom-attributes-v1" &&
             value != "assembly-reference-evolution-v1"), noOp.RequiredRuntimeCapabilities);

@@ -4,7 +4,7 @@ internal sealed class ResourceUpdateCompatibility
 {
 	public const string Policy = "dhe-proven-safe-subset-v1";
 	public const string RuntimeProtocol = "dhe-runtime-protocol-v1";
-    public const string CurrentNativeRuntimeContract = "dhe-runtime-v7";
+    public const string CurrentNativeRuntimeContract = "dhe-runtime-v8";
     public static readonly string[] KnownRuntimeCapabilities =
     {
 		"aot-guard-v1",
@@ -29,6 +29,7 @@ internal sealed class ResourceUpdateCompatibility
         "supplemental-type-declarations-v1",
         "supplemental-method-generic-invocation-v1",
         "supplemental-generic-unresolved-stubs-v1",
+        "homologous-attribute-constructors-v1",
         "supplemental-nested-types-v1",
         "supplemental-top-level-types-v1",
     };
@@ -240,6 +241,8 @@ internal sealed class ResourceUpdateCompatibility
         if (addedTypes.Any(type => !type.IsNested))
             requiredCapabilities.Add("supplemental-top-level-types-v1");
         var baseTypeNames = new HashSet<string>(baseline.Types.Select(type => type.Identity), StringComparer.Ordinal);
+        if (current.LocalAttributeConstructorTypeNames.Any(baseTypeNames.Contains))
+            requiredCapabilities.Add("homologous-attribute-constructors-v1");
         if (addedTypes.Any(type => type.LocalReferencedTypeNames.Any(baseTypeNames.Contains)))
             requiredCapabilities.Add("supplemental-type-base-references-v1");
         if (addedTypes.Any(type => type.LocalDeclarationReferencedTypeNames.Any(baseTypeNames.Contains)))
