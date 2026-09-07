@@ -1,0 +1,24 @@
+{
+  "labRoot": "..",
+  "toolAssembly": "../../../artifacts/dhe-evolution-20260908/host-generic/HybridCLR.DheTool.dll",
+  "outputRoot": "../../../artifacts/dhe-evolution-20260908/replay-u21-capabilities",
+  "updates": [
+    "../../../artifacts/dhe-evolution-20260908/resource-generic-u21",
+    "../../../artifacts/dhe-evolution-20260908/resource-generic-next-u21"
+  ],
+  "timeoutSeconds": 120,
+  "bases": [
+    {
+      "label": "u21-consecutive",
+      "playerRoot": "../../../artifacts/dhe-evolution-20260908/base-generic-u21/player",
+      "buildIdentity": "../../../artifacts/dhe-evolution-20260908/base-generic-u21/build-identity.json",
+      "skipFirstUpdate": false
+    },
+    {
+      "label": "u21-skipped",
+      "playerRoot": "../../../artifacts/dhe-evolution-20260908/base-generic-u21/player",
+      "buildIdentity": "../../../artifacts/dhe-evolution-20260908/base-generic-u21/build-identity.json",
+      "skipFirstUpdate": true
+    }
+  ]
+}

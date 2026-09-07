@@ -66,10 +66,12 @@ internal static class Program
         string sourceChanges = (await Run("git", new[] { "-C", lab, "status", "--porcelain" }, lab, 30)).Text.Trim();
         var results = new List<object>();
         var errors = new List<string>();
+        int distinctBaseCount = 0;
         try
         {
             var configuredIds = config.Bases.Select(item => Read(Resolve(item.BuildIdentity))
                 .GetProperty("baseId").GetString()!).ToHashSet(StringComparer.OrdinalIgnoreCase);
+            distinctBaseCount = configuredIds.Count;
             foreach (string update in updates)
             {
                 JsonElement manifest = Read(Path.Combine(update, "dhe-resource-update.json"));
@@ -146,7 +148,8 @@ internal static class Program
         {
             format = "hybridclr.dhe-evolution-smoke.json", schemaVersion = 1,
             generatedAtUtc = DateTimeOffset.UtcNow, passed = errors.Count == 0,
-            scope = "Windows structural multi-Base resource replay; not production qualification",
+            scope = "Windows structural resource replay; not production qualification",
+            distinctBaseCount,
             sourceHead, sourceTree, sourceChanges, runnerSha256 = Hash(typeof(Program).Assembly.Location),
             toolSha256 = Hash(tool), configSha256 = Hash(configPath), requiredChecks = RequiredChecks, results, errors,
         }, JsonOptions));
