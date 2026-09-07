@@ -393,7 +393,9 @@ internal static class LabCommands
         var destinationRoot = ResolvePath(lab, cli.Optional("outputroot") ?? "artifacts/engine-projects");
         var destination = Path.Combine(destinationRoot, workflowId);
         SafeDelete(destination, destinationRoot);
-        var source = Path.Combine(lab, "unity-test-project"); Directory.CreateDirectory(Path.Combine(destination, "Assets"));
+        var source = Path.Combine(lab, cli.Has("dhedemo") ? "unity2021-dhe-demo" : "unity-test-project");
+        RequireDirectory(source);
+        Directory.CreateDirectory(Path.Combine(destination, "Assets"));
         var workflows = ReadJson(Path.Combine(lab, "manifests/runtime-workflows.json"));
         var workflow = workflows.GetProperty("workflows").EnumerateArray().Single(x => StringProperty(x, "id") == workflowId);
         var managedCasesRoot = ResolvePath(lab, Path.Combine("artifacts", "managed-cases", target));

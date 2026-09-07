@@ -273,3 +273,16 @@ It does not change the MV wire format or stable identities. A v5 Base remains a
 negative regression input and cannot receive this native fix through resources.
 The candidate must pass real-header native tests and new Windows Base/Current
 runs before it supplies positive evidence.
+
+The five original declaration groups and five expanded groups now pass on the
+v6 Unity 2021 Windows Base. Expanded coverage includes arrays, ref/out reflection
+and delegates, Base interface implementation, type/method generic constraints,
+generic inheritance, and generic/array Type arguments in instantiated and raw
+attributes. The frozen `d42ec47` replay uses the original and expanded payloads
+on the same immutable Base, including an independent skipped-update process.
+This remains one Base identity, not completed multi-generation qualification.
+
+For other Windows engines, `prepare-engine-test-project -DheDemo` selects the
+same DHE Demo source instead of the ordinary interpreter test project. It keeps
+the existing isolated output, target-specific package and engine selection,
+and managed input staging. No Unity Library or native build cache is copied.
