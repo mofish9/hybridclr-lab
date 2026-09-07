@@ -70,7 +70,7 @@ rollback of native code. Resource rollback must be a forward resource release.
 - [x] Create an isolated candidate worktree without changing formal releases.
 - [x] Reproduce structural updates on existing Windows Base Players.
 - [ ] Fix uncovered failures and expand realistic evolution coverage.
-- [ ] Verify old/new Bases and consecutive/skipped updates with one payload.
+- [x] Verify the six selected old/new Bases and consecutive/skipped structural updates with one payload.
 - [ ] Freeze, review, and prepare the verified Android project handoff.
 
 ## First replay and reproducibility repairs
@@ -124,6 +124,9 @@ deletes archives, releases, or previous replay evidence.
 
 These 48 assertions are not the separate 220-case managed reference suite, and
 the report is not a production release qualification or a performance result.
+The frozen `c0ab3ac` replay completed 13 actual Windows processes with 13 unique
+PIDs and 624 successful assertion evaluations. See
+`reports/dhe-evolution-windows-c0ab3ac.md` for the exact evidence identity.
 
 ## Next capability failure: added attributed methods
 
