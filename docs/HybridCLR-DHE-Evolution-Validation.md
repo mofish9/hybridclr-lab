@@ -286,3 +286,15 @@ For other Windows engines, `prepare-engine-test-project -DheDemo` selects the
 same DHE Demo source instead of the ordinary interpreter test project. It keeps
 the existing isolated output, target-specific package and engine selection,
 and managed input staging. No Unity Library or native build cache is copied.
+
+Fresh Unity 2022 and Tuanjie preparation exposed a missing linker-input directory
+dependency. Bee calls the linker descriptor callback before populating staging.
+The assembly filter's list was also insufficient because it omitted framework
+dependencies. The package now uses the same current BuildReport file roles and
+filename precedence as PlayerBuildConfig: ManagedLibrary, DependentManagedLibrary,
+and ManagedEngineAPI. Unity 2021 still uses its supplied input directory because
+its BuildReport file inventory is incomplete at that callback. Newer Editors use
+GetFiles(). Both paths are checked in their actual Editors.
+Explicit input lists are tested with assemblies in different directories and
+without a staging directory. No static input cache or framework-directory guess
+is used. This changes Editor preparation only, not the v6 native runtime contract.

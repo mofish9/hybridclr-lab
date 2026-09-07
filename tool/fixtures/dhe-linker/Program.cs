@@ -46,6 +46,25 @@ var checks = new Dictionary<string, bool>
 string first = File.ReadAllText(linkPath);
 DheLinkerPreservation.Write(input, new[] { "Hotfix", "Hotfix" }, linkPath);
 checks["deterministic-and-deduplicated"] = first == File.ReadAllText(linkPath);
+string exactInputPath = Path.Combine(output, "exact-inputs.xml");
+string[] exactInputs = Directory.GetFiles(input, "*.dll");
+string graphImplementation = Path.Combine(output, "graph-inputs", "Implementation.dll");
+Directory.CreateDirectory(Path.GetDirectoryName(graphImplementation));
+File.Copy(Path.Combine(input, "Implementation.dll"), graphImplementation);
+string[] graphInputs = exactInputs.Where(path => Path.GetFileName(path) != "Implementation.dll")
+    .Append(graphImplementation).ToArray();
+DheLinkerPreservation.Write(graphInputs.Concat(graphInputs), new[] { "Hotfix" }, exactInputPath);
+checks["explicit-inputs-without-staging-directory"] = first == File.ReadAllText(exactInputPath);
+string missingInputPath = Path.Combine(output, "missing-input.xml");
+try
+{
+    DheLinkerPreservation.Write(exactInputs.Append(Path.Combine(input, "Absent.dll")), new[] { "Hotfix" }, missingInputPath);
+    checks["explicit-missing-input-rejected"] = false;
+}
+catch (FileNotFoundException)
+{
+    checks["explicit-missing-input-rejected"] = !File.Exists(missingInputPath);
+}
 string fullPath = Path.Combine(output, "future-api.xml");
 DheLinkerPreservation.Write(input, new[] { "Hotfix" }, fullPath, new[] { "Implementation" });
 checks["future-aot-assembly-retained-in-full"] = XDocument.Load(fullPath).Root.Elements("assembly")
