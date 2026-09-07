@@ -10,11 +10,11 @@ now has only the same two remaining exception differences: `divide_by_zero_catch
 and `invalid_cast_catch`. The overall gate remains failed. All three real-header
 compile/CTest gates pass. See `reports/dhe-evolution-missing-aot-generics-windows.md`.
 
-The indexed-argument repair leaves two Unity 2021 reflection failures because
+The indexed-argument repair left two Unity 2021 reflection failures because
 an unchanged generic definition can be instantiated without generated native
 code. Method-change status is not proof of AOT implementation availability.
 
-The next candidate passes explicit missing-AOT information from GenericMethod's
+This candidate passes explicit missing-AOT information from GenericMethod's
 original method-pointer lookup into interpreter eligibility. It also allows the
 existing slow call-pointer initialization and missing-invoker FGS preparation to
 select IL when no usable AOT implementation exists. Already-interpreted methods
@@ -167,7 +167,7 @@ existing Player runner's case-observation boundary. Golden exception comparisons
 remain mandatory. The partial binary, failed Player and logs remain under
 `replay-full-differential`; they are not passing 220-case evidence.
 
-## Latest checkpoint: logical attribute members
+## Previous checkpoint: logical attribute members
 
 The clean `8de07cb` replay passes 18 Windows processes across three original v8
 Bases and three repaired, already-evolved v9 Bases. Both common resource releases
