@@ -1,6 +1,27 @@
 # DHE evolution implementation and validation
 
-## Latest checkpoint: AOT compiler exception controls
+## Latest checkpoint: package compiler integration and cold differential
+
+The package-owned C# compiler transaction is integrated at `2c04c24`. Its
+33 transaction tests and nine compiler-patch tests pass separately on all three
+real Editor compilers. Fresh Unity 2021, Unity 2022 and Tuanjie Base workflows
+pass, including no-op Players and all three real-header native gates.
+
+The clean `51f71e1` replay passes nine cold Windows processes on these three
+Bases. Every run executes 220 cases with zero differences; all six interpreted
+runs have 220 entry receipts and all three retained-AOT runs have zero receipts.
+There is no diagnostic pre-touch or immutable Base-file change. See
+`reports/dhe-evolution-compiler-integration-windows.md` for exact identities.
+
+This closes the reproduced cold-suite failures, not the complete evolution
+objective. These Bases contain only one managed generation per engine. The next
+gate rebuilds original-generation Bases on the same frozen implementation and
+tests both generations against shared current resources, including skipped
+updates. Generic fields, field addresses, interface/layout and Unity-facing
+evolution, external AOT API availability, concurrency/GC/ABI and performance
+remain required. No formal branch/tag, Installer selection or CAT source changed.
+
+## Previous checkpoint: AOT compiler exception controls
 
 Unregistered, unguarded Unity 2021 AOT reproduces the two remaining exception
 differences with unchanged method IL. The supported divide-check option repairs
