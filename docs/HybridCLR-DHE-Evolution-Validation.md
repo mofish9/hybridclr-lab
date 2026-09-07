@@ -30,6 +30,14 @@ verifier checks unchanged compiler-data bytes and field declarations while leavi
 the output's actual RVA and MV intact. An exploratory CLR run now matches all 220
 golden cases, and the interpreted variant changes 554 managed method bodies.
 
+The first actual Unity 2021 replay reaches `checked_multiply_overflow`, then
+stops because the driver only caught TargetInvocationException while Unity
+propagated the case's OverflowException directly. The driver now records either
+the direct exception or one invocation wrapper's inner exception, matching the
+existing Player runner's case-observation boundary. Golden exception comparisons
+remain mandatory. The partial binary, failed Player and logs remain under
+`replay-full-differential`; they are not passing 220-case evidence.
+
 ## Latest checkpoint: logical attribute members
 
 The clean `8de07cb` replay passes 18 Windows processes across three original v8

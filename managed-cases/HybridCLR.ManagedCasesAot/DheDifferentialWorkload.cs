@@ -70,10 +70,11 @@ namespace HybridCLR.Lab.ManagedCasesAot
                     object observation = null;
                     string exceptionType = null;
                     try { observation = callback.DynamicInvoke(); }
-                    catch (TargetInvocationException exception)
+                    catch (Exception exception)
                     {
-                        if (exception.InnerException == null) throw;
-                        exceptionType = exception.InnerException.GetType().FullName;
+                        Exception original = exception is TargetInvocationException invocation && invocation.InnerException != null
+                            ? invocation.InnerException : exception;
+                        exceptionType = original.GetType().FullName;
                     }
                     WriteNullable(writer, observation == null ? null : (string)Property(observation, "ReturnValue"));
                     WriteNullable(writer, observation == null ? null : (string)Property(observation, "SideEffect"));
