@@ -226,6 +226,9 @@ namespace HybridCLR.Lab.ManagedCasesAot
                     data.Constructor.GetParameters().Length == 1 && data.ConstructorArguments.Count == 1 &&
                     (int)data.ConstructorArguments[0].Value == 5103, "new attribute constructor metadata");
             });
+#if DHE_GENERIC_FIELDS_CURRENT
+            DheGenericFieldEvolutionAssertions.Validate(Check);
+#endif
             Require(errors.Count == 0, "new type declarations: " + string.Join("; ", errors));
         }
 

@@ -39,6 +39,13 @@ namespace HybridCLR.Lab.ManagedCasesAot
         }
 
         public T Value { get; }
+
+#if DHE_GENERIC_FIELDS_CURRENT
+        public T AddedValue = default!;
+        public T[] AddedItems = null!;
+        public static T AddedShared = default!;
+        public static int AddedCount;
+#endif
     }
 #endif
 }
