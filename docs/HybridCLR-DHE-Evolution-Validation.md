@@ -236,3 +236,14 @@ reader/writer lock implementation. Unused metadata operations abort. Additional
 assertions cover supplemental definitions/inflations, absent supplemental mapping,
 and unchanged methods remaining native. This fixes the fixture without bypassing
 the production dispatch check.
+
+## Verified capability checkpoint
+
+HybridCLR `32d23ae` and package `80c00e7` passed the fresh three-engine native
+matrix. A new Unity 2021 Windows Base then executed the complete capability
+fixture successfully. Frozen replay source `686e0cb` passed two consecutive
+updates plus an independent skipped-first-update run: three unique processes,
+48 outer checks per run, and ten unchanged immutable files. This proves one
+current capable Base, not the older six-Base matrix for these new features.
+See `reports/dhe-evolution-capabilities-windows.md` for exact source/artifact
+identity, file-size costs, failure history, and remaining gates.
