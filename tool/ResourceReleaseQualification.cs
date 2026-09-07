@@ -498,7 +498,7 @@ internal static partial class Program
                 item.BaseId + ".");
 
         string workflowPath = Path.Combine(baseRoot,
-            "dhe-resource-player-workflow.json");
+            "resource-player-workflow-report.json");
         if (ResourcePlayerEvidence(new Cli("resource-player-evidence",
                 new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase)
                 {
