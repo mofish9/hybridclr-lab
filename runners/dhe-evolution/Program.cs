@@ -45,6 +45,8 @@ internal static class Program
         string configText = File.ReadAllText(configPath);
         Config config = JsonSerializer.Deserialize<Config>(configText, JsonOptions) ??
             throw new InvalidDataException("Missing replay configuration.");
+        Require(new[] { "off", "after", "types", "fields", "construct", "all" }.Contains(config.LayoutDiagnostics),
+            "Unknown layout diagnostic mode.");
         string Resolve(string path) => Path.GetFullPath(Path.Combine(Path.GetDirectoryName(configPath)!, path));
         string output = Resolve(config.OutputRoot);
         string tool = Resolve(config.ToolAssembly);
@@ -167,6 +169,7 @@ internal static class Program
                         if (differentialReferences.Length != 0)
                         {
                             environment["HYBRIDCLR_DHE_DIFFERENTIAL_RESULT"] = differentialPath;
+                            environment["HYBRIDCLR_DHE_LAYOUT_DIAGNOSTICS"] = config.LayoutDiagnostics;
                             if (interpretedEntries[index]) environment["HYBRIDCLR_DHE_CASE_ENTRIES"] = caseEntryRoot;
                         }
                         ProcessResult process = await Run(executable, new[] { "-batchmode", "-nographics", "-labMode", "dhe",
@@ -336,6 +339,8 @@ internal static class Program
             format = "hybridclr.dhe-evolution-smoke.json", schemaVersion = 1,
             generatedAtUtc = DateTimeOffset.UtcNow, passed = errors.Count == 0,
             scope = "Windows structural resource replay; not production qualification",
+            layoutDiagnostics = config.LayoutDiagnostics,
+            diagnosticPreTouch = config.LayoutDiagnostics is "types" or "fields" or "construct" or "all",
             distinctBaseCount,
             baseGenerations, requiredStructuralBaseGenerations = config.RequireStructuralBaseGenerations,
             sourceHead, sourceTree, sourceChanges, runnerSha256 = Hash(typeof(Program).Assembly.Location),
@@ -358,6 +363,7 @@ internal static class Program
         start.Environment.Remove("HYBRIDCLR_DHE_DIFFERENTIAL_RESULT");
         start.Environment.Remove("HYBRIDCLR_DHE_CASE_ENTRIES");
         start.Environment.Remove("HYBRIDCLR_DHE_EVOLUTION_EVIDENCE");
+        start.Environment.Remove("HYBRIDCLR_DHE_LAYOUT_DIAGNOSTICS");
         if (environment != null)
             foreach (var entry in environment) start.Environment[entry.Key] = entry.Value;
         using Process process = Process.Start(start) ?? throw new InvalidOperationException("Process start failed.");
@@ -406,7 +412,8 @@ internal static class Program
     private sealed record Config(string LabRoot, string ToolAssembly, string OutputRoot, string[] Updates, Base[] Bases,
         int TimeoutSeconds = 120, bool RequireStructuralBaseGenerations = false, string[]? ReferenceResults = null,
         string[][]? EvolutionCheckRequirements = null, string[]? DifferentialReferences = null,
-        bool[]? RequireInterpretedCaseEntries = null, string? DifferentialManifest = null, string? DifferentialGolden = null);
+        bool[]? RequireInterpretedCaseEntries = null, string? DifferentialManifest = null, string? DifferentialGolden = null,
+        string LayoutDiagnostics = "after");
     private sealed record Base(string Label, string PlayerRoot, string BuildIdentity, bool SkipFirstUpdate = false);
     private sealed record ProcessResult(int Id, int ExitCode, long ElapsedMilliseconds, string Text);
 }

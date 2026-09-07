@@ -36,6 +36,15 @@ prefix 64 NOP bytes to every case-assembly method. This exceeds the archived
 test Bases' default 32-byte inline budget without changing declarations or
 golden values. It is a diagnostic variant only, not a production workaround.
 
+The `4129fe1` field/construction diagnostic changes the result: interpreted
+cases pass after that pre-touch, while the cold and no-inline runs still fail.
+This is initialization-order evidence, not a repair. Runtime field offsets
+are correct when queried before the case (inner 0/4, outer 0/8), and reflected
+construction yields 2/3/5/7. The next fixture defaults to diagnostics AFTER the
+220 observations so qualification cannot silently rely on prewarming. Explicit
+types-only, fields-only, construction-only and combined pre-touch modes are
+recorded in the configuration/report and are diagnostic experiments only.
+
 The clean `8d04137` no-inline replay still fails the same nested generic case
 on all six Bases. No inlining fix is justified by that experiment. The next
 resource adds a separate layout diagnostic for `Pair<int>` and `Pair<Pair<int>>`,

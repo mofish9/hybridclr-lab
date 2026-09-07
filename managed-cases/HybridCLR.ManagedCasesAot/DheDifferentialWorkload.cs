@@ -15,6 +15,7 @@ namespace HybridCLR.Lab.ManagedCasesAot
     {
         internal const string ResultVariable = "HYBRIDCLR_DHE_DIFFERENTIAL_RESULT";
         internal const string EntriesVariable = "HYBRIDCLR_DHE_CASE_ENTRIES";
+        internal const string LayoutVariable = "HYBRIDCLR_DHE_LAYOUT_DIAGNOSTICS";
         private static bool _executed;
 
         public static void RunIfRequested()
@@ -41,7 +42,11 @@ namespace HybridCLR.Lab.ManagedCasesAot
             MethodInfo aotCount = api == null ? null : api.GetMethod("GetDifferentialAotEntryCount");
             if (api != null && (changed == null || interpreterCount == null || aotCount == null))
                 throw new MissingMethodException("DHE diagnostic API is incomplete.");
-            WriteLayoutDiagnostics(cases, path + ".layout.log");
+            string layoutMode = Environment.GetEnvironmentVariable(LayoutVariable) ?? "after";
+            if (!new[] { "off", "after", "types", "fields", "construct", "all" }.Contains(layoutMode))
+                throw new ArgumentException("Unknown layout diagnostic mode: " + layoutMode);
+            if (layoutMode != "after" && layoutMode != "off")
+                WriteLayoutDiagnostics(cases, path + ".layout.log", layoutMode);
 
             using (var stream = new FileStream(path, FileMode.CreateNew, FileAccess.Write, FileShare.Read))
             using (var writer = new BinaryWriter(stream, new UTF8Encoding(false)))
@@ -97,9 +102,11 @@ namespace HybridCLR.Lab.ManagedCasesAot
                 }
                 writer.Write(0x454e4f44);
             }
+            if (layoutMode == "after")
+                WriteLayoutDiagnostics(cases, path + ".layout.log", "all");
         }
 
-        private static void WriteLayoutDiagnostics(Assembly cases, string path)
+        private static void WriteLayoutDiagnostics(Assembly cases, string path, string mode)
         {
             using (var writer = new StreamWriter(new FileStream(path, FileMode.CreateNew,
                 FileAccess.Write, FileShare.Read), new UTF8Encoding(false)))
@@ -109,7 +116,9 @@ namespace HybridCLR.Lab.ManagedCasesAot
                     Type definition = cases.GetType("HybridCLR.Lab.ManagedCases.CaseRegistry+Pair`1", true);
                     Type pair = definition.MakeGenericType(typeof(int));
                     Type nested = definition.MakeGenericType(pair);
-                    foreach (Type type in new[] { pair, nested })
+                    writer.WriteLine("mode=" + mode);
+                    if (mode == "types") return;
+                    if (mode != "construct") foreach (Type type in new[] { pair, nested })
                     {
                         writer.WriteLine(type.FullName);
                         foreach (FieldInfo field in type.GetFields())
@@ -123,6 +132,7 @@ namespace HybridCLR.Lab.ManagedCasesAot
                         try { writer.WriteLine("marshaledSize=" + Marshal.SizeOf(Activator.CreateInstance(type))); }
                         catch (ArgumentException exception) { writer.WriteLine("marshaledSizeUnavailable=" + exception.Message); }
                     }
+                    if (mode == "fields") return;
                     object first = Activator.CreateInstance(pair, new object[] { 2, 3 });
                     object second = Activator.CreateInstance(pair, new object[] { 5, 7 });
                     object outer = Activator.CreateInstance(nested, new[] { first, second });
