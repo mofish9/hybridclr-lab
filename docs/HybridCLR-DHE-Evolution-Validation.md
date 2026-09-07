@@ -181,13 +181,18 @@ override. This is not a passing evolution Player result:
 `artifacts/dhe-evolution-20260908/player-evolution-u21.json` (workspace root).
 The offline assembly-reference check did not detect the missing member.
 
-The generated linker descriptor names framework types under the `netstandard`
-facade rather than their actual implementation assemblies. A package-owned
+The generated linker descriptor names referenced framework types under the
+`netstandard` facade rather than their actual implementation assemblies. A package-owned
 UnityLinker callback now resolves references against the target's real pre-link
 inputs, preserves those external types in their defining assemblies, and preserves
-all DHE root assemblies. Seven standalone tests cover forwarding, root retention,
-determinism, deduplication, and missing inputs. Unity 2021 Editor compilation also
-passes. A new Base must be built and tested; the failed Base is retained unchanged.
+all DHE root assemblies. The first rebuilt Base still failed: its original hotfix
+code does not reference Assembly at all, so reference-only preservation cannot
+cover the future API. The package therefore exposes `dhePreserveAotAssemblies`,
+defaulting to complete preservation of mscorlib, System, and System.Core. Other
+future AOT API libraries can be selected before freezing a Base. Nine standalone
+tests cover forwarding, root retention, future API libraries, determinism,
+deduplication, and missing inputs. A new Base must be built and tested; both failed
+Bases are retained unchanged. Base size/build-time costs must be measured.
 An archived Base cannot gain stripped native APIs through a resource update.
 
 The latest parameter-attribute evolution DLL also passed the eight offline

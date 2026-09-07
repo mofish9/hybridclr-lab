@@ -46,6 +46,21 @@ var checks = new Dictionary<string, bool>
 string first = File.ReadAllText(linkPath);
 DheLinkerPreservation.Write(input, new[] { "Hotfix", "Hotfix" }, linkPath);
 checks["deterministic-and-deduplicated"] = first == File.ReadAllText(linkPath);
+string fullPath = Path.Combine(output, "future-api.xml");
+DheLinkerPreservation.Write(input, new[] { "Hotfix" }, fullPath, new[] { "Implementation" });
+checks["future-aot-assembly-retained-in-full"] = XDocument.Load(fullPath).Root.Elements("assembly")
+    .Any(element => (string)element.Attribute("fullname") == "Implementation" &&
+        (string)element.Attribute("preserve") == "all");
+try
+{
+    DheLinkerPreservation.Write(input, new[] { "Hotfix" }, Path.Combine(output, "missing-future.xml"),
+        new[] { "MissingFuture" });
+    checks["missing-future-aot-assembly-rejected"] = false;
+}
+catch (FileNotFoundException)
+{
+    checks["missing-future-aot-assembly-rejected"] = !File.Exists(Path.Combine(output, "missing-future.xml"));
+}
 bool Rejects(string[] names, string destination)
 {
     try { DheLinkerPreservation.Write(input, names, destination); return false; }
