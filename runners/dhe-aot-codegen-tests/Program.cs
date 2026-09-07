@@ -11,6 +11,8 @@ var results = new List<object>();
 bool passed = true;
 string patched = Path.Combine(root, "patched", "Unity.IL2CPP.dll");
 await Check("valid-input", input, patched, inputHash, true);
+File.Copy(Path.Combine(Path.GetDirectoryName(input)!, "Unity.IL2CPP.DataModel.dll"),
+    Path.Combine(Path.GetDirectoryName(patched)!, "Unity.IL2CPP.DataModel.dll"));
 string patchedHash = Hash(patched);
 await Check("wrong-hash", input, Path.Combine(root, "wrong-hash.dll"), new string('0', 64), false);
 await Check("existing-output", input, patched, inputHash, false);

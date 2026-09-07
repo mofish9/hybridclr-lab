@@ -3,9 +3,11 @@
     <OutputType>Exe</OutputType>
     <TargetFramework>net6.0</TargetFramework>
     <ImplicitUsings>enable</ImplicitUsings>
-    <Nullable>enable</Nullable>
+    <Nullable>disable</Nullable>
+    <DheUnityPackageRoot Condition="'$(DheUnityPackageRoot)' == ''">$(MSBuildThisFileDirectory)../../unity2021-dhe-demo/Packages/com.code-philosophy.hybridclr</DheUnityPackageRoot>
   </PropertyGroup>
   <ItemGroup>
+    <Compile Include="$(DheUnityPackageRoot)/Editor/Il2CppDef/DheAotCompilerPatch.cs" Link="DheAotCompilerPatch.cs" />
     <Reference Include="dnlib"><HintPath>../../tool/dnlib.dll</HintPath></Reference>
   </ItemGroup>
 </Project>

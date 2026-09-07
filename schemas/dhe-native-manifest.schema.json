@@ -24,6 +24,20 @@
       }
     },
     "generatedCppRoot": { "type": "string", "minLength": 1 },
+    "compilerIdentity": {
+      "type": ["object", "null"],
+      "additionalProperties": false,
+      "required": ["contract", "engineVersion", "originalCompilerSha256", "compilerSha256", "dataModelSha256", "additionalIl2CppArgs", "divideByZeroChecks"],
+      "properties": {
+        "contract": { "const": "dhe-aot-codegen-v1" },
+        "engineVersion": { "type": "string", "minLength": 1 },
+        "originalCompilerSha256": { "type": "string", "pattern": "^[0-9a-f]{64}$" },
+        "compilerSha256": { "type": "string", "pattern": "^[0-9a-f]{64}$" },
+        "dataModelSha256": { "type": "string", "pattern": "^[0-9a-f]{64}$" },
+        "additionalIl2CppArgs": { "type": "string", "minLength": 1 },
+        "divideByZeroChecks": { "const": true }
+      }
+    },
     "changedMethodCount": { "type": "integer", "minimum": 0 },
     "supportedChangedMethodCount": { "type": "integer", "minimum": 0 },
     "unsupportedChangedMethodCount": { "type": "integer", "minimum": 0 },
