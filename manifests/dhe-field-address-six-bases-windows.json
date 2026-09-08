@@ -1,7 +1,7 @@
 {
   "labRoot": "..",
   "toolAssembly": "../../../artifacts/dhe-evolution-20260908/host-field-bound/HybridCLR.DheTool.dll",
-  "outputRoot": "../../../artifacts/dhe-evolution-20260908/replay-field-six-run",
+  "outputRoot": "../../../artifacts/dhe-evolution-20260908/replay-field-six-verified",
   "updates": [
     "../../../artifacts/dhe-evolution-20260908/resource-field-six-first",
     "../../../artifacts/dhe-evolution-20260908/resource-field-six-latest"

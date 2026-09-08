@@ -223,6 +223,8 @@ internal static class Program
                                 bool existed = callerBase.methods.TryGetValue(method.StableId, out string? original);
                                 Require(!existed || string.Equals(original, method.Version, StringComparison.OrdinalIgnoreCase),
                                     "Existing native caller was changed; this cannot prove retained AOT slot dispatch: " + method.Name);
+                                Require(existed || !callerBase.types.ContainsKey(method.DeclaringTypeStableId),
+                                    "New caller evidence requires an interpreter-only declaring type absent from Base.");
                                 return !existed;
                             });
                             string routingPath = evolutionEvidencePath + ".generic-interface-callers";
