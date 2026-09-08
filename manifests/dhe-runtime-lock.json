@@ -20,8 +20,8 @@
       "repository": "il2cpp_plus",
       "sourceMode": "integrated",
       "baseCommit": "511df62f4aa7cba2bdb505deead48a8d080d582c",
-      "integratedCommit": "01c17253b198590671280eecf91b819a5f2d622b",
-      "expectedTreeSha256": "10F946A415B585F2A10316CED35E24E5DE37B0B84AE143BBBACFA9D50393BB74",
+      "integratedCommit": "566a4b270d597bfc5e0a72b83b678fecf7ca3a6e",
+      "expectedTreeSha256": "00D022327D702E56D0388130E3BDED5BA4FC669DC1A2472C742E54B41792BA11",
       "engineWorkflows": [
         "Unity2021Standard"
       ],
@@ -35,8 +35,8 @@
       "repository": "il2cpp_plus",
       "sourceMode": "integrated",
       "baseCommit": "bf15337e189ae7da5876aa51c9b896a36c52a155",
-      "integratedCommit": "4e3637d9d44f672aacd3580717ad7f5c9317a0d8",
-      "expectedTreeSha256": "90C930484BC6AB67E85B600A829744FF9F138A80F2192E84AE5D80A5A1901E07",
+      "integratedCommit": "27dd0ee877bc94a75584378ca8f590ca88753e21",
+      "expectedTreeSha256": "A3D136DAC5D34F483DF607A146F79E1B72B4DF414BACFEEB6F6F3D40E5DB24E7",
       "engineWorkflows": [
         "Unity2022Fgs"
       ],
@@ -50,8 +50,8 @@
       "repository": "il2cpp_plus",
       "sourceMode": "integrated",
       "baseCommit": "82162cb681f1564807d2ab5e7f3a9312271d0a73",
-      "integratedCommit": "98873c0602384b2db5f2cb9448d8cdcb856cd664",
-      "expectedTreeSha256": "803F23C0DE4E069D0D9866452FBB73C98E617E03230F94307A60D7488EA88672",
+      "integratedCommit": "6159455972722c94dfc4b4adbedceb62c6905618",
+      "expectedTreeSha256": "6902183EDE353342AAAE15D8F63384883F306D71FE27116AA81070CACEECB7D5",
       "engineWorkflows": [
         "Tuanjie2022Fgs"
       ],
@@ -65,8 +65,8 @@
       "repository": "hybridclr_unity",
       "sourceMode": "integrated",
       "baseCommit": "623073baafd5a1d12ea46df8145de9fddc899fac",
-      "integratedCommit": "5d172565543145b428ba20fb0b90d5d514b66949",
-      "expectedTreeSha256": "B2D69A43E5C09DB119FFAE609A37D294C3754CAFC5108DF5193BE177F22E9BB0",
+      "integratedCommit": "ba2da96cec9512d83c88cbc5a2b1247b0bf93fbd",
+      "expectedTreeSha256": "C51FC5052473F3A4F3FF8AEB60624F0B35BDB002807C97BE2028FAA69D0FFBC0",
       "treeHashIgnoredPaths": [
         "Editor/BuildProcessors/AddLil2cppSourceCodeToXcodeproj2023OrNewer.cs.meta"
       ],

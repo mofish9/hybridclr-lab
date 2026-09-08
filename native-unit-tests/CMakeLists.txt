@@ -90,6 +90,9 @@ add_library(hybridclr_runtime_api_compile_gate OBJECT
     "${HYBRIDCLR_TEST_SOURCE_ROOT}/RuntimeApi.cpp"
 )
 
+add_library(hybridclr_codegen_header_compile_gate OBJECT codegen_header_compile.cpp)
+add_dependencies(hybridclr_native_tests hybridclr_codegen_header_compile_gate)
+
 add_library(hybridclr_interpreter_compile_gate OBJECT
     "${HYBRIDCLR_TEST_SOURCE_ROOT}/interpreter/InterpreterModule.cpp"
     "${HYBRIDCLR_TEST_SOURCE_ROOT}/interpreter/Interpreter_Execute.cpp"
@@ -170,6 +173,7 @@ endfunction()
 configure_hybridclr_target(hybridclr_native_tests)
 configure_hybridclr_target(hybridclr_metadata_compile_gate)
 configure_hybridclr_target(hybridclr_runtime_api_compile_gate)
+configure_hybridclr_target(hybridclr_codegen_header_compile_gate)
 configure_hybridclr_target(hybridclr_interpreter_compile_gate)
 configure_hybridclr_target(hybridclr_engine_reflection_compile_gate)
 

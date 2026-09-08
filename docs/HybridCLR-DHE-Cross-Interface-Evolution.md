@@ -1,5 +1,21 @@
 # DHE cross-assembly and inherited interface evolution
 
+## Player header dependency regression
+
+After the shared-log repair, the actual Tuanjie evolved Base build reaches native
+compilation and fails in its generated precompiled header: codegen's virtual
+dispatch helper references `hybridclr::dhe` without declaring that namespace.
+The preserved failure is `base-cross-virtual-tuanjie-shared-log/unity-scripts.log`.
+The prior compile gate included HybridCLR headers first and missed this ordering.
+
+Add a standalone compile unit consuming the codegen header in Player include
+order. First retain its failure on the archived v20 Tuanjie runtime, then add the
+explicit DheRuntime.h dependency to each engine's helper header and run all three
+real-header gates. This is an include dependency repair: dispatch semantics,
+MV schema, capabilities and archived Players must remain unchanged. New source
+identities must be bound before building the two missing Tuanjie Bases. Reuse
+already successful v19/v20 Bases by their actual identities and capabilities.
+
 ## Objective and fixed inputs
 
 Extend the completed 42-group interface checkpoint without modifying its six
