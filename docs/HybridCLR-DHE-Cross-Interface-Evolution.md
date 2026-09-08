@@ -43,3 +43,22 @@ header profiles and build fresh Base identities; do not overwrite old Players.
 Rollback selects the last matched native/package/tool snapshot and its proven
 resources. General virtual/layout evolution, Unity behavior, sidecar expansion,
 external AOT availability, GC/ABI/concurrency stress and performance remain open.
+
+## First payload fingerprint diagnosis
+
+The initial `cross-interface-prepared-identity/report.json` is preserved with its
+18/19 failure: all 220 case entry versions were expected to remain unchanged.
+`cross-interface-rva-diagnostic/report.json` retains that failure and proves the
+cause. All 220 bodies and method metadata match; 12 dependency fingerprints differ.
+Compiler-generated array constants have identical bytes at different RVA addresses.
+Recomputing only in memory with the old RVAs restores all 220 method versions.
+No DLL, embedded MV, scanner algorithm or archived result is rewritten.
+
+The fixture now explicitly checks unchanged bodies/metadata, the existing cross-image
+AOT callers, and the absence of unexplained dependency changes. First-payload case
+routing is mixed: 208 retained-AOT candidates and 12 conservatively invalidated
+entries on the diagnosed evolved Base. Every actual Player method state must still
+match its own exact Base/current MV; latest requires all 220 interpreted receipts.
+This does not resolve the scanner's RVA sensitivity or qualify AOT retention as
+optimal. Removing that sensitivity while preserving immutable Base contracts is
+separate unfinished work; the old all-AOT assertion did not pass.
