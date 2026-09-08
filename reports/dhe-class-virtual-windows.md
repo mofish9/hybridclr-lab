@@ -21,7 +21,7 @@ AOT 依赖不热更。Unity 2021 不再安排新门禁；Android/iOS 尚无设�
 ## 精确源码和工具身份
 
 本轮在 research/dhe-class-virtual-v8.13.0 及两个 engine 对应研究工作树实施，
-所有候选提交可 fast-forward 收拢回 research/dhe-evolution 系列工作树。
+候选提交以 fast-forward 收拢回 research/dhe-evolution 系列工作树，运行时提交身份不变。
 没有修改正式 optimize 分支、runtime tag、Installer 默认选择或 CAT 项目。
 
 | 组件 | 精确 commit |
@@ -144,3 +144,9 @@ runtime-class-virtual-reflection-bound 中各自的精确来源。
 本轮早期输入/设置的恢复点也保留：Unity b9bdb6f、a59ac6e；团结 1b99e72、8bae46e。
 没有删除以前的 stash 或失败 Player。后续构建输入仍以显式归档和 manifest 为准，
 不要直接恢复不明 stash 后把它当作当前已验证构建。
+
+本轮已结束的 replay-class-virtual-old-six-observable 与 replay-class-virtual-eight
+副本启用了透明 NTFS 压缩。前后复核全部 10,206 个文件的内容哈希汇总完全一致，
+文件与路径均保留；观察到 C: 可用空间增加约 6.8 GiB 至约 17.4 GiB。详细结果在
+class-virtual-replay-compression-audit.json。这是本地存储维护，不属于跨平台构建
+依赖，也不改变任何历史执行结果。
