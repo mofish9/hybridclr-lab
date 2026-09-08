@@ -235,6 +235,9 @@ namespace HybridCLR.Lab.ManagedCasesAot
 #if DHE_INTERFACE_EVOLUTION_CURRENT
             DheInterfaceEvolutionAssertions.Validate(Check);
 #endif
+#if DHE_CROSS_INTERFACE_CURRENT
+            DheCrossInterfaceEvolutionAssertions.Validate(Check);
+#endif
             Require(errors.Count == 0, "new type declarations: " + string.Join("; ", errors));
         }
 
