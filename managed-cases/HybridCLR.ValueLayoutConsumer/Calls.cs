@@ -1,0 +1,65 @@
+extern alias OtherValues;
+using System;
+using System.Runtime.CompilerServices;
+using HybridCLR.Lab.ValueLayout;
+using OtherPayload = OtherValues::HybridCLR.Lab.ValueLayout.Payload;
+
+namespace HybridCLR.Lab.ValueLayoutConsumer
+{
+    public struct LocalWrapper { public Nested Value; public object Marker; }
+    public static class Calls
+    {
+        [MethodImpl(MethodImplOptions.NoInlining)]
+        public static Payload DirectCopy(Payload value) => value;
+        [MethodImpl(MethodImplOptions.NoInlining)]
+        public static Nested NestedCopy(Nested value) => value;
+        [MethodImpl(MethodImplOptions.NoInlining)]
+        public static LocalWrapper LocalNestedCopy(LocalWrapper value) => value;
+        [MethodImpl(MethodImplOptions.NoInlining)]
+        public static GenericValue<Payload> GenericCopy(GenericValue<Payload> value) => value;
+        [MethodImpl(MethodImplOptions.NoInlining)]
+        public static Payload? NullableCopy(Payload? value) => value;
+        [MethodImpl(MethodImplOptions.NoInlining)]
+        public static object ForwardBox() => Factory.Box(Factory.Create());
+        [MethodImpl(MethodImplOptions.NoInlining)]
+        public static object GenericForwardBox() => Factory.Box(Factory.Identity(Factory.Create()));
+        [MethodImpl(MethodImplOptions.NoInlining)]
+        public static Payload ArrayElement(Payload[] values, int index) => values[index];
+        [MethodImpl(MethodImplOptions.NoInlining)]
+        public static void RefRoundTrip(ref Payload value) => value = DirectCopy(value);
+        [MethodImpl(MethodImplOptions.NoInlining)]
+        public static int ContainerNeighbor(InlineChild owner) => owner.Neighbor;
+        [MethodImpl(MethodImplOptions.NoInlining)]
+        public static int GenericContainerNeighbor(GenericOwner<Payload> owner) => owner.Neighbor;
+        [MethodImpl(MethodImplOptions.NoInlining)]
+        public static int Unrelated(int value) => value + 1;
+        [MethodImpl(MethodImplOptions.NoInlining)]
+        public static UnchangedValue UnchangedCopy(UnchangedValue value) => value;
+        [MethodImpl(MethodImplOptions.NoInlining)]
+        public static OtherPayload OtherAssemblyCopy(OtherPayload value) => value;
+        [MethodImpl(MethodImplOptions.NoInlining)]
+        public static GenericValue<int> UnchangedGenericCopy(GenericValue<int> value) => value;
+        [MethodImpl(MethodImplOptions.NoInlining)]
+        public static T OpenGenericCopy<T>(T value) => value;
+
+        public static bool Run()
+        {
+            Payload value = Factory.Create();
+            var nested = new Nested { Value = value, Tail = 19 };
+            var local = new LocalWrapper { Value = nested, Marker = new object() };
+            var generic = new GenericValue<Payload> { Value = value, Marker = 23 };
+            Payload copy = DirectCopy(value); copy.Count = 29;
+            Payload alias = value; RefRoundTrip(ref alias);
+            return value.Count == 17 && copy.Count == 29 && NestedCopy(nested).Tail == 19 &&
+                LocalNestedCopy(local).Value.Value.Count == 17 && GenericCopy(generic).Marker == 23 &&
+                NullableCopy(value).Value.Count == 17 && ((Payload)ForwardBox()).Count == 17 &&
+                ((Payload)GenericForwardBox()).Count == 17 && ArrayElement(new[] { value }, 0).Count == 17 &&
+                alias.Count == 17 && ContainerNeighbor(new InlineChild { Neighbor = 31 }) == 31 &&
+                GenericContainerNeighbor(new GenericOwner<Payload> { Neighbor = 37 }) == 37 &&
+                Unrelated(41) == 42 && UnchangedCopy(new UnchangedValue { Value = 43 }).Value == 43 &&
+                OtherAssemblyCopy(new OtherPayload { Count = 47 }).Count == 47 &&
+                UnchangedGenericCopy(new GenericValue<int> { Value = 53 }).Value == 53 &&
+                OpenGenericCopy(value).Count == 17;
+        }
+    }
+}
