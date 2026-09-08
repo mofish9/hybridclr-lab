@@ -188,3 +188,29 @@ transaction cleanup and failed artifacts. Commit 0787aad adds the explicit cast;
 the runtime remains v25 with the same capability. These failed roots are
 native-generic-signatures and base-generic-signatures-interface-u21. New staged
 sources, compile gates and Players must use the corrected commit.
+
+## Corrected signatures and a retained-entry harness failure
+
+The corrected 0787aad native candidate passes all three real-header gates and
+the U21 Base/no-op workflow at clean tool source 19b0ef3. The frozen payload
+replay at clean f3785c1 passes latest and skipped-latest: 61 groups, 220 cases,
+zero differences and 220 interpreted case receipts in each process. First
+executes all 61 groups, but the Player exits 1 because dispatchProbeValidated
+still requires one of three fixed entry methods to have changed. The complete
+replay remains failed at replay-mr-u21 and must remain unchanged.
+
+Its actual Base/Current MV and runtime receipt agree: ExerciseCurrentMembers
+is unchanged, executes once, and its call contains 39 interpreter entries.
+The same fixed-entry rejection is also present in the old v24 report. Keeping
+this wrapper in AOT while its callees change is intended differential behavior.
+The mixed-dispatch fixture reproduces the erroneous rejection using the real
+DLLs and failed Player result (13/14 checks before repair).
+
+The Demo now accepts the existing MV-bound structural-call receipt as execution
+evidence, while preserving changedProbeChanged=false for an unchanged probe.
+The host independently validates MV, native routing, execution, and counters.
+Negative tests reject zero/negative counters, missing execution, wrong native
+or MV routing, wrong Base membership and wrong method identity. No managed
+workload, golden, native source or archived Player is changed. A new Demo Base
+and replay are required; the broader Release qualification commands still use
+the old changedProbeChanged requirement and must be aligned before promotion.

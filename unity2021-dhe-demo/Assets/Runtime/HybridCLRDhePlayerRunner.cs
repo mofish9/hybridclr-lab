@@ -450,9 +450,11 @@ namespace HybridCLR.Lab
                 instanceStableChanged == instanceStableExpectedChanged;
             bool representativeChanged = addChanged || multiBaseProbeChanged ||
                 structural.entryDispatch?.ChangedBaseEntryExecuted == true;
+            bool interpretedStructuralCall = structural.entryDispatch?.InterpretedCallExecuted == true;
             bool changedBehaviorValidated = changedMethodCount == 0
                 ? noOpAotBehaviorValidated && structural.passed && newHotfixValidated
-                : (representativeChanged && !identityUnchangedChanged && stableDispatchValidated &&
+                : ((representativeChanged || interpretedStructuralCall) &&
+                    !identityUnchangedChanged && stableDispatchValidated &&
                     mainBehaviorConsistencyValidated && capabilityConsistencyValidated &&
                     multiAssemblyConsistencyValidated && workflowInterpreterEntryCount > 0 &&
                     workflowAotEntryCount > 0 && structural.passed && newHotfixValidated);

@@ -296,7 +296,14 @@ internal static class Program
                             DheFixturePolicy.ValidateEntryDispatch(baseMv, currentMv, evidence);
                             Require(evidence.interpreterEntries <= result.GetProperty("interpreterEntryCount").GetInt32(),
                                 "Structural entry count exceeds the complete workflow count.");
+                            if (result.GetProperty("changedMethodCount").GetInt32() > 0 &&
+                                !result.GetProperty("changedProbeChanged").GetBoolean())
+                                Require(evidence.InterpretedCallExecuted,
+                                    "Unchanged probe entries require an MV-bound call with interpreted execution.");
                         }
+                        else if (result.GetProperty("changedMethodCount").GetInt32() > 0)
+                            Require(result.GetProperty("changedProbeChanged").GetBoolean(),
+                                "Changed resource has neither a changed probe nor mixed-call evidence.");
                         Require(result.GetProperty("interpreterEntryCount").GetInt32() > 0 &&
                             result.GetProperty("aotEntryCount").GetInt32() > 0, "Both execution paths must be exercised.");
                         Require(originalHashes.All(pair => Hash(pair.Key) == pair.Value), "Player modified immutable Base files.");

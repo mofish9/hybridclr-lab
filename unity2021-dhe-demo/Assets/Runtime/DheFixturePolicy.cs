@@ -131,6 +131,12 @@ namespace HybridCLR.Lab
 
             public bool ChangedBaseEntryExecuted => presentInBase && expectedChanged &&
                 nativeChanged && executed && interpreterEntries > 0;
+
+            // An unchanged AOT entry can call changed or added interpreted
+            // methods. This is execution evidence for the call, not a claim
+            // that the entry itself changed. ValidateEntryDispatch binds it to MV.
+            public bool InterpretedCallExecuted => executed && interpreterEntries > 0 &&
+                (!presentInBase || nativeChanged == expectedChanged);
         }
 
         public static void ValidateLegacyEvidence(DheFixtureMetaVersion baseline,
