@@ -1,5 +1,8 @@
 # DHE 六 Base 世代与证据工具验证（Windows）
 
+这是 v26 checkpoint 的记录。后续类虚方法演进与八 Base 当前验证见
+[类虚方法报告](dhe-class-virtual-windows.md)；本文的源码身份和历史结果保持不变。
+
 ## 结论与范围
 
 Unity 2022 和团结 2022 各有 original、evolved、generic-interface 三类 Base。

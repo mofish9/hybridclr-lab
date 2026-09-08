@@ -1,6 +1,22 @@
 # DHE evolution implementation and validation
 
-## Active checkpoint: six 2022 Bases and mixed-call evidence pass
+## Active checkpoint: class virtual evolution across eight Windows Bases
+
+Clean 8634f3c passes 24 unique processes across six unchanged v26 Bases and two
+new class-virtual v27 Bases, on Unity 2022 and Tuanjie 2022. Each run executes
+71 evolution groups and 220 differential cases with zero differences. Both
+new Base/no-op/schema workflows pass with zero interpreter entries. Eight
+retained AOT callers pass on the new Bases; new types remain interpreted on
+older Bases. The independent audit rehashes 378 evidence/original/replayed
+files and verifies that all 16 DLL/MV payload files are unchanged by the
+runtime reflection fix. See reports/dhe-class-virtual-windows.md.
+
+This is conditional Windows correctness, not a complete DHE implementation or
+performance/release qualification. External AOT descendant reflection, further
+virtual Base generations, value-type layouts, parent replacement and Unity
+behavior still require work. MV remains DHEMETA1/schema 1.
+
+## Historical checkpoint: six 2022 Bases and mixed-call evidence pass
 
 Clean dc5396c passes original/evolved/generic-interface Bases on both active
 engines: 18 unique processes, 61 evolution groups and 220 differential cases
