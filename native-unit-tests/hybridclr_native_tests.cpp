@@ -462,6 +462,94 @@ namespace
     }
 
 #if HYBRIDCLR_LAB_DHE_ENABLED
+    void TestDheCurrentImagePlan()
+    {
+#if defined(HYBRIDCLR_DHE_HAS_CURRENT_IMAGE_PLAN)
+        using namespace hybridclr::dhe;
+        MetaVersionData base, current;
+        base.assemblyName = current.assemblyName = "ValueLayout";
+        base.assemblyHash.fill(31);
+        current.assemblyHash.fill(32);
+        MetaVersionType value, owner;
+        value.stableId.fill(1); value.token = 0x02000002; value.flags = 1;
+        owner.stableId.fill(2); owner.token = 0x02000003;
+        base.types = { value, owner };
+        value.token = 0x02000003; value.version.fill(2);
+        owner.token = 0x02000002;
+        current.types = { owner, value };
+        MetaVersionMethod member, caller, unrelated;
+        member.stableId.fill(11); member.declaringTypeStableId.fill(1);
+        member.token = 0x06000002; member.flags = 8;
+        caller.stableId.fill(12); caller.declaringTypeStableId.fill(2);
+        caller.token = 0x06000005; caller.flags = 8;
+        unrelated.stableId.fill(13); unrelated.declaringTypeStableId.fill(2);
+        unrelated.token = 0x06000009; unrelated.flags = 8;
+        base.methods = { member, caller, unrelated };
+        member.token = 0x0600000a;
+        caller.token = 0x06000007;
+        unrelated.token = 0x06000002; // Collides with a different Base method.
+        current.methods = { unrelated, caller, member };
+        CurrentImagePlan plan;
+        CHECK(BuildCurrentImagePlan(base, current, { value.token }, { caller.token }, plan));
+        CHECK(plan.assemblyName == base.assemblyName);
+        CHECK(plan.baseAssemblyHash == base.assemblyHash && plan.currentAssemblyHash == current.assemblyHash);
+        CHECK(plan.types.size() == 1 && plan.types[0].baseToken == 0x02000002 &&
+            plan.types[0].currentToken == value.token);
+        CHECK(plan.methods.size() == 2 && plan.methods[0].baseToken == 0x06000002 &&
+            plan.methods[0].currentToken == member.token && plan.methods[1].baseToken == 0x06000005 &&
+            plan.methods[1].currentToken == caller.token);
+        CHECK(base.methods[0].version == current.methods[2].version); // Layout, not IL, forces selection.
+        CHECK(BuildCurrentImagePlan(base, current, { value.token }, { caller.token, member.token }, plan));
+        CHECK(plan.methods.size() == 2); // Explicit/owner selection has one binding.
+        auto olderBase = base;
+        olderBase.assemblyHash.fill(40);
+        olderBase.types[0].token = 0x02000008;
+        olderBase.methods[0].token = 0x06000015;
+        CHECK(BuildCurrentImagePlan(olderBase, current, { value.token }, { caller.token }, plan));
+        CHECK(plan.baseAssemblyHash == olderBase.assemblyHash && plan.currentAssemblyHash == current.assemblyHash);
+        CHECK(plan.types[0].baseToken == 0x02000008 && plan.types[0].currentToken == value.token);
+        CHECK(plan.methods.size() == 2 && plan.methods[1].baseToken == 0x06000015 &&
+            plan.methods[1].currentToken == member.token); // Same Current, different Base tokens.
+        CHECK(BuildCurrentImagePlan(base, base, {}, {}, plan));
+        CHECK(plan.types.empty() && plan.methods.empty());
+
+        auto rejects = [&](const MetaVersionData& oldMv, const MetaVersionData& newMv,
+            std::vector<uint32_t> types, std::vector<uint32_t> methods) {
+            CurrentImagePlan sentinel;
+            sentinel.assemblyName = "unchanged-on-failure";
+            sentinel.types.emplace_back(123, 456);
+            CHECK(!BuildCurrentImagePlan(oldMv, newMv, types, methods, sentinel));
+            CHECK(sentinel.assemblyName == "unchanged-on-failure" && sentinel.types.size() == 1 &&
+                sentinel.types[0].currentToken == 456);
+        };
+        rejects(base, current, { value.token, value.token }, {});
+        rejects(base, current, {}, { caller.token, caller.token });
+        rejects(base, current, { caller.token }, {});
+        rejects(base, current, {}, { value.token });
+        rejects(base, current, { 0x02000001 }, {}); // <Module> is not storage.
+        rejects(base, current, {}, { 0x06000099 });
+        auto invalid = current;
+        invalid.assemblyName = "Other";
+        rejects(base, invalid, { value.token }, {});
+        invalid = current; invalid.types[1].stableId.fill(99);
+        rejects(base, invalid, { value.token }, {}); // New types already use interpreter storage.
+        invalid = current; invalid.methods[1].stableId.fill(99);
+        rejects(base, invalid, {}, { caller.token });
+        invalid = current; invalid.types[1].flags = 0;
+        rejects(base, invalid, { value.token }, {}); // Value/reference kind cannot be remapped.
+        invalid = current; invalid.methods[1].flags = 4; // Native-only entry needs its own bridge.
+        rejects(base, invalid, {}, { caller.token });
+        invalid = current; invalid.methods[2].flags = 4;
+        rejects(base, invalid, { value.token }, {}); // Also reject implicit native member selection.
+        invalid = current; invalid.types.push_back(invalid.types[0]);
+        rejects(base, invalid, { value.token }, {});
+        invalid = current; invalid.methods[0].token = caller.token;
+        rejects(base, invalid, {}, { caller.token });
+        invalid = base; invalid.methods[0].declaringTypeStableId.fill(99);
+        rejects(invalid, current, { value.token }, {});
+#endif
+    }
+
     void TestDheMethodRegistry()
     {
         using DheI4I4 = int32_t(*)(const MethodInfo*, int32_t);
@@ -883,6 +971,12 @@ namespace
         CHECK(physicalCurrent.isInterpterImpl);
         CHECK(hybridclr::dhe::ResolveInterpreterMethod(&changed) == &physicalCurrent);
         CHECK(hybridclr::dhe::ResolveInterpreterMethod(&physicalCurrent) == &physicalCurrent);
+#if defined(HYBRIDCLR_DHE_HAS_CURRENT_IMAGE_PLAN)
+        CHECK(hybridclr::dhe::ResolveCurrentExecutionMethod(&changed) == &physicalCurrent);
+        CHECK(hybridclr::dhe::ResolveCurrentExecutionMethod(&physicalCurrent) == &physicalCurrent);
+        CHECK(hybridclr::dhe::ResolveCurrentExecutionMethod(&unchanged) == &unchanged);
+        CHECK(hybridclr::dhe::ResolveCurrentExecutionMethod(nullptr) == nullptr);
+#endif
         CHECK(hybridclr::dhe::CanEnterWithBaseAbi(&changed));
         CHECK(hybridclr::dhe::ShouldDispatchToInterpreter(&changed));
         CHECK(!hybridclr::dhe::IsChangedMethod(&unchanged));
@@ -1011,6 +1105,9 @@ namespace
 		CHECK(hybridclr::dhe::IsRemovedType(klass));
 		CHECK(hybridclr::dhe::IsChangedMethod(&changed));
 		CHECK(hybridclr::dhe::IsRemovedMethod(&changed));
+#if defined(HYBRIDCLR_DHE_HAS_CURRENT_IMAGE_PLAN)
+        CHECK(hybridclr::dhe::ResolveCurrentExecutionMethod(&changed) == &changed);
+#endif
 		MethodInfo currentTokenCollision = changed;
 		currentTokenCollision.isInterpterImpl = true;
 		CHECK(!hybridclr::dhe::IsChangedMethod(&currentTokenCollision));
@@ -2088,6 +2185,7 @@ int main()
     TestBlobReader();
     TestMetadataUtilities();
 #if HYBRIDCLR_LAB_DHE_ENABLED
+    TestDheCurrentImagePlan();
     TestDheMethodRegistry();
 #endif
     TestOpcodeDecode();
