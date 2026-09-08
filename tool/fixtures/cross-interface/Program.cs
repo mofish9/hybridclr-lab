@@ -75,6 +75,12 @@ checks["candidate-capabilities-satisfy-declarations"] = ResourceUpdateCompatibil
     ResourceUpdateCompatibility.KnownRuntimeCapabilities, analyses[names[0]].RequiredRuntimeCapabilities);
 checks["missing-assembly-set-requires-declaration-capability"] = ResourceUpdateCompatibility.Analyze(
     baseline[names[0]], current[names[0]]).RequiredRuntimeCapabilities.Contains(declarationCapability);
+const string inheritedCapability = "inherited-interface-dispatch-v1";
+checks["inherited-interface-capability-required"] = analyses[names[0]].RequiredRuntimeCapabilities.Contains(inheritedCapability);
+checks["declaration-only-runtime-rejected"] = !ResourceUpdateCompatibility.CanExecuteUpdate(
+    ResourceUpdateCompatibility.RuntimeProtocol, "dhe-runtime-v17",
+    ResourceUpdateCompatibility.KnownRuntimeCapabilities.Where(value => value != inheritedCapability),
+    analyses[names[0]].RequiredRuntimeCapabilities);
 bool passed = checks.Values.All(value => value);
 Directory.CreateDirectory(output);
 File.WriteAllText(Path.Combine(output, "report.json"), JsonSerializer.Serialize(new

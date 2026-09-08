@@ -4,7 +4,7 @@ internal sealed class ResourceUpdateCompatibility
 {
 	public const string Policy = "dhe-proven-safe-subset-v1";
 	public const string RuntimeProtocol = "dhe-runtime-protocol-v1";
-    public const string CurrentNativeRuntimeContract = "dhe-runtime-v17";
+    public const string CurrentNativeRuntimeContract = "dhe-runtime-v18";
     public static readonly string[] KnownRuntimeCapabilities =
     {
 		"aot-guard-v1",
@@ -20,6 +20,7 @@ internal sealed class ResourceUpdateCompatibility
         "supplemental-instance-field-addresses-v1",
         "existing-interface-method-slots-v1",
         "cross-assembly-interface-declarations-v1",
+        "inherited-interface-dispatch-v1",
 		"supplemental-existing-type-methods-v1",
 		"removed-existing-type-methods-v1",
 		"existing-type-method-signature-replacement-v1",
@@ -235,6 +236,13 @@ internal sealed class ResourceUpdateCompatibility
                     assembly.TypeReferenceScopes.TryGetValue(name, out string? scope) &&
                     scope.Split('\n').Any(identity => identity.Split(',')[0] == current.AssemblyName)))))
             requiredCapabilities.Add("cross-assembly-interface-declarations-v1");
+        var interfaceOwners = current.Types.Where(type => !type.IsInterface &&
+            type.LocalDeclarationReferencedTypeNames.Any(evolvedInterfaces.Contains))
+            .Select(type => type.Identity).ToHashSet(StringComparer.Ordinal);
+        if (evolvedInterfaces.Count != 0 && (currentAssemblySet == null || currentAssemblySet.Any(assembly =>
+                assembly.TypeParents.Values.Any(parent => parent.AssemblyName == current.AssemblyName &&
+                    interfaceOwners.Contains(parent.TypeName)))))
+            requiredCapabilities.Add("inherited-interface-dispatch-v1");
         if (!new HashSet<string>(baseline.AssemblyReferences.Values, StringComparer.Ordinal)
                 .SetEquals(current.AssemblyReferences.Values))
             requiredCapabilities.Add("assembly-reference-evolution-v1");

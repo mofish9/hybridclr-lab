@@ -80,3 +80,26 @@ declares `cross-assembly-interface-declarations-v1`. Resource compatibility requ
 it when an existing interface gains methods and another Current assembly references
 that interface; missing assembly-set context is conservative. v16 capability sets
 are rejected by the focused test. Actual repaired Player execution is still pending.
+
+## Inherited-slot crash after declaration resolution
+
+The v17 Unity 2021 Base/no-op workflow passes at `base-cross-declarations-u21`.
+All three real-header native gates pass at `native-cross-declarations/<profile>`.
+The packaged command rejects all six archived v16 Bases at
+`resource-cross-declarations-v16-rejected` and emits no resource manifest.
+
+Clean `bc1f0af` then reproduces three access violations at
+`replay-cross-declarations-u21-cold`. The old AOT Probe.Run reaches its interface
+Compute(int) invocation, but receives Describe() from the inherited old parent
+vtable. The integer argument becomes an invalid MethodInfo pointer in the wrong
+native signature. The symbolized log identifies DheRuntime.cpp:456 and
+CrossAssemblyDerived.cpp:656; crash dumps are copied to `cross-declarations-crashes`.
+This is a failed candidate, not a completed capability checkpoint.
+
+The next candidate uses Current parent definitions as well as Current interfaces
+inside a DHE vtable dependency graph. Native Base definitions remain immutable.
+The v18 contract adds `inherited-interface-dispatch-v1`; the resource analyzer
+requires it when an evolved interface's implementing/referencing type has a derived
+type in the Current assembly set. Missing set context is conservative. Class
+virtual slots on newly interpreted descendants and generic inflation need actual
+Player verification; no result is assumed from this source-level repair.
