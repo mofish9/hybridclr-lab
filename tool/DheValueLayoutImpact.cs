@@ -5,9 +5,17 @@ namespace HybridCLR.DheTool;
 // Planning only: an impact result does not enable value-layout loading. The
 // runtime/storage implementation must satisfy these obligations before release.
 public sealed record DheValueLayoutMethodImpact(string AssemblyName, string MethodIdentity,
-    string Decision, string[] ChangedValueTypes);
+    string Decision, string[] ChangedValueTypes)
+{
+    public uint CurrentMethodToken { get; init; }
+}
 public sealed record DheValueLayoutTypeImpact(string TypeIdentity, bool RequiresOrdinaryAotBridge,
-    string[] ChangedValueTypes);
+    string[] ChangedValueTypes)
+{
+    public string AssemblyName { get; init; } = "";
+    public string DefinitionIdentity { get; init; } = "";
+    public uint CurrentTypeToken { get; init; }
+}
 public sealed record DheValueLayoutImpactResult(string[] ChangedValueTypes,
     DheValueLayoutTypeImpact[] Layouts, DheValueLayoutMethodImpact[] Methods);
 
@@ -36,6 +44,7 @@ public static class DheValueLayoutImpact
         private readonly HashSet<string> changed = new(StringComparer.Ordinal);
         private readonly Dictionary<string, HashSet<string>> layouts = new(StringComparer.Ordinal);
         private readonly Dictionary<string, bool> genericLayouts = new(StringComparer.Ordinal);
+        private readonly Dictionary<string, TypeDef> layoutDefinitions = new(StringComparer.Ordinal);
         private readonly HashSet<string> visiting = new(StringComparer.Ordinal);
 
         public Analysis(IEnumerable<string> paths, IEnumerable<string> ordinaryAotPaths)
@@ -135,7 +144,8 @@ public static class DheValueLayoutImpact
                             methods.Add(new(entry.Key, identity,
                                 ordinary || method.IsPinvokeImpl ? "native-abi-bridge" :
                                 dependencies.Count != 0 ? "interpret" : "inspect-generic-context",
-                                dependencies.OrderBy(value => value, StringComparer.Ordinal).ToArray()));
+                                dependencies.OrderBy(value => value, StringComparer.Ordinal).ToArray())
+                            { CurrentMethodToken = method.MDToken.Raw });
                     }
                 }
             }
@@ -143,7 +153,12 @@ public static class DheValueLayoutImpact
                 layouts.Where(entry => entry.Value.Count != 0).OrderBy(entry => entry.Key, StringComparer.Ordinal)
                     .Select(entry => new DheValueLayoutTypeImpact(entry.Key,
                         !hotfixAssemblies.Contains(entry.Key.Split('|')[0]),
-                        entry.Value.OrderBy(value => value, StringComparer.Ordinal).ToArray())).ToArray(),
+                        entry.Value.OrderBy(value => value, StringComparer.Ordinal).ToArray())
+                    {
+                        AssemblyName = layoutDefinitions[entry.Key].DefinitionAssembly.Name.String,
+                        DefinitionIdentity = TypeKey(layoutDefinitions[entry.Key]),
+                        CurrentTypeToken = layoutDefinitions[entry.Key].MDToken.Raw,
+                    }).ToArray(),
                 methods.OrderBy(method => method.AssemblyName, StringComparer.Ordinal)
                     .ThenBy(method => method.MethodIdentity, StringComparer.Ordinal).ToArray());
         }
@@ -201,6 +216,7 @@ public static class DheValueLayoutImpact
                 Inline(field.FieldType, use.Context, result, ref generic);
             visiting.Remove(use.Key);
             layouts.Add(use.Key, result);
+            layoutDefinitions.Add(use.Key, use.Definition);
             genericLayouts.Add(use.Key, generic);
             open |= generic;
             return result;

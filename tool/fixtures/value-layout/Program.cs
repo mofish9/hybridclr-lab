@@ -2,6 +2,7 @@ using System.Diagnostics;
 using System.Runtime.Loader;
 using System.Security.Cryptography;
 using System.Text.Json;
+using System.Text.Json.Nodes;
 using HybridCLR.DheTool;
 
 string[] assemblies = { "HybridCLR.ValueLayoutModel", "HybridCLR.ValueLayoutOther", "HybridCLR.ValueLayoutConsumer" };
@@ -23,6 +24,82 @@ string Run(string executable, string root, params string[] arguments)
     string result = stdout.GetAwaiter().GetResult() + stderr.GetAwaiter().GetResult();
     if (process.ExitCode != 0) throw new InvalidOperationException(result);
     return result;
+}
+if (args.Length == 6 && args[0] == "probe-project")
+{
+    string lab = Path.GetFullPath(args[1]), package = Path.GetFullPath(args[2]),
+        fixture = Path.GetFullPath(args[4]), destination = Path.GetFullPath(args[5]);
+    NewOutput(destination);
+    string engineVersion = args[3] == "Unity2022Fgs" ? "2022.3.62f3" :
+        args[3] == "Tuanjie2022Fgs" ? "2022.3.62t12" : throw new ArgumentException("Unknown engine.");
+    void CopyTree(string source, string target)
+    {
+        Directory.CreateDirectory(target);
+        foreach (string file in Directory.GetFiles(source))
+            if (Path.GetFileName(file) != ".git") File.Copy(file, Path.Combine(target, Path.GetFileName(file)));
+        foreach (string directory in Directory.GetDirectories(source))
+            if (Path.GetFileName(directory) != ".git") CopyTree(directory, Path.Combine(target, Path.GetFileName(directory)));
+    }
+    CopyTree(Path.Combine(lab, "unity2021-dhe-demo/ProjectSettings"), Path.Combine(destination, "ProjectSettings"));
+    CopyTree(package, Path.Combine(destination, "Packages/com.code-philosophy.hybridclr"));
+    var packageManifest = JsonNode.Parse(File.ReadAllText(Path.Combine(lab, "unity2021-dhe-demo/Packages/manifest.json")))!;
+    packageManifest["dependencies"]!.AsObject().Remove("com.code-philosophy.hybridclr");
+    if (args[3] == "Unity2022Fgs") packageManifest["dependencies"]!.AsObject().Remove("com.unity.modules.infinity");
+    File.WriteAllText(Path.Combine(destination, "Packages/manifest.json"), packageManifest.ToJsonString(json));
+    File.WriteAllText(Path.Combine(destination, "ProjectSettings/ProjectVersion.txt"), "m_EditorVersion: " + engineVersion + "\n");
+    Directory.CreateDirectory(Path.Combine(destination, "Assets/Editor"));
+    Directory.CreateDirectory(Path.Combine(destination, "Assets/Plugins/ValueLayout"));
+    foreach (string name in assemblies.Append(nativeAssembly))
+        File.Copy(Path.Combine(fixture, name + ".dll"), Path.Combine(destination, "Assets/Plugins/ValueLayout", name + ".dll"));
+    string templateRoot = Path.Combine(lab, "tool/fixtures/value-layout/Unity");
+    File.Copy(Path.Combine(templateRoot, "CurrentStorageRuntime.cs"), Path.Combine(destination, "Assets/CurrentStorageRuntime.cs"));
+    File.Copy(Path.Combine(templateRoot, "CurrentStorageProbeBuild.cs"), Path.Combine(destination, "Assets/Editor/CurrentStorageProbeBuild.cs"));
+    File.WriteAllText(Path.Combine(destination, "Assets/link.xml"), "<linker>" +
+        string.Join("", assemblies.Append(nativeAssembly).Append("Assembly-CSharp").Select(name => "<assembly fullname=\"" + name + "\" preserve=\"all\"/>")) + "</linker>");
+    File.WriteAllText(Path.Combine(destination, "probe-source.json"), JsonSerializer.Serialize(new
+    {
+        scope = "Current storage research probe; no DHE native guards or production workflow qualification",
+        labHead = Run("git", lab, "rev-parse", "HEAD").Trim(), labChanges = Run("git", lab, "status", "--porcelain").Trim(),
+        packageHead = Run("git", package, "rev-parse", "HEAD").Trim(), engineVersion,
+        inputAssemblies = assemblies.Append(nativeAssembly).Select(name => new { name, sha256 = Hash(Path.Combine(fixture, name + ".dll")) }).ToArray(),
+    }, json));
+    Console.WriteLine(destination);
+    return 0;
+}
+if (args.Length == 4 && args[0] == "probe-payload")
+{
+    string probeBase = Path.GetFullPath(args[1]), probeCurrent = Path.GetFullPath(args[2]), probeOutput = Path.GetFullPath(args[3]);
+    NewOutput(probeOutput);
+    var probeImpact = DheValueLayoutImpact.Analyze(assemblies.Select(name => Path.Combine(probeBase, name + ".dll")),
+        assemblies.Select(name => Path.Combine(probeCurrent, name + ".dll")), new[] { Path.Combine(probeBase, nativeAssembly + ".dll") });
+    var selections = assemblies.Select(name =>
+    {
+        string beforeFile = Path.Combine(probeBase, name + ".dll"), afterFile = Path.Combine(probeCurrent, name + ".dll");
+        var old = MetaVersionSnapshot.Create(beforeFile); var next = MetaVersionSnapshot.Create(afterFile);
+        old.WriteBinary(Path.Combine(probeOutput, "base", name + ".mv"));
+        next.WriteBinary(Path.Combine(probeOutput, "current", name + ".mv"));
+        File.Copy(afterFile, Path.Combine(probeOutput, "current", name + ".dll"));
+        // The probe explicitly enters its static, argument-free roots with
+        // Current metadata. Full native entry/caller coverage remains a gate.
+        uint[] entryTokens = probeImpact.ChangedValueTypes.Length == 0 ? Array.Empty<uint>() :
+            next.Methods.Where(method => method.Name == "Run" &&
+                (method.DeclaringType == "HybridCLR.Lab.ValueLayout.ValueLayoutProbe" ||
+                 method.DeclaringType == "HybridCLR.Lab.ValueLayoutConsumer.Calls"))
+                .Select(method => method.Token).ToArray();
+        return new { name, baseSha256 = old.AssemblySha256, currentSha256 = next.AssemblySha256,
+            types = probeImpact.Layouts.Where(type => !type.RequiresOrdinaryAotBridge && type.AssemblyName == name)
+                .Select(type => type.CurrentTypeToken).Distinct().OrderBy(token => token).ToArray(),
+            methods = probeImpact.Methods.Where(method => method.AssemblyName == name && method.Decision != "native-abi-bridge")
+                .Select(method => method.CurrentMethodToken).Concat(entryTokens).Distinct().OrderBy(token => token).ToArray(),
+            explicitProbeEntryTokens = entryTokens };
+    }).ToArray();
+    File.WriteAllText(Path.Combine(probeOutput, "plan.json"), JsonSerializer.Serialize(new
+    {
+        format = "hybridclr.dhe-current-storage-probe", releaseReady = false, assemblies = selections,
+        ordinaryAotSha256 = Hash(Path.Combine(probeBase, nativeAssembly + ".dll")), impact = probeImpact,
+    }, json));
+    Console.WriteLine(Path.Combine(probeOutput, "plan.json"));
+    return 0;
 }
 if (args.Length == 3 && args[0] == "build")
 {

@@ -71,6 +71,14 @@ release such a resource and must not be reported as a passing Player.
    its logical mapping. The public resource loader remains closed to changed
    value layouts until complete dependency selection, cross-image preparation,
    generic-context conversion and ordinary AOT boundaries are implemented.
+   Use the lab-owned CurrentStorageRuntime internal calls to exercise the
+   native preparation path before exposing it in the package. The isolated
+   probe builds the three value-layout hotfix DLLs as Base AOT and keeps
+   ValueLayoutNative ordinary AOT. Its two argument-free static entry methods
+   can explicitly select Current reflection metadata. This isolates native
+   storage failures; it is not native caller/guard or full workflow evidence.
+   The resource generator records these extra entry selections and unresolved
+   ordinary AOT obligations. Preserve every failed Player and result file.
 4. Freeze native/package/engine/tool identities, run real-header compile/CTest,
    managed differential and two-engine Windows Base/no-op/resource tests.
    Extend the multi-Base matrix with an evolved value-layout Base consuming the

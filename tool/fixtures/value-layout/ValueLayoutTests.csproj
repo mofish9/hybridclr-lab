@@ -6,6 +6,7 @@
     <Nullable>enable</Nullable>
   </PropertyGroup>
   <ItemGroup>
+    <Compile Remove="Unity/**/*.cs" />
     <Compile Include="../../MetaVersion.cs" Link="MetaVersion.cs" />
     <Compile Include="../../ResourceUpdateCompatibility.cs" Link="ResourceUpdateCompatibility.cs" />
     <Compile Include="../../DheValueLayoutImpact.cs" Link="DheValueLayoutImpact.cs" />

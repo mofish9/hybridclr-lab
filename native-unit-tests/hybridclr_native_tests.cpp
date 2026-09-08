@@ -501,6 +501,13 @@ namespace
         CHECK(base.methods[0].version == current.methods[2].version); // Layout, not IL, forces selection.
         CHECK(BuildCurrentImagePlan(base, current, { value.token }, { caller.token, member.token }, plan));
         CHECK(plan.methods.size() == 2); // Explicit/owner selection has one binding.
+        CurrentImagePlan samePlan;
+        CHECK(BuildCurrentImagePlan(base, current, { value.token }, { member.token, caller.token }, samePlan));
+        CHECK(plan == samePlan); // Equivalent input order can reuse a pending image.
+        samePlan.methods.pop_back(); CHECK(!(plan == samePlan));
+        samePlan = plan; samePlan.types.clear(); CHECK(!(plan == samePlan));
+        samePlan = plan; samePlan.baseAssemblyHash.fill(41); CHECK(!(plan == samePlan));
+        samePlan = plan; samePlan.currentAssemblyHash.fill(42); CHECK(!(plan == samePlan));
         auto olderBase = base;
         olderBase.assemblyHash.fill(40);
         olderBase.types[0].token = 0x02000008;
