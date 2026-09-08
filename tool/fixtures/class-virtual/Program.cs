@@ -85,6 +85,19 @@ bool expectedRejection = args.Length == 5 && args[4] == "expect-rejection";
 checksAnalysis["compatibility-as-expected"] = expectedRejection
     ? analyses[owner].UnsupportedChanges.Any(change => change.StartsWith("added-virtual-abstract-or-pinvoke-method-on-existing-type:"))
     : analyses.Values.All(value => value.Compatible);
+if (!expectedRejection)
+{
+    const string capability = "existing-class-virtual-methods-v1";
+    checksAnalysis["class-virtual-capability-required"] = analyses[owner].RequiredRuntimeCapabilities.Contains(capability);
+    checksAnalysis["older-runtime-rejected"] = !ResourceUpdateCompatibility.CanExecuteUpdate(
+        ResourceUpdateCompatibility.RuntimeProtocol, "dhe-runtime-v26",
+        ResourceUpdateCompatibility.KnownRuntimeCapabilities.Where(value => value != capability), analyses[owner].RequiredRuntimeCapabilities);
+    checksAnalysis["capable-runtime-accepted"] = ResourceUpdateCompatibility.CanExecuteUpdate(
+        ResourceUpdateCompatibility.RuntimeProtocol, ResourceUpdateCompatibility.CurrentNativeRuntimeContract,
+        ResourceUpdateCompatibility.KnownRuntimeCapabilities, analyses[owner].RequiredRuntimeCapabilities);
+    var noOp = ResourceUpdateCompatibility.Analyze(baseline[owner], baseline[owner], currentAssemblySet: baseline.Values);
+    checksAnalysis["no-op-does-not-require-new-class-capability"] = !noOp.RequiredRuntimeCapabilities.Contains(capability);
+}
 string analysisOutput = Output(args[3]);
 File.WriteAllText(Path.Combine(analysisOutput, "report.json"), JsonSerializer.Serialize(new
 {

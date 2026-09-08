@@ -4,7 +4,7 @@ internal sealed class ResourceUpdateCompatibility
 {
 	public const string Policy = "dhe-proven-safe-subset-v1";
 	public const string RuntimeProtocol = "dhe-runtime-protocol-v1";
-    public const string CurrentNativeRuntimeContract = "dhe-runtime-v26";
+    public const string CurrentNativeRuntimeContract = "dhe-runtime-v27";
     public static readonly string[] KnownRuntimeCapabilities =
     {
 		"aot-guard-v1",
@@ -23,6 +23,7 @@ internal sealed class ResourceUpdateCompatibility
         "cross-assembly-interface-declarations-v1",
         "inherited-interface-dispatch-v1",
         "base-virtual-slots-on-current-descendants-v1",
+        "existing-class-virtual-methods-v1",
         "closed-current-parent-vtables-v1",
         "open-generic-dispatch-definitions-v1",
         "supplemental-closed-generic-methods-v1",
@@ -174,6 +175,9 @@ internal sealed class ResourceUpdateCompatibility
         var interfaceImplementations = new HashSet<string>(current.InterfaceImplementationMethodIdentities,
             StringComparer.Ordinal);
         bool requiresInterfaceSlots = false;
+        bool requiresClassVirtualMethods = removed.Any(method => method.IsVirtual &&
+            !method.DeclaringTypeIsInterface && !method.DeclaringTypeIsValueType &&
+            currentTypes.ContainsKey(method.DeclaringTypeStableId));
         foreach (MetaVersionMethod method in added)
         {
             if (!baselineTypes.TryGetValue(method.DeclaringTypeStableId, out MetaVersionType? declaringType))
@@ -187,6 +191,8 @@ internal sealed class ResourceUpdateCompatibility
             }
             else if (interfaceImplementations.Contains(method.Identity))
                 requiresInterfaceSlots = true;
+            else if (method.IsVirtual && !method.IsStatic && !method.IsPInvoke && !method.DeclaringTypeIsValueType)
+                requiresClassVirtualMethods = true;
             else if (method.IsVirtual || (method.Flags & (2u | 4u)) != 0)
                 unsupported.Add("added-virtual-abstract-or-pinvoke-method-on-existing-type:" + method.Identity);
         }
@@ -233,6 +239,8 @@ internal sealed class ResourceUpdateCompatibility
         };
         if (requiresInterfaceSlots)
             requiredCapabilities.Add("existing-interface-method-slots-v1");
+        if (requiresClassVirtualMethods)
+            requiredCapabilities.Add("existing-class-virtual-methods-v1");
         if (current.Fields.Any(field => !field.IsStatic && field.DeclaringTypeIsGeneric &&
                 baselineFields.ContainsKey(field.StableId) && allAddressTakenFields.Contains(field.Identity)))
             requiredCapabilities.Add("aot-fgs-field-address-null-check-v1");

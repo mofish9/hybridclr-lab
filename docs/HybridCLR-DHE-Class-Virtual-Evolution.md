@@ -26,6 +26,13 @@ hierarchy, then select the Current receiver's implementation. Resolve from
 the root rather than an old override so removing an override falls back to
 its parent implementation. Respect new-slot declarations.
 
+The fixture disables nullable annotations in both variants to isolate virtual
+evolution. An initial build with inferred annotations adds NullableAttribute
+to the child type's generic parameter when overrides are added, and the
+current analyzer rejects that generic-parameter metadata change. Preserve that
+initial rejection report; nullable annotation evolution needs its own metadata
+review and must not be confused with a change to the physical object layout.
+
 Interpreter, delegate and reflection calls retain a MethodInfo and must use
 a method-aware lookup. A new alias may have a Current slot numerically equal
 to a different Base method; never treat that number as a Base slot. Generic

@@ -1,4 +1,5 @@
 #if DHE_CLASS_VIRTUAL_BASE
+#nullable disable
 using System;
 using System.Collections.Generic;
 using System.IO;
@@ -146,14 +147,14 @@ namespace HybridCLR.Lab.CrossAssemblyDerived
             Require(result.Number == value.Number && result.Fraction == value.Fraction && result.Text == value.Text, "native value return");
             Require(Observe("Generic", () => ClassVirtualNativeCallers.Generic(new RevisionGenericVirtualChild<int>(), 29), routes) == "echo",
                 "native generic virtual selects added override");
-            string? path = Environment.GetEnvironmentVariable("HYBRIDCLR_DHE_EVOLUTION_EVIDENCE");
+            string path = Environment.GetEnvironmentVariable("HYBRIDCLR_DHE_EVOLUTION_EVIDENCE");
             if (!string.IsNullOrEmpty(path) && routes.Count != 0)
                 File.WriteAllLines(path + ".class-virtual-callers", routes);
         }
 
         private static T Observe<T>(string name, Func<T> action, List<string> routes)
         {
-            Type? api = AppDomain.CurrentDomain.GetAssemblies().Select(assembly =>
+            Type api = AppDomain.CurrentDomain.GetAssemblies().Select(assembly =>
                 assembly.GetType("HybridCLR.RuntimeApi", false)).FirstOrDefault(type => type != null);
             if (api == null) return action();
             MethodInfo changed = api.GetMethod("IsDifferentialMethodChanged")!;
@@ -243,7 +244,7 @@ namespace HybridCLR.Lab.CrossAssemblyDerived
         {
             using var ready = new CountdownEvent(8);
             using var start = new ManualResetEventSlim(false);
-            var errors = new Exception?[8];
+            var errors = new Exception[8];
             var threads = Enumerable.Range(0, 8).Select(index => new Thread(() =>
             {
                 ready.Signal();
