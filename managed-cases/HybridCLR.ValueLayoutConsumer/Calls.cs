@@ -56,7 +56,9 @@ namespace HybridCLR.Lab.ValueLayoutConsumer
             // Compare every Current public field so an old-ABI projection that
             // silently drops added fields cannot pass on the original Count.
             foreach (var field in typeof(Payload).GetFields())
+            {
                 if (!object.Equals(field.GetValue(before), field.GetValue(after))) return false;
+            }
             return true;
         }
 
