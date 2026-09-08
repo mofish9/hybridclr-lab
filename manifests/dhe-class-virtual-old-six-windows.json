@@ -1,14 +1,14 @@
 {
   "labRoot": "..",
   "toolAssembly": "../../../artifacts/dhe-evolution-20260908/host-class-virtual-abstract/HybridCLR.DheTool.dll",
-  "outputRoot": "../../../artifacts/dhe-evolution-20260908/replay-class-virtual-old-six",
+  "outputRoot": "../../../artifacts/dhe-evolution-20260908/replay-class-virtual-old-six-observable",
   "updates": [
     "../../../artifacts/dhe-evolution-20260908/resource-class-virtual-prepared-old-six",
-    "../../../artifacts/dhe-evolution-20260908/resource-class-virtual-prepared-old-six-latest"
+    "../../../artifacts/dhe-evolution-20260908/resource-class-virtual-observable-old-six-latest"
   ],
   "referenceResults": [
     "../../../artifacts/dhe-evolution-20260908/class-virtual-prepared-first-reference.json",
-    "../../../artifacts/dhe-evolution-20260908/class-virtual-prepared-latest-reference.json"
+    "../../../artifacts/dhe-evolution-20260908/class-virtual-observable-latest-reference.json"
   ],
   "evolutionCheckRequirements": [
     [
