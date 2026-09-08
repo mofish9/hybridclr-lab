@@ -54,3 +54,10 @@ and Unity serialization remain unqualified. No new Unity 2021 build is required.
 Rollback selects matching prior native/package/tool identities and resources
 already proven for the selected Base. A resource cannot repair this native
 helper in an installed Player, so the failed Base archives remain ineligible.
+
+The first v26 package commit updated Runtime/DheRuntime.cs but missed the
+duplicated declarations in Editor/Commands/DheBuildPipeline.cs. The offline
+runtime-contract-package-binding check caught this, and both base-fn-generic
+Players rejected their v25 identity before executing the workload. These failed
+outputs remain archived. Package f80d4c3 updates the Base generator; regression
+now checks capability-set equality as well as the contract in both declarations.

@@ -29,6 +29,7 @@ internal static partial class Program
         "reference-field-and-type-removal", "value-field-removal-rejected",
         "runtime-contract-capability-negotiation",
         "runtime-contract-schema-binding", "runtime-contract-package-binding",
+        "runtime-capability-package-binding",
         "runtime-capability-missing-rejected", "composite-base-id-runtime-bound",
         "composite-base-id-aot-inventory-bound", "composite-base-id-build-configuration-bound",
         "base-aot-outside-dhe-rejected",

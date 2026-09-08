@@ -994,6 +994,25 @@ internal static partial class Program
             managedRuntimeSource.Contains(expectedContractDeclaration,
                 StringComparison.Ordinal),
             "package build/runtime constants must match the current runtime contract");
+        bool HasCurrentRuntimeCapabilities(string source)
+        {
+            var block = System.Text.RegularExpressions.Regex.Match(source,
+                @"NativeRuntimeCapabilities\s*=\s*\{(?<values>[\s\S]*?)\};");
+            var capabilities = System.Text.RegularExpressions.Regex.Matches(
+                block.Groups["values"].Value, "\"([^\"]+)\"")
+                .Select(match => match.Groups[1].Value).ToArray();
+            return block.Success &&
+                capabilities.Length == ResourceUpdateCompatibility.KnownRuntimeCapabilities.Length &&
+                capabilities.ToHashSet(StringComparer.Ordinal)
+                    .SetEquals(ResourceUpdateCompatibility.KnownRuntimeCapabilities);
+        }
+        AddRegressionCheck(checks, errors, "runtime-capability-package-binding",
+            HasCurrentRuntimeCapabilities(buildPipelineSource) &&
+            HasCurrentRuntimeCapabilities(managedRuntimeSource) &&
+            !HasCurrentRuntimeCapabilities(buildPipelineSource.Replace(
+                "\"aot-fgs-field-address-null-check-v1\"", "\"omitted-field-address-capability\"",
+                StringComparison.Ordinal)),
+            "Base generator, managed runtime and resource analyzer must declare identical capabilities");
         string[] missingCapability = ResourceUpdateCompatibility.KnownRuntimeCapabilities
             .Where(value => value != "stable-method-identity-v1").ToArray();
         AddRegressionCheck(checks, errors, "runtime-capability-missing-rejected",
