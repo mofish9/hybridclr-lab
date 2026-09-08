@@ -1,0 +1,16 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <TargetFramework>netstandard2.1</TargetFramework>
+    <AssemblyName>HybridCLR.NativeDescendants</AssemblyName>
+  </PropertyGroup>
+  <ItemGroup>
+    <Reference Include="HybridCLR.CrossAssemblyDerived">
+      <HintPath>$(DheClassVirtualBaseRoot)/HybridCLR.CrossAssemblyDerived.dll</HintPath>
+      <Private>false</Private>
+    </Reference>
+  </ItemGroup>
+  <Target Name="RequireImmutableBase" BeforeTargets="ResolveReferences">
+    <Error Condition="'$(DheClassVirtualBaseRoot)' == '' Or !Exists('$(DheClassVirtualBaseRoot)/HybridCLR.CrossAssemblyDerived.dll')"
+           Text="Set DheClassVirtualBaseRoot to the immutable class-virtual Base DLL directory." />
+  </Target>
+</Project>

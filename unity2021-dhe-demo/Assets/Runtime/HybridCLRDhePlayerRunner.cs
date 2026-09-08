@@ -39,6 +39,7 @@ namespace HybridCLR.Lab
             try
             {
                 result = Execute();
+                RunNativeDescendants(result);
                 exitCode = result.passed ? 0 : 1;
             }
             catch (Exception exception)
@@ -64,6 +65,32 @@ namespace HybridCLR.Lab
             }
             Debug.Log("[HybridCLR Lab] DHE demo: " + (result.passed ? "passed" : "failed"));
             Application.Quit(exitCode);
+        }
+
+        private static void RunNativeDescendants(DheRun result)
+        {
+            const string assemblyName = "HybridCLR.NativeDescendants";
+            Assembly assembly = AppDomain.CurrentDomain.GetAssemblies().FirstOrDefault(value => value.GetName().Name == assemblyName);
+            result.nativeDescendantPresent = assembly != null;
+            if (assembly == null) return;
+            try
+            {
+                if (result.loadedDheAssemblies.Contains(assemblyName))
+                    throw new InvalidDataException("The native descendant test assembly must remain ordinary AOT.");
+                Type probe = assembly.GetType("HybridCLR.Lab.NativeDescendants.NativeClassVirtualProbe", true);
+                int beforeInterpreted = RuntimeApi.GetDifferentialInterpreterEntryCount();
+                int beforeAot = RuntimeApi.GetDifferentialAotEntryCount();
+                result.nativeDescendantChecks = (string[])probe.GetMethod("Run").Invoke(null, null);
+                result.nativeDescendantInterpreterEntries = RuntimeApi.GetDifferentialInterpreterEntryCount() - beforeInterpreted;
+                result.nativeDescendantAotEntries = RuntimeApi.GetDifferentialAotEntryCount() - beforeAot;
+                result.nativeDescendantPassed = result.nativeDescendantChecks.Length == 9 &&
+                    result.nativeDescendantChecks.All(value => value.EndsWith("\tpassed", StringComparison.Ordinal)) &&
+                    (result.changedMethodCount != 0 || result.nativeDescendantInterpreterEntries == 0);
+                if (!result.nativeDescendantPassed)
+                    result.nativeDescendantError = string.Join("; ", result.nativeDescendantChecks.Where(value => !value.EndsWith("\tpassed", StringComparison.Ordinal)));
+            }
+            catch (Exception exception) { result.nativeDescendantError = exception.ToString(); }
+            result.passed &= result.nativeDescendantPassed;
         }
 
         private static DheRun Execute()
@@ -2072,6 +2099,12 @@ namespace HybridCLR.Lab
         [Serializable]
         private sealed class DheRun
         {
+            public bool nativeDescendantPresent;
+            public bool nativeDescendantPassed;
+            public string nativeDescendantError;
+            public string[] nativeDescendantChecks;
+            public int nativeDescendantInterpreterEntries;
+            public int nativeDescendantAotEntries;
             public int schemaVersion = 1;
             public string format = "hybridclr.dhe-player-result.json";
             public string target;

@@ -193,6 +193,20 @@ internal static class Program
                         string[] requiredEvolutionChecks = checkRequirements.Length == 0 ? Array.Empty<string>() : checkRequirements[index];
                         string[] executedEvolutionChecks = DheEvolutionEvidence.Validate(evolutionEvidencePath, requiredEvolutionChecks);
                         JsonElement result = Read(resultPath);
+                        bool hasNativeDescendants = result.TryGetProperty("nativeDescendantPresent", out JsonElement nativePresent) && nativePresent.GetBoolean();
+                        Require(hasNativeDescendants == item.RequireNativeDescendants, "Native descendant presence does not match this Base's required boundary fixture.");
+                        string[] nativeDescendantChecks = Array.Empty<string>();
+                        if (hasNativeDescendants)
+                        {
+                            string[] names = { "base-definitions", "native-overrides", "current-inherited", "new-slot", "reflection",
+                                "delegates", "generics", "direct-and-base-calls", "inherited-attributes" };
+                            nativeDescendantChecks = result.GetProperty("nativeDescendantChecks").EnumerateArray().Select(value => value.GetString()!).ToArray();
+                            Require(result.GetProperty("nativeDescendantPassed").GetBoolean() && nativeDescendantChecks.Length == names.Length &&
+                                nativeDescendantChecks.OrderBy(value => value, StringComparer.Ordinal).SequenceEqual(
+                                    names.Select(name => name + "\tpassed").OrderBy(value => value, StringComparer.Ordinal)), "Native descendant boundary checks failed or incomplete.");
+                            Require(!result.GetProperty("loadedDheAssemblies").EnumerateArray().Any(value => value.GetString() == "HybridCLR.NativeDescendants"),
+                                "Ordinary native descendant assembly was included in DHE registration.");
+                        }
                         if (references.Length != 0)
                             DheObservedResults.Validate(Read(references[index]).GetProperty("observations"), result);
                         Require(result.GetProperty("target").GetString() == "StandaloneWindows64" &&
@@ -369,6 +383,7 @@ internal static class Program
                             differential,
                             retainedCallers,
                             classVirtualCallers,
+                            nativeDescendantChecks,
                             requiredEvolutionChecks,
                             executedEvolutionChecks,
                             evolutionEvidencePath,
@@ -501,7 +516,8 @@ internal static class Program
         string[][]? EvolutionCheckRequirements = null, string[]? DifferentialReferences = null,
         bool[]? RequireInterpretedCaseEntries = null, string? DifferentialManifest = null, string? DifferentialGolden = null,
         string LayoutDiagnostics = "after", bool SingleUpdateEvidenceOnly = false);
-    private sealed record Base(string Label, string PlayerRoot, string BuildIdentity, bool SkipFirstUpdate = false);
+    private sealed record Base(string Label, string PlayerRoot, string BuildIdentity, bool SkipFirstUpdate = false,
+        bool RequireNativeDescendants = false);
     private sealed record ProcessResult(int Id, int ExitCode, long ElapsedMilliseconds, string Text);
 
     private sealed class PlayerProcessHandles : IDisposable
