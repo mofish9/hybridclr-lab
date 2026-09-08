@@ -18,11 +18,23 @@ namespace HybridCLR.Lab.CrossAssemblyDerived
 
     public interface ICrossRevisionValue<T> : ICrossAssemblyLazyVTableContract
     {
+#if DHE_GENERIC_INTERFACE_CURRENT
+        T AddedValue(T value);
+        U EchoGeneric<U>(T value, U result);
+#endif
         T RoundTrip(T value);
     }
 
+#if DHE_GENERIC_INTERFACE_BASE
+    public class CrossRevisionValue<T> : CrossAssemblyLazyVTableBase, ICrossRevisionValue<T>
+#else
     public sealed class CrossRevisionValue<T> : CrossAssemblyLazyVTableBase, ICrossRevisionValue<T>
+#endif
     {
+#if DHE_GENERIC_INTERFACE_CURRENT
+        public T AddedValue(T value) => default!;
+        public U EchoGeneric<U>(T value, U result) => result;
+#endif
         public T RoundTrip(T value) => value;
     }
 
@@ -101,10 +113,18 @@ namespace HybridCLR.Lab.CrossAssemblyDerived
                 text.RoundTrip("value") == "value" && text.EchoAdded(19) == 19,
                 "generic interface with inherited Base contract");
             InterfaceMapping map = typeof(CrossRevisionValue<int>).GetInterfaceMap(typeof(ICrossRevisionValue<int>));
+#if DHE_GENERIC_INTERFACE_CURRENT
+            int roundTrip = Array.FindIndex(map.InterfaceMethods, method => method.Name == "RoundTrip");
+            Require(map.InterfaceMethods.Length == 3 && map.TargetMethods.Length == 3 && roundTrip >= 0 &&
+                map.TargetMethods[roundTrip].DeclaringType == typeof(CrossRevisionValue<int>) &&
+                (int)map.TargetMethods[roundTrip].Invoke(integer, new object[] { 23 }) == 23,
+                "closed generic interface map");
+#else
             Require(map.InterfaceMethods.Length == 1 && map.TargetMethods.Length == 1 &&
                 map.TargetMethods[0].DeclaringType == typeof(CrossRevisionValue<int>) &&
                 (int)map.TargetMethods[0].Invoke(integer, new object[] { 23 }) == 23,
                 "closed generic interface map");
+#endif
         }
 
         public static void ExplicitImplementation()

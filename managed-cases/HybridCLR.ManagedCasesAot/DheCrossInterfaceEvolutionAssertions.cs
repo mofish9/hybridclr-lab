@@ -37,6 +37,33 @@ namespace HybridCLR.Lab.ManagedCasesAot
                     }
                 });
             }
+#if DHE_GENERIC_INTERFACE_CURRENT
+            Type genericProbe = assembly.GetType("HybridCLR.Lab.CrossAssemblyDerived.GenericInterfaceEvolutionProbe", true);
+            var genericGroups = new[]
+            {
+                ("existing-generic-interface-native-callers", "NativeCallers"),
+                ("existing-generic-interface-dispatch", "Dispatch"),
+                ("existing-generic-interface-generic-method", "GenericMethod"),
+                ("existing-generic-interface-delegates", "Delegates"),
+                ("existing-generic-interface-reflection", "Reflection"),
+                ("existing-generic-interface-maps", "Maps"),
+                ("existing-generic-interface-inherited", "Inherited"),
+                ("existing-generic-interface-boxed-constrained", "BoxedAndConstrained"),
+                ("existing-generic-interface-identity", "Identity"),
+            };
+            foreach (var group in genericGroups)
+            {
+                check(group.Item1, () =>
+                {
+                    MethodInfo method = genericProbe.GetMethod(group.Item2) ?? throw new MissingMethodException(genericProbe.FullName, group.Item2);
+                    try { method.Invoke(null, null); }
+                    catch (TargetInvocationException exception)
+                    {
+                        throw new InvalidOperationException((exception.InnerException ?? exception).ToString());
+                    }
+                });
+            }
+#endif
         }
     }
 }

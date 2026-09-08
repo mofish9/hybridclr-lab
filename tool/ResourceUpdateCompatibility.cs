@@ -245,7 +245,7 @@ internal sealed class ResourceUpdateCompatibility
             .Select(type => type.Identity).ToHashSet(StringComparer.Ordinal);
         if (evolvedInterfaces.Count != 0 && (currentAssemblySet == null || currentAssemblySet.Any(assembly =>
                 assembly.TypeParents.Values.Any(parent => parent.AssemblyName == current.AssemblyName &&
-                    interfaceOwners.Contains(parent.TypeName)))))
+                    interfaceOwners.Contains(parent.DefinitionName ?? parent.TypeName)))))
         {
             requiredCapabilities.Add("inherited-interface-dispatch-v1");
             requiredCapabilities.Add("base-virtual-slots-on-current-descendants-v1");
