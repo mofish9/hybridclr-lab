@@ -63,6 +63,15 @@ checks["candidate-runtime-eligible"] = ResourceUpdateCompatibility.CanExecuteUpd
     evolvedUpdate.RequiredRuntimeCapabilities);
 checks["unchanged-interface-needs-no-capability"] = !ResourceUpdateCompatibility.Analyze(after, after)
     .RequiredRuntimeCapabilities.Contains(capability);
+var localUpdate = ResourceUpdateCompatibility.Analyze(before, after, currentAssemblySet: new[] { after });
+checks["local-interface-needs-no-cross-assembly-repair"] = !localUpdate.RequiredRuntimeCapabilities.Contains(
+    "cross-assembly-interface-declarations-v1");
+checks["local-interface-needs-no-inherited-dispatch-repair"] = !localUpdate.RequiredRuntimeCapabilities.Contains(
+    "inherited-interface-dispatch-v1");
+checks["local-interface-remains-eligible-on-v16"] = ResourceUpdateCompatibility.CanExecuteUpdate(
+    ResourceUpdateCompatibility.RuntimeProtocol, "dhe-runtime-v16",
+    ResourceUpdateCompatibility.KnownRuntimeCapabilities.Where(value => value != "cross-assembly-interface-declarations-v1" &&
+        value != "inherited-interface-dispatch-v1"), localUpdate.RequiredRuntimeCapabilities);
 Directory.CreateDirectory(output);
 foreach (bool final in new[] { false, true })
 {
