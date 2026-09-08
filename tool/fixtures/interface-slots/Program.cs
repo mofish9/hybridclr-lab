@@ -40,6 +40,8 @@ foreach (string name in new[] { "IIntOperation", "IntOperationStruct", "DheEvolu
 MethodDef implementation = Type(current, "DheEvolutionOperation").Methods.Single(method => method.HasOverrides);
 checks["explicit-class-implementation"] = implementation.IsVirtual && implementation.IsFinal && implementation.IsPrivate &&
     implementation.Overrides.Count == 1 && implementation.Overrides[0].MethodDeclaration.Name == "Added";
+checks["explicit-declaration-is-current-methoddef"] = implementation.Overrides[0].MethodDeclaration is MethodDef declaration &&
+    declaration.DeclaringType == Type(current, "IIntOperation");
 MethodDef structMethod = Type(current, "IntOperationStruct").Methods.Single(method => method.Name == "Added");
 checks["implicit-struct-implementation"] = structMethod.IsVirtual && structMethod.IsFinal && structMethod.IsPublic;
 const string capability = "existing-interface-method-slots-v1";
