@@ -1,6 +1,7 @@
 using System.Security.Cryptography;
 using System.Text.Json;
 using dnlib.DotNet;
+using dnlib.DotNet.Emit;
 using HybridCLR.DheTool;
 
 if (args.Length != 4)
@@ -41,8 +42,37 @@ checks["explicit-class-implementation"] = implementation.IsVirtual && implementa
     implementation.Overrides.Count == 1 && implementation.Overrides[0].MethodDeclaration.Name == "Added";
 MethodDef structMethod = Type(current, "IntOperationStruct").Methods.Single(method => method.Name == "Added");
 checks["implicit-struct-implementation"] = structMethod.IsVirtual && structMethod.IsFinal && structMethod.IsPublic;
-bool passed = checks.Values.All(value => value);
+const string capability = "existing-interface-method-slots-v1";
+var originalUpdate = ResourceUpdateCompatibility.Analyze(MetaVersionSnapshot.Create(paths[0]), after);
+var evolvedUpdate = ResourceUpdateCompatibility.Analyze(before, after);
+checks["original-interface-update-requires-capability"] = originalUpdate.Compatible && originalUpdate.RequiredRuntimeCapabilities.Contains(capability);
+checks["evolved-interface-update-requires-capability"] = evolvedUpdate.Compatible && evolvedUpdate.RequiredRuntimeCapabilities.Contains(capability);
+checks["old-runtime-rejected"] = !ResourceUpdateCompatibility.CanExecuteUpdate(ResourceUpdateCompatibility.RuntimeProtocol,
+    "dhe-runtime-v13", ResourceUpdateCompatibility.KnownRuntimeCapabilities.Where(value => value != capability),
+    evolvedUpdate.RequiredRuntimeCapabilities);
+checks["candidate-runtime-eligible"] = ResourceUpdateCompatibility.CanExecuteUpdate(ResourceUpdateCompatibility.RuntimeProtocol,
+    ResourceUpdateCompatibility.CurrentNativeRuntimeContract, ResourceUpdateCompatibility.KnownRuntimeCapabilities,
+    evolvedUpdate.RequiredRuntimeCapabilities);
+checks["unchanged-interface-needs-no-capability"] = !ResourceUpdateCompatibility.Analyze(after, after)
+    .RequiredRuntimeCapabilities.Contains(capability);
 Directory.CreateDirectory(output);
+foreach (bool final in new[] { false, true })
+{
+    using var negative = ModuleDefMD.Load(paths[2]);
+    var method = new MethodDefUser("UnrelatedVirtual", MethodSig.CreateInstance(negative.CorLibTypes.Int32),
+        dnlib.DotNet.MethodAttributes.Public | dnlib.DotNet.MethodAttributes.Virtual | dnlib.DotNet.MethodAttributes.NewSlot |
+        (final ? dnlib.DotNet.MethodAttributes.Final : 0));
+    method.Body = new CilBody();
+    method.Body.Instructions.Add(Instruction.Create(OpCodes.Ldc_I4, 123));
+    method.Body.Instructions.Add(Instruction.Create(OpCodes.Ret));
+    Type(negative, "DheEvolutionOperation").Methods.Add(method);
+    string path = Path.Combine(output, final ? "unrelated-final.dll" : "unrelated-virtual.dll");
+    negative.Write(path);
+    var analysis = ResourceUpdateCompatibility.Analyze(before, MetaVersionSnapshot.Create(path));
+    checks[final ? "unrelated-final-virtual-rejected" : "unrelated-virtual-rejected"] = !analysis.Compatible &&
+        analysis.UnsupportedChanges.Any(reason => reason.Contains("UnrelatedVirtual", StringComparison.Ordinal));
+}
+bool passed = checks.Values.All(value => value);
 File.WriteAllText(Path.Combine(output, "report.json"), JsonSerializer.Serialize(new
 {
     passed, scope = "Current interface slot collision and unchanged Base declarations; not runtime support",

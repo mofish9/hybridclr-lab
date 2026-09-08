@@ -30,6 +30,8 @@ internal sealed class MetaVersionSnapshot
     [JsonIgnore]
     public string[] AddressTakenFieldIdentities { get; private init; } = Array.Empty<string>();
     [JsonIgnore]
+    public string[] InterfaceImplementationMethodIdentities { get; private init; } = Array.Empty<string>();
+    [JsonIgnore]
     public string[] LocalAttributeConstructorTypeNames { get; private init; } = Array.Empty<string>();
     [JsonIgnore]
     public MetaVersionAttributeUse[] AttributeUses { get; private init; } = Array.Empty<MetaVersionAttributeUse>();
@@ -78,6 +80,7 @@ internal sealed class MetaVersionSnapshot
             Methods = methods,
             AddressTakenFieldIdentities = addressTakenFields.OrderBy(value => value,
                 StringComparer.Ordinal).ToArray(),
+            InterfaceImplementationMethodIdentities = ReadInterfaceImplementationMethods(assemblyPath),
             LocalAttributeConstructorTypeNames = ReadLocalAttributeConstructorTypes(module),
             AttributeUses = ReadAttributeUses(module),
             TypeParents = module.GetTypes().Where(type => type.BaseType != null).ToDictionary(type => type.FullName,
@@ -101,6 +104,29 @@ internal sealed class MetaVersionSnapshot
                 attribute.NamedArguments.Any(argument => !argument.IsField)));
         }
         return uses.Distinct().ToArray();
+    }
+
+    private static string[] ReadInterfaceImplementationMethods(string assemblyPath)
+        => AnalyzeCapabilityModule(assemblyPath, CollectInterfaceImplementationMethods);
+
+    private static string[] CollectInterfaceImplementationMethods(ModuleDefMD module)
+    {
+        var comparer = new SigComparer();
+        var identities = new List<string>();
+        foreach (TypeDef type in module.GetTypes().Where(type => !type.IsInterface))
+            foreach (MethodDef method in type.Methods.Where(method => method.IsVirtual && method.IsFinal &&
+                method.IsNewSlot && !method.IsStatic && !method.IsAbstract && !method.IsPinvokeImpl))
+            {
+                bool explicitImplementation = method.Overrides.Any(item =>
+                    item.MethodDeclaration.DeclaringType.ResolveTypeDef()?.IsInterface == true);
+                bool implicitImplementation = method.IsPublic && type.Interfaces.Any(item =>
+                    item.Interface.ResolveTypeDef() is TypeDef definition && definition.IsInterface &&
+                    definition.Methods.Any(declaration => declaration.Name == method.Name &&
+                        comparer.Equals(declaration.MethodSig, method.MethodSig)));
+                if (explicitImplementation || implicitImplementation)
+                    identities.Add(MethodIdentity(method));
+            }
+        return identities.OrderBy(value => value, StringComparer.Ordinal).ToArray();
     }
 
     private static string[] ReadLocalAttributeConstructorTypes(ModuleDefMD module)
@@ -469,6 +495,9 @@ internal sealed class MetaVersionSnapshot
 	}
 
 	private static HashSet<string> FindAddressTakenFields(string assemblyPath)
+		=> AnalyzeCapabilityModule(assemblyPath, CollectAddressTakenFields);
+
+	private static T AnalyzeCapabilityModule<T>(string assemblyPath, Func<ModuleDefMD, T> analyze)
 	{
 		// Capability analysis must not alter the frozen MV fingerprint resolver or
 		// field-operand spelling: existing Base identities bind those exact bytes.
@@ -479,7 +508,7 @@ internal sealed class MetaVersionSnapshot
 		resolver.PostSearchPaths.Add(Path.GetDirectoryName(Path.GetFullPath(assemblyPath))!);
 		using var module = ModuleDefMD.Load(assemblyPath, context);
 		resolver.AddToCache(module);
-		try { return CollectAddressTakenFields(module); }
+		try { return analyze(module); }
 		finally
 		{
 			foreach (AssemblyDef assembly in resolver.GetCachedAssemblies().Where(assembly => assembly != null))

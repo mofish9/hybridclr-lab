@@ -4,7 +4,7 @@ internal sealed class ResourceUpdateCompatibility
 {
 	public const string Policy = "dhe-proven-safe-subset-v1";
 	public const string RuntimeProtocol = "dhe-runtime-protocol-v1";
-    public const string CurrentNativeRuntimeContract = "dhe-runtime-v13";
+    public const string CurrentNativeRuntimeContract = "dhe-runtime-v14";
     public static readonly string[] KnownRuntimeCapabilities =
     {
 		"aot-guard-v1",
@@ -18,6 +18,7 @@ internal sealed class ResourceUpdateCompatibility
         "supplemental-existing-type-static-fields-v1",
         "supplemental-existing-generic-type-fields-v1",
         "supplemental-instance-field-addresses-v1",
+        "existing-interface-method-slots-v1",
 		"supplemental-existing-type-methods-v1",
 		"removed-existing-type-methods-v1",
 		"existing-type-method-signature-replacement-v1",
@@ -160,12 +161,22 @@ internal sealed class ResourceUpdateCompatibility
                     field.Identity);
         }
 
+        var interfaceImplementations = new HashSet<string>(current.InterfaceImplementationMethodIdentities,
+            StringComparer.Ordinal);
+        bool requiresInterfaceSlots = false;
         foreach (MetaVersionMethod method in added)
         {
             if (!baselineTypes.TryGetValue(method.DeclaringTypeStableId, out MetaVersionType? declaringType))
                 continue;
             if (declaringType.IsInterface || method.DeclaringTypeIsInterface)
-                unsupported.Add("added-method-on-existing-interface:" + method.Identity);
+            {
+                if (!method.IsStatic && !method.IsPInvoke && method.IsAbstract)
+                    requiresInterfaceSlots = true;
+                else
+                    unsupported.Add("added-method-on-existing-interface:" + method.Identity);
+            }
+            else if (interfaceImplementations.Contains(method.Identity))
+                requiresInterfaceSlots = true;
             else if (method.IsVirtual || (method.Flags & (2u | 4u)) != 0)
                 unsupported.Add("added-virtual-abstract-or-pinvoke-method-on-existing-type:" + method.Identity);
         }
@@ -210,6 +221,8 @@ internal sealed class ResourceUpdateCompatibility
             "single-current-multibase-v1",
             "atomic-multi-assembly-registration-v1",
         };
+        if (requiresInterfaceSlots)
+            requiredCapabilities.Add("existing-interface-method-slots-v1");
         if (!new HashSet<string>(baseline.AssemblyReferences.Values, StringComparer.Ordinal)
                 .SetEquals(current.AssemblyReferences.Values))
             requiredCapabilities.Add("assembly-reference-evolution-v1");

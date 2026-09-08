@@ -1,5 +1,30 @@
 # DHE existing interface evolution
 
+## Candidate implementation
+
+HybridCLR `e58946f` keeps Base interface slots and appends logical slots for
+Current-only methods. Its homologous VTableSetUp context uses Current interface
+declarations with canonical Base type identities. Dispatch resolves the current
+receiver vtable and maps the implementation back to its logical method. Slot
+maps are built before DHE registration publication; receiver entries are created
+under g_MetadataLock and remain stable after insertion. Failed registrations do
+not expose this map through the published DHE assembly set.
+
+Unity 2021 `2266aca`, Unity 2022 `5679c71` and Tuanjie `a840b0c` route their real
+interface lookup paths through that map. Reflection resolves each logical slot
+independently instead of indexing a contiguous old vtable slice. Tuanjie's lazy
+lookup implementation remains separate. All three actual-header compile/CTest
+gates pass at lab `4f5c064`, including the newly compiled ClassInlines.cpp and
+RuntimeType.cpp, and native slot collision/removal/overflow checks.
+
+Package `1e86958` and the candidate C# analyzer declare runtime v14 and
+`existing-interface-method-slots-v1`. Nineteen declaration/compatibility checks
+pass, including rejecting old runtimes and unrelated final/non-final virtual
+methods. All 24 archived MV snapshots still reproduce exactly. This capability
+declaration is exploratory for new validation Bases, not a release or a Player
+qualification. Actual interface execution and the full mixed-Base replay remain
+pending. MV wire format remains DHEMETA1/schema 1.
+
 ## Reproduced checkpoint
 
 Clean fixture source `16107af` compiles with zero warnings/errors and passes all
