@@ -69,6 +69,14 @@ namespace HybridCLR.Lab.ValueLayout
         public static object Box(Payload value) => value;
         [MethodImpl(MethodImplOptions.NoInlining)]
         public static T Identity<T>(T value) => value;
+        public static bool HasCurrentFields(Payload value)
+        {
+#if DHE_VALUE_LAYOUT_CURRENT
+            return value.Count == 17 && value.Extra == 90000000001L && value.Reference != null;
+#else
+            return value.Count == 17;
+#endif
+        }
     }
 
     public static class ValueLayoutProbe

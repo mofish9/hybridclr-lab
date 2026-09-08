@@ -67,7 +67,7 @@ namespace HybridCLR.Lab.ValueLayoutConsumer
             var local = new LocalWrapper { Value = nested, Marker = new object() };
             var generic = new GenericValue<Payload> { Value = value, Marker = 23 };
             if (!FullCopyMatches(value, DirectCopy(value)) || !FullCopyMatches(value, NativeRoundTrip(value)) ||
-                !FullCopyMatches(value, (Payload)ForwardBox()) || !FullCopyMatches(value, (Payload)GenericForwardBox()) ||
+                !Factory.HasCurrentFields((Payload)ForwardBox()) || !Factory.HasCurrentFields((Payload)GenericForwardBox()) ||
                 !FullCopyMatches(value, GenericCopy(generic).Value) || !FullCopyMatches(value, NullableCopy(value).Value) ||
                 !FullCopyMatches(value, ArrayElement(new[] { value }, 0))) return false;
             Payload copy = DirectCopy(value); copy.Count = 29;
