@@ -84,7 +84,9 @@ internal sealed class MetaVersionSnapshot
             LocalAttributeConstructorTypeNames = ReadLocalAttributeConstructorTypes(module),
             AttributeUses = ReadAttributeUses(module),
             TypeParents = module.GetTypes().Where(type => type.BaseType != null).ToDictionary(type => type.FullName,
-                type => new MetaVersionTypeReference(type.BaseType.DefinitionAssembly?.Name.String ?? "", type.BaseType.FullName),
+                type => new MetaVersionTypeReference(type.BaseType.DefinitionAssembly?.Name.String ?? "", type.BaseType.FullName,
+                    type.BaseType is TypeSpec specification && specification.TypeSig is GenericInstSig generic
+                        ? generic.GenericType.FullName : type.BaseType.FullName),
                 StringComparer.Ordinal),
         };
     }
@@ -746,7 +748,7 @@ internal sealed class MetaVersionSnapshot
     }
 }
 
-internal sealed record MetaVersionTypeReference(string AssemblyName, string TypeName);
+internal sealed record MetaVersionTypeReference(string AssemblyName, string TypeName, string? DefinitionName = null);
 internal sealed record MetaVersionAttributeUse(string AssemblyName, string TypeName,
     string ConstructorIdentity, bool HasNamedProperties);
 

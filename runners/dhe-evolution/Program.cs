@@ -174,9 +174,10 @@ internal static class Program
                         }
                         ProcessResult process = await Run(executable, new[] { "-batchmode", "-nographics", "-labMode", "dhe",
                         "-labTarget", "StandaloneWindows64", "-labResult", resultPath, "-logFile", logPath }, playerRoot, config.TimeoutSeconds,
-                            environment);
+                            environment, requireSuccess: false);
                         attempt = process;
                         Require(processIds.Add(process.Id), "Player process IDs must be unique.");
+                        Require(process.ExitCode == 0, "Player exited with " + process.ExitCode + "; see " + logPath);
                         string[] requiredEvolutionChecks = checkRequirements.Length == 0 ? Array.Empty<string>() : checkRequirements[index];
                         string[] executedEvolutionChecks = DheEvolutionEvidence.Validate(evolutionEvidencePath, requiredEvolutionChecks);
                         JsonElement result = Read(resultPath);
@@ -359,7 +360,8 @@ internal static class Program
     }
 
     private static async Task<ProcessResult> Run(string executable, IEnumerable<string> arguments,
-        string directory, int timeoutSeconds, IReadOnlyDictionary<string, string>? environment = null)
+        string directory, int timeoutSeconds, IReadOnlyDictionary<string, string>? environment = null,
+        bool requireSuccess = true)
     {
         var start = new ProcessStartInfo(executable)
         {
@@ -386,7 +388,7 @@ internal static class Program
             throw new TimeoutException("Process timed out: " + executable);
         }
         string text = await stdout + await stderr;
-        if (process.ExitCode != 0) throw new InvalidOperationException(executable + " exited with " + process.ExitCode + ": " + text);
+        if (requireSuccess && process.ExitCode != 0) throw new InvalidOperationException(executable + " exited with " + process.ExitCode + ": " + text);
         return new ProcessResult(process.Id, process.ExitCode, watch.ElapsedMilliseconds, text);
     }
 

@@ -4,7 +4,7 @@ internal sealed class ResourceUpdateCompatibility
 {
 	public const string Policy = "dhe-proven-safe-subset-v1";
 	public const string RuntimeProtocol = "dhe-runtime-protocol-v1";
-    public const string CurrentNativeRuntimeContract = "dhe-runtime-v20";
+    public const string CurrentNativeRuntimeContract = "dhe-runtime-v22";
     public static readonly string[] KnownRuntimeCapabilities =
     {
 		"aot-guard-v1",
@@ -22,6 +22,7 @@ internal sealed class ResourceUpdateCompatibility
         "cross-assembly-interface-declarations-v1",
         "inherited-interface-dispatch-v1",
         "base-virtual-slots-on-current-descendants-v1",
+        "closed-current-parent-vtables-v1",
 		"supplemental-existing-type-methods-v1",
 		"removed-existing-type-methods-v1",
 		"existing-type-method-signature-replacement-v1",
@@ -226,6 +227,8 @@ internal sealed class ResourceUpdateCompatibility
         };
         if (requiresInterfaceSlots)
             requiredCapabilities.Add("existing-interface-method-slots-v1");
+        if (RequiresClosedCurrentParentVtables(addedTypes, baseline, current, currentAssemblySet))
+            requiredCapabilities.Add("closed-current-parent-vtables-v1");
         // A Current MemberRef declaration can name an interface method absent
         // from the Base definition table. Older slot-only runtimes cannot
         // resolve that declaration during atomic multi-image registration.
@@ -341,6 +344,38 @@ internal sealed class ResourceUpdateCompatibility
             UnsupportedChanges = unsupported.Distinct(StringComparer.Ordinal).OrderBy(value => value,
                 StringComparer.Ordinal).ToArray(),
         };
+    }
+
+    private static bool RequiresClosedCurrentParentVtables(IEnumerable<MetaVersionType> addedTypes,
+        MetaVersionSnapshot baseline, MetaVersionSnapshot current,
+        IEnumerable<MetaVersionSnapshot>? currentAssemblySet)
+    {
+        var snapshots = (currentAssemblySet ?? new[] { current }).ToDictionary(
+            snapshot => snapshot.AssemblyName, StringComparer.OrdinalIgnoreCase);
+        snapshots[current.AssemblyName] = current;
+        var baseNames = baseline.Types.Select(type => type.Identity).ToHashSet(StringComparer.Ordinal);
+        foreach (MetaVersionType added in addedTypes.Where(type => !type.IsInterface))
+        {
+            var reference = new MetaVersionTypeReference(current.AssemblyName, added.Identity);
+            var visited = new HashSet<MetaVersionTypeReference>();
+            while (visited.Add(reference) && snapshots.TryGetValue(reference.AssemblyName, out var owner) &&
+                owner.TypeParents.TryGetValue(reference.TypeName, out var parent))
+            {
+                string definitionName = parent.DefinitionName ?? parent.TypeName;
+                if (definitionName != parent.TypeName)
+                {
+                    bool localParent = string.Equals(parent.AssemblyName, baseline.AssemblyName,
+                        StringComparison.OrdinalIgnoreCase);
+                    // Other DHE assemblies can contain an already-native parent;
+                    // this per-assembly comparison does not have their Base types.
+                    if (localParent ? baseNames.Contains(definitionName) :
+                        currentAssemblySet == null || snapshots.ContainsKey(parent.AssemblyName))
+                        return true;
+                }
+                reference = new MetaVersionTypeReference(parent.AssemblyName, definitionName);
+            }
+        }
+        return false;
     }
 
     private static bool RequiresLogicalAttributeMetadata(MetaVersionSnapshot baseline,
