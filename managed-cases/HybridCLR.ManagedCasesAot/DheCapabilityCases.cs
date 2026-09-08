@@ -251,10 +251,10 @@ namespace HybridCLR.Lab.ManagedCasesAot
 
     public interface IIntOperation
     {
-        int Apply(int value);
 #if DHE_INTERFACE_EVOLUTION_CURRENT
         int Added(int value);
 #endif
+        int Apply(int value);
     }
 
     public readonly struct IntOperationStruct : IIntOperation

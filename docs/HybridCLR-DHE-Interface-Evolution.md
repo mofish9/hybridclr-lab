@@ -7,6 +7,9 @@ A later resource adds an interface method and updates its implementations, witho
 changing object or value-type fields. The same resource must work when the class
 implementation is new to an original Base and already native in an evolved Base.
 The ordinary Apply method and its existing AOT call sites must keep their semantics.
+Added precedes Apply in Current metadata, deliberately shifting Apply from slot 0
+to slot 1. Base AOT callers still use the original slot 0; the fixture must prove
+both old and new dispatch instead of only appending a method after existing slots.
 This is an initial fixture for the wider interface/vtable objective, not a claim
 that other interface, inheritance or value-layout changes may remain unsupported.
 
