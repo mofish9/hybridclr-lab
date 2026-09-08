@@ -216,6 +216,9 @@ namespace HybridCLR.Lab.Editor
 
         private static BuildReport BuildWithBaseProbes(BuildPlayerOptions options, string baselineRoot)
         {
+            if (File.Exists(Path.Combine(ProjectRoot(), "Assets/Plugins/HybridCLRLab/HybridCLR.NativeDescendants.dll")))
+                options.extraScriptingDefines = (options.extraScriptingDefines ?? Array.Empty<string>())
+                    .Concat(new[] { "HYBRIDCLR_LAB_NATIVE_DESCENDANTS" }).Distinct(StringComparer.Ordinal).ToArray();
             using (var module = ModuleDefMD.Load(Path.Combine(baselineRoot, "HybridCLR.ManagedCasesAot.dll")))
             {
                 var identities = new HashSet<string>(module.GetTypes().SelectMany(type => type.Methods)

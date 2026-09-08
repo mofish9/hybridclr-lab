@@ -71,7 +71,20 @@ namespace HybridCLR.Lab
         {
             const string assemblyName = "HybridCLR.NativeDescendants";
             Assembly assembly = AppDomain.CurrentDomain.GetAssemblies().FirstOrDefault(value => value.GetName().Name == assemblyName);
+            if (assembly == null)
+            {
+                try { assembly = Assembly.Load(assemblyName); }
+                catch (FileNotFoundException) { }
+            }
             result.nativeDescendantPresent = assembly != null;
+#if HYBRIDCLR_LAB_NATIVE_DESCENDANTS
+            if (assembly == null)
+            {
+                result.nativeDescendantError = "The required ordinary AOT descendant assembly was not linked into this Base.";
+                result.passed = false;
+                return;
+            }
+#endif
             if (assembly == null) return;
             try
             {
