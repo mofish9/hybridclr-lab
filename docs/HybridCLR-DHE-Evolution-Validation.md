@@ -1,6 +1,23 @@
 # DHE evolution implementation and validation
 
-## Active checkpoint: Unity 2022 and Tuanjie 2022 FGS replay passes
+## Active checkpoint: six 2022 Bases and mixed-call evidence pass
+
+Clean dc5396c passes original/evolved/generic-interface Bases on both active
+engines: 18 unique processes, 61 evolution groups and 220 differential cases
+per run, zero differences. All six Base/no-op workflows pass. Independent
+checks cover 168 original/replayed immutable files and 16 unchanged DLL/MV
+payload files. Retained Base callers and new interpreter-only callers have
+separate MV-bound expectations.
+
+The integrated resource-evidence tool b53cad1 accepts the real mixed calls and
+counts modified, removed and added methods independently of native guards.
+Eight evidence documents and their schemas pass in Exploratory mode; 31
+actual-payload negative/positive checks pass. See
+reports/dhe-six-base-and-evidence-windows.md for precise identities and limits.
+Existing ordinary-class virtual additions and value-type layout changes remain
+explicitly unsupported; the full DHE goal and Release qualification are open.
+
+## Historical checkpoint: two FGS generic-interface Bases
 
 The user's current scope retires Unity 2021 from new builds and qualification.
 Clean eaa4435 passes two fresh generic-interface Bases, six unique Windows

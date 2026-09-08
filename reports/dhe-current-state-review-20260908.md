@@ -3,13 +3,13 @@
 ## 最新范围与验证结果
 
 用户已明确只支持 Unity 2022 App 和团结 2022 小游戏；Unity 2021 不再安排新构建或门禁。
-新 FGS 字段空对象修复已在两引擎上通过真实头文件 native compile/CTest、Base/no-op，
-以及 6 个独立进程的连续/跳版本热更回放。每次 61 组演化、220 cases，差异为 0。
-未变化泛型调用入口保持 AOT。当前只验证了 generic-interface 这一类 Base 世代，
-两引擎 original/evolved Base 和完整正式工具门禁仍需补齐。
+当前两引擎各有 original/evolved/generic-interface 三类 Base，全部 Base/no-op 通过。
+六 Base 的 18 个独立进程完成连续/跳版本回放，每次 61 组演化、220 cases，差异为 0。
+未变化泛型调用入口保持 AOT。混合调用与修改/新增/删除计数校验也已修复并验证；
+已有普通类新增虚方法、值类型布局等仍有明确实现限制，完整 DHE 目标尚未完成。
 
 最新身份、保留的失败记录、工作区与回滚见
-[两引擎 Windows 验证报告](dhe-field-address-two-engines-windows.md)。
+[六 Base 与证据工具验证报告](dhe-six-base-and-evidence-windows.md)。
 下文保留的是此次范围调整和 FGS 修复之前的复核记录，不能作为最新提交的验收结论。
 
 ## 结论与目标
