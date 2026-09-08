@@ -50,6 +50,25 @@ await Check("missing-structural-entry-counter-rejected", Change(withEntry, value
     value["structuralEntryDispatch"]!.AsObject().Remove("interpreterEntries")), false);
 await Check("negative-structural-entry-counter-rejected", Change(withEntry, value =>
     value["structuralEntryDispatch"]!["interpreterEntries"] = -1), false);
+JsonObject absentEntry = Change(original, value => value["structuralEntryDispatch"] = new JsonObject
+{
+    ["methodIdentity"] = "", ["methodStableId"] = "", ["presentInBase"] = false,
+    ["expectedChanged"] = false, ["nativeChanged"] = false,
+    ["executed"] = false, ["interpreterEntries"] = 0,
+});
+await Check("absent-entry-no-structural-work", absentEntry, true);
+await Check("absent-entry-expected-dispatch-rejected", Change(absentEntry, value =>
+    value["structuralDispatchExpected"] = true), false);
+await Check("absent-entry-expected-structure-rejected", Change(absentEntry, value =>
+    value["structuralExpected"] = true), false);
+await Check("absent-entry-missing-expectation-rejected", Change(absentEntry, value =>
+    value.Remove("structuralDispatchExpected")), false);
+await Check("absent-entry-native-change-rejected", Change(absentEntry, value =>
+    value["structuralEntryDispatch"]!["nativeChanged"] = true), false);
+await Check("absent-entry-execution-count-rejected", Change(absentEntry, value =>
+    value["structuralEntryDispatch"]!["interpreterEntries"] = 1), false);
+await Check("absent-entry-named-method-rejected", Change(absentEntry, value =>
+    value["structuralEntryDispatch"]!["methodIdentity"] = "missing-method"), false);
 File.WriteAllText(Path.Combine(output, "report.json"), JsonSerializer.Serialize(new
 {
     passed = failures == 0,

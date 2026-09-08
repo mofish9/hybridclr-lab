@@ -66,14 +66,34 @@
       "type": ["object", "null"],
       "required": ["methodIdentity", "methodStableId", "presentInBase", "expectedChanged", "nativeChanged", "executed", "interpreterEntries"],
       "properties": {
-        "methodIdentity": { "type": "string", "minLength": 1 },
-        "methodStableId": { "type": "string", "pattern": "^[0-9a-fA-F]{64}$" },
+        "methodIdentity": { "type": "string" },
+        "methodStableId": { "type": "string" },
         "presentInBase": { "type": "boolean" },
         "expectedChanged": { "type": "boolean" },
         "nativeChanged": { "type": "boolean" },
-        "executed": { "const": true },
+        "executed": { "type": "boolean" },
         "interpreterEntries": { "type": "integer", "minimum": 0 }
-      }
+      },
+      "anyOf": [
+        {
+          "properties": {
+            "methodIdentity": { "minLength": 1 },
+            "methodStableId": { "pattern": "^[0-9a-fA-F]{64}$" },
+            "executed": { "const": true }
+          }
+        },
+        {
+          "properties": {
+            "methodIdentity": { "const": "" },
+            "methodStableId": { "const": "" },
+            "presentInBase": { "const": false },
+            "expectedChanged": { "const": false },
+            "nativeChanged": { "const": false },
+            "executed": { "const": false },
+            "interpreterEntries": { "const": 0 }
+          }
+        }
+      ]
     },
     "structuralExpected": { "type": "boolean" },
     "structuralDispatchExpected": { "type": "boolean" },
@@ -251,6 +271,25 @@
     "structuralNewSignatureResult": { "type": "integer" }
   },
   "allOf": [
+    {
+      "if": {
+        "required": ["structuralEntryDispatch"],
+        "properties": {
+          "structuralEntryDispatch": {
+            "type": "object",
+            "required": ["executed"],
+            "properties": { "executed": { "const": false } }
+          }
+        }
+      },
+      "then": {
+        "required": ["structuralExpected", "structuralDispatchExpected"],
+        "properties": {
+          "structuralExpected": { "const": false },
+          "structuralDispatchExpected": { "const": false }
+        }
+      }
+    },
     {
       "if": { "properties": { "passed": { "const": true } }, "required": ["passed"] },
       "then": {
