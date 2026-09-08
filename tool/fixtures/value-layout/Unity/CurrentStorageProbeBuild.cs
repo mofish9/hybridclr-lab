@@ -38,6 +38,7 @@ namespace HybridCLR.Lab.Editor
             Directory.CreateDirectory("Assets/Scenes");
             var scene = EditorSceneManager.NewScene(NewSceneSetup.EmptyScene, NewSceneMode.Single);
             EditorSceneManager.SaveScene(scene, "Assets/Scenes/CurrentStorage.unity");
+            EditorBuildSettings.scenes = new[] { new EditorBuildSettingsScene("Assets/Scenes/CurrentStorage.unity", true) };
             AssetDatabase.SaveAssets(); AssetDatabase.Refresh();
             string output = Argument("-probeOutput");
             DheBuildPipeline.PrepareProjectArtifacts(new DheProjectPrepareOptions

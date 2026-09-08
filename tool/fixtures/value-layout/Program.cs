@@ -25,6 +25,24 @@ string Run(string executable, string root, params string[] arguments)
     if (process.ExitCode != 0) throw new InvalidOperationException(result);
     return result;
 }
+if (args.Length == 3 && args[0] == "probe-refresh")
+{
+    string lab = Path.GetFullPath(args[1]), project = Path.GetFullPath(args[2]);
+    if (!File.Exists(Path.Combine(project, "probe-source.json"))) throw new IOException("Not a probe project.");
+    string sourceHead = Run("git", lab, "rev-parse", "HEAD").Trim();
+    string receipt = Path.Combine(project, "probe-refresh-" + sourceHead + ".json"); NewOutput(receipt);
+    var refreshed = new[] { (Name: "CurrentStorageRuntime.cs", Folder: "Assets"),
+        (Name: "CurrentStorageProbeBuild.cs", Folder: "Assets/Editor") }.Select(item =>
+    {
+        string source = Path.Combine(lab, "tool/fixtures/value-layout/Unity", item.Name),
+            target = Path.Combine(project, item.Folder, item.Name);
+        string beforeSha256 = Hash(target); File.Copy(source, target, true);
+        return new { path = target, beforeSha256, afterSha256 = Hash(target) };
+    }).ToArray();
+    File.WriteAllText(receipt, JsonSerializer.Serialize(new { sourceHead,
+        sourceChanges = Run("git", lab, "status", "--porcelain").Trim(), refreshed }, json));
+    Console.WriteLine(receipt); return 0;
+}
 if (args.Length == 6 && args[0] == "probe-project")
 {
     string lab = Path.GetFullPath(args[1]), package = Path.GetFullPath(args[2]),
