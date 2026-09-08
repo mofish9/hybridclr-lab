@@ -4342,7 +4342,7 @@ internal static partial class Program
             var unityLog = argumentList[unityLogIndex + 1];
             if (File.Exists(unityLog))
             {
-                var text = File.ReadAllText(unityLog);
+                var text = UnityBatchLog.Read(unityLog);
                 if (text.Contains("executeMethod method", StringComparison.Ordinal) &&
                         text.Contains("threw exception", StringComparison.Ordinal) ||
                     text.Contains("Application will terminate with return code 1", StringComparison.Ordinal) ||

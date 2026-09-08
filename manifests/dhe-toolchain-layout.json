@@ -13,6 +13,7 @@
     "tool/ArchiveSupport.cs",
     "tool/ProductionGates.cs",
     "tool/RuntimeSourceBinding.cs",
+    "tool/UnityBatchLog.cs",
     "tool/MetaVersion.cs",
     "tool/ResourceUpdateCompatibility.cs",
     "tool/ResourceUpdateStaging.cs",
