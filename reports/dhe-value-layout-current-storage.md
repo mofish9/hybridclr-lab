@@ -1,22 +1,22 @@
-# Current storage and execution metadata: native checkpoint
+# Current storage and execution metadata: Unity 2022 research checkpoint
 
-本轮是已有 struct 布局演化的原生基础实现，尚未形成可交付的结构体热更能力。
-Unity 2022、团结 2022 的真实 headers compile/CTest 有条件通过；没有本轮身份的
-Windows Player、性能、内存或 ARM64 结论。公共资源加载流程仍未传入 Current
-storage plan，C# 工作流的已有值类型布局拒绝检查仍然保留。
+本轮仍是研究候选，尚未形成可交付的结构体热更能力。当前只推进 Unity 2022，
+其真实 headers compile/CTest 已通过，但同一身份的 Windows Player 仍在泛型
+字段别名和 sidecar GC 生命周期处失败；没有性能、内存或 ARM64 结论。团结 2022
+尚未按本轮逻辑重新组装或验证。公共资源加载流程仍未传入 Current storage plan。
 
 ## 精确身份
 
 | 组件 | commit |
 |---|---|
-| HybridCLR | 9b980c6c0206b1bcdc882db9e7a43142877cf37d |
-| native 测试和锁 | fdb1823db5f091632d22a789244040d050323c7a |
+| HybridCLR | acd8ee541db74c1d67b141047644bb5686925d6e |
+| native 测试和锁 | a65da32 |
 | Unity 2022 IL2CPP，复用 | 3482c81998b5e382b59a3d6f4e5fec2d0988d22b |
 | 团结 2022 IL2CPP，复用 | df8d0123d9f5a9fce79283fe5261dba21e802aa0 |
 | package，复用 | bc319e5e376d97ed89fdd0f127d4256fa466f1ef |
 
 HybridCLR canonical source SHA-256：
-3083E4B03A6EEC07D660ADFB9F1D15CF62D8F5F577086E497689F2059EAE830A。
+39E75AD6C8419DB518DB04472CD191B07E2E8A184998E0092847344830C7D2EF。
 
 源码及测试在上述提交 clean 时构建。报告提交只增加说明，不替代测试身份。
 组装和 native gate 仍用归档 host-native-descendants-bound/HybridCLR.DheTool.dll。
@@ -41,6 +41,19 @@ HybridCLR canonical source SHA-256：
   本轮不证明整个 metadata image/cache 加载事务可回滚。
 
 ## 验证与证据限制
+
+Unity 2022 native gate：
+`native-current-storage-p10/DHE-Unity2022/native-gate.json`，
+`passed=true`、`mergeReady=true`、`surrogateExternalHeadersUsed=false`、
+`FGS tests=true`。该 gate 使用 HybridCLR `acd8ee5` 和 Unity 2022 il2cpp_plus
+`3482c81`。
+
+Unity 2022 Player p10：
+`current-storage-p10-update-u22-result.json`。Current image 加载成功
+（`loadCode=0`），普通嵌套值、数组、Nullable、装箱、集合、跨程序集和重排等
+路径完成；`generic-values` 与 `generic-layout-addition` 返回 NullReference，
+随后 `managed-reference-gc` 在 sidecar 触达后未完成。该结果是失败证据，不能
+写成 Player correctness 通过。
 
 以下路径相对 C:/hybridclr_optimize/artifacts/dhe-evolution-20260908。
 
