@@ -94,6 +94,7 @@ internal static class Program
         var errors = new List<string>();
         int distinctBaseCount = 0;
         var processIds = new HashSet<int>();
+        using var playerHandles = new PlayerProcessHandles();
         var baseGenerations = new Dictionary<string, bool>(StringComparer.OrdinalIgnoreCase);
         var referenceRecords = new List<object>();
         try
@@ -185,7 +186,7 @@ internal static class Program
                         }
                         ProcessResult process = await Run(executable, new[] { "-batchmode", "-nographics", "-labMode", "dhe",
                         "-labTarget", "StandaloneWindows64", "-labResult", resultPath, "-logFile", logPath }, playerRoot, config.TimeoutSeconds,
-                            environment, requireSuccess: false);
+                            environment, requireSuccess: false, retainedProcesses: playerHandles);
                         attempt = process;
                         Require(processIds.Add(process.Id), "Player process IDs must be unique.");
                         Require(process.ExitCode == 0, "Player exited with " + process.ExitCode + "; see " + logPath);
@@ -428,6 +429,7 @@ internal static class Program
             referenceRecords,
             toolSha256 = Hash(tool), configSha256 = Hash(configPath), requiredChecks = RequiredChecks,
             singleUpdateEvidenceOnly = config.SingleUpdateEvidenceOnly,
+            playerHandlesRetainedUntilReport = true,
             results, failedRuns, errors,
         }, JsonOptions));
         return errors.Count == 0 ? 0 : 1;
@@ -435,7 +437,7 @@ internal static class Program
 
     private static async Task<ProcessResult> Run(string executable, IEnumerable<string> arguments,
         string directory, int timeoutSeconds, IReadOnlyDictionary<string, string>? environment = null,
-        bool requireSuccess = true)
+        bool requireSuccess = true, PlayerProcessHandles? retainedProcesses = null)
     {
         var start = new ProcessStartInfo(executable)
         {
@@ -449,7 +451,9 @@ internal static class Program
         start.Environment.Remove("HYBRIDCLR_DHE_LAYOUT_DIAGNOSTICS");
         if (environment != null)
             foreach (var entry in environment) start.Environment[entry.Key] = entry.Value;
-        using Process process = Process.Start(start) ?? throw new InvalidOperationException("Process start failed.");
+        Process process = Process.Start(start) ?? throw new InvalidOperationException("Process start failed.");
+        using Process? ownedProcess = retainedProcesses == null ? process : null;
+        retainedProcesses?.Add(process);
         var watch = Stopwatch.StartNew();
         Task<string> stdout = process.StandardOutput.ReadToEndAsync();
         Task<string> stderr = process.StandardError.ReadToEndAsync();
@@ -499,4 +503,17 @@ internal static class Program
         string LayoutDiagnostics = "after", bool SingleUpdateEvidenceOnly = false);
     private sealed record Base(string Label, string PlayerRoot, string BuildIdentity, bool SkipFirstUpdate = false);
     private sealed record ProcessResult(int Id, int ExitCode, long ElapsedMilliseconds, string Text);
+
+    private sealed class PlayerProcessHandles : IDisposable
+    {
+        private readonly List<Process> processes = new();
+        // Windows can reuse a terminated PID once its last process handle is
+        // closed. Retain our handles through report creation so the unique-PID
+        // gate remains meaningful even while other builds launch many processes.
+        public void Add(Process process) => processes.Add(process);
+        public void Dispose()
+        {
+            foreach (Process process in processes) process.Dispose();
+        }
+    }
 }
