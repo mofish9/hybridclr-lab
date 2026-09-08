@@ -180,3 +180,11 @@ No new runtime cache, publication field or object layout is needed. Declare
 supplemental-generic-memberref-signatures-v1 for added members on existing generic
 types and retain the exact DLL payloads for the next replay. Passing reflection
 alone is insufficient to declare those members callable from IL.
+
+The first signature candidate dc1d1fd fails all three native compile gates with
+C2440: GetGenericContainerFromIndex returns an opaque handle. The U21 workflow
+also fails native compilation and exits normally, preserving its compiler
+transaction cleanup and failed artifacts. Commit 0787aad adds the explicit cast;
+the runtime remains v25 with the same capability. These failed roots are
+native-generic-signatures and base-generic-signatures-interface-u21. New staged
+sources, compile gates and Players must use the corrected commit.
