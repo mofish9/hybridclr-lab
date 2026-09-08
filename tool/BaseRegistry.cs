@@ -75,7 +75,7 @@ internal static partial class Program
             if (!IsHex(baseId, 64, 64) || !baseIds.Add(baseId))
                 throw new DheException("DHE Base registry contains an invalid or duplicate baseId.");
             string engineWorkflow = GetString(item, "engineWorkflow") ?? string.Empty;
-            if (!RequiredPlayerEngineWorkflows.Contains(engineWorkflow,
+            if (!KnownPlayerEngineWorkflows.Contains(engineWorkflow,
                     StringComparer.Ordinal))
                 throw new DheException("DHE Base registry contains an unsupported engineWorkflow: " +
                     engineWorkflow);
@@ -126,7 +126,7 @@ internal static partial class Program
                 string reason = GetString(item, "reason") ?? string.Empty;
                 if (!IsHex(baseId, 64, 64) || !retiredIds.Add(baseId) ||
                     baseIds.Contains(baseId) ||
-                    !RequiredPlayerEngineWorkflows.Contains(engineWorkflow,
+                    !KnownPlayerEngineWorkflows.Contains(engineWorkflow,
                         StringComparer.Ordinal) ||
                     string.IsNullOrWhiteSpace(label) || label.Length > 256 ||
                     retiredAtRevision < 2 || retiredAtRevision > revision ||

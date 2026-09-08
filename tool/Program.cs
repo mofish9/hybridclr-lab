@@ -2613,7 +2613,8 @@ internal static partial class Program
                     if (resourceOnly) ValidateResourcePlayerEvidenceBindings(report, reportPath);
                     if (changed <= 0 || GetInt(player, "changedMethodCount") != changed ||
                         GetInt(player, "interpreterEntryCount") <= 0 || GetInt(player, "aotEntryCount") <= 0 ||
-                        !GetBool(player, "dispatchProbeValidated") || !GetBool(player, "changedProbeChanged") ||
+                        !GetBool(player, "dispatchProbeValidated") ||
+                        (!resourceOnly && !GetBool(player, "changedProbeChanged")) ||
                         (!resourceOnly && GetBool(player, "unchangedProbeChanged")) ||
                         !GetBool(player, "retryValidated") ||
                         GetString(player, "transactionStatus") != "validated")
@@ -3295,6 +3296,10 @@ internal static partial class Program
         ValidateResourcePlayerAssemblyScope(report, manifestAssemblyNames,
             playerPlannedNames, playerLoadedNames, differentialNames,
             interpreterOnlyNames, loadedInterpreterOnlyNames, player, modeErrors);
+        ValidateResourcePlayerExecution(player, CountResourceChangedMethods(selectedManifestBases[0]),
+            interpreterOnlyNames.Length, modeErrors, ReadResourceDispatchAssemblies(updateRoot,
+                selectedManifestVariant, selectedManifestBases[0], baseWorkflow, baseWorkflowPath,
+                ReadJson<JsonElement>(buildIdentityPath)));
         if (modeErrors.Count != 0)
             throw new DheException(string.Join(" ", modeErrors));
         JsonElement selectedValidationVariant = SelectPayloadVariant(validation, selectedVariantId,

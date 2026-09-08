@@ -666,7 +666,7 @@ internal static partial class Program
             !IsHex(artifactTree, 64, 64) ||
             !IsHex(toolchainPackageId, 64, 64) ||
             !IsPortableRelativePath(artifactRelative) || workflows.Length < 1 ||
-            workflows.Any(workflow => !RequiredPlayerEngineWorkflows.Contains(workflow,
+            workflows.Any(workflow => !KnownPlayerEngineWorkflows.Contains(workflow,
                 StringComparer.Ordinal)) || workflows.Distinct(StringComparer.Ordinal).Count() !=
                 workflows.Length)
             throw new DheException("DHE channel head contract is invalid.");

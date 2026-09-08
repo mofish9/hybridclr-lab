@@ -17,6 +17,7 @@
     "tool/MetaVersion.cs",
     "tool/ResourceUpdateCompatibility.cs",
     "tool/ResourceUpdateStaging.cs",
+    "tool/DhePlayerDispatch.cs",
     "tool/ResourceReleaseGate.cs",
     "tool/EvidenceAuthorities.cs",
     "tool/ChannelState.cs",

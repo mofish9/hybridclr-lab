@@ -526,10 +526,11 @@ internal static partial class Program
         ValidatePlayerAssemblies(player, assemblyNames, errors);
 
         int expectedChanged = selectedBase.ValueKind == JsonValueKind.Undefined ? 0 :
-            selectedBase.GetProperty("assemblies").EnumerateArray().Sum(item =>
-                GetInt(item, "guardRequiredMethodCount") + GetInt(item, "addedMethodCount"));
+            CountResourceChangedMethods(selectedBase);
         ValidateResourcePlayerExecution(player, expectedChanged,
-            interpreterOnlyNames.Length, errors);
+            interpreterOnlyNames.Length, errors, ReadResourceDispatchAssemblies(updateRoot,
+                selectedManifestVariant, selectedBase, baseWorkflow, baseWorkflowPath,
+                ReadJson<JsonElement>(buildIdentityPath)));
 
         if (!GetBool(stage, "baseMetaVersionUnchanged") ||
             stage.GetProperty("immutableFiles").EnumerateArray().Any(item =>
@@ -1100,8 +1101,66 @@ internal static partial class Program
             errors.Add("Resource Player workflow assembly scope differs from its manifest or Player result.");
     }
 
+    private static int CountResourceChangedMethods(JsonElement selectedBase) =>
+        selectedBase.GetProperty("assemblies").EnumerateArray().Sum(item =>
+            GetInt(item, "changedMethodCount") + GetInt(item, "addedMethodCount"));
+
+    private static IEnumerable<DhePlayerDispatch.AssemblyPair> ReadResourceDispatchAssemblies(
+        string updateRoot, JsonElement variant, JsonElement selectedBase,
+        JsonElement baseWorkflow, string baseWorkflowPath, JsonElement buildIdentity)
+    {
+        string planPath = ResolveBaseWorkflowReference(baseWorkflow, baseWorkflowPath,
+            "projectPlan", "Base workflow project plan");
+        var plan = ReadJson<JsonElement>(planPath);
+        var baselineRecords = plan.GetProperty("assemblies").EnumerateArray()
+            .ToDictionary(item => NormalizeName(GetString(item, "assemblyName") ?? ""),
+                StringComparer.OrdinalIgnoreCase);
+        var identityRecords = buildIdentity.GetProperty("assemblies").EnumerateArray()
+            .ToDictionary(item => NormalizeName(GetString(item, "assemblyName") ?? ""),
+                StringComparer.OrdinalIgnoreCase);
+        var selectedRecords = selectedBase.GetProperty("assemblies").EnumerateArray()
+            .ToDictionary(item => NormalizeName(GetString(item, "assemblyName") ?? ""),
+                StringComparer.OrdinalIgnoreCase);
+        foreach (JsonElement record in variant.GetProperty("assemblies").EnumerateArray())
+        {
+            string name = NormalizeName(GetString(record, "assemblyName") ?? "");
+            string currentPath = RequireFile(ResolveContainedPath(updateRoot,
+                GetString(record, "dll") ?? "", "Current dispatch assembly"), "Current dispatch assembly");
+            var current = MetaVersionSnapshot.Create(currentPath);
+            if (current.AssemblyName != name ||
+                !current.AssemblySha256.Equals(GetString(record, "dllSha256"),
+                    StringComparison.OrdinalIgnoreCase) ||
+                !Sha256Bytes(current.ToBinary()).Equals(GetString(record, "currentMetaVersionSha256"),
+                    StringComparison.OrdinalIgnoreCase))
+                throw new DheException("Mixed-call Current DLL/MV does not match the selected resource: " + name);
+            MetaVersionSnapshot? baseline = null;
+            if (identityRecords.TryGetValue(name, out var identity))
+            {
+                if (!baselineRecords.TryGetValue(name, out var baselineRecord) ||
+                    !selectedRecords.TryGetValue(name, out var selected))
+                    throw new DheException("Mixed-call Base assembly records are incomplete: " + name);
+                string baselinePath = ResolveEvidencePath(GetString(baselineRecord, "baseline"),
+                    Path.GetDirectoryName(planPath)!, "Base dispatch assembly");
+                baseline = MetaVersionSnapshot.Create(baselinePath);
+                string baseMvHash = Sha256Bytes(baseline.ToBinary());
+                if (baseline.AssemblyName != name ||
+                    !baseline.AssemblySha256.Equals(GetString(identity, "baselineSha256"),
+                        StringComparison.OrdinalIgnoreCase) ||
+                    !baseline.AssemblySha256.Equals(GetString(selected, "baselineAssemblySha256"),
+                        StringComparison.OrdinalIgnoreCase) ||
+                    !baseMvHash.Equals(GetString(identity, "baseMetaVersionSha256"),
+                        StringComparison.OrdinalIgnoreCase) ||
+                    !baseMvHash.Equals(GetString(selected, "baseMetaVersionSha256"),
+                        StringComparison.OrdinalIgnoreCase))
+                    throw new DheException("Mixed-call Base DLL/MV does not match the Player identity: " + name);
+            }
+            yield return new DhePlayerDispatch.AssemblyPair(baseline, current);
+        }
+    }
+
     private static void ValidateResourcePlayerExecution(JsonElement player, int expectedChanged,
-        int interpreterOnlyAssemblyCount, List<string> errors)
+        int interpreterOnlyAssemblyCount, List<string> errors,
+        IEnumerable<DhePlayerDispatch.AssemblyPair>? dispatchAssemblies = null)
     {
         if (expectedChanged < 0 || interpreterOnlyAssemblyCount < 0)
         {
@@ -1122,8 +1181,10 @@ internal static partial class Program
 
         if (expectedChanged > 0)
         {
+            try { DhePlayerDispatch.Validate(player, dispatchAssemblies ??
+                Array.Empty<DhePlayerDispatch.AssemblyPair>()); }
+            catch (Exception exception) { errors.Add("Changed dispatch: " + exception.Message); }
             if (GetInt(player, "interpreterEntryCount") <= 0 ||
-                !GetBool(player, "changedProbeChanged") ||
                 !GetBool(player, "capabilityPassed") ||
                 !GetBool(player, "secondaryAssemblyChangedValidated") ||
                 !GetBool(player, "structuralPassed") || !GetBool(player, "retryValidated") ||
@@ -1910,7 +1971,7 @@ internal static partial class Program
             string label = GetString(entry, "label") ?? string.Empty;
             string payloadVariantId = GetString(entry, "payloadVariantId") ?? "default";
             if (!IsHex(baseId, 64, 64) || !active.TryAdd(baseId, entry) ||
-                !RequiredPlayerEngineWorkflows.Contains(workflow,
+                !KnownPlayerEngineWorkflows.Contains(workflow,
                     StringComparer.Ordinal) ||
                 string.IsNullOrWhiteSpace(label) || label.Length > 256 ||
                 !IsPayloadVariantId(payloadVariantId))
@@ -1968,7 +2029,7 @@ internal static partial class Program
             string label = GetString(entry, "label") ?? string.Empty;
             string payloadVariantId = GetString(entry, "payloadVariantId") ?? "default";
             if (!IsHex(baseId, 64, 64) || !parentActive.TryAdd(baseId, entry) ||
-                !RequiredPlayerEngineWorkflows.Contains(workflow,
+                !KnownPlayerEngineWorkflows.Contains(workflow,
                     StringComparer.Ordinal) ||
                 string.IsNullOrWhiteSpace(label) || label.Length > 256 ||
                 !IsPayloadVariantId(payloadVariantId))
@@ -2043,7 +2104,7 @@ internal static partial class Program
                 GetString(value, "reason") ?? string.Empty);
             if (!IsHex(retirement.BaseId, 64, 64) ||
                 activeIds.Contains(retirement.BaseId) ||
-                !RequiredPlayerEngineWorkflows.Contains(retirement.EngineWorkflow,
+                !KnownPlayerEngineWorkflows.Contains(retirement.EngineWorkflow,
                     StringComparer.Ordinal) ||
                 string.IsNullOrWhiteSpace(retirement.Label) || retirement.Label.Length > 256 ||
                 retirement.RetiredAtRevision < 2 ||

@@ -717,7 +717,10 @@ internal static partial class Program
         {
             if (GetInt(player, "interpreterEntryCount") <= 0) errors.Add("Changed workflow did not enter the interpreter.");
             if (GetInt(player, "aotEntryCount") <= 0) errors.Add("Changed workflow did not prove an unchanged AOT entry.");
-            if (!GetBool(player, "changedProbeChanged") || GetBool(player, "unchangedProbeChanged"))
+            try { DhePlayerDispatch.Validate(player, liveDiffs.Values.Select(value =>
+                new DhePlayerDispatch.AssemblyPair(value.Baseline, value.Current))); }
+            catch (Exception exception) { errors.Add("Changed dispatch: " + exception.Message); }
+            if (GetBool(player, "unchangedProbeChanged"))
                 errors.Add("Changed workflow dispatch probe did not distinguish interpreter and AOT paths.");
             if (!GetBool(player, "retryValidated") || GetString(player, "transactionStatus") != "validated" || GetString(player, "retryFailure") != "DHE_MV_REGISTRATION_FAILED")
                 errors.Add("Changed workflow did not prove transaction rollback and retry.");
