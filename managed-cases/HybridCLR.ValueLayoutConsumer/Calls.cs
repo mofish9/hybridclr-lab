@@ -49,12 +49,27 @@ namespace HybridCLR.Lab.ValueLayoutConsumer
         [MethodImpl(MethodImplOptions.NoInlining)]
         public static T OpenGenericCopy<T>(T value) => value;
 
+        [MethodImpl(MethodImplOptions.NoInlining)]
+        public static bool FullCopyMatches(Payload before, Payload after)
+        {
+            // The frozen Base consumer cannot name fields introduced later.
+            // Compare every Current public field so an old-ABI projection that
+            // silently drops added fields cannot pass on the original Count.
+            foreach (var field in typeof(Payload).GetFields())
+                if (!object.Equals(field.GetValue(before), field.GetValue(after))) return false;
+            return true;
+        }
+
         public static bool Run()
         {
             Payload value = Factory.Create();
             var nested = new Nested { Value = value, Tail = 19 };
             var local = new LocalWrapper { Value = nested, Marker = new object() };
             var generic = new GenericValue<Payload> { Value = value, Marker = 23 };
+            if (!FullCopyMatches(value, DirectCopy(value)) || !FullCopyMatches(value, NativeRoundTrip(value)) ||
+                !FullCopyMatches(value, (Payload)ForwardBox()) || !FullCopyMatches(value, (Payload)GenericForwardBox()) ||
+                !FullCopyMatches(value, GenericCopy(generic).Value) || !FullCopyMatches(value, NullableCopy(value).Value) ||
+                !FullCopyMatches(value, ArrayElement(new[] { value }, 0))) return false;
             Payload copy = DirectCopy(value); copy.Count = 29;
             Payload alias = value; RefRoundTrip(ref alias);
             return value.Count == 17 && copy.Count == 29 && NestedCopy(nested).Tail == 19 &&

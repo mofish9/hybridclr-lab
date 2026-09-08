@@ -92,7 +92,7 @@ var methods = after[owner].Methods.Where(method => method.DeclaringType == prefi
 DheValueLayoutMethodImpact? Decision(string name) => impact.Methods.SingleOrDefault(method =>
     method.AssemblyName == owner && method.MethodIdentity == methods[name].Identity);
 string[] affected = { "DirectCopy", "NestedCopy", "LocalNestedCopy", "GenericCopy", "NullableCopy", "ForwardBox",
-    "GenericForwardBox", "ArrayElement", "RefRoundTrip", "ContainerNeighbor", "GenericContainerNeighbor", "NativeRoundTrip" };
+    "GenericForwardBox", "ArrayElement", "RefRoundTrip", "ContainerNeighbor", "GenericContainerNeighbor", "NativeRoundTrip", "FullCopyMatches" };
 foreach (string name in affected) checks["impact-" + name] = Decision(name)?.Decision == "interpret";
 foreach (string name in new[] { "Unrelated", "UnchangedCopy", "OtherAssemblyCopy", "UnchangedGenericCopy", "ExternalGenericInt", "ReferenceOnly" })
     checks["retained-" + name] = Decision(name) == null;
