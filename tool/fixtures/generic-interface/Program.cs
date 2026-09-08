@@ -111,6 +111,19 @@ foreach (string capability in new[] { "existing-interface-method-slots-v1", "inh
         analyses[owner].RequiredRuntimeCapabilities);
 }
 const string openGenericCapability = "open-generic-dispatch-definitions-v1";
+const string fieldAddressCapability = "aot-fgs-field-address-null-check-v1";
+const string mainAssembly = "HybridCLR.ManagedCasesAot";
+foreach (var pair in new[] { ("noop", baseline[mainAssembly]), ("current", current[mainAssembly]) })
+{
+    var fieldAddresses = ResourceUpdateCompatibility.Analyze(baseline[mainAssembly], pair.Item2,
+        currentAssemblySet: pair.Item1 == "noop" ? baseline.Values : current.Values);
+    checks["native-field-address-" + pair.Item1 + "-requires-null-check"] =
+        fieldAddresses.RequiredRuntimeCapabilities.Contains(fieldAddressCapability);
+    checks["native-field-address-" + pair.Item1 + "-old-Base-rejected"] =
+        !ResourceUpdateCompatibility.CanExecuteUpdate(ResourceUpdateCompatibility.RuntimeProtocol, "dhe-runtime-v25",
+            ResourceUpdateCompatibility.KnownRuntimeCapabilities.Where(value => value != fieldAddressCapability),
+            fieldAddresses.RequiredRuntimeCapabilities);
+}
 var noOp = ResourceUpdateCompatibility.Analyze(baseline[owner], baseline[owner], currentAssemblySet: baseline.Values);
 checks["native-generic-no-op-requires-definition-dispatch"] = noOp.RequiredRuntimeCapabilities.Contains(openGenericCapability);
 checks["native-generic-no-op-old-Base-rejected"] = !ResourceUpdateCompatibility.CanExecuteUpdate(

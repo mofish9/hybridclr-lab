@@ -2066,10 +2066,10 @@ internal static partial class Program
         ValidateJsonSchema(matrixEvidenceSchema, matrixEvidence.RootElement, matrixEvidenceSchema, "$",
             matrixEvidenceErrors);
         AddRegressionCheck(checks, errors, "evidence-native-matrix-roles",
-            RequiredStaticReleaseEvidenceRoles.Length == 8 && matrixFiles.Count == 11 &&
+            RequiredStaticReleaseEvidenceRoles.Length == 6 && matrixFiles.Count == 8 &&
             matrixEvidenceErrors.Count == 0,
-            "release evidence must require an extensible three-engine changed Base matrix, no-op, " +
-            "and all three resolver/native engine lanes");
+            "release evidence must require Unity 2022 and Tuanjie 2022 changed Bases, no-op, " +
+            "and both resolver/native engine lanes");
 
         var unsafeArchive = Path.Combine(regressionRoot, "not-an-archive");
         Directory.CreateDirectory(unsafeArchive);
@@ -2086,7 +2086,6 @@ internal static partial class Program
         string? resolverIdentityFixture = null;
         var resolverInputs = new[]
         {
-            (Role: "resolver-unity2021", Option: "resolverunity2021"),
             (Role: "resolver-unity2022", Option: "resolverunity2022"),
             (Role: "resolver-tuanjie2022", Option: "resolvertuanjie2022")
         };
@@ -2095,7 +2094,7 @@ internal static partial class Program
             var supplied = resolverInputs.Where(item =>
                 !string.IsNullOrWhiteSpace(cli.Optional(item.Option))).ToArray();
             if (supplied.Length != 0 && supplied.Length != resolverInputs.Length)
-                throw new DheException("Resolver regression inputs must contain all three engine workflows.");
+                throw new DheException("Resolver regression inputs must contain both supported engine workflows.");
             if (supplied.Length == resolverInputs.Length)
             {
                 foreach (var item in resolverInputs)
@@ -2105,9 +2104,9 @@ internal static partial class Program
                     resolverOutputs.Add(new { role = item.Role, path, sha256 = Sha256File(path) });
                 }
                 resolverIdentityFixture = File.ReadAllText(RequireFile(
-                    cli.Optional("resolverunity2021")!, "Unity 2021 resolver regression"));
+                    cli.Optional("resolverunity2022")!, "Unity 2022 resolver regression"));
                 realResolverOutputsValidated = true;
-                resolverDetails = "three real Editor resolver reports validated";
+                resolverDetails = "both supported real Editor resolver reports validated";
             }
             else
             {
@@ -2118,15 +2117,15 @@ internal static partial class Program
                     schemaVersion = 1,
                     format = "hybridclr.dhe-cpp-resolver-regression.json",
                     generatedAtUtc = DateTimeOffset.UtcNow,
-                    engineWorkflow = "Unity2021Standard",
-                    unityVersion = "2021.3.45f2",
+                    engineWorkflow = "Unity2022Fgs",
+                    unityVersion = "2022.3.62f3",
                     resolverSourceSha256 = GetString(packageLock, "resolverSourceSha256"),
                     passed = true,
                     checks = RequiredResolverChecks.Select(name => new { name, passed = true, error = "" }),
                     errors = Array.Empty<string>()
                 });
                 using var fixture = JsonDocument.Parse(resolverIdentityFixture);
-                ValidateResolverEvidence("resolver-unity2021", fixture.RootElement, cli.Root);
+                ValidateResolverEvidence("resolver-unity2022", fixture.RootElement, cli.Root);
             }
             resolverContractValidated = true;
         }
@@ -2145,7 +2144,7 @@ internal static partial class Program
                 var node = System.Text.Json.Nodes.JsonNode.Parse(resolverIdentityFixture)!.AsObject();
                 node["resolverSourceSha256"] = new string('0', 64);
                 using var tampered = JsonDocument.Parse(node.ToJsonString());
-                ValidateResolverEvidence("resolver-unity2021", tampered.RootElement, cli.Root);
+                ValidateResolverEvidence("resolver-unity2022", tampered.RootElement, cli.Root);
             }
             catch
             {

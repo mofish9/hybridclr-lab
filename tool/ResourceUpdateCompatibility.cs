@@ -4,7 +4,7 @@ internal sealed class ResourceUpdateCompatibility
 {
 	public const string Policy = "dhe-proven-safe-subset-v1";
 	public const string RuntimeProtocol = "dhe-runtime-protocol-v1";
-    public const string CurrentNativeRuntimeContract = "dhe-runtime-v25";
+    public const string CurrentNativeRuntimeContract = "dhe-runtime-v26";
     public static readonly string[] KnownRuntimeCapabilities =
     {
 		"aot-guard-v1",
@@ -18,6 +18,7 @@ internal sealed class ResourceUpdateCompatibility
         "supplemental-existing-type-static-fields-v1",
         "supplemental-existing-generic-type-fields-v1",
         "supplemental-instance-field-addresses-v1",
+        "aot-fgs-field-address-null-check-v1",
         "existing-interface-method-slots-v1",
         "cross-assembly-interface-declarations-v1",
         "inherited-interface-dispatch-v1",
@@ -232,6 +233,9 @@ internal sealed class ResourceUpdateCompatibility
         };
         if (requiresInterfaceSlots)
             requiredCapabilities.Add("existing-interface-method-slots-v1");
+        if (current.Fields.Any(field => !field.IsStatic && field.DeclaringTypeIsGeneric &&
+                baselineFields.ContainsKey(field.StableId) && allAddressTakenFields.Contains(field.Identity)))
+            requiredCapabilities.Add("aot-fgs-field-address-null-check-v1");
         if (RequiresClosedCurrentParentVtables(addedTypes, baseline, current, currentAssemblySet))
             requiredCapabilities.Add("closed-current-parent-vtables-v1");
         if (current.Methods.Any(method => method.IsVirtual && method.GenericParameterCount != 0 &&

@@ -129,10 +129,14 @@ internal static partial class Program
     private static readonly string[] RequiredStaticReleaseEvidenceRoles =
     {
         "regression", "demo-noop", "native-tuanjie2022",
-        "native-unity2022", "native-unity2021", "resolver-tuanjie2022", "resolver-unity2022",
-        "resolver-unity2021"
+        "native-unity2022", "resolver-tuanjie2022", "resolver-unity2022"
     };
     private static readonly string[] RequiredPlayerEngineWorkflows =
+    {
+        "Unity2022Fgs", "Tuanjie2022Fgs"
+    };
+    // Keep archived Base identities readable without qualifying new Unity 2021 builds.
+    private static readonly string[] KnownPlayerEngineWorkflows =
     {
         "Unity2021Standard", "Unity2022Fgs", "Tuanjie2022Fgs"
     };
@@ -483,7 +487,7 @@ internal static partial class Program
         {
             if (!IsHex(baseId, 64, 64) || retiredIds.Contains(baseId) || !baseIds.Add(baseId))
                 throw new DheException("Registry contains an invalid or duplicate Base ID: " + baseId);
-            if (!RequiredPlayerEngineWorkflows.Contains(engineWorkflow,
+            if (!KnownPlayerEngineWorkflows.Contains(engineWorkflow,
                     StringComparer.Ordinal) || !IsPayloadVariantId(payloadVariantId))
                 throw new DheException("Registry Base workflow or payload variant is invalid: " +
                     engineWorkflow + "/" + payloadVariantId);
@@ -2323,10 +2327,8 @@ internal static partial class Program
             (Role: "demo-noop", Option: "demonoop"),
             (Role: "native-tuanjie2022", Option: "nativetuanjie2022"),
             (Role: "native-unity2022", Option: "nativeunity2022"),
-            (Role: "native-unity2021", Option: "nativeunity2021"),
             (Role: "resolver-tuanjie2022", Option: "resolvertuanjie2022"),
-            (Role: "resolver-unity2022", Option: "resolverunity2022"),
-            (Role: "resolver-unity2021", Option: "resolverunity2021")
+            (Role: "resolver-unity2022", Option: "resolverunity2022")
         }.Select(item => (item.Role, Path: RequireFile(cli.Require(item.Option), item.Role + " evidence"))).ToArray();
         var changedPlayerPaths = cli.GetList("changedplayers");
         if (changedPlayerPaths.Count == 0)
@@ -2341,8 +2343,8 @@ internal static partial class Program
             .Select(path => RequireFile(path, "changed Player evidence"))
             .Distinct(StringComparer.OrdinalIgnoreCase).ToList();
         if (changedPlayerPaths.Count < RequiredPlayerEngineWorkflows.Length)
-            throw new DheException("Release evidence requires at least three changed Base Player reports " +
-                "covering Unity 2021, Unity 2022, and Tuanjie 2022.");
+            throw new DheException("Release evidence requires changed Base Player reports " +
+                "covering Unity 2022 and Tuanjie 2022.");
         if (changedPlayerPaths.Count > MaxChangedPlayerEvidenceCount)
             throw new DheException("Release evidence changed Player report count exceeds " +
                 MaxChangedPlayerEvidenceCount + ".");
@@ -2502,8 +2504,9 @@ internal static partial class Program
                 throw new DheException("Regression workflow output hash does not match release evidence: " + key);
         }
         if (!regressionReport.Value.TryGetProperty("resolverOutputs", out var resolverOutputs) ||
-            resolverOutputs.ValueKind != JsonValueKind.Array || resolverOutputs.GetArrayLength() != 3)
-            throw new DheException("Regression evidence does not bind the three-engine generated-C++ resolver matrix.");
+            resolverOutputs.ValueKind != JsonValueKind.Array ||
+            resolverOutputs.GetArrayLength() != RequiredPlayerEngineWorkflows.Length)
+            throw new DheException("Regression evidence does not bind the supported-engine generated-C++ resolver matrix.");
         foreach (var resolver in resolverOutputs.EnumerateArray())
         {
             var role = GetString(resolver, "role") ?? "";
@@ -2539,7 +2542,7 @@ internal static partial class Program
                     !report.TryGetProperty("workflowOutputs", out var workflowOutputs) ||
                     workflowOutputs.ValueKind != JsonValueKind.Array ||
                     workflowOutputs.GetArrayLength() < RequiredPlayerEngineWorkflows.Length + 1)
-                    throw new DheException("Regression evidence did not validate the three-engine changed Base matrix and no-op output tree.");
+                    throw new DheException("Regression evidence did not validate the supported-engine changed Base matrix and no-op output tree.");
                 var workflowKeys = new HashSet<string>(StringComparer.Ordinal);
                 var regressionChangedReports = new List<(JsonElement Report, string Path)>();
                 int noOpWorkflowCount = 0;
@@ -2571,8 +2574,9 @@ internal static partial class Program
                 ValidateRegressionResourceReleaseBinding(report, regressionReleaseProof);
                 if (!GetBool(report, "realResolverOutputsValidated") ||
                     !report.TryGetProperty("resolverOutputs", out var resolverOutputs) ||
-                    resolverOutputs.ValueKind != JsonValueKind.Array || resolverOutputs.GetArrayLength() != 3)
-                    throw new DheException("Regression evidence did not validate the three-engine generated-C++ resolver matrix.");
+                    resolverOutputs.ValueKind != JsonValueKind.Array ||
+                    resolverOutputs.GetArrayLength() != RequiredPlayerEngineWorkflows.Length)
+                    throw new DheException("Regression evidence did not validate the supported-engine generated-C++ resolver matrix.");
                 var resolverRoles = new HashSet<string>(StringComparer.Ordinal);
                 foreach (var resolver in resolverOutputs.EnumerateArray())
                 {
@@ -2584,8 +2588,8 @@ internal static partial class Program
                         throw new DheException("Regression resolver output identity is invalid: " + resolverRole);
                     ValidateResolverEvidence(resolverRole, ReadJson<JsonElement>(resolverPath), sourceRoot);
                 }
-                if (!resolverRoles.SetEquals(new[]
-                    { "resolver-unity2021", "resolver-unity2022", "resolver-tuanjie2022" }))
+                if (!resolverRoles.SetEquals(RequiredStaticReleaseEvidenceRoles.Where(
+                    required => required.StartsWith("resolver-", StringComparison.Ordinal))))
                     throw new DheException("Regression resolver output roles are incomplete.");
                 break;
             case "player-changed":
@@ -2960,7 +2964,7 @@ internal static partial class Program
         RequireEvidenceFormat(runtime, "hybridclr.dhe-runtime-manifest.json",
             "Changed Player runtime manifest");
         string engineWorkflow = GetString(runtime, "engineWorkflow") ?? string.Empty;
-        if (!RequiredPlayerEngineWorkflows.Contains(engineWorkflow, StringComparer.Ordinal))
+        if (!KnownPlayerEngineWorkflows.Contains(engineWorkflow, StringComparer.Ordinal))
             throw new DheException("Changed Player workflow uses an unsupported engine workflow: " +
                 engineWorkflow + ".");
         return (engineWorkflow, baseId);
@@ -2974,7 +2978,7 @@ internal static partial class Program
             : 1;
         if (reports.Count < minimumReportCount)
             throw new DheException(requireEngineMatrix
-                ? "Changed Player evidence requires all three engine workflows."
+                ? "Changed Player evidence requires all supported engine workflows."
                 : "Resource release evidence requires at least one active Base Player.");
         string[] baseIds = reports.Select(item =>
             GetString(item.Report, "selectedBaseId") ?? string.Empty).ToArray();
@@ -2991,8 +2995,7 @@ internal static partial class Program
             var workflows = identities.Select(item => item.Identity.EngineWorkflow)
                 .ToHashSet(StringComparer.Ordinal);
             if (!RequiredPlayerEngineWorkflows.All(workflows.Contains))
-                throw new DheException("Changed Player evidence does not cover Unity 2021, Unity 2022, " +
-                    "and Tuanjie 2022.");
+                throw new DheException("Changed Player evidence does not cover Unity 2022 and Tuanjie 2022.");
         }
 
         var first = identities[0].Item;
