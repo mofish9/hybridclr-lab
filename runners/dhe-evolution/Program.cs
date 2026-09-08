@@ -69,9 +69,13 @@ internal static class Program
             checkRequirements.All(checks => checks != null && checks.Distinct(StringComparer.Ordinal).Count() == checks.Length &&
                 checks.All(check => Regex.IsMatch(check, "^[a-z0-9-]+$")))),
             "Evolution check requirements must match the updates and contain unique check names.");
-        if (updates.Length < 2 || config.Bases.Length < 2 || config.TimeoutSeconds < 1 ||
+        Require(!config.SingleUpdateEvidenceOnly ||
+            (updates.Length == 1 && !config.RequireStructuralBaseGenerations),
+            "Single-update evidence cannot qualify structural Base generations.");
+        if (updates.Length < (config.SingleUpdateEvidenceOnly ? 1 : 2) ||
+            config.Bases.Length < 2 || config.TimeoutSeconds < 1 ||
             config.TimeoutSeconds > 600 || config.Bases.Select(item => item.Label).Distinct().Count() != config.Bases.Length)
-            throw new InvalidDataException("Replay requires multiple updates, unique Base labels, and a bounded timeout.");
+            throw new InvalidDataException("Replay requires the configured update count, unique Base labels, and a bounded timeout.");
         foreach (string input in updates.Concat(config.Bases.Select(item => Resolve(item.PlayerRoot))).Append(lab))
         {
             Require(!Within(output, input) && !Within(input, output), "Replay output overlaps an input tree.");
@@ -396,6 +400,7 @@ internal static class Program
             sourceHead, sourceTree, sourceChanges, runnerSha256 = Hash(typeof(Program).Assembly.Location),
             referenceRecords,
             toolSha256 = Hash(tool), configSha256 = Hash(configPath), requiredChecks = RequiredChecks,
+            singleUpdateEvidenceOnly = config.SingleUpdateEvidenceOnly,
             results, failedRuns, errors,
         }, JsonOptions));
         return errors.Count == 0 ? 0 : 1;
@@ -464,7 +469,7 @@ internal static class Program
         int TimeoutSeconds = 120, bool RequireStructuralBaseGenerations = false, string[]? ReferenceResults = null,
         string[][]? EvolutionCheckRequirements = null, string[]? DifferentialReferences = null,
         bool[]? RequireInterpretedCaseEntries = null, string? DifferentialManifest = null, string? DifferentialGolden = null,
-        string LayoutDiagnostics = "after");
+        string LayoutDiagnostics = "after", bool SingleUpdateEvidenceOnly = false);
     private sealed record Base(string Label, string PlayerRoot, string BuildIdentity, bool SkipFirstUpdate = false);
     private sealed record ProcessResult(int Id, int ExitCode, long ElapsedMilliseconds, string Text);
 }

@@ -22,6 +22,12 @@ and execution counts. Existing rollback, AOT-path, payload, registry, ledger and
 source checks remain required. Recheck cold Player behavior after binding the
 tool changes; a passed helper test alone is not release qualification.
 
+The focused formal-first runner uses SingleUpdateEvidenceOnly so its staged
+files still match the first resource when the formal validator reopens them.
+That mode is incompatible with structural-generation qualification. Full
+six-Base consecutive/skipped replay remains a separate mandatory checkpoint;
+this focused run cannot replace it.
+
 Keep recognized Unity 2021 registry IDs readable for historical inspection,
 while qualification still requires only the two active 2022 engines.
 Rollback reverts the tool validator and its package-layout entry together;

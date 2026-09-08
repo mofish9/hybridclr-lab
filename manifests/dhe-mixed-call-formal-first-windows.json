@@ -74,6 +74,7 @@
     ]
   ],
   "requireStructuralBaseGenerations": false,
+  "singleUpdateEvidenceOnly": true,
   "layoutDiagnostics": "after",
   "timeoutSeconds": 300,
   "differentialManifest": "test-manifest.json",
