@@ -10,6 +10,11 @@ Freeze the preceding native-descendant checkpoint: lab 821b011 and HybridCLR
 research/dhe-value-layout-v8.13.0 worktrees; leave those archived Players,
 payloads, failed reports, ordinary AOT DLL and formal release references intact.
 
+The first implementation checkpoint is recorded in
+reports/dhe-value-layout-impact.md: 35 impact checks, 14 CLR semantic groups per
+version, and 40 byte-identical archived MVs. This is planning/reference evidence,
+not a value-layout Player pass. Native storage and dispatch work remains open.
+
 ## Representation and correctness requirements
 
 An existing struct may grow, shrink, reorder fields, gain a managed reference,
