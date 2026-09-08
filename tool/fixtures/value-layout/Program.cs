@@ -104,12 +104,18 @@ if (args.Length == 4 && args[0] == "probe-payload")
                 (method.DeclaringType == "HybridCLR.Lab.ValueLayout.ValueLayoutProbe" ||
                  method.DeclaringType == "HybridCLR.Lab.ValueLayoutConsumer.Calls"))
                 .Select(method => method.Token).ToArray();
+        var oldMethods = old.Methods.ToDictionary(method => method.StableId, StringComparer.Ordinal);
+        uint[] changedMethodTokens = next.Methods
+            .Where(method => !oldMethods.TryGetValue(method.StableId, out var previous) ||
+                !string.Equals(previous.Version, method.Version, StringComparison.Ordinal))
+            .Select(method => method.Token).ToArray();
         return new { name, baseSha256 = old.AssemblySha256, currentSha256 = next.AssemblySha256,
             types = probeImpact.Layouts.Where(type => !type.RequiresOrdinaryAotBridge && type.AssemblyName == name)
                 .Select(type => type.CurrentTypeToken).Distinct().OrderBy(token => token).ToArray(),
             methods = probeImpact.Methods.Where(method => method.AssemblyName == name && method.Decision != "native-abi-bridge")
-                .Select(method => method.CurrentMethodToken).Concat(entryTokens).Distinct().OrderBy(token => token).ToArray(),
-            explicitProbeEntryTokens = entryTokens };
+                .Select(method => method.CurrentMethodToken).Concat(changedMethodTokens).Concat(entryTokens)
+                .Distinct().OrderBy(token => token).ToArray(),
+            changedMethodTokens, explicitProbeEntryTokens = entryTokens };
     }).ToArray();
     File.WriteAllText(Path.Combine(probeOutput, "plan.json"), JsonSerializer.Serialize(new
     {
