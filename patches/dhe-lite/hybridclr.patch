@@ -1814,7 +1814,7 @@ index 0000000..ed1ed15
 +}
 +}
 diff --git a/hybridclr/metadata/Image.cpp b/hybridclr/metadata/Image.cpp
-index 2bb9800..0b35e18 100644
+index 2bb9800..595e3ee 100644
 --- a/hybridclr/metadata/Image.cpp
 +++ b/hybridclr/metadata/Image.cpp
 @@ -22,6 +22,7 @@
@@ -1906,6 +1906,16 @@ index 2bb9800..0b35e18 100644
          }
          else
          {
+@@ -1183,6 +1237,9 @@ namespace metadata
+             nullptr, DecodeTokenTableType(token), DecodeTokenRowIndex(token));
+ 
+         IL2CPP_ASSERT(method);
++        // Cache the public identity and logical slot, not the hidden Current
++        // interface declaration returned by a new MethodDef token.
++        method = MetadataModule::ResolveDheMethod(method);
+         il2cpp::vm::Class::Init(method->klass);
+ 
+         tokenCache.insert({ key, (void*)method });
 diff --git a/hybridclr/metadata/InterpreterImage.cpp b/hybridclr/metadata/InterpreterImage.cpp
 index dd45bcd..17eaa41 100644
 --- a/hybridclr/metadata/InterpreterImage.cpp
@@ -2271,7 +2281,7 @@ index 4ba0c6a..876f351 100644
  		static bool IsMetadataPublished(const int32_t* initialized)
  		{
 diff --git a/hybridclr/metadata/MetadataModule.cpp b/hybridclr/metadata/MetadataModule.cpp
-index 9c240fa..bdb89fc 100644
+index 9c240fa..8e69626 100644
 --- a/hybridclr/metadata/MetadataModule.cpp
 +++ b/hybridclr/metadata/MetadataModule.cpp
 @@ -1,4 +1,5 @@
@@ -2731,7 +2741,7 @@ index 9c240fa..bdb89fc 100644
 +		return GetDheAttributePropertyByIndex(GetDheSupplementalImage(klass->image), klass, index);
 +	}
 +
-+	const MethodInfo* MetadataModule::ResolveDheCustomAttributeConstructor(const MethodInfo* method)
++	const MethodInfo* MetadataModule::ResolveDheMethod(const MethodInfo* method)
 +	{
 +		if (!method || !method->klass || !method->klass->image ||
 +			!IsInterpreterImage(method->klass->image) ||
@@ -3095,10 +3105,10 @@ index 9c240fa..bdb89fc 100644
  }
  }
 diff --git a/hybridclr/metadata/MetadataModule.h b/hybridclr/metadata/MetadataModule.h
-index 4989130..c452422 100644
+index 4989130..7a85145 100644
 --- a/hybridclr/metadata/MetadataModule.h
 +++ b/hybridclr/metadata/MetadataModule.h
-@@ -52,6 +52,108 @@ namespace metadata
+@@ -52,6 +52,112 @@ namespace metadata
  		}
  		
  		static Image* GetUnderlyingInterpreterImage(const MethodInfo* method);
@@ -3193,7 +3203,11 @@ index 4989130..c452422 100644
 +
 +		static const PropertyInfo* GetDheCustomAttributeProperty(Il2CppClass* klass, uint32_t index);
 +
-+		static const MethodInfo* ResolveDheCustomAttributeConstructor(const MethodInfo* method);
++		static const MethodInfo* ResolveDheMethod(const MethodInfo* method);
++		static const MethodInfo* ResolveDheCustomAttributeConstructor(const MethodInfo* method)
++		{
++			return ResolveDheMethod(method);
++		}
 +
 +		static bool HasDheLogicalEventView(Il2CppClass* klass);
 +
@@ -3207,7 +3221,7 @@ index 4989130..c452422 100644
  
  
  		static const char* GetStringFromEncodeIndex(StringIndex index)
-@@ -242,6 +344,9 @@ namespace metadata
+@@ -242,6 +348,9 @@ namespace metadata
  			return GetImage(DecodeImageIndex(index))->GetFieldOrParameterDefalutValueByRawIndex(DecodeMetadataIndex(index));
  		}
  
@@ -3217,7 +3231,7 @@ index 4989130..c452422 100644
  #if HYBRIDCLR_UNITY_2020
  		static bool HasAttribute(const Il2CppImage* image, uint32_t token, Il2CppClass* attribute)
  		{
-@@ -254,18 +359,22 @@ namespace metadata
+@@ -254,18 +363,22 @@ namespace metadata
  		}
  #endif
  

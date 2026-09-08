@@ -2,6 +2,13 @@
 
 ## Current capability work: existing interface slots
 
+The v15 replay (`d086ef2`) now registers successfully in all three processes and
+passes 38/42 groups, including reflection interface invocation and maps. Four
+IL-call groups still fail because method-token caching retains the hidden Current
+interface identity. Candidate `8cbc13a` normalizes cached method identity using
+the existing published logical map. New v16 execution is pending; the full gate
+remains failed, and both earlier failures are preserved.
+
 The first v14 changed-interface replay (`2c2f6bd`) fails all three Unity 2021
 processes during atomic registration: the explicit Added implementation cannot
 match the interface declaration. Candidate `fd3b112` normalizes MethodImpl

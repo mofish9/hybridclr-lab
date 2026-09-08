@@ -496,7 +496,7 @@ index 0000000..4267ed1
 +  assetBundleName:
 +  assetBundleVariant:
 diff --git a/Editor/Commands/DheBuildPipeline.cs b/Editor/Commands/DheBuildPipeline.cs
-index aa81ffd..a1b587d 100644
+index aa81ffd..42433a9 100644
 --- a/Editor/Commands/DheBuildPipeline.cs
 +++ b/Editor/Commands/DheBuildPipeline.cs
 @@ -2,11 +2,13 @@ using System;
@@ -521,7 +521,7 @@ index aa81ffd..a1b587d 100644
 -        private const string NativeGuardEndPrefix = "HYBRIDCLR_DHE_GUARD_END_V5:";
 -        private const string LegacyNativeGuardPrefix = "HYBRIDCLR_DHE_GUARD_V4:";
 +		private const string NativeRuntimeProtocol = "dhe-runtime-protocol-v1";
-+        private const string NativeRuntimeContract = "dhe-runtime-v15";
++        private const string NativeRuntimeContract = "dhe-runtime-v16";
 +        private static readonly string[] NativeRuntimeCapabilities =
 +        {
 +            "aot-guard-v1",
@@ -5139,7 +5139,7 @@ index 0000000..7c8fd53
 +  assetBundleName:
 +  assetBundleVariant:
 diff --git a/Runtime/DheRuntime.cs b/Runtime/DheRuntime.cs
-index 0e5fda3..11bb7de 100644
+index 0e5fda3..2d6b492 100644
 --- a/Runtime/DheRuntime.cs
 +++ b/Runtime/DheRuntime.cs
 @@ -1,6 +1,8 @@
@@ -5184,7 +5184,7 @@ index 0e5fda3..11bb7de 100644
          private const string PlanAssetPath = "Assets/GameMain/HotfixDlls/DheRuntimePlan.json";
          private const string DefaultAssetRoot = "Assets/GameMain/HotfixDlls/";
 +		private const string NativeRuntimeProtocol = "dhe-runtime-protocol-v1";
-+		private const string NativeRuntimeContract = "dhe-runtime-v15";
++		private const string NativeRuntimeContract = "dhe-runtime-v16";
 +        private static readonly string[] NativeRuntimeCapabilities =
 +        {
 +            "aot-guard-v1",

@@ -1,5 +1,22 @@
 # DHE existing interface evolution
 
+## Token dispatch repair
+
+Clean replay `d086ef2` on the fresh v15 Base closes the registration failure.
+All three processes report `loadError=OK` and execute the previous 35 groups plus
+the new reflection-invoke, interface-map and type-identity groups. Direct class,
+boxed-struct, constrained and delegate calls still fail with MethodAccessException.
+The failed output is preserved in `replay-interface-owner-u21-cold`.
+
+IL MethodDef resolution returns the hidden Current interface MethodInfo and caches
+its raw slot. Reflection already returns the canonical Base alias and logical slot.
+Candidate `8cbc13a` reuses the existing published logical-method resolver before
+an IL method token enters its cache. The custom-attribute entry remains a wrapper
+over that shared resolver. Normal images and unavailable/unpublished DHE maps retain
+their original behavior. Package `a22db3d` identifies the new native build as v16;
+capabilities and MV bytes do not change. Fresh Base and unchanged-payload replay
+are required before claiming this dispatch repair works.
+
 ## Reproduced explicit declaration failure
 
 Clean replay `2c2f6bd` runs three processes on the new v14 Unity 2021 Base.
