@@ -1967,6 +1967,14 @@ internal static partial class Program
         var buildConfiguration = ResolveWorkflowBuildConfiguration(cli,
             productionEvidence.RuntimeManifest);
 
+        void RunBoundUnity(IEnumerable<string> arguments, IDictionary<string, string> environment,
+            string logPath)
+        {
+            RequireWorkflowRuntimeBinding(productionEvidence.RuntimeManifest, project);
+            RunUnity(unity, project, arguments, environment, logPath, timeout);
+            RequireWorkflowRuntimeBinding(productionEvidence.RuntimeManifest, project);
+        }
+
         var prepareArguments = new List<string> { "-batchmode", "-nographics", "-quit", "-projectPath", project,
             "-executeMethod", adapterClass, "-dheTarget", target, "-dheOutputRoot", output,
             "-dheBaselineRoot", baselineCopy, "-dheCurrentRoot", current, "-dheMode", mode,
@@ -1979,9 +1987,9 @@ internal static partial class Program
             prepareArguments.AddRange(new[] { "-dheCurrentInputRoot",
                 RequireDirectory(currentInputRoot, "DHE current assembly input root") });
         AppendUnityArguments(prepareArguments, cli);
-        RunUnity(unity, project, prepareArguments,
+        RunBoundUnity(prepareArguments,
             bootstrap ? new Dictionary<string, string>() : new Dictionary<string, string> { ["DHE_BASELINE_ROOT"] = baseline },
-            Path.Combine(output, "unity-prepare-process.log"), timeout);
+            Path.Combine(output, "unity-prepare-process.log"));
         var preparePath = Path.Combine(output, "adapter", "prepare.json");
         RequireFile(preparePath, "DHE adapter prepare report");
 
@@ -2016,21 +2024,21 @@ internal static partial class Program
                 buildConfiguration.AotMetadataAssemblies });
         if (cli.Has("bootstrap")) common.AddRange(new[] { "-dheBootstrap", "true" });
         AppendUnityArguments(common, cli);
-        RunUnity(unity, project, common.Append("-executeMethod").Append(adapterType + ".StageRuntimePlan").Append("-logFile").Append(Path.Combine(output, "unity-stage.log")), new Dictionary<string, string> { ["DHE_BASELINE_ROOT"] = baseline }, Path.Combine(output, "unity-stage-process.log"), timeout);
+        RunBoundUnity(common.Append("-executeMethod").Append(adapterType + ".StageRuntimePlan").Append("-logFile").Append(Path.Combine(output, "unity-stage.log")), new Dictionary<string, string> { ["DHE_BASELINE_ROOT"] = baseline }, Path.Combine(output, "unity-stage-process.log"));
         var runtimePlanPath = Path.Combine(output, "runtime-plan", "dhe-runtime-plan.json");
         var baseAotMetadataArchive = MaterializeBaseAotMetadataRoot(output, runtimePlanPath);
-        RunUnity(unity, project, common.Append("-executeMethod").Append(adapterType + ".BuildDheYooAsset").Append("-logFile").Append(Path.Combine(output, "unity-yooasset.log")), new Dictionary<string, string> { ["DHE_BASELINE_ROOT"] = baseline }, Path.Combine(output, "unity-yooasset-process.log"), timeout);
+        RunBoundUnity(common.Append("-executeMethod").Append(adapterType + ".BuildDheYooAsset").Append("-logFile").Append(Path.Combine(output, "unity-yooasset.log")), new Dictionary<string, string> { ["DHE_BASELINE_ROOT"] = baseline }, Path.Combine(output, "unity-yooasset-process.log"));
         var resourcePath = Path.Combine(output, "adapter", "resource-evidence.json");
         ValidateResourceEvidence(resourcePath, target);
-        RunUnity(unity, project, common.Append("-executeMethod").Append(adapterType + ".BuildScriptsOnly").Append("-logFile").Append(Path.Combine(output, "unity-scripts.log")), new Dictionary<string, string> { ["DHE_BASELINE_ROOT"] = baseline }, Path.Combine(output, "unity-scripts-process.log"), timeout);
+        RunBoundUnity(common.Append("-executeMethod").Append(adapterType + ".BuildScriptsOnly").Append("-logFile").Append(Path.Combine(output, "unity-scripts.log")), new Dictionary<string, string> { ["DHE_BASELINE_ROOT"] = baseline }, Path.Combine(output, "unity-scripts-process.log"));
         if (bootstrap)
         {
-            RunUnity(unity, project, common.Append("-executeMethod").Append(adapterType + ".BuildFinalPlayer").Append("-logFile").Append(Path.Combine(output, "unity-player.log")), new Dictionary<string, string> { ["DHE_BASELINE_ROOT"] = baseline }, Path.Combine(output, "unity-player-process.log"), timeout);
+            RunBoundUnity(common.Append("-executeMethod").Append(adapterType + ".BuildFinalPlayer").Append("-logFile").Append(Path.Combine(output, "unity-player.log")), new Dictionary<string, string> { ["DHE_BASELINE_ROOT"] = baseline }, Path.Combine(output, "unity-player-process.log"));
             Console.WriteLine("DHE bootstrap Player built with universal guards; use resource-update for later releases.");
         }
         else
         {
-            RunUnity(unity, project, common.Append("-executeMethod").Append(adapterType + ".BuildFinalPlayer").Append("-logFile").Append(Path.Combine(output, "unity-player.log")), new Dictionary<string, string> { ["DHE_BASELINE_ROOT"] = baseline }, Path.Combine(output, "unity-player-process.log"), timeout);
+            RunBoundUnity(common.Append("-executeMethod").Append(adapterType + ".BuildFinalPlayer").Append("-logFile").Append(Path.Combine(output, "unity-player.log")), new Dictionary<string, string> { ["DHE_BASELINE_ROOT"] = baseline }, Path.Combine(output, "unity-player-process.log"));
         }
         var playerPath = Path.Combine(output, "dhe-player-result.json");
         var nativePath = Path.Combine(output, "native", "dhe-native-manifest.json");

@@ -120,6 +120,11 @@ internal static partial class Program
                 runtime = ReadJson<JsonElement>(runtimeManifestPath);
                 runtimeReady = ValidateRuntimeManifest(runtime, runtimeManifestPath, project, cli, release, errors,
                     out externalSurrogate);
+                var binding = ValidateInstalledRuntime(runtime, project);
+                checks.Add(new { name = "runtime:installed-source", passed = binding.Passed,
+                    details = JsonSerializer.Serialize(binding) });
+                errors.AddRange(binding.Errors);
+                runtimeReady &= binding.Passed;
             }
             catch (Exception ex) { errors.Add("Runtime manifest: " + ex.Message); }
         }
@@ -244,8 +249,8 @@ internal static partial class Program
         }
 
         var stagedRuntime = GetString(runtime, "stagedLibil2cpp");
-        if (release && (string.IsNullOrWhiteSpace(stagedRuntime) || !Directory.Exists(stagedRuntime) ||
-            !TreeHashForRelease(stagedRuntime, Array.Empty<string>()).Equals(GetString(runtime, "stagedRuntimeSha256"), StringComparison.OrdinalIgnoreCase)))
+        if (string.IsNullOrWhiteSpace(stagedRuntime) || !Directory.Exists(stagedRuntime) ||
+            !TreeHashForRelease(stagedRuntime, Array.Empty<string>()).Equals(GetString(runtime, "stagedRuntimeSha256"), StringComparison.OrdinalIgnoreCase))
         {
             errors.Add("Runtime staged libil2cpp tree does not match its manifest.");
             valid = false;
@@ -305,6 +310,30 @@ internal static partial class Program
             }
         }
         return valid;
+    }
+
+    private static RuntimeSourceBinding.Result ValidateInstalledRuntime(JsonElement runtime, string project)
+    {
+        string editorPlatform = OperatingSystem.IsWindows() ? "WindowsEditor" :
+            OperatingSystem.IsMacOS() ? "OSXEditor" : "LinuxEditor";
+        string source = RequireDirectory(GetString(runtime, "stagedLibil2cpp") ?? "",
+            "Manifest-bound DHE runtime source");
+        return RuntimeSourceBinding.Validate(source, RuntimeSourceBinding.InstalledRoot(project, editorPlatform));
+    }
+
+    private static void RequireWorkflowRuntimeBinding(string? manifestPath, string project)
+    {
+        if (manifestPath == null) return;
+        var runtime = ReadJson<JsonElement>(manifestPath);
+        string source = RequireDirectory(GetString(runtime, "stagedLibil2cpp") ?? "",
+            "Manifest-bound DHE runtime source");
+        if (!TreeHashForRelease(source, Array.Empty<string>()).Equals(
+                GetString(runtime, "stagedRuntimeSha256"), StringComparison.OrdinalIgnoreCase))
+            throw new DheException("Runtime source changed after preflight.");
+        var binding = ValidateInstalledRuntime(runtime, project);
+        if (!binding.Passed)
+            throw new DheException("DHE installed runtime does not match RuntimeManifestPath: " +
+                string.Join("; ", binding.Errors));
     }
 
     private static bool WriteCleanCheckout(Cli cli, bool release, string project, string toolRoot, string output)

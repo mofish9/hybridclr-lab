@@ -1,5 +1,15 @@
 # DHE evolution implementation and validation
 
+## Current blocker: actual installed runtime differs from the selected source
+
+The `aea9d17` generic-field replay has finished: all nine processes fail during
+registration with `unsupported DHE supplemental instance field` for AddedValue.
+The Unity 2021 project-local runtime still contains the older native implementation,
+although the supplied runtime manifest and package capabilities identify v12.
+The new binding regression must reject this mismatch before Unity preparation.
+See `docs/HybridCLR-DHE-Runtime-Source-Binding.md`. Existing failure reports and
+Base archives remain unchanged; the generic-field implementation is not qualified.
+
 ## In progress: existing generic reference-type fields
 
 The `19f439b` fixture adds instance and static fields to DheAddedGenericType<T>.
