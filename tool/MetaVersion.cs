@@ -657,7 +657,7 @@ internal sealed class MetaVersionSnapshot
     private static int InstructionIndex(Instruction? instruction,
         IReadOnlyDictionary<Instruction, int> indexes) => instruction == null ? -1 : indexes[instruction];
 
-    private static string MethodIdentity(MethodDef method) =>
+    internal static string MethodIdentity(MethodDef method) =>
         (method.DeclaringType?.FullName ?? "") + "::" + method.Name + "|" + method.MethodSig;
 
     private static string StableGenericParameter(GenericParam parameter) => string.Join(":", parameter.Number,
