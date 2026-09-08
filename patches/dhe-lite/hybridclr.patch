@@ -1729,10 +1729,18 @@ index 0000000000000000000000000000000000000000..c34042ac72dff099c4461f17c108e539
 +}
 +}
 diff --git a/hybridclr/metadata/Image.cpp b/hybridclr/metadata/Image.cpp
-index 2bb98002b1a6f7cb62c265ff684163733a373628..dc796cf891bf49755e767a6bf5f8a18f9eff71f7 100644
+index 2bb98002b1a6f7cb62c265ff684163733a373628..c47f92c16d6ec7636f833fc5d48947fa5504e3de 100644
 --- a/hybridclr/metadata/Image.cpp
 +++ b/hybridclr/metadata/Image.cpp
-@@ -101,6 +101,27 @@ namespace metadata
+@@ -22,6 +22,7 @@
+ #include "utils/StringUtils.h"
+ 
+ #include "MetadataUtil.h"
++#include "MetadataModule.h"
+ #include "BlobReader.h"
+ #include "MetadataPool.h"
+ 
+@@ -101,6 +102,27 @@ namespace metadata
  			return handle == il2cpp_defaults.value_type_class->typeMetadataHandle ||
  				handle == il2cpp_defaults.enum_class->typeMetadataHandle;
          }
@@ -1760,7 +1768,7 @@ index 2bb98002b1a6f7cb62c265ff684163733a373628..dc796cf891bf49755e767a6bf5f8a18f
          default:
          {
              return false;
-@@ -968,7 +989,7 @@ namespace metadata
+@@ -968,7 +990,7 @@ namespace metadata
              if (cur->token == fieldDef->token)
              {
                  IL2CPP_ASSERT(std::strcmp(cur->name, name) == 0);
@@ -1769,7 +1777,7 @@ index 2bb98002b1a6f7cb62c265ff684163733a373628..dc796cf891bf49755e767a6bf5f8a18f
              }
          }
          RaiseMissingFieldException(&type, name);
-@@ -992,6 +1013,39 @@ namespace metadata
+@@ -992,6 +1014,39 @@ namespace metadata
                      return GetMethodInfo(type, methodDef, genericInstantiation, genericContext);
                  }
              }

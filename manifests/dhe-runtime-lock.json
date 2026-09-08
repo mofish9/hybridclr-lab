@@ -8,10 +8,10 @@
       "repository": "hybridclr",
       "sourceMode": "integrated",
       "baseCommit": "9e4fc7219724a3c63ff845e0b2acaa7d10c2430b",
-      "integratedCommit": "12237e0ef7674fcf3ee39512781c8fad6efb8884",
-      "expectedTreeSha256": "E1608735CC107E6BF21796A092C28059B0C667260C103763802819F70ED4CA4D",
+      "integratedCommit": "1dd57b46bd86b4470ef8d2195536519fac667af2",
+      "expectedTreeSha256": "B1224B8C4961378FCDE3865A909885D851279A9042B9BD96C7571A8170E89414",
       "path": "patches/dhe-lite/hybridclr.patch",
-      "sha256": "BB82693349B0A02752FE20B21FED7C70BAF7C26D508EB80668F5CEF8557AF8B6",
+      "sha256": "CBD7113D76E8C7CA4514192EF373A6A8331B38E48F23238E3053EB7E2328206E",
       "applyRoot": "libil2cpp",
       "stripComponents": 1
     },

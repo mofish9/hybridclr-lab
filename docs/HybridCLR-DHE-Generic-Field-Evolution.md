@@ -26,6 +26,11 @@ Native tests add physical field identity checks; the compile matrix now also
 compiles MetadataUtil.cpp. Native and actual Player gates on this exact candidate
 remain pending. This is not a released or qualified runtime capability.
 
+The first Unity 2021 compile finds a missing MetadataModule include in Image.cpp.
+HybridCLR `1dd57b4` adds that declaration include; no semantic assertion changes.
+The failed `native-generic-fields` output is retained. Corrected native/runtime
+outputs use the separate `*-generic-fields-verified` roots.
+
 ## Objective and scope
 
 An immutable Base containing a generic reference type must accept a resource
