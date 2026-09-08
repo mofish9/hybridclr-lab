@@ -1,10 +1,10 @@
 {
   "labRoot": "..",
-  "toolAssembly": "../../../artifacts/dhe-evolution-20260908/host-class-virtual-abstract/HybridCLR.DheTool.dll",
-  "outputRoot": "../../../artifacts/dhe-evolution-20260908/replay-class-virtual-eight",
+  "toolAssembly": "../../../artifacts/dhe-evolution-20260908/host-class-virtual-reflection-bound/HybridCLR.DheTool.dll",
+  "outputRoot": "../../../artifacts/dhe-evolution-20260908/replay-class-virtual-reflection-eight",
   "updates": [
-    "../../../artifacts/dhe-evolution-20260908/resource-class-virtual-eight-first",
-    "../../../artifacts/dhe-evolution-20260908/resource-class-virtual-eight-latest"
+    "../../../artifacts/dhe-evolution-20260908/resource-class-virtual-reflection-eight-first",
+    "../../../artifacts/dhe-evolution-20260908/resource-class-virtual-reflection-eight-latest"
   ],
   "referenceResults": [
     "../../../artifacts/dhe-evolution-20260908/class-virtual-prepared-first-reference.json",
@@ -174,24 +174,24 @@
   "bases": [
     {
       "label": "u22-class-virtual-consecutive",
-      "playerRoot": "../../../artifacts/dhe-evolution-20260908/base-class-virtual-abstract-u22/player",
-      "buildIdentity": "../../../artifacts/dhe-evolution-20260908/base-class-virtual-abstract-u22/build-identity.json"
+      "playerRoot": "../../../artifacts/dhe-evolution-20260908/base-class-virtual-reflection-u22/player",
+      "buildIdentity": "../../../artifacts/dhe-evolution-20260908/base-class-virtual-reflection-u22/build-identity.json"
     },
     {
       "label": "u22-class-virtual-skipped",
-      "playerRoot": "../../../artifacts/dhe-evolution-20260908/base-class-virtual-abstract-u22/player",
-      "buildIdentity": "../../../artifacts/dhe-evolution-20260908/base-class-virtual-abstract-u22/build-identity.json",
+      "playerRoot": "../../../artifacts/dhe-evolution-20260908/base-class-virtual-reflection-u22/player",
+      "buildIdentity": "../../../artifacts/dhe-evolution-20260908/base-class-virtual-reflection-u22/build-identity.json",
       "skipFirstUpdate": true
     },
     {
       "label": "tj-class-virtual-consecutive",
-      "playerRoot": "../../../artifacts/dhe-evolution-20260908/base-class-virtual-abstract-tj/player",
-      "buildIdentity": "../../../artifacts/dhe-evolution-20260908/base-class-virtual-abstract-tj/build-identity.json"
+      "playerRoot": "../../../artifacts/dhe-evolution-20260908/base-class-virtual-reflection-tj/player",
+      "buildIdentity": "../../../artifacts/dhe-evolution-20260908/base-class-virtual-reflection-tj/build-identity.json"
     },
     {
       "label": "tj-class-virtual-skipped",
-      "playerRoot": "../../../artifacts/dhe-evolution-20260908/base-class-virtual-abstract-tj/player",
-      "buildIdentity": "../../../artifacts/dhe-evolution-20260908/base-class-virtual-abstract-tj/build-identity.json",
+      "playerRoot": "../../../artifacts/dhe-evolution-20260908/base-class-virtual-reflection-tj/player",
+      "buildIdentity": "../../../artifacts/dhe-evolution-20260908/base-class-virtual-reflection-tj/build-identity.json",
       "skipFirstUpdate": true
     },
     {
