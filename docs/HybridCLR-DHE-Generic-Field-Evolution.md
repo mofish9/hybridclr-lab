@@ -1,5 +1,31 @@
 # DHE existing generic reference-type fields
 
+## Candidate implementation
+
+HybridCLR `12237e0` adds closed supplemental-field views, sharing instance slots
+by open definition while retaining closed logical types and separate physical
+Current owners for static storage. FieldDef/MemberRef and token-handle resolution
+converge on logical fields; generic removals use their physical definitions.
+Runtime generic parameter types bind to the public Base container, not unresolved
+signature indexes. Ordinary non-DHE supplemental metadata keeps its previous
+generic instance-field restriction.
+
+Closed views are constructed and read under the existing metadata lock, and
+published vectors remain immutable. Sidecar reads release their mutex before
+calling engine type/boxing APIs; allocating writes take metadata lock before
+sidecar mutex. Reflected value-type reads and writes copy boxes, including
+nullable boxing semantics. The fixture now explicitly checks boxed-struct copy
+isolation in addition to its earlier nine groups.
+
+Package `47a94eb` and the C# generator declare `dhe-runtime-v12` and
+`supplemental-existing-generic-type-fields-v1`. The capability is required when
+fields are added to or removed from an existing generic type, not when the whole
+type is new to Base. Ten initial compatibility tests pass against the prior
+prepared fixture, including old-runtime, field-address and ThreadStatic rejection.
+Native tests add physical field identity checks; the compile matrix now also
+compiles MetadataUtil.cpp. Native and actual Player gates on this exact candidate
+remain pending. This is not a released or qualified runtime capability.
+
 ## Objective and scope
 
 An immutable Base containing a generic reference type must accept a resource

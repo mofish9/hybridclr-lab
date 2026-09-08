@@ -1,5 +1,5 @@
 diff --git a/hybridclr/DheRuntime.cpp b/hybridclr/DheRuntime.cpp
-index 7103ed2..86a98f1 100644
+index 7103ed2b422f2359d5f0e7d50a045623422c911d..86a98f17327c768d39536be55c3f6aeeca6db73f 100644
 --- a/hybridclr/DheRuntime.cpp
 +++ b/hybridclr/DheRuntime.cpp
 @@ -18,21 +18,32 @@
@@ -750,7 +750,7 @@ index 7103ed2..86a98f1 100644
  }
 +}
 diff --git a/hybridclr/DheRuntime.h b/hybridclr/DheRuntime.h
-index e143176..54f5f11 100644
+index e143176b6237283efcd8872209fab37b1323fd98..54f5f11d0774cb42ef0a0fe3ac5735e57ef6944f 100644
 --- a/hybridclr/DheRuntime.h
 +++ b/hybridclr/DheRuntime.h
 @@ -6,43 +6,91 @@
@@ -870,8 +870,48 @@ index e143176..54f5f11 100644
      void ResetForTests();
  }
 +}
+diff --git a/hybridclr/Il2CppCompatibleDef.cpp b/hybridclr/Il2CppCompatibleDef.cpp
+index b213b60f3df08dbc59e83484779336ffd51b245f..32ce2c56a2d463047155826d00fa3d6fa3ba5b92 100644
+--- a/hybridclr/Il2CppCompatibleDef.cpp
++++ b/hybridclr/Il2CppCompatibleDef.cpp
+@@ -157,7 +157,8 @@ namespace hybridclr
+ 		// MetadataModule::IsImplementedByInterpreter may acquire g_MetadataLock.
+ 		// Resolve it before taking the method-pointer lock so this path never
+ 		// creates an s_methodPointerInitLock -> g_MetadataLock edge.
+-		bool implementedByInterpreter = hybridclr::metadata::MetadataModule::IsImplementedByInterpreter(method);
++		bool implementedByInterpreter = hybridclr::metadata::MetadataModule::IsImplementedByInterpreter(
++			method, ReadPublishedPointer(&method->methodPointer) == nullptr);
+ 		ResolvedInterpreterCallMethodPointers resolved = ResolveInterpreterCallMethodPointers(
+ 			method, implementedByInterpreter);
+ 		il2cpp::os::FastAutoLock lock(&s_methodPointerInitLock);
+@@ -184,7 +185,7 @@ namespace hybridclr
+ 			if (needsInterpreterFallback)
+ 			{
+ 				implementedByInterpreter = hybridclr::metadata::MetadataModule::IsImplementedByInterpreter(
+-					const_cast<MethodInfo*>(method));
++					const_cast<MethodInfo*>(method), true);
+ 			}
+ 			ResolvedInterpreterCallMethodPointers resolved;
+ 			if (implementedByInterpreter)
+diff --git a/hybridclr/Il2CppCompatibleDef.h b/hybridclr/Il2CppCompatibleDef.h
+index d192de22c52632ec86f737f40a933a81a9e18f24..cf6f58f131daeb946a51f8071dc79f551c154745 100644
+--- a/hybridclr/Il2CppCompatibleDef.h
++++ b/hybridclr/Il2CppCompatibleDef.h
+@@ -168,9 +168,10 @@ namespace hybridclr
+ 		// DHE leaves unchanged methods on their native AOT entry. They still
+ 		// participate in interpreter call graphs, where the managed-to-native
+ 		// reflection bridge invokes methodPointer directly.
+-		if (IsDheUnchangedMethod(method))
++		if (IsDheUnchangedMethod(method) &&
++			ReadPublishedPointer(&const_cast<MethodInfo*>(method)->methodPointer) != nullptr)
+ 		{
+-			return ReadPublishedPointer(&const_cast<MethodInfo*>(method)->methodPointer) != nullptr;
++			return true;
+ 		}
+ 		return InitAndGetInterpreterDirectlyCallMethodPointer(method) != nullptr;
+ 	}
 diff --git a/hybridclr/RuntimeApi.cpp b/hybridclr/RuntimeApi.cpp
-index e4f38ae..9095781 100644
+index e4f38ae5c26f2d25fd28229fed56bf6ac0a91425..9095781ad332d6dd31476714bdae13f7cb4b8726 100644
 --- a/hybridclr/RuntimeApi.cpp
 +++ b/hybridclr/RuntimeApi.cpp
 @@ -1,6 +1,10 @@
@@ -1216,7 +1256,7 @@ index e4f38ae..9095781 100644
  
  	int32_t RuntimeApi::IsDifferentialMethodChanged(Il2CppReflectionMethod* method)
 diff --git a/hybridclr/RuntimeApi.h b/hybridclr/RuntimeApi.h
-index 0664ff5..0e73745 100644
+index 0664ff5d58854a95688f996ff8f4f25086a046f8..0e73745eb89aa8182c22e35cb96c5fd115b0e3e1 100644
 --- a/hybridclr/RuntimeApi.h
 +++ b/hybridclr/RuntimeApi.h
 @@ -11,8 +11,8 @@ namespace hybridclr
@@ -1231,7 +1271,7 @@ index 0664ff5..0e73745 100644
  		static int32_t GetDifferentialInterpreterEntryCount();
  		static int32_t GetDifferentialAotBridgeCallCount();
 diff --git a/hybridclr/interpreter/Instruction.cpp b/hybridclr/interpreter/Instruction.cpp
-index 6bc9e0d..9e4ae10 100644
+index 6bc9e0d4a7be13aa9d4e2543956e6b127c1d5aef..9e4ae1055d4306a19bc91ee0d8184a3cdc57ea29 100644
 --- a/hybridclr/interpreter/Instruction.cpp
 +++ b/hybridclr/interpreter/Instruction.cpp
 @@ -919,6 +919,8 @@ namespace interpreter
@@ -1244,7 +1284,7 @@ index 6bc9e0d..9e4ae10 100644
          //!!!}}INST_SIZE
      };
 diff --git a/hybridclr/interpreter/Instruction.h b/hybridclr/interpreter/Instruction.h
-index 50e803f..d7c75a2 100644
+index 50e803f42ba3f3585fc0b4e775093621ccc7c8cb..d7c75a2c0bc6bf4b9084f87dff2f6914305054c7 100644
 --- a/hybridclr/interpreter/Instruction.h
 +++ b/hybridclr/interpreter/Instruction.h
 @@ -935,6 +935,8 @@ namespace interpreter
@@ -1291,8 +1331,26 @@ index 50e803f..d7c75a2 100644
  	//!!!}}INST
  #pragma pack(pop)
  
+diff --git a/hybridclr/interpreter/InterpreterModule.cpp b/hybridclr/interpreter/InterpreterModule.cpp
+index 944aaef6d90b63d1d4ed3dee5e45901b3edd8d1d..0b440a17eab3ea58c2cc40f4c8f773c1e5f797c9 100644
+--- a/hybridclr/interpreter/InterpreterModule.cpp
++++ b/hybridclr/interpreter/InterpreterModule.cpp
+@@ -300,7 +300,12 @@ namespace interpreter
+ 		}
+ 		if (hybridclr::metadata::IsInterpreterImplement(method))
+ 		{
+-			Interpreter::Execute(method,  localVarBase + argVarIndexs[0], ret);
++			const InterpMethodInfo* imi = GetInterpMethodInfo(method);
++			// Native-form constructors can place this after their explicit arguments.
++			// The caller frame keeps their original references rooted during this copy.
++			std::vector<StackObject> args(imi->argStackObjectSize ? imi->argStackObjectSize : 1);
++			CopyIndexedStackArguments(args.data(), localVarBase, argVarIndexs, *imi);
++			Interpreter::Execute(method, args.data(), ret);
+ 			return;
+ 		}
+ 		if (method && method->klass && method->klass->image &&
 diff --git a/hybridclr/interpreter/Interpreter_Execute.cpp b/hybridclr/interpreter/Interpreter_Execute.cpp
-index 81332ad..58c2629 100644
+index 81332ad01e584ed32c783f75417a74cf65bb5430..58c262982c65f328f50c912446dba866dc839435 100644
 --- a/hybridclr/interpreter/Interpreter_Execute.cpp
 +++ b/hybridclr/interpreter/Interpreter_Execute.cpp
 @@ -12496,6 +12496,38 @@ const int32_t kMaxRetValueTypeStackObjectSize = 1024;
@@ -1334,11 +1392,37 @@ index 81332ad..58c2629 100644
  				//!!!}}INSTRINCT
  #pragma endregion
  				default:
+diff --git a/hybridclr/interpreter/MemoryUtil.h b/hybridclr/interpreter/MemoryUtil.h
+index 8617e3d69baa61483622610971e392404c999c02..0552b19bf38c82251bc7bdb8c102102698624db5 100644
+--- a/hybridclr/interpreter/MemoryUtil.h
++++ b/hybridclr/interpreter/MemoryUtil.h
+@@ -141,6 +141,21 @@ namespace interpreter
+ 		}
+ 	}
+ 
++	// The destination must not overlap the caller frame, including later arguments.
++	inline void CopyIndexedStackArguments(StackObject* dst, StackObject* localVarBase,
++		const uint16_t* argIndices, const InterpMethodInfo& method)
++	{
++		uint32_t offset = 0;
++		for (uint32_t i = 0; i < method.argCount; ++i)
++		{
++			uint32_t size = method.args[i].stackObjectSize;
++			IL2CPP_ASSERT(offset + size <= method.argStackObjectSize);
++			CopyStackObject(dst + offset, localVarBase + argIndices[i], size);
++			offset += size;
++		}
++		IL2CPP_ASSERT(offset == method.argStackObjectSize);
++	}
++
+ 	inline void CopyBySize(void* dst, void* src, uint32_t size)
+ 	{
+ 		switch (size)
 diff --git a/hybridclr/metadata/AOTHomologousImage.h b/hybridclr/metadata/AOTHomologousImage.h
-index a74d810..1c749cf 100644
+index a74d8105cce1812ba2e3f9f6976ecb7a05232473..f583687bcb2c04f07c9dce6a03e5fa9beeeda65c 100644
 --- a/hybridclr/metadata/AOTHomologousImage.h
 +++ b/hybridclr/metadata/AOTHomologousImage.h
-@@ -42,9 +42,128 @@ namespace metadata
+@@ -42,9 +42,144 @@ namespace metadata
  
  		LoadImageErrorCode Load(const byte* imageData, size_t length);
  
@@ -1387,6 +1471,11 @@ index a74d810..1c749cf 100644
 +			return 0;
 +		}
 +
++		virtual const MethodInfo* ResolveLogicalMethod(const MethodInfo* method)
++		{
++			return method;
++		}
++
 +		virtual FieldInfo* GetFirstSupplementalField(Il2CppClass* klass, void** iter)
 +		{
 +			return nullptr;
@@ -1406,6 +1495,17 @@ index a74d810..1c749cf 100644
 +		virtual bool IsRemovedField(const FieldInfo* field)
 +		{
 +			return false;
++		}
++
++		virtual const FieldInfo* ResolveSupplementalField(const FieldInfo* field)
++		{
++			return field;
++		}
++
++		virtual const Il2CppFieldDefinition* ResolveSupplementalFieldDefinition(
++			const Il2CppType* type, const char* name, const Il2CppType* fieldType)
++		{
++			return nullptr;
 +		}
 +
 +		virtual Il2CppClass* GetSupplementalFieldLogicalParent(const FieldInfo* field)
@@ -1470,10 +1570,10 @@ index a74d810..1c749cf 100644
 \ No newline at end of file
 +}
 diff --git a/hybridclr/metadata/Assembly.cpp b/hybridclr/metadata/Assembly.cpp
-index 4d889ab..4b3bfbc 100644
+index 4d889abb60f0a3cff239afc1c59292a2a08dbb92..4080d30dc31bc42a881bda15940f38794b8e4f17 100644
 --- a/hybridclr/metadata/Assembly.cpp
 +++ b/hybridclr/metadata/Assembly.cpp
-@@ -230,11 +230,47 @@ namespace metadata
+@@ -230,11 +230,52 @@ namespace metadata
              return LoadImageErrorCode::HOMOLOGOUS_ONLY_SUPPORT_AOT_ASSEMBLY;
          }
          image->SetTargetAssembly(aotAss);
@@ -1519,15 +1619,117 @@ index 4d889ab..4b3bfbc 100644
 +			// Supplemental types must report the public Base assembly identity even
 +			// though their metadata and executable bodies live in this hidden image.
 +			fallbackIl2CppImage->assembly = const_cast<Il2CppAssembly*>(aotAss);
-+			interpreterFallbackImage->InitRuntimeMetadatas();
 +			static_cast<SuperSetAOTHomologousImage*>(image)->SetInterpreterFallbackImage(
-+				interpreterFallbackImage);
++				interpreterFallbackImage, expectedAssemblyName != nullptr);
++			if (expectedAssemblyName)
++			{
++				interpreterFallbackImage->SetHomologousTypeReferenceImage(
++					static_cast<SuperSetAOTHomologousImage*>(image));
++			}
++			interpreterFallbackImage->InitRuntimeMetadatas();
 +		}
          image->InitRuntimeMetadatas();
          AOTHomologousImage::RegisterLocked(image, lock);
  		if (targetAssembly)
+diff --git a/hybridclr/metadata/DheCustomAttributeMetadata.h b/hybridclr/metadata/DheCustomAttributeMetadata.h
+new file mode 100644
+index 0000000000000000000000000000000000000000..2825f58438d5bbc77aedf8c44eb6f7d94fa24489
+--- /dev/null
++++ b/hybridclr/metadata/DheCustomAttributeMetadata.h
+@@ -0,0 +1,59 @@
++#pragma once
++
++#include "AOTHomologousImage.h"
++
++namespace hybridclr
++{
++namespace metadata
++{
++    // Physical Base slots stay stable. Logical properties occupy a separate
++    // suffix because their PropertyInfo objects are not in klass->properties.
++    inline bool TryGetDheAttributePropertyIndex(AOTHomologousImage* image,
++        const PropertyInfo* property, int32_t& index)
++    {
++        Il2CppClass* klass = property->parent;
++        if (!image || !image->HasLogicalPropertyView(klass))
++            return false;
++        void* iter = nullptr;
++        const PropertyInfo* candidate = image->GetFirstLogicalProperty(klass, &iter);
++        int32_t candidateIndex = klass->property_count;
++        while (candidate)
++        {
++            if (candidate == property)
++            {
++                index = candidateIndex;
++                return true;
++            }
++            ++candidateIndex;
++            if (!image->TryGetNextLogicalProperty(klass, &iter, &candidate))
++                break;
++        }
++        return false;
++    }
++
++    inline const PropertyInfo* GetDheAttributePropertyByIndex(AOTHomologousImage* image,
++        Il2CppClass* klass, uint32_t index)
++    {
++        if (index < klass->property_count)
++        {
++#if UNITY_ENGINE_TUANJIE
++            return klass->properties[index];
++#else
++            return &klass->properties[index];
++#endif
++        }
++        if (!image || !image->HasLogicalPropertyView(klass))
++            return nullptr;
++        index -= klass->property_count;
++        void* iter = nullptr;
++        const PropertyInfo* property = image->GetFirstLogicalProperty(klass, &iter);
++        while (property && index != 0)
++        {
++            --index;
++            if (!image->TryGetNextLogicalProperty(klass, &iter, &property))
++                return nullptr;
++        }
++        return property;
++    }
++}
++}
+diff --git a/hybridclr/metadata/DheGenericFieldMetadata.h b/hybridclr/metadata/DheGenericFieldMetadata.h
+new file mode 100644
+index 0000000000000000000000000000000000000000..c34042ac72dff099c4461f17c108e53920f06e2f
+--- /dev/null
++++ b/hybridclr/metadata/DheGenericFieldMetadata.h
+@@ -0,0 +1,26 @@
++#pragma once
++
++#include "../Il2CppCompatibleDef.h"
++#include <cstring>
++
++namespace hybridclr
++{
++namespace metadata
++{
++    // Raw Current fields and logical Base aliases use different owners. Only
++    // search the supplied physical array, never recurse through the merged view.
++    inline FieldInfo* FindDhePhysicalField(Il2CppClass* owner, const FieldInfo* identity)
++    {
++        if (!owner || !owner->fields || !identity || !identity->name)
++            return nullptr;
++        for (uint16_t index = 0; index < owner->field_count; ++index)
++        {
++            FieldInfo* field = owner->fields + index;
++            if (field->token == identity->token && field->name &&
++                std::strcmp(field->name, identity->name) == 0)
++                return field;
++        }
++        return nullptr;
++    }
++}
++}
 diff --git a/hybridclr/metadata/Image.cpp b/hybridclr/metadata/Image.cpp
-index 2bb9800..44c2c21 100644
+index 2bb98002b1a6f7cb62c265ff684163733a373628..dc796cf891bf49755e767a6bf5f8a18f9eff71f7 100644
 --- a/hybridclr/metadata/Image.cpp
 +++ b/hybridclr/metadata/Image.cpp
 @@ -101,6 +101,27 @@ namespace metadata
@@ -1558,6 +1760,15 @@ index 2bb9800..44c2c21 100644
          default:
          {
              return false;
+@@ -968,7 +989,7 @@ namespace metadata
+             if (cur->token == fieldDef->token)
+             {
+                 IL2CPP_ASSERT(std::strcmp(cur->name, name) == 0);
+-                return cur;
++                return MetadataModule::ResolveDheSupplementalField(cur);
+             }
+         }
+         RaiseMissingFieldException(&type, name);
 @@ -992,6 +1013,39 @@ namespace metadata
                      return GetMethodInfo(type, methodDef, genericInstantiation, genericContext);
                  }
@@ -1599,10 +1810,30 @@ index 2bb9800..44c2c21 100644
          else
          {
 diff --git a/hybridclr/metadata/InterpreterImage.cpp b/hybridclr/metadata/InterpreterImage.cpp
-index dd45bcd..f5de472 100644
+index dd45bcd37a62a507895153443d7d1a081e07d76f..9b25f7d333cf9358b23c0e34bbe697ed84b7561d 100644
 --- a/hybridclr/metadata/InterpreterImage.cpp
 +++ b/hybridclr/metadata/InterpreterImage.cpp
-@@ -496,10 +496,23 @@ namespace metadata
+@@ -1,4 +1,6 @@
+ #include "InterpreterImage.h"
++#include "DheCustomAttributeMetadata.h"
++#include "SuperSetAOTHomologousImage.h"
+ 
+ #include <cstring>
+ #include <cmath>
+@@ -316,6 +318,12 @@ namespace metadata
+ 
+ 		HC_METADATA_STAGE(_index, "InitGenericParamDefs0", InitGenericParamDefs0());
+ 		HC_METADATA_STAGE(_index, "InitTypeDefs_0", InitTypeDefs_0());
++		// Bind TypeDef references before signatures, parents and layouts can
++		// publish hidden Current classes as the types of public declarations.
++		if (_homologousTypeReferenceImage)
++		{
++			_homologousTypeReferenceImage->InitTypeReferences();
++		}
+ 		HC_METADATA_STAGE(_index, "InitMethodDefs0", InitMethodDefs0());
+ 		HC_METADATA_STAGE(_index, "InitGenericParamDefs", InitGenericParamDefs());
+ 		HC_METADATA_STAGE(_index, "InitNestedClass", InitNestedClass()); // must before typedefs1, because parent may be nested class
+@@ -496,10 +504,23 @@ namespace metadata
  					if (parentType != classifiedParent)
  					{
  						classifiedParent = parentType;
@@ -1630,7 +1861,21 @@ index dd45bcd..f5de472 100644
  					}
  					if (classifiedParentIsEnum)
  					{
-@@ -1088,6 +1101,10 @@ namespace metadata
+@@ -1029,7 +1050,12 @@ namespace metadata
+ 		auto stageStart = std::chrono::steady_clock::now();
+ #endif
+ 		MethodRefInfo mri = {};
+-		ReadMethodRefInfoFromToken(nullptr, nullptr, DecodeTokenTableType(ctorMethodToken), DecodeTokenRowIndex(ctorMethodToken), mri);
++		// The serialized constructor index must name the same public class that
++		// reflection filters and allocates, including attributes already in Base.
++		Image* resolveImage = _homologousTypeReferenceImage
++			? static_cast<Image*>(_homologousTypeReferenceImage) : this;
++		resolveImage->ReadMethodRefInfoFromToken(nullptr, nullptr,
++			DecodeTokenTableType(ctorMethodToken), DecodeTokenRowIndex(ctorMethodToken), mri);
+ 		const MethodInfo* ctorMethod = GetMethodInfoFromMethodDef(mri.containerType, mri.methodDef);
+ 		MethodIndex ctorIndex = il2cpp::vm::GlobalMetadata::GetMethodIndexFromDefinition(mri.methodDef);
+ 		auto result = _customAttributeCtorInfos.emplace(ctorMethodToken, CustomAttributeCtorInfo{ ctorMethod, ctorIndex, mri.methodDef->parameterCount });
+@@ -1088,6 +1114,10 @@ namespace metadata
  		{
  			writer.WriteByte((byte)IL2CPP_TYPE_IL2CPP_TYPE_INDEX);
  		}
@@ -1641,7 +1886,16 @@ index dd45bcd..f5de472 100644
  		else
  		{
  			writer.WriteByte((uint8_t)type->type);
-@@ -1271,7 +1288,43 @@ namespace metadata
+@@ -1114,7 +1144,7 @@ namespace metadata
+ 			writer.WriteCompressedInt32(-1);
+ 			return;
+ 		}
+-		Il2CppReflectionType* type = GetReflectionTypeFromName(fullName);
++		Il2CppReflectionType* type = ReadAttributeTypeName(fullName);
+ 		if (!type)
+ 		{
+ 			std::string stdTypeName = il2cpp::utils::StringUtils::Utf16ToUtf8(fullName->chars);
+@@ -1271,7 +1301,43 @@ namespace metadata
  			{
  				RaiseExecutionEngineException("type not find");
  			}
@@ -1686,11 +1940,177 @@ index dd45bcd..f5de472 100644
  			{
  				ConvertBoxedValue(writer, reader, writeType);
  			}
+@@ -1362,6 +1428,16 @@ namespace metadata
+ 		{
+ 			RaiseExecutionEngineException("GetFieldDeclaringTypeIndexAndFieldIndexByName can't find field");
+ 		}
++		AOTHomologousImage* propertyImage = _homologousTypeReferenceImage;
++		if ((!propertyImage || propertyInfo->parent->image->assembly != propertyImage->GetTargetAssembly()) &&
++			dhe::IsDheAssembly(propertyInfo->parent->image->assembly))
++			propertyImage = AOTHomologousImage::FindImageByAssembly(propertyInfo->parent->image->assembly);
++		if (TryGetDheAttributePropertyIndex(propertyImage, propertyInfo, fieldIndex))
++		{
++			typeIndex = propertyInfo->parent == klass ? kTypeDefinitionIndexInvalid
++				: il2cpp::vm::GlobalMetadata::GetIndexForTypeDefinition(propertyInfo->parent);
++			return;
++		}
+ 		if (propertyInfo->parent == klass)
+ 		{
+ 			typeIndex = kTypeDefinitionIndexInvalid;
+@@ -1387,8 +1463,18 @@ namespace metadata
+ 		}
+ 		IL2CPP_ASSERT(fieldIndex != -1);
+ #else
+-		fieldIndex = (int32_t)(propertyInfo - klass->properties);
++		fieldIndex = -1;
++		for (int32_t i = 0; i < klass->property_count; i++)
++		{
++			if (&klass->properties[i] == propertyInfo)
++			{
++				fieldIndex = i;
++				break;
++			}
++		}
+ #endif
++		if (fieldIndex == -1)
++			RaiseExecutionEngineException("Custom attribute property has no physical or logical slot.");
+ 	}
+ 
+ 	void InterpreterImage::ConvertILCustomAttributeData2Il2CppFormat(const MethodInfo* ctorMethod, BlobReader& reader)
+@@ -2929,7 +3015,7 @@ namespace metadata
+ 		IL2CPP_ASSERT(rowIndex > 0);
+ 		EnsureFieldMetadataInitializedLocked(rowIndex - 1);
+ 		const FieldDetail& fd = GetFieldDetailFromRawIndex(rowIndex - 1);
+-		ret.containerType = GetIl2CppTypeFromRawTypeDefIndex(DecodeMetadataIndex(fd.typeDefIndex));
++		ret.containerType = GetRawTypeDefinitionType(DecodeMetadataIndex(fd.typeDefIndex));
+ 		ret.field = &fd.fieldDef;
+ 	}
+ 
+@@ -3419,7 +3505,7 @@ namespace metadata
+ 		{
+ 			return nullptr;
+ 		}
+-		Il2CppReflectionType* type = GetReflectionTypeFromName(fullName);
++		Il2CppReflectionType* type = ReadAttributeTypeName(fullName);
+ 		if (!type)
+ 		{
+ 			std::string stdTypeName = il2cpp::utils::StringUtils::Utf16ToUtf8(fullName->chars);
+@@ -3429,6 +3515,60 @@ namespace metadata
+ 		return type;
+ 	}
+ 
++	Il2CppReflectionType* InterpreterImage::ReadAttributeTypeName(Il2CppString* name)
++	{
++		Il2CppReflectionType* reflection = GetReflectionTypeFromName(name);
++		if (!_homologousTypeReferenceImage || !reflection)
++		{
++			return reflection;
++		}
++		return il2cpp::vm::Reflection::GetTypeObject(ResolveHomologousType(reflection->type));
++	}
++
++	const Il2CppType* InterpreterImage::ResolveHomologousType(const Il2CppType* type)
++	{
++		Il2CppType resolved = *type;
++		switch (type->type)
++		{
++		case IL2CPP_TYPE_CLASS:
++		case IL2CPP_TYPE_VALUETYPE:
++		{
++			const Il2CppTypeDefinition* definition =
++				(const Il2CppTypeDefinition*)type->data.typeHandle;
++			if (definition && DecodeImageIndex(definition->byvalTypeIndex) == _index)
++			{
++				resolved.data = GetIl2CppTypeFromRawTypeDefIndex(GetTypeRawIndex(definition))->data;
++			}
++			break;
++		}
++		case IL2CPP_TYPE_GENERICINST:
++		{
++			const Il2CppGenericClass* generic = type->data.generic_class;
++			const Il2CppGenericInst* arguments = generic->context.class_inst;
++			std::vector<const Il2CppType*> types(arguments->type_argc);
++			for (uint32_t index = 0; index < arguments->type_argc; ++index)
++			{
++				types[index] = ResolveHomologousType(arguments->type_argv[index]);
++			}
++			resolved.data.generic_class = const_cast<Il2CppGenericClass*>(
++				il2cpp::metadata::GenericMetadata::GetGenericClass(ResolveHomologousType(generic->type),
++					il2cpp::vm::MetadataCache::GetGenericInst(types.data(), static_cast<uint32_t>(types.size()))));
++			break;
++		}
++		case IL2CPP_TYPE_SZARRAY:
++		case IL2CPP_TYPE_PTR:
++			resolved.data.type = ResolveHomologousType(type->data.type);
++			break;
++		case IL2CPP_TYPE_ARRAY:
++			resolved.data.array = const_cast<Il2CppArrayType*>(MetadataPool::GetPooledIl2CppArrayType(
++				ResolveHomologousType(type->data.array->etype), type->data.array->rank));
++			break;
++		default:
++			break;
++		}
++		return MetadataPool::GetPooledIl2CppType(resolved);
++	}
++
+ 
+ 	Il2CppObject* InterpreterImage::ReadBoxedValue(BlobReader& reader)
+ 	{
+@@ -3611,7 +3751,7 @@ namespace metadata
+ 		{
+ 			Il2CppString* enumTypeName = ReadSerString(reader);
+ 
+-			Il2CppReflectionType* enumType = GetReflectionTypeFromName(enumTypeName);
++			Il2CppReflectionType* enumType = ReadAttributeTypeName(enumTypeName);
+ 			if (!enumType)
+ 			{
+ 				std::string stdStrName = il2cpp::utils::StringUtils::Utf16ToUtf8(enumTypeName->chars);
+@@ -3691,7 +3831,7 @@ namespace metadata
+ 			Il2CppTypeDefinition* typeDef = GetTypeDefinitionByTypeDetail(&type);
+ 			if (typeDef->namespaceIndex == encodedNamespaceIndex && typeDef->nameIndex == encodedNameIndex)
+ 			{
+-				return GetIl2CppTypeFromTypeDefinition(typeDef);
++				return GetIl2CppTypeFromRawTypeDefIndex(GetTypeRawIndex(typeDef));
+ 			}
+ 		}
+ 		if (!raiseExceptionIfNotFound)
+@@ -3706,5 +3846,12 @@ namespace metadata
+ 			CStringToStringView(_il2cppImage->nameNoExt)));
+ 		return nullptr;
+ 	}
++
++	const Il2CppType* InterpreterImage::GetIl2CppTypeFromRawTypeDefIndex(uint32_t index)
++	{
++		return _homologousTypeReferenceImage
++			? _homologousTypeReferenceImage->GetIl2CppTypeFromRawTypeDefIndex(index)
++			: GetRawTypeDefinitionType(index);
++	}
+ }
+ }
 diff --git a/hybridclr/metadata/InterpreterImage.h b/hybridclr/metadata/InterpreterImage.h
-index 4ba0c6a..cf8fd6b 100644
+index 4ba0c6ac530fd182207d53e4382cf9c2ddb46e34..876f351656c8bb37ef4f56f19d364631ce3584d8 100644
 --- a/hybridclr/metadata/InterpreterImage.h
 +++ b/hybridclr/metadata/InterpreterImage.h
-@@ -812,7 +812,12 @@ namespace metadata
+@@ -21,6 +21,7 @@ namespace metadata
+ 	void FlushMetadataProfile();
+ 
+ 	class ClassFieldLayoutCalculator;
++	class SuperSetAOTHomologousImage;
+ 	struct InterfaceOffsetInfo
+ 	{
+ 		const Il2CppType* type;
+@@ -504,7 +505,9 @@ namespace metadata
+ 
+ 		const Il2CppType* GetIl2CppTypeFromRawIndex(uint32_t index) const;
+ 
+-		const Il2CppType* GetIl2CppTypeFromRawTypeDefIndex(uint32_t index) override
++		const Il2CppType* GetIl2CppTypeFromRawTypeDefIndex(uint32_t index) override;
++
++		const Il2CppType* GetRawTypeDefinitionType(uint32_t index) const
+ 		{
+ 			IL2CPP_ASSERT(index < (uint32_t)_typesDefines.size());
+ 			return GetIl2CppTypeFromRawIndex(DecodeMetadataIndex(_typesDefines[index].byvalTypeIndex));
+@@ -812,7 +815,12 @@ namespace metadata
  			const MethodInfo* removeOn = pd.removeMethodIndex ? klass->methods[pd.removeMethodIndex - baseMethodIdx] : nullptr;
  			const MethodInfo* raiseOn = pd.fireMethodIndex ? klass->methods[pd.fireMethodIndex - baseMethodIdx] : nullptr;
  #endif
@@ -1704,11 +2124,45 @@ index 4ba0c6a..cf8fd6b 100644
  		}
  
  		const Il2CppAssembly* GetReferencedAssembly(int32_t referencedAssemblyTableIndex, const Il2CppAssembly assembliesTable[], int assembliesCount);
+@@ -982,6 +990,10 @@ namespace metadata
+ 		void BuildIl2CppAssembly(Il2CppAssembly* assembly);
+ 
+ 		void InitRuntimeMetadatas() override;
++		void SetHomologousTypeReferenceImage(SuperSetAOTHomologousImage* image)
++		{
++			_homologousTypeReferenceImage = image;
++		}
+ 		bool TryApplyClassLayoutLocked(Il2CppClass* klass);
+ 	protected:
+ 
+@@ -1041,6 +1053,8 @@ namespace metadata
+ 		bool ReadUTF8SerString(BlobReader& reader, std::string& s);
+ #endif
+ 		Il2CppReflectionType* ReadSystemType(BlobReader& reader);
++		Il2CppReflectionType* ReadAttributeTypeName(Il2CppString* name);
++		const Il2CppType* ResolveHomologousType(const Il2CppType* type);
+ 		Il2CppObject* ReadBoxedValue(BlobReader& reader);
+ 		void ReadFixedArg(BlobReader& reader, const Il2CppType* argType, void* data);
+ 		void ReadCustomAttributeFieldOrPropType(BlobReader& reader, Il2CppType& type);
+@@ -1051,6 +1065,7 @@ namespace metadata
+ 
+ 		bool _inited;
+ 		Il2CppImage* _il2cppImage;
++		SuperSetAOTHomologousImage* _homologousTypeReferenceImage = nullptr;
+ 		const uint32_t _index;
+ 		static bool IsMetadataPublished(const int32_t* initialized)
+ 		{
 diff --git a/hybridclr/metadata/MetadataModule.cpp b/hybridclr/metadata/MetadataModule.cpp
-index 9c240fa..586bddc 100644
+index 9c240fa21166fc29f0e99a45e34b865000a84e55..ae2a26d2f97eb2d5ff8a508b903560c944f313cc 100644
 --- a/hybridclr/metadata/MetadataModule.cpp
 +++ b/hybridclr/metadata/MetadataModule.cpp
-@@ -7,9 +7,15 @@
+@@ -1,4 +1,5 @@
+ #include "MetadataModule.h"
++#include "DheCustomAttributeMetadata.h"
+ 
+ #include "os/Atomic.h"
+ #include "os/Mutex.h"
+@@ -7,9 +8,15 @@
  #include "vm/String.h"
  #include "vm/Assembly.h"
  #include "vm/Class.h"
@@ -1724,7 +2178,7 @@ index 9c240fa..586bddc 100644
  #include "utils/Logging.h"
  #include "utils/MemoryMappedFile.h"
  #include "utils/Memory.h"
-@@ -22,6 +28,10 @@
+@@ -22,6 +29,10 @@
  #include "SuperSetAOTHomologousImage.h"
  #include "MetadataPool.h"
  
@@ -1735,7 +2189,7 @@ index 9c240fa..586bddc 100644
  using namespace il2cpp;
  
  namespace hybridclr
-@@ -29,6 +39,195 @@ namespace hybridclr
+@@ -29,6 +40,195 @@ namespace hybridclr
  
  namespace metadata
  {
@@ -1931,7 +2385,7 @@ index 9c240fa..586bddc 100644
  
  
  
-@@ -41,9 +240,354 @@ namespace metadata
+@@ -41,9 +241,444 @@ namespace metadata
  
      Image* MetadataModule::GetUnderlyingInterpreterImage(const MethodInfo* methodInfo)
      {
@@ -1978,6 +2432,21 @@ index 9c240fa..586bddc 100644
 +        return homologous && homologous->GetTargetAssembly()->image == image ? homologous : nullptr;
 +    }
 +
++	const PropertyInfo* MetadataModule::GetDheCustomAttributeProperty(Il2CppClass* klass, uint32_t index)
++	{
++		return GetDheAttributePropertyByIndex(GetDheSupplementalImage(klass->image), klass, index);
++	}
++
++	const MethodInfo* MetadataModule::ResolveDheCustomAttributeConstructor(const MethodInfo* method)
++	{
++		if (!method || !method->klass || !method->klass->image ||
++			!IsInterpreterImage(method->klass->image) ||
++			!dhe::IsDheAssembly(method->klass->image->assembly))
++			return method;
++		AOTHomologousImage* image = AOTHomologousImage::FindImageByAssembly(method->klass->image->assembly);
++		return image ? image->ResolveLogicalMethod(method) : method;
++	}
++
 +	bool MetadataModule::TryGetDheCustomAttributeSource(const Il2CppImage* image,
 +		uint32_t token, const Il2CppImage*& sourceImage, uint32_t& sourceToken)
 +	{
@@ -1985,6 +2454,41 @@ index 9c240fa..586bddc 100644
 +		return homologous && homologous->TryGetCustomAttributeSource(
 +			token, sourceImage, sourceToken);
 +	}
++
++    const Il2CppImage* MetadataModule::GetDheMethodMetadataImage(const MethodInfo* method)
++    {
++        const Il2CppImage* image = method->klass->image;
++        AOTHomologousImage* homologous = GetDheSupplementalImage(image);
++        Image* supplemental = homologous ? homologous->GetSupplementalMethodImage(method) : nullptr;
++        return supplemental ? static_cast<InterpreterImage*>(supplemental)->GetIl2CppImage() : image;
++    }
++
++    bool MetadataModule::TryGetDheReferencedAssemblies(const Il2CppAssembly* assembly,
++        std::vector<const Il2CppAssemblyName*>& references)
++    {
++        AOTHomologousImage* homologous = GetDheSupplementalImage(assembly->image);
++        if (!homologous)
++        {
++            return false;
++        }
++        RawImageBase& raw = homologous->GetRawImage();
++        std::vector<const Il2CppAssemblyName*> currentReferences;
++        const uint32_t count = raw.GetTable(TableType::ASSEMBLYREF).rowNum;
++        currentReferences.reserve(count);
++        for (uint32_t row = 1; row <= count; ++row)
++        {
++            TbAssemblyRef reference = raw.ReadAssemblyRef(row);
++            const char* name = raw.GetStringFromRawIndex(reference.name);
++            const Il2CppAssembly* referencedAssembly = il2cpp::vm::Assembly::GetLoadedAssembly(name);
++            if (!referencedAssembly)
++            {
++                il2cpp::vm::Exception::Raise(il2cpp::vm::Exception::GetDllNotFoundException(name));
++            }
++            currentReferences.push_back(&referencedAssembly->aname);
++        }
++        references.insert(references.end(), currentReferences.begin(), currentReferences.end());
++        return true;
++    }
 +
 +    Il2CppClass* MetadataModule::FindDheSupplementalType(const Il2CppImage* image,
 +        const char* namespaze, const char* name)
@@ -2001,7 +2505,7 @@ index 9c240fa..586bddc 100644
 +        {
 +            homologous->GetSupplementalTypes(types);
 +        }
-+    }
+     }
 +
 +    Il2CppClass* MetadataModule::GetFirstDheSupplementalNestedType(Il2CppClass* klass,
 +        void** iter)
@@ -2009,7 +2513,7 @@ index 9c240fa..586bddc 100644
 +        AOTHomologousImage* homologous = klass && klass->image
 +            ? GetDheSupplementalImage(klass->image) : nullptr;
 +        return homologous ? homologous->GetFirstSupplementalNestedType(klass, iter) : nullptr;
-     }
++    }
 +
 +    bool MetadataModule::TryGetNextDheSupplementalNestedType(Il2CppClass* klass, void** iter,
 +        Il2CppClass** nestedType)
@@ -2125,10 +2629,37 @@ index 9c240fa..586bddc 100644
 +		return logical ? logical : field->parent;
 +	}
 +
++	const FieldInfo* MetadataModule::ResolveDheSupplementalField(const FieldInfo* field)
++	{
++		if (!field || !field->parent || !field->parent->image ||
++			!dhe::IsDheAssembly(field->parent->image->assembly))
++			return field;
++		AOTHomologousImage* image = AOTHomologousImage::FindImageByAssembly(field->parent->image->assembly);
++		return image ? image->ResolveSupplementalField(field) : field;
++	}
++
++	const Il2CppFieldDefinition* MetadataModule::ResolveDheSupplementalFieldDefinition(
++		const Il2CppType* type, const char* name, const Il2CppType* fieldType)
++	{
++		Il2CppClass* klass = il2cpp::vm::Class::FromIl2CppType(type);
++		AOTHomologousImage* image = GetDheSupplementalImage(klass->image);
++		return image ? image->ResolveSupplementalFieldDefinition(type, name, fieldType) : nullptr;
++	}
++
 +	void MetadataModule::RegisterDheSupplementalInstanceField(FieldInfo* runtimeField,
-+		FieldInfo* logicalField)
++		FieldInfo* logicalField, const FieldInfo* definitionField)
 +	{
 +		std::lock_guard<std::mutex> lock(s_dheSidecarMutex);
++		if (definitionField)
++		{
++			auto definition = s_dheInstanceFieldSlots.find(definitionField);
++			if (definition == s_dheInstanceFieldSlots.end())
++				RaiseExecutionEngineException("DHE generic field definition has no sidecar slot.");
++			DheInstanceFieldSlot slot = { definition->second.slot, logicalField };
++			s_dheInstanceFieldSlots[runtimeField] = slot;
++			s_dheInstanceFieldSlots[logicalField] = slot;
++			return;
++		}
 +		auto runtimeSlot = s_dheInstanceFieldSlots.find(runtimeField);
 +		if (runtimeSlot != s_dheInstanceFieldSlots.end())
 +		{
@@ -2149,14 +2680,15 @@ index 9c240fa..586bddc 100644
 +	bool MetadataModule::TryGetDheSupplementalInstanceFieldValue(Il2CppObject* obj,
 +		FieldInfo* field, void* value)
 +	{
-+		std::lock_guard<std::mutex> lock(s_dheSidecarMutex);
 +		uint32_t slot;
 +		FieldInfo* logicalField;
-+		if (!TryGetDheFieldSlotLocked(field, slot, logicalField))
++		Il2CppObject* stored;
 +		{
-+			return false;
++			std::lock_guard<std::mutex> lock(s_dheSidecarMutex);
++			if (!TryGetDheFieldSlotLocked(field, slot, logicalField))
++				return false;
++			stored = GetDheSidecarValueLocked(obj, slot);
 +		}
-+		Il2CppObject* stored = GetDheSidecarValueLocked(obj, slot);
 +		if (!stored)
 +		{
 +			il2cpp::vm::Field::SetValueRaw(logicalField->type, value, nullptr, false);
@@ -2189,6 +2721,8 @@ index 9c240fa..586bddc 100644
 +		}
 +		Il2CppClass* fieldType = il2cpp::vm::Class::FromIl2CppType(logicalField->type);
 +		Il2CppObject* boxed = il2cpp::vm::Object::Box(fieldType, value);
++		// Sidecar allocation can enter engine metadata; keep one lock order.
++		il2cpp::os::FastAutoLock metadataLock(&il2cpp::vm::g_MetadataLock);
 +		std::lock_guard<std::mutex> lock(s_dheSidecarMutex);
 +		SetDheSidecarValueLocked(obj, slot, boxed);
 +		return true;
@@ -2197,18 +2731,23 @@ index 9c240fa..586bddc 100644
 +	bool MetadataModule::TryGetDheSupplementalInstanceFieldValueObject(Il2CppObject* obj,
 +		FieldInfo* field, Il2CppObject** value)
 +	{
-+		std::lock_guard<std::mutex> lock(s_dheSidecarMutex);
 +		uint32_t slot;
 +		FieldInfo* logicalField;
-+		if (!TryGetDheFieldSlotLocked(field, slot, logicalField))
++		Il2CppObject* stored;
 +		{
-+			return false;
++			std::lock_guard<std::mutex> lock(s_dheSidecarMutex);
++			if (!TryGetDheFieldSlotLocked(field, slot, logicalField))
++				return false;
++			stored = GetDheSidecarValueLocked(obj, slot);
 +		}
-+		Il2CppObject* stored = GetDheSidecarValueLocked(obj, slot);
 +		Il2CppClass* fieldType = il2cpp::vm::Class::FromIl2CppType(logicalField->type);
 +		if (!stored && fieldType->byval_arg.valuetype && !il2cpp::vm::Class::IsNullable(fieldType))
 +		{
 +			stored = il2cpp::vm::Object::New(fieldType);
++		}
++		else if (stored && fieldType->byval_arg.valuetype)
++		{
++			stored = il2cpp::vm::Object::Box(stored->klass, il2cpp::vm::Object::Unbox(stored));
 +		}
 +		*value = stored;
 +		return true;
@@ -2217,13 +2756,18 @@ index 9c240fa..586bddc 100644
 +	bool MetadataModule::TrySetDheSupplementalInstanceFieldValueObject(Il2CppObject* obj,
 +		FieldInfo* field, Il2CppObject* value)
 +	{
-+		std::lock_guard<std::mutex> lock(s_dheSidecarMutex);
 +		uint32_t slot;
 +		FieldInfo* logicalField;
-+		if (!TryGetDheFieldSlotLocked(field, slot, logicalField))
 +		{
-+			return false;
++			std::lock_guard<std::mutex> lock(s_dheSidecarMutex);
++			if (!TryGetDheFieldSlotLocked(field, slot, logicalField))
++				return false;
 +		}
++		Il2CppClass* fieldType = il2cpp::vm::Class::FromIl2CppType(logicalField->type);
++		if (value && fieldType->byval_arg.valuetype)
++			value = il2cpp::vm::Object::Box(value->klass, il2cpp::vm::Object::Unbox(value));
++		il2cpp::os::FastAutoLock metadataLock(&il2cpp::vm::g_MetadataLock);
++		std::lock_guard<std::mutex> lock(s_dheSidecarMutex);
 +		SetDheSidecarValueLocked(obj, slot, value);
 +		return true;
 +	}
@@ -2290,14 +2834,19 @@ index 9c240fa..586bddc 100644
  }
  }
 diff --git a/hybridclr/metadata/MetadataModule.h b/hybridclr/metadata/MetadataModule.h
-index 4989130..915e300 100644
+index 4989130b77c9159106aa4aa854f7c5e8b030b45f..b36639c23571d738a2108411a6822e22a61d41d8 100644
 --- a/hybridclr/metadata/MetadataModule.h
 +++ b/hybridclr/metadata/MetadataModule.h
-@@ -52,6 +52,89 @@ namespace metadata
+@@ -52,6 +52,103 @@ namespace metadata
  		}
  		
  		static Image* GetUnderlyingInterpreterImage(const MethodInfo* method);
 +		static Image* GetInterpreterResolveImage(const MethodInfo* method);
++
++        static const Il2CppImage* GetDheMethodMetadataImage(const MethodInfo* method);
++
++        static bool TryGetDheReferencedAssemblies(const Il2CppAssembly* assembly,
++            std::vector<const Il2CppAssemblyName*>& references);
 +
 +		static Il2CppClass* FindDheSupplementalType(const Il2CppImage* image,
 +			const char* namespaze, const char* name);
@@ -2324,6 +2873,11 @@ index 4989130..915e300 100644
 +
 +		static size_t GetDheSupplementalFieldCount(Il2CppClass* klass);
 +
++		static const FieldInfo* ResolveDheSupplementalField(const FieldInfo* field);
++
++		static const Il2CppFieldDefinition* ResolveDheSupplementalFieldDefinition(
++			const Il2CppType* type, const char* name, const Il2CppType* fieldType);
++
 +		static bool IsDheRemovedMethod(const MethodInfo* method)
 +		{
 +			return dhe::IsRemovedMethod(method);
@@ -2345,7 +2899,7 @@ index 4989130..915e300 100644
 +		static Il2CppClass* GetDheLogicalFieldParent(FieldInfo* field);
 +
 +		static void RegisterDheSupplementalInstanceField(FieldInfo* runtimeField,
-+			FieldInfo* logicalField);
++			FieldInfo* logicalField, const FieldInfo* definitionField = nullptr);
 +
 +		static bool IsDheSupplementalInstanceField(const FieldInfo* field);
 +
@@ -2371,6 +2925,10 @@ index 4989130..915e300 100644
 +
 +		static size_t GetDheLogicalPropertyCount(Il2CppClass* klass);
 +
++		static const PropertyInfo* GetDheCustomAttributeProperty(Il2CppClass* klass, uint32_t index);
++
++		static const MethodInfo* ResolveDheCustomAttributeConstructor(const MethodInfo* method);
++
 +		static bool HasDheLogicalEventView(Il2CppClass* klass);
 +
 +		static const EventInfo* GetFirstDheLogicalEvent(Il2CppClass* klass,
@@ -2383,7 +2941,7 @@ index 4989130..915e300 100644
  
  
  		static const char* GetStringFromEncodeIndex(StringIndex index)
-@@ -242,6 +325,9 @@ namespace metadata
+@@ -242,6 +339,9 @@ namespace metadata
  			return GetImage(DecodeImageIndex(index))->GetFieldOrParameterDefalutValueByRawIndex(DecodeMetadataIndex(index));
  		}
  
@@ -2393,20 +2951,69 @@ index 4989130..915e300 100644
  #if HYBRIDCLR_UNITY_2020
  		static bool HasAttribute(const Il2CppImage* image, uint32_t token, Il2CppClass* attribute)
  		{
+@@ -254,18 +354,22 @@ namespace metadata
+ 		}
+ #endif
+ 
+-		static bool IsImplementedByInterpreter(MethodInfo* method)
++		static bool IsImplementedByInterpreter(MethodInfo* method, bool aotImplementationMissing = false)
+ 		{
+ 			Il2CppClass* klass = method->klass;
+ 			const Il2CppAssembly* assembly = klass && klass->image ? klass->image->assembly : nullptr;
+-			if (AOTHomologousImage::FindImageByAssembly(assembly))
++			if (AOTHomologousImage* image = AOTHomologousImage::FindImageByAssembly(assembly))
+ 			{
+ 				// Ordinary supplemental metadata keeps the historical assembly-wide
+ 				// interpreter behavior. A registered DHE image narrows it to the
+-				// methods listed by mv; all other methods remain native AOT.
++				// methods listed by mv, unless the requested instantiation has no AOT code.
+ 				if (dhe::IsDheAssembly(assembly))
+ 				{
+-					return dhe::IsChangedMethod(method);
++					// Supplemental aliases keep a Base declaring class, but have no
++					// Base token or AOT implementation, including generic inflations.
++					return aotImplementationMissing || IsInterpreterImplement(method) ||
++						image->GetSupplementalMethodImage(method) != nullptr ||
++						dhe::IsChangedMethod(method);
+ 				}
+ 				return true;
+ 			}
+diff --git a/hybridclr/metadata/MetadataUtil.cpp b/hybridclr/metadata/MetadataUtil.cpp
+index 602b33d309bad4ae2438e40269f01a9b11c1b2ee..c8a4fb63b2341d0d6eef407536b185dc9b7abdcf 100644
+--- a/hybridclr/metadata/MetadataUtil.cpp
++++ b/hybridclr/metadata/MetadataUtil.cpp
+@@ -717,8 +717,8 @@ namespace metadata
+ 				return true;
+ 			}
+ 		}
+-		retFieldDef = nullptr;
+-		return false;
++		retFieldDef = MetadataModule::ResolveDheSupplementalFieldDefinition(type, resolveFieldName, resolveFieldType);
++		return retFieldDef != nullptr;
+ 	}
+ 
+ 	const Il2CppGenericContainer* GetGenericContainerFromIl2CppType(const Il2CppType* type)
 diff --git a/hybridclr/metadata/SuperSetAOTHomologousImage.cpp b/hybridclr/metadata/SuperSetAOTHomologousImage.cpp
-index 3682882..ff4f1e0 100644
+index 368288240e065503bb671b3e03cddbb6925fd3d0..50b456db0489d0432e37eff5f47303315dbdd0c7 100644
 --- a/hybridclr/metadata/SuperSetAOTHomologousImage.cpp
 +++ b/hybridclr/metadata/SuperSetAOTHomologousImage.cpp
-@@ -8,6 +8,8 @@
+@@ -3,11 +3,15 @@
+ #include "vm/MetadataLock.h"
+ #include "vm/GlobalMetadata.h"
+ #include "vm/Class.h"
++#include "vm/GenericClass.h"
+ #include "vm/Image.h"
+ #include "vm/Exception.h"
  #include "vm/MetadataCache.h"
  #include "metadata/GenericMetadata.h"
  #include "MetadataPool.h"
 +#include "InterpreterImage.h"
 +#include "MetadataModule.h"
++#include "DheGenericFieldMetadata.h"
  
  namespace hybridclr
  {
-@@ -60,6 +62,23 @@ namespace metadata
+@@ -60,17 +64,44 @@ namespace metadata
  		return nullptr;
  	}
  
@@ -2429,16 +3036,36 @@ index 3682882..ff4f1e0 100644
 +
  	void SuperSetAOTHomologousImage::InitRuntimeMetadatas()
  	{
- 		_defaultIl2CppType = &il2cpp_defaults.missing_class->byval_arg;
-@@ -71,6 +90,7 @@ namespace metadata
+-		_defaultIl2CppType = &il2cpp_defaults.missing_class->byval_arg;
++		if (_typeIntermediateInfos.empty())
++		{
++			InitTypeReferences();
++		}
++		InitSupplementalTypes(_typeIntermediateInfos);
++		InitMethods(_typeIntermediateInfos);
++		InitFields(_typeIntermediateInfos);
++		InitPropertiesAndEvents(_typeIntermediateInfos);
++		_typeIntermediateInfos.clear();
++		_typeIntermediateInfos.shrink_to_fit();
++	}
  
- 		InitMethods(typeIntermediateInfos);
- 		InitFields(typeIntermediateInfos);
-+		InitPropertiesAndEvents(typeIntermediateInfos);
+-		std::vector< SuperSetTypeIntermediateInfo> typeIntermediateInfos;
+-		InitTypes0(typeIntermediateInfos);
+-		InitNestedClass(typeIntermediateInfos);
+-		InitTypes1(typeIntermediateInfos);
++	void SuperSetAOTHomologousImage::InitTypeReferences()
++	{
++		_defaultIl2CppType = &il2cpp_defaults.missing_class->byval_arg;
+ 
+-		InitMethods(typeIntermediateInfos);
+-		InitFields(typeIntermediateInfos);
++		InitTypes0(_typeIntermediateInfos);
++		InitNestedClass(_typeIntermediateInfos);
++		InitTypes1(_typeIntermediateInfos);
  	}
  
  	void SuperSetAOTHomologousImage::InitTypes0(std::vector< SuperSetTypeIntermediateInfo>& typeIntermediateInfos)
-@@ -145,7 +165,15 @@ namespace metadata
+@@ -145,7 +176,15 @@ namespace metadata
  			}
  		}
  		labelInitDefault:
@@ -2446,7 +3073,7 @@ index 3682882..ff4f1e0 100644
 +		if (_interpreterFallbackImage)
 +		{
 +			const uint32_t rawTypeIndex = rowIndex - 1;
-+			type.aotIl2CppType = _interpreterFallbackImage->GetIl2CppTypeFromRawTypeDefIndex(rawTypeIndex);
++			type.aotIl2CppType = _interpreterFallbackImage->GetRawTypeDefinitionType(rawTypeIndex);
 +		}
 +		else
 +		{
@@ -2455,7 +3082,7 @@ index 3682882..ff4f1e0 100644
  		//TEMP_FORMAT(msg, "type: %s::%s can't find homologous type in assembly:%s", type.namespaze, type.name, _targetAssembly->aname.name);
  		//RaiseExecutionEngineException(msg);
  	}
-@@ -171,11 +199,32 @@ namespace metadata
+@@ -171,11 +210,45 @@ namespace metadata
  		uint32_t index = 0;
  		for (SuperSetTypeIntermediateInfo& td : typeIntermediateInfos)
  		{
@@ -2468,7 +3095,20 @@ index 3682882..ff4f1e0 100644
 +				_customAttributeTokens[td.aotTypeDef->token] =
 +					EncodeToken(TableType::TYPEDEF, rawTypeIndex + 1);
 +			}
-+			else if (_interpreterFallbackImage && rawTypeIndex != 0)
++		}
++	}
++
++	void SuperSetAOTHomologousImage::InitSupplementalTypes(
++		std::vector<SuperSetTypeIntermediateInfo>& typeIntermediateInfos)
++	{
++		if (!_interpreterFallbackImage)
++		{
++			return;
++		}
++		for (uint32_t rawTypeIndex = 1; rawTypeIndex < typeIntermediateInfos.size(); ++rawTypeIndex)
++		{
++			SuperSetTypeIntermediateInfo& td = typeIntermediateInfos[rawTypeIndex];
++			if (!td.aotTypeDef)
 +			{
 +				Il2CppClass* supplemental =
 +					_interpreterFallbackImage->GetTypeInfoFromTypeDefinitionRawIndex(rawTypeIndex);
@@ -2488,7 +3128,7 @@ index 3682882..ff4f1e0 100644
  			}
  		}
  	}
-@@ -197,23 +246,53 @@ namespace metadata
+@@ -197,23 +270,53 @@ namespace metadata
  			{
  				SuperSetMethodDefDetail& method = _methodDefs[i - 1];
  				TbMethod data = _rawImage->ReadMethod(i);
@@ -2553,14 +3193,15 @@ index 3682882..ff4f1e0 100644
  				}
  			}
  		}
-@@ -264,23 +343,162 @@ namespace metadata
+@@ -264,23 +367,183 @@ namespace metadata
  
  				//field.declaringTypeDef = type.aotTypeDef;
  				field.declaringIl2CppType = type.aotIl2CppType;
 -				if (type.aotTypeDef == nullptr)
 +				const Il2CppType* logicalFieldType = nullptr;
 +				if (type.aotTypeDef != nullptr)
-+				{
+ 				{
+-					continue;
 +					BlobReader br = _rawImage->GetBlobReaderByRawIndex(data.signature);
 +					FieldRefSig frs;
 +					ReadFieldRefSig(br, nullptr, frs);
@@ -2574,6 +3215,19 @@ index 3682882..ff4f1e0 100644
 +
 +					const char* fieldName = _rawImage->GetStringFromRawIndex(data.name);
 +					field.aotFieldDef = FindMatchField(type.aotTypeDef, field, fieldName, frs.type);
++					if (!field.aotFieldDef && _isDheImage &&
++						type.aotTypeDef->genericContainerIndex != kGenericContainerIndexInvalid)
++					{
++						// Matching uses positional variables, but runtime field types
++						// must refer to the public Base's actual generic parameters.
++						BlobReader logicalReader = _rawImage->GetBlobReaderByRawIndex(data.signature);
++						FieldRefSig logicalSignature;
++						ReadFieldRefSig(logicalReader, GetGenericContainerFromIl2CppType(type.aotIl2CppType),
++							logicalSignature);
++						Il2CppType* logicalType = MetadataPool::ShallowCloneIl2CppType(logicalSignature.type);
++						logicalType->attrs = data.flags;
++						logicalFieldType = logicalType;
++					}
 +					if (field.aotFieldDef)
 +					{
 +						_matchedAotFieldTokens.insert(field.aotFieldDef->token);
@@ -2582,13 +3236,12 @@ index 3682882..ff4f1e0 100644
 +					}
 +				}
 +				if (!field.aotFieldDef && _interpreterFallbackImage)
- 				{
--					continue;
++				{
 +					field.aotFieldDef = _interpreterFallbackImage->GetFieldDefinitionFromRawIndex(i - 1);
 +					const uint32_t rawTypeIndex = static_cast<uint32_t>(
 +						&type - &typeIntermediateInfos[0]);
 +					field.declaringIl2CppType =
-+						_interpreterFallbackImage->GetIl2CppTypeFromRawTypeDefIndex(rawTypeIndex);
++						_interpreterFallbackImage->GetRawTypeDefinitionType(rawTypeIndex);
 +					field.interpreterFallback = true;
 +					if (type.aotTypeDef)
 +					{
@@ -2607,10 +3260,12 @@ index 3682882..ff4f1e0 100644
 +						}
 +						_supplementalFields[baseClass].push_back(logicalField);
 +						_supplementalFieldLogicalParents[logicalField] = baseClass;
++						_logicalFields[fallbackField] = logicalField;
++						_logicalFields[logicalField] = logicalField;
 +						if ((data.flags & FIELD_ATTRIBUTE_STATIC) == 0)
 +						{
 +							if (baseClass->byval_arg.valuetype ||
-+								type.aotTypeDef->genericContainerIndex != kGenericContainerIndexInvalid ||
++								(!_isDheImage && type.aotTypeDef->genericContainerIndex != kGenericContainerIndexInvalid) ||
 +								logicalField->type->byref || logicalField->type->type == IL2CPP_TYPE_PTR ||
 +								logicalField->type->type == IL2CPP_TYPE_FNPTR ||
 +								logicalField->type->type == IL2CPP_TYPE_TYPEDBYREF)
@@ -2655,6 +3310,12 @@ index 3682882..ff4f1e0 100644
  
 -				const char* fieldName = _rawImage->GetStringFromRawIndex(data.name);
 -				field.aotFieldDef = FindMatchField(type.aotTypeDef, field, fieldName, frs.type);
++	const MethodInfo* SuperSetAOTHomologousImage::ResolveLogicalMethod(const MethodInfo* method)
++	{
++		auto logical = _logicalMethods.find(method);
++		return logical == _logicalMethods.end() ? method : logical->second;
++	}
++
 +	const MethodInfo* SuperSetAOTHomologousImage::GetLogicalMethod(
 +		const MethodInfo* currentMethod)
 +	{
@@ -2727,7 +3388,7 @@ index 3682882..ff4f1e0 100644
  			}
  		}
  	}
-@@ -293,6 +511,10 @@ namespace metadata
+@@ -293,6 +556,10 @@ namespace metadata
  			return nullptr;
  		}
  		SuperSetMethodDefDetail* method = it->second;
@@ -2738,7 +3399,7 @@ index 3682882..ff4f1e0 100644
  		uint32_t rowIndex = (uint32_t)(method - &_methodDefs[0] + 1);
  		TbMethod methodData = _rawImage->ReadMethod(rowIndex);
  		MethodBody* body = new (HYBRIDCLR_MALLOC_ZERO(sizeof(MethodBody))) MethodBody();
-@@ -402,6 +624,302 @@ namespace metadata
+@@ -402,6 +669,397 @@ namespace metadata
  		}
  		}
  	}
@@ -2846,18 +3507,26 @@ index 3682882..ff4f1e0 100644
 +
 +	Image* SuperSetAOTHomologousImage::GetSupplementalMethodImage(const MethodInfo* method)
 +	{
++		if (method->is_inflated)
++		{
++			method = method->genericMethod->methodDefinition;
++		}
 +		auto image = _supplementalMethodImages.find(method);
 +		return image == _supplementalMethodImages.end() ? nullptr : image->second;
 +	}
 +
 +	Image* SuperSetAOTHomologousImage::GetMethodResolveImage(const MethodInfo* method)
 +	{
-+		// Both the public alias and the hidden current MethodInfo must resolve
-+		// body tokens through the merged Base/current metadata view. Methods on
-+		// wholly new types are absent from both maps and keep their interpreter
-+		// image as the resolution context.
++		if (method->is_inflated)
++		{
++			method = method->genericMethod->methodDefinition;
++		}
++		// New types can also refer back to Base types. Their bodies must use the
++		// merged view, or typeof/casts/calls see a second hidden current class.
 +		return _supplementalMethodImages.find(method) != _supplementalMethodImages.end() ||
-+			_logicalMethods.find(method) != _logicalMethods.end()
++			_logicalMethods.find(method) != _logicalMethods.end() ||
++			(_interpreterFallbackImage &&
++				method->klass->image == _interpreterFallbackImage->GetIl2CppImage())
 +			? this : nullptr;
 +	}
 +
@@ -2867,62 +3536,149 @@ index 3682882..ff4f1e0 100644
 +		return methods == _supplementalMethods.end() ? 0 : methods->second.size();
 +	}
 +
++	const std::vector<FieldInfo*>* SuperSetAOTHomologousImage::GetSupplementalFields(Il2CppClass* klass)
++	{
++		auto direct = _supplementalFields.find(klass);
++		if (direct != _supplementalFields.end())
++			return &direct->second;
++		if (!_isDheImage || !klass->generic_class)
++			return nullptr;
++		Il2CppClass* definition = il2cpp::vm::GenericClass::GetTypeDefinition(klass->generic_class);
++		auto declared = _supplementalFields.find(definition);
++		if (declared == _supplementalFields.end())
++			return nullptr;
++
++		il2cpp::os::FastAutoLock lock(&il2cpp::vm::g_MetadataLock);
++		auto cached = _genericSupplementalFields.find(klass);
++		if (cached != _genericSupplementalFields.end())
++			return &cached->second;
++		const Il2CppGenericContext* context = il2cpp::vm::GenericClass::GetContext(klass->generic_class);
++		std::vector<FieldInfo*> fields;
++		fields.reserve(declared->second.size());
++		for (FieldInfo* definitionField : declared->second)
++		{
++			Il2CppClass* physicalOwner = il2cpp::vm::GenericClass::GetClass(
++				il2cpp::metadata::GenericMetadata::GetGenericClass(definitionField->parent, context->class_inst));
++			il2cpp::vm::Class::SetupFields(physicalOwner);
++			FieldInfo* physical = FindDhePhysicalField(physicalOwner, definitionField);
++			if (!physical)
++				RaiseMissingFieldException(&physicalOwner->byval_arg, definitionField->name);
++			FieldInfo* logical = static_cast<FieldInfo*>(HYBRIDCLR_METADATA_MALLOC(sizeof(FieldInfo)));
++			*logical = *physical;
++			logical->type = il2cpp::metadata::GenericMetadata::InflateIfNeeded(
++				definitionField->type, context, false);
++			if ((logical->type->attrs & FIELD_ATTRIBUTE_STATIC) == 0)
++				MetadataModule::RegisterDheSupplementalInstanceField(physical, logical, definitionField);
++			fields.push_back(logical);
++		}
++		// The metadata lock publishes the complete vector and its sidecar aliases.
++		return &_genericSupplementalFields.emplace(klass, std::move(fields)).first->second;
++	}
++
 +	FieldInfo* SuperSetAOTHomologousImage::GetFirstSupplementalField(
 +		Il2CppClass* klass, void** iter)
 +	{
-+		auto fields = _supplementalFields.find(klass);
-+		if (fields == _supplementalFields.end() || fields->second.empty())
++		const std::vector<FieldInfo*>* fields = GetSupplementalFields(klass);
++		if (!fields || fields->empty())
 +		{
 +			return nullptr;
 +		}
-+		*iter = &fields->second[0];
-+		return fields->second[0];
++		*iter = const_cast<FieldInfo**>(fields->data());
++		return (*fields)[0];
 +	}
 +
 +	bool SuperSetAOTHomologousImage::TryGetNextSupplementalField(Il2CppClass* klass,
 +		void** iter, FieldInfo** field)
 +	{
-+		auto fields = _supplementalFields.find(klass);
-+		if (fields == _supplementalFields.end() || fields->second.empty() || !*iter)
++		const std::vector<FieldInfo*>* fields = GetSupplementalFields(klass);
++		if (!fields || fields->empty() || !*iter)
 +		{
 +			return false;
 +		}
 +		const uintptr_t current = reinterpret_cast<uintptr_t>(*iter);
-+		const uintptr_t begin = reinterpret_cast<uintptr_t>(&fields->second[0]);
++		const uintptr_t begin = reinterpret_cast<uintptr_t>(fields->data());
 +		const uintptr_t end = reinterpret_cast<uintptr_t>(
-+			&fields->second[0] + fields->second.size());
++			fields->data() + fields->size());
 +		if (current < begin || current >= end ||
 +			(current - begin) % sizeof(FieldInfo*) != 0)
 +		{
 +			return false;
 +		}
 +		const size_t nextIndex = (current - begin) / sizeof(FieldInfo*) + 1;
-+		if (nextIndex >= fields->second.size())
++		if (nextIndex >= fields->size())
 +		{
 +			*field = nullptr;
 +			return true;
 +		}
-+		*iter = &fields->second[nextIndex];
-+		*field = fields->second[nextIndex];
++		*iter = const_cast<FieldInfo**>(fields->data() + nextIndex);
++		*field = (*fields)[nextIndex];
 +		return true;
 +	}
 +
 +	size_t SuperSetAOTHomologousImage::GetSupplementalFieldCount(Il2CppClass* klass)
 +	{
-+		auto fields = _supplementalFields.find(klass);
-+		return fields == _supplementalFields.end() ? 0 : fields->second.size();
++		const std::vector<FieldInfo*>* fields = GetSupplementalFields(klass);
++		return fields ? fields->size() : 0;
 +	}
 +
 +	bool SuperSetAOTHomologousImage::IsRemovedField(const FieldInfo* field)
 +	{
++		if (_isDheImage && field->parent->generic_class)
++			field = FindDhePhysicalField(il2cpp::vm::GenericClass::GetTypeDefinition(
++				field->parent->generic_class), field);
 +		return _removedFields.find(field) != _removedFields.end();
++	}
++
++	const FieldInfo* SuperSetAOTHomologousImage::ResolveSupplementalField(const FieldInfo* field)
++	{
++		auto direct = _logicalFields.find(field);
++		if (direct != _logicalFields.end())
++			return direct->second;
++		Il2CppClass* owner = GetSupplementalFieldLogicalParent(field);
++		const std::vector<FieldInfo*>* fields = owner ? GetSupplementalFields(owner) : nullptr;
++		if (fields)
++			for (FieldInfo* candidate : *fields)
++				if (candidate->token == field->token && std::strcmp(candidate->name, field->name) == 0)
++					return candidate;
++		return field;
++	}
++
++	const Il2CppFieldDefinition* SuperSetAOTHomologousImage::ResolveSupplementalFieldDefinition(
++		const Il2CppType* type, const char* name, const Il2CppType* fieldType)
++	{
++		Il2CppClass* definition = type->type == IL2CPP_TYPE_GENERICINST
++			? il2cpp::vm::GenericClass::GetTypeDefinition(type->data.generic_class)
++			: il2cpp::vm::Class::FromIl2CppType(type);
++		auto fields = _supplementalFields.find(definition);
++		if (fields == _supplementalFields.end())
++			return nullptr;
++		const Il2CppGenericContainer* container = GetGenericContainerFromIl2CppType(type);
++		for (FieldInfo* field : fields->second)
++			if (std::strcmp(field->name, name) == 0 && IsMatchSigType(field->type, fieldType, container, nullptr))
++				return _interpreterFallbackImage->GetFieldDefinitionFromRawIndex(DecodeTokenRowIndex(field->token) - 1);
++		return nullptr;
 +	}
 +
 +	Il2CppClass* SuperSetAOTHomologousImage::GetSupplementalFieldLogicalParent(
 +		const FieldInfo* field)
 +	{
++		auto logical = _logicalFields.find(field);
++		if (_isDheImage && logical != _logicalFields.end())
++			field = logical->second;
 +		auto parent = _supplementalFieldLogicalParents.find(field);
-+		return parent == _supplementalFieldLogicalParents.end() ? nullptr : parent->second;
++		if (parent != _supplementalFieldLogicalParents.end())
++			return parent->second;
++		if (!_isDheImage || !field || !field->parent->generic_class)
++			return nullptr;
++		il2cpp::os::FastAutoLock lock(&il2cpp::vm::g_MetadataLock);
++		Il2CppGenericClass* generic = field->parent->generic_class;
++		FieldInfo* definitionField = FindDhePhysicalField(il2cpp::vm::GenericClass::GetTypeDefinition(generic), field);
++		auto alias = _logicalFields.find(definitionField);
++		if (alias == _logicalFields.end())
++			return nullptr;
++		Il2CppClass* baseDefinition = _supplementalFieldLogicalParents.at(alias->second);
++		return il2cpp::vm::GenericClass::GetClass(il2cpp::metadata::GenericMetadata::GetGenericClass(
++			baseDefinition, il2cpp::vm::GenericClass::GetContext(generic)->class_inst));
 +	}
 +
 +	bool SuperSetAOTHomologousImage::TryGetCustomAttributeSource(uint32_t token,
@@ -3043,7 +3799,7 @@ index 3682882..ff4f1e0 100644
  }
 -
 diff --git a/hybridclr/metadata/SuperSetAOTHomologousImage.h b/hybridclr/metadata/SuperSetAOTHomologousImage.h
-index 53eb614..12705b0 100644
+index 53eb614f5c6e59ff8de8985913a6a234585cb2b0..115a862505ecd886392381fac13185f1f5ec3fba 100644
 --- a/hybridclr/metadata/SuperSetAOTHomologousImage.h
 +++ b/hybridclr/metadata/SuperSetAOTHomologousImage.h
 @@ -3,6 +3,8 @@
@@ -3063,7 +3819,7 @@ index 53eb614..12705b0 100644
  		};
  
  		struct SuperSetFieldDefDetail
-@@ -57,13 +60,21 @@ namespace hybridclr
+@@ -57,14 +60,24 @@ namespace hybridclr
  			//const Il2CppTypeDefinition* declaringTypeDef;
  			const Il2CppType* declaringIl2CppType;
  			const Il2CppFieldDefinition* aotFieldDef;
@@ -3077,15 +3833,18 @@ index 53eb614..12705b0 100644
  		public:
  			SuperSetAOTHomologousImage() : AOTHomologousImage() {}
  
-+			void SetInterpreterFallbackImage(InterpreterImage* image)
++			void SetInterpreterFallbackImage(InterpreterImage* image, bool isDheImage = false)
 +			{
 +				_interpreterFallbackImage = image;
++				_isDheImage = isDheImage;
 +			}
 +
  			void InitRuntimeMetadatas() override;
++			void InitTypeReferences();
  
  			const Il2CppType* ReadTypeFromResolutionScope(uint32_t scope, uint32_t typeNamespace, uint32_t typeName) override;
-@@ -73,6 +84,35 @@ namespace hybridclr
+ 			MethodBody* GetMethodBody(uint32_t token) override;
+@@ -73,25 +86,81 @@ namespace hybridclr
  			Il2CppGenericContainer* GetGenericContainerByTypeDefRawIndex(int32_t typeDefIndex) override;
  			const Il2CppMethodDefinition* GetMethodDefinitionFromRawIndex(uint32_t index) override;
  			void ReadFieldRefInfoFromFieldDefToken(uint32_t rowIndex, FieldRefInfo& ret) override;
@@ -3100,11 +3859,15 @@ index 53eb614..12705b0 100644
 +			Image* GetSupplementalMethodImage(const MethodInfo* method) override;
 +			Image* GetMethodResolveImage(const MethodInfo* method) override;
 +			size_t GetSupplementalMethodCount(Il2CppClass* klass) override;
++			const MethodInfo* ResolveLogicalMethod(const MethodInfo* method) override;
 +			FieldInfo* GetFirstSupplementalField(Il2CppClass* klass, void** iter) override;
 +			bool TryGetNextSupplementalField(Il2CppClass* klass, void** iter,
 +				FieldInfo** field) override;
 +			size_t GetSupplementalFieldCount(Il2CppClass* klass) override;
 +			bool IsRemovedField(const FieldInfo* field) override;
++			const FieldInfo* ResolveSupplementalField(const FieldInfo* field) override;
++			const Il2CppFieldDefinition* ResolveSupplementalFieldDefinition(
++				const Il2CppType* type, const char* name, const Il2CppType* fieldType) override;
 +			Il2CppClass* GetSupplementalFieldLogicalParent(const FieldInfo* field) override;
 +			bool TryGetCustomAttributeSource(uint32_t token,
 +				const Il2CppImage*& sourceImage, uint32_t& sourceToken) override;
@@ -3121,27 +3884,39 @@ index 53eb614..12705b0 100644
  		private:
  
  			void InitTypes0(std::vector<SuperSetTypeIntermediateInfo>& typeIntermediateInfos);
-@@ -82,6 +122,9 @@ namespace hybridclr
+ 			void InitNestedClass(std::vector<SuperSetTypeIntermediateInfo>& typeIntermediateInfos);
+ 			void InitType(std::vector<SuperSetTypeIntermediateInfo>& typeIntermediateInfos, SuperSetTypeIntermediateInfo& type);
+ 			void InitTypes1(std::vector<SuperSetTypeIntermediateInfo>& typeIntermediateInfos);
++			void InitSupplementalTypes(std::vector<SuperSetTypeIntermediateInfo>& typeIntermediateInfos);
  			void ReadMethodDefSig(BlobReader& reader, MethodRefSig& method);
  			void InitMethods(std::vector<SuperSetTypeIntermediateInfo>& typeIntermediateInfos);
  			void InitFields(std::vector<SuperSetTypeIntermediateInfo>& typeIntermediateInfos);
 +			void InitPropertiesAndEvents(
 +				std::vector<SuperSetTypeIntermediateInfo>& typeIntermediateInfos);
 +			const MethodInfo* GetLogicalMethod(const MethodInfo* currentMethod);
++			const std::vector<FieldInfo*>* GetSupplementalFields(Il2CppClass* klass);
  
  			const Il2CppType* _defaultIl2CppType;
  
-@@ -92,6 +135,19 @@ namespace hybridclr
+ 			std::vector<SuperSetTypeDefDetail> _typeDefs;
++			std::vector<SuperSetTypeIntermediateInfo> _typeIntermediateInfos;
+ 			Il2CppHashMap<int32_t, SuperSetTypeDefDetail*, il2cpp::utils::PassThroughHash<int32_t>> _aotTypeIndex2TypeDefs;
+ 
+ 			Il2CppHashMap<uint32_t, SuperSetMethodDefDetail*, il2cpp::utils::PassThroughHash<uint32_t>> _token2MethodDefs;
  			std::vector<SuperSetMethodDefDetail> _methodDefs;
  
  			std::vector<SuperSetFieldDefDetail> _fields;
 +			InterpreterImage* _interpreterFallbackImage = nullptr;
++			bool _isDheImage = false;
 +			std::vector<Il2CppClass*> _supplementalTypes;
 +			std::unordered_map<Il2CppClass*, std::vector<Il2CppClass*>> _supplementalNestedTypes;
 +			std::unordered_map<Il2CppClass*, std::vector<const MethodInfo*>> _supplementalMethods;
 +			std::unordered_map<const MethodInfo*, Image*> _supplementalMethodImages;
 +			std::unordered_map<const MethodInfo*, const MethodInfo*> _logicalMethods;
 +			std::unordered_map<Il2CppClass*, std::vector<FieldInfo*>> _supplementalFields;
++			std::unordered_map<const FieldInfo*, FieldInfo*> _logicalFields;
++			// All accesses use g_MetadataLock; published vectors never change.
++			std::unordered_map<Il2CppClass*, std::vector<FieldInfo*>> _genericSupplementalFields;
 +			std::unordered_map<const FieldInfo*, Il2CppClass*> _supplementalFieldLogicalParents;
 +			std::unordered_set<uint32_t> _matchedAotFieldTokens;
 +			std::unordered_set<const FieldInfo*> _removedFields;
@@ -3154,7 +3929,7 @@ index 53eb614..12705b0 100644
 \ No newline at end of file
 +}
 diff --git a/hybridclr/transform/Transform.cpp b/hybridclr/transform/Transform.cpp
-index d929800..a520897 100644
+index d92980080c589f3111ff681bcac7cfbacf3b4a6b..a5208975907ea3b0f9819d318ffbc73fa3efc328 100644
 --- a/hybridclr/transform/Transform.cpp
 +++ b/hybridclr/transform/Transform.cpp
 @@ -24,11 +24,12 @@ namespace transform
@@ -3183,7 +3958,7 @@ index d929800..a520897 100644
  		ctx.TransformBody(0, 0, *result);
  		metadata::MethodBodyCache::EnableShrinkMethodBodyCache(true);
 diff --git a/hybridclr/transform/TransformContext.cpp b/hybridclr/transform/TransformContext.cpp
-index 8d02cff..8c85dec 100644
+index 8d02cff68d81221ff9bc4816f018f558286a7373..8c85deca30dc882b2088445365856dd6e11b59ee 100644
 --- a/hybridclr/transform/TransformContext.cpp
 +++ b/hybridclr/transform/TransformContext.cpp
 @@ -4003,7 +4003,7 @@ else \

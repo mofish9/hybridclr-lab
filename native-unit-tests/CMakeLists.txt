@@ -75,6 +75,7 @@ add_library(hybridclr_metadata_compile_gate OBJECT
 	"${HYBRIDCLR_TEST_SOURCE_ROOT}/metadata/Image.cpp"
     "${HYBRIDCLR_TEST_SOURCE_ROOT}/metadata/InterpreterImage.cpp"
     "${HYBRIDCLR_TEST_SOURCE_ROOT}/metadata/MetadataModule.cpp"
+    "${HYBRIDCLR_TEST_SOURCE_ROOT}/metadata/MetadataUtil.cpp"
     "${HYBRIDCLR_TEST_SOURCE_ROOT}/metadata/SuperSetAOTHomologousImage.cpp"
     "${HYBRIDCLR_TEST_SOURCE_ROOT}/metadata/VTableSetup.cpp"
 )

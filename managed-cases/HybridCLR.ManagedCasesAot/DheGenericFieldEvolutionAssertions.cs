@@ -66,6 +66,15 @@ namespace HybridCLR.Lab.ManagedCasesAot
                 SmallValue read = item.AddedValue;
                 Require(read.Number == 19 && read.Wide == 0x23456789aL && item.Value.Number == 3,
                     "struct reflection store preserves original field");
+                object boxed = new SmallValue(23, 29);
+                field.SetValue(item, boxed);
+                typeof(SmallValue).GetField(nameof(SmallValue.Number)).SetValue(boxed, 99);
+                read = item.AddedValue;
+                Require(read.Number == 23, "reflection setter copies boxed struct");
+                object returned = field.GetValue(item);
+                typeof(SmallValue).GetField(nameof(SmallValue.Number)).SetValue(returned, 101);
+                read = item.AddedValue;
+                Require(read.Number == 23, "reflection getter copies boxed struct");
             });
             check("generic-fields-nullable", () =>
             {

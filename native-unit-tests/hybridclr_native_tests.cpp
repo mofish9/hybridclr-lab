@@ -35,6 +35,11 @@ static_assert(std::is_constructible<hybridclr::dhe::MetaVersionRegistration,
 #include "hybridclr/interpreter/MemoryUtil.h"
 #include "native_test_hooks.h"
 
+#if __has_include("hybridclr/metadata/DheGenericFieldMetadata.h")
+#include "hybridclr/metadata/DheGenericFieldMetadata.h"
+#define HYBRIDCLR_LAB_HAS_GENERIC_FIELD_METADATA 1
+#endif
+
 #if __has_include("hybridclr/transform/OptimizationFacts.h")
 #include "hybridclr/transform/OptimizationFacts.h"
 #define HYBRIDCLR_LAB_HAS_OPTIMIZATION_FACTS 1
@@ -1839,8 +1844,45 @@ namespace
 #endif
 }
 
+#if HYBRIDCLR_LAB_HAS_GENERIC_FIELD_METADATA
+static void TestDheGenericFieldIdentity()
+{
+    using hybridclr::metadata::FindDhePhysicalField;
+    Il2CppClass* owner = static_cast<Il2CppClass*>(std::calloc(1, sizeof(Il2CppClass)));
+    CHECK(owner != nullptr);
+    if (!owner) return;
+    FieldInfo fields[3]{};
+    fields[0].name = "Original";
+    fields[0].token = 0x04000001;
+    fields[1].name = "Added";
+    fields[1].token = 0x04000002;
+    fields[2].name = "Added";
+    fields[2].token = 0x04000003;
+    owner->fields = fields;
+    owner->field_count = 3;
+    FieldInfo identity = fields[1];
+    CHECK(FindDhePhysicalField(owner, &identity) == fields + 1);
+    identity.token = fields[2].token;
+    CHECK(FindDhePhysicalField(owner, &identity) == fields + 2);
+    identity.name = "Original";
+    CHECK(FindDhePhysicalField(owner, &identity) == nullptr);
+    identity.token = fields[0].token;
+    CHECK(FindDhePhysicalField(owner, &identity) == fields);
+    identity.token = 0x040000ff;
+    CHECK(FindDhePhysicalField(owner, &identity) == nullptr);
+    CHECK(FindDhePhysicalField(nullptr, &identity) == nullptr);
+    CHECK(FindDhePhysicalField(owner, nullptr) == nullptr);
+    owner->field_count = 0;
+    CHECK(FindDhePhysicalField(owner, &fields[0]) == nullptr);
+    std::free(owner);
+}
+#endif
+
 int main()
 {
+#if HYBRIDCLR_LAB_HAS_GENERIC_FIELD_METADATA
+    TestDheGenericFieldIdentity();
+#endif
 #if HYBRIDCLR_LAB_FGS_TESTS
     TestManagedToNativeCallSelection();
 #endif
