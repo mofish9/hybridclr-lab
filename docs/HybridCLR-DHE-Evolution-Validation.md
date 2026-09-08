@@ -1,6 +1,24 @@
 # DHE evolution implementation and validation
 
-## Active checkpoint: six-Base cross-interface replay is failed
+## Active checkpoint: repaired generic parent replay passes six Bases
+
+Clean `5f27aa7` passes 18 cold Windows processes with 18 unique PIDs across six
+fresh v22 original/evolved Bases on all three engines. Every process executes
+52 evolution groups and 220 differential cases with zero differences. All 114
+protected files independently rehash unchanged. First resources retain 208 AOT
+case entries and conservatively invalidate 12; latest/skipped resources record
+220 interpreted entries. The unchanged previously failing generic descendant
+now resolves its closed Current parent declaration correctly.
+
+All six construction/no-op/schema workflows and all three real-header native
+compile/CTest gates pass. Ten capability checks, 29 cross-interface checks and
+24 byte-identical archived MV reconstructions pass. The old unsafe resources
+still fail on old original Bases; their complete rerun now preserves all PIDs.
+See `reports/dhe-generic-parent-generations-windows.md` for exact source,
+artifact identities, recoverable stashes, limits and rollback. The full goal
+remains incomplete; existing generic interface definitions are the next boundary.
+
+## Historical checkpoint: six-Base cross-interface replay is failed
 
 Clean d19b649 runs both frozen resource updates against original/evolved Bases
 on all three Windows engines. The three evolved Bases pass nine runs with all
