@@ -66,8 +66,15 @@ The native manifest lacks the installed runtime source digest. Its own hash is
 already included in BaseId, so the package must bind the actual runtime sources
 there. Merely fixing host preflight cannot distinguish these existing archives.
 
-`manifests/dhe-generic-fields-bound-windows.json` replays the exact original
-generic-field resources on the newly compiled binaries, solely to diagnose the
-v12 implementation. This reuse is possible because of the reproduced BaseId
-collision; it is not a valid distinct-Base lifecycle release or qualification.
-No old resources, Player binaries or build identities are modified.
+The first `35e0746` replay tries the original resource manifests on the new
+archives. All nine attempts are rejected at staging, before a Player is launched:
+the raw build-identity file hashes differ even though the BaseId is unchanged.
+That secondary check remains effective; this is not native execution evidence.
+The failed `replay-generic-fields-bound` report is retained.
+
+The bound replay configuration now uses resource manifests regenerated against
+`registry-generic-fields-bound.json`, with unchanged current DLL/MV inputs and CLR
+references. Its output is `replay-generic-fields-bound-current`. This diagnostic
+still cannot qualify distinct native Base generations until the package binds
+actual native sources into its manifest. No old resources, Player binaries or
+build identities are modified.

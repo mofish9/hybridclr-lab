@@ -1,10 +1,10 @@
 {
   "labRoot": "..",
   "toolAssembly": "../../../artifacts/dhe-evolution-20260908/host-runtime-binding/HybridCLR.DheTool.dll",
-  "outputRoot": "../../../artifacts/dhe-evolution-20260908/replay-generic-fields-bound",
+  "outputRoot": "../../../artifacts/dhe-evolution-20260908/replay-generic-fields-bound-current",
   "updates": [
-    "../../../artifacts/dhe-evolution-20260908/resource-generic-fields-first",
-    "../../../artifacts/dhe-evolution-20260908/resource-generic-fields-latest"
+    "../../../artifacts/dhe-evolution-20260908/resource-generic-fields-bound-first",
+    "../../../artifacts/dhe-evolution-20260908/resource-generic-fields-bound-latest"
   ],
   "referenceResults": [
     "../../../artifacts/dhe-evolution-20260908/reference-generic-fields-first.json",
