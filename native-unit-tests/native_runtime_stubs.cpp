@@ -187,6 +187,10 @@ namespace
 		Il2CppClass* klass;
 	};
 	std::vector<DheResolverRecord> s_dheResolvers;
+    thread_local bool s_captureVmExceptions = false;
+    thread_local hybridclr::native_test::VmExceptionKind s_vmExceptionKind =
+        hybridclr::native_test::VmExceptionKind::ExecutionEngine;
+    thread_local std::string s_vmExceptionMessage;
 
     void InterpreterMethodPointerStub()
     {
@@ -263,16 +267,28 @@ namespace vm
 
     void Exception::Raise(Il2CppException*, MethodInfo*)
     {
+        if (s_captureVmExceptions)
+            throw hybridclr::native_test::RaisedVmException(s_vmExceptionKind, s_vmExceptionMessage);
         std::abort();
     }
 
-    Il2CppException* Exception::GetExecutionEngineException(const char*)
+    Il2CppException* Exception::GetExecutionEngineException(const char* message)
     {
+        if (s_captureVmExceptions)
+        {
+            s_vmExceptionKind = hybridclr::native_test::VmExceptionKind::ExecutionEngine;
+            s_vmExceptionMessage = message ? message : "";
+        }
         return nullptr;
     }
 
-    Il2CppException* Exception::GetMissingMethodException(const char*)
+    Il2CppException* Exception::GetMissingMethodException(const char* message)
     {
+        if (s_captureVmExceptions)
+        {
+            s_vmExceptionKind = hybridclr::native_test::VmExceptionKind::MissingMethod;
+            s_vmExceptionMessage = message ? message : "";
+        }
         return nullptr;
     }
 
@@ -388,6 +404,12 @@ namespace
 }
 namespace native_test
 {
+    void CaptureVmExceptions(bool enabled)
+    {
+        s_captureVmExceptions = enabled;
+        s_vmExceptionMessage.clear();
+    }
+
     void SetDheSupplementalMethod(const MethodInfo* method)
     {
         s_supplementalMethod.store(method, std::memory_order_release);

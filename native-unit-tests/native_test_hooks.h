@@ -2,6 +2,7 @@
 
 #include <cstddef>
 #include <cstdint>
+#include <stdexcept>
 
 #include "il2cpp-class-internals.h"
 
@@ -9,6 +10,15 @@ namespace hybridclr
 {
 namespace native_test
 {
+    enum class VmExceptionKind { ExecutionEngine, MissingMethod };
+    struct RaisedVmException : std::runtime_error
+    {
+        RaisedVmException(VmExceptionKind value, const std::string& message)
+            : std::runtime_error(message), kind(value) {}
+        VmExceptionKind kind;
+    };
+    // Per-thread opt-in; unexpected VM exceptions still abort normal fixtures.
+    void CaptureVmExceptions(bool enabled);
     void SetAOTMetadataAvailable(bool available);
     void SetDheSupplementalMethod(const MethodInfo* method);
     void ThrowOnInterpreterMethodPointer(const MethodInfo* method);

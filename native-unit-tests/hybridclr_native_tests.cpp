@@ -1017,6 +1017,17 @@ namespace
         CHECK(hybridclr::dhe::PrepareAndRegisterMetaVersions({ executionRegistration }));
         CHECK(!hybridclr::dhe::CanEnterWithBaseAbi(&changed));
         CHECK(hybridclr::dhe::CanEnterWithBaseAbi(&physicalCurrent));
+        hybridclr::native_test::CaptureVmExceptions(true);
+        bool unsafeFrameRejected = false;
+        try { hybridclr::dhe::ShouldDispatchToInterpreter(&changed); }
+        catch (const hybridclr::native_test::RaisedVmException& error)
+        {
+            unsafeFrameRejected = error.kind == hybridclr::native_test::VmExceptionKind::ExecutionEngine &&
+                std::string(error.what()).find("Current call frame") != std::string::npos;
+        }
+        hybridclr::native_test::CaptureVmExceptions(false);
+        CHECK(unsafeFrameRejected);
+        CHECK(hybridclr::dhe::ShouldDispatchToInterpreter(&physicalCurrent));
         CHECK(hybridclr::dhe::ResolveInterpreterMethod(&changed) == &physicalCurrent);
         hybridclr::dhe::ResetForTests();
         physicalCurrent.isInterpterImpl = false;
