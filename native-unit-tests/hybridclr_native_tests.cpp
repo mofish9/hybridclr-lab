@@ -45,6 +45,11 @@ static_assert(std::is_constructible<hybridclr::dhe::MetaVersionRegistration,
 #define HYBRIDCLR_LAB_HAS_INTERFACE_SLOTS 1
 #endif
 
+#if __has_include("hybridclr/metadata/DheVirtualSlots.h")
+#include "hybridclr/metadata/DheVirtualSlots.h"
+#define HYBRIDCLR_LAB_HAS_CLASS_VIRTUAL_SLOTS 1
+#endif
+
 #if __has_include("hybridclr/transform/OptimizationFacts.h")
 #include "hybridclr/transform/OptimizationFacts.h"
 #define HYBRIDCLR_LAB_HAS_OPTIMIZATION_FACTS 1
@@ -1908,6 +1913,22 @@ static void TestDheInterfaceSlots()
 
 int main()
 {
+#if HYBRIDCLR_LAB_HAS_CLASS_VIRTUAL_SLOTS
+    {
+        using hybridclr::metadata::FindDheVirtualSlotDeclaration;
+        MethodInfo nonvirtual = {}, abstractMethod = {}, concreteMethod = {};
+        nonvirtual.slot = abstractMethod.slot = 4;
+        abstractMethod.flags = METHOD_ATTRIBUTE_VIRTUAL | METHOD_ATTRIBUTE_ABSTRACT;
+        concreteMethod.slot = 5;
+        concreteMethod.flags = METHOD_ATTRIBUTE_VIRTUAL;
+        const MethodInfo* methods[] = { &nonvirtual, &abstractMethod, &concreteMethod };
+        CHECK(FindDheVirtualSlotDeclaration(nullptr, methods, 3, 4) == &abstractMethod);
+        CHECK(FindDheVirtualSlotDeclaration(nullptr, methods, 3, 5) == &concreteMethod);
+        CHECK(FindDheVirtualSlotDeclaration(nullptr, methods, 3, 6) == nullptr);
+        CHECK(FindDheVirtualSlotDeclaration(nullptr, nullptr, 0, 4) == nullptr);
+        CHECK(FindDheVirtualSlotDeclaration(&concreteMethod, methods, 3, 4) == &concreteMethod);
+    }
+#endif
 #if HYBRIDCLR_LAB_HAS_INTERFACE_SLOTS
     TestDheInterfaceSlots();
 #endif
