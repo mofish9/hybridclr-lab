@@ -66,7 +66,7 @@ p8/p9/p10 的失败结果仍保留作修复链证据；它们不能替代 p11 �
 推导 Android/iOS 或团结 2022 生产结论。
 
 最新 Unity 2022 历史 Base 复测（p27）为
-`current-storage-p27-update-u22-result.json`：loadCode=0，11/14 语义项通过；
+`current-storage-p27-update-u22-result.json`：loadCode=0，12/14 语义项通过；
 `array-copy-and-clone` 仍为 InvalidCastException，反射字段现在可解析但
 RuntimeFieldInfo.GetValue/SetValue 报“field ... is not a field on the target object”，
 Consumer FullCopyMatches 同样失败。因此多 Base 证据仍为条件失败，不能宣称完整能力。
