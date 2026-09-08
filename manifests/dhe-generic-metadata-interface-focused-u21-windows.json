@@ -1,7 +1,7 @@
 {
   "labRoot": "..",
   "toolAssembly": "../../../artifacts/dhe-evolution-20260908/host-generic-metadata/HybridCLR.DheTool.dll",
-  "outputRoot": "../../../artifacts/dhe-evolution-20260908/replay-generic-metadata-interface-focused-u21-cold",
+  "outputRoot": "../../../artifacts/dhe-evolution-20260908/replay-gm-u21",
   "updates": [
     "../../../artifacts/dhe-evolution-20260908/resource-generic-metadata-interface-focused-u21-first",
     "../../../artifacts/dhe-evolution-20260908/resource-generic-metadata-interface-focused-u21-latest"

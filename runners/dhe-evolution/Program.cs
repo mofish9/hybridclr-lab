@@ -165,6 +165,13 @@ internal static class Program
                         await Run("dotnet", new[] { tool, "stage-resource-update", "-UpdateRoot", updates[index],
                         "-AssetRoot", assets, "-BaseBuildIdentity", identityPath,
                         "-ImmutableFiles", string.Join(',', immutableFiles), "-Output", stagePath }, lab, config.TimeoutSeconds);
+                        if (OperatingSystem.IsWindows())
+                        {
+                            string? longPath = Directory.EnumerateFiles(assets, "*", SearchOption.AllDirectories)
+                                .FirstOrDefault(path => Path.GetFullPath(path).Length >= 260);
+                            Require(longPath == null, "Unity Windows Player cannot read a staged path of 260 or more characters; " +
+                                "shorten the replay output root: " + longPath);
+                        }
                         var environment = new Dictionary<string, string> { ["HYBRIDCLR_DHE_EVOLUTION_EVIDENCE"] = evolutionEvidencePath };
                         if (differentialReferences.Length != 0)
                         {

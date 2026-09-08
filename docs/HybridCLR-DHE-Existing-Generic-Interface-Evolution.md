@@ -150,3 +150,11 @@ method/type declarations, including wholly new DHE types where relevant. Keep th
 61-group DLL payloads and failed Bases unchanged. Rebuild supported Base generations
 with matched sources, run the same payloads, and then extend the Windows engine matrix.
 None of these source diagnoses constitutes passing execution evidence.
+
+The first v24 focused replay at 8463730 never reaches runtime registration:
+its copied AOT metadata paths are 261 characters, beyond this Windows Unity
+Player's file API limit. The files exist and the .NET stage hashes validate.
+Keep that failed report (CC8F46F1F15CAE4AD4FD35F290C8FE659A068DF1968FA86CB902829925728777).
+Use the shorter replay-gm-u21 output and reject staged runtime asset paths of
+260 or more characters before launching Windows Players. Base/resources and
+all required assertions remain unchanged; this is a harness path correction.
