@@ -8,6 +8,7 @@
 #include <iostream>
 #include <limits>
 #include <string>
+#include <stdexcept>
 #include <thread>
 #include <type_traits>
 #include <vector>
@@ -848,6 +849,7 @@ namespace
 
 
 #if defined(HYBRIDCLR_DHE_HAS_CURRENT_EXECUTION)
+        hybridclr::native_test::SetAOTMetadataAvailable(true);
         // Layout-dependent methods can keep the same MV fingerprint while
         // requiring a distinct Current signature and interpreter frame.
         MethodInfo originalChanged = changed;
@@ -951,6 +953,17 @@ namespace
         CHECK(!hybridclr::dhe::IsDheAssembly(&assembly));
         CHECK(!physicalCurrent.isInterpterImpl && !secondPhysicalCurrent.isInterpterImpl);
         CHECK(!changed.isInterpterImpl && !unchanged.isInterpterImpl);
+        secondPhysicalCurrent.initInterpCallMethodPointer = 0;
+        hybridclr::native_test::ThrowOnInterpreterMethodPointer(&secondPhysicalCurrent);
+        bool preparationThrew = false;
+        try { hybridclr::dhe::PrepareAndRegisterMetaVersions({ executionRegistration }); }
+        catch (const std::runtime_error&) { preparationThrew = true; }
+        hybridclr::native_test::ThrowOnInterpreterMethodPointer(nullptr);
+        CHECK(preparationThrew);
+        CHECK(!hybridclr::dhe::IsDheAssembly(&assembly));
+        CHECK(!physicalCurrent.isInterpterImpl && !secondPhysicalCurrent.isInterpterImpl);
+        CHECK(!changed.isInterpterImpl && !unchanged.isInterpterImpl);
+        physicalCurrent.isInterpterImpl = false;
         secondPhysicalCurrent.methodPointerCallByInterp = reinterpret_cast<Il2CppMethodPointer>(InterpreterProbeMethod);
         CHECK(hybridclr::dhe::PrepareAndRegisterMetaVersions({ executionRegistration }));
         std::atomic<int> currentReadFailures{ 0 };
@@ -969,6 +982,7 @@ namespace
         changed = originalChanged;
         unchanged = originalUnchanged;
         std::free(executionClass);
+        hybridclr::native_test::SetAOTMetadataAvailable(false);
 #endif
 
 		// Tombstones publish removed Base types and methods without requiring

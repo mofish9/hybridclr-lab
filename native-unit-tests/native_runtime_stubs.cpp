@@ -5,6 +5,7 @@
 #include <cstring>
 #include <memory>
 #include <mutex>
+#include <stdexcept>
 #include <vector>
 
 #include "Baselib.h"
@@ -383,12 +384,18 @@ namespace hybridclr
 namespace
 {
     std::atomic<const MethodInfo*> s_supplementalMethod{nullptr};
+    std::atomic<const MethodInfo*> s_throwInterpreterMethodPointer{nullptr};
 }
 namespace native_test
 {
     void SetDheSupplementalMethod(const MethodInfo* method)
     {
         s_supplementalMethod.store(method, std::memory_order_release);
+    }
+
+    void ThrowOnInterpreterMethodPointer(const MethodInfo* method)
+    {
+        s_throwInterpreterMethodPointer.store(method, std::memory_order_release);
     }
 
     void SetAOTMetadataAvailable(bool available)
@@ -532,8 +539,10 @@ namespace metadata
 
 namespace interpreter
 {
-    Il2CppMethodPointer InterpreterModule::GetMethodPointer(const MethodInfo*)
+    Il2CppMethodPointer InterpreterModule::GetMethodPointer(const MethodInfo* method)
     {
+        if (method == s_throwInterpreterMethodPointer.load(std::memory_order_acquire))
+            throw std::runtime_error("Injected Current method preparation failure");
         return InterpreterMethodPointerStub;
     }
 
