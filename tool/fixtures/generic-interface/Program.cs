@@ -101,7 +101,8 @@ foreach (string name in new[] { "Integer", "Reference", "Value" })
 foreach (string name in names) checks[name + "-compatible"] = analyses[name].Compatible;
 foreach (string capability in new[] { "existing-interface-method-slots-v1", "inherited-interface-dispatch-v1",
     "base-virtual-slots-on-current-descendants-v1", "open-generic-dispatch-definitions-v1",
-    "supplemental-closed-generic-methods-v1", "closed-generic-method-definitions-v1" })
+    "supplemental-closed-generic-methods-v1", "closed-generic-method-definitions-v1",
+    "supplemental-generic-memberref-signatures-v1" })
 {
     checks[capability + "-required"] = analyses[owner].RequiredRuntimeCapabilities.Contains(capability);
     checks[capability + "-missing-Base-rejected"] = !ResourceUpdateCompatibility.CanExecuteUpdate(

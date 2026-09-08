@@ -158,3 +158,25 @@ Keep that failed report (CC8F46F1F15CAE4AD4FD35F290C8FE659A068DF1968FA86CB902829
 Use the shorter replay-gm-u21 output and reject staged runtime asset paths of
 260 or more characters before launching Windows Players. Base/resources and
 all required assertions remain unchanged; this is a harness path correction.
+
+## Remaining MemberRef signature mismatch
+
+The shorter 0f00124 replay reaches registration and executes 56/61 groups in
+all three processes. Reflection, interface maps, native callers and type identity
+now pass. Five direct/delegate/constrained groups still fail to resolve AddedValue
+or EchoGeneric on ICrossRevisionValue<int>. Preserve replay-gm-u21 (report SHA-256
+DE6AB6E7165FBDD6B7540FDFC22CEE1F6645ECEE8FD2127AA4995FDD041FC01B).
+
+Image::ResolveMethodInfo compares a raw MemberRef signature containing VAR/MVAR
+ordinals against the now-inflated supplemental MethodInfo, whose class arguments
+are already int/string/etc. It also supplies the Base generic container, although
+the supplemental definition's parameter handles belong to Current. Match the
+uninflated method definition and its actual metadata declaring-type container,
+then return/inflate the already-selected logical method with the caller context.
+This preserves the distinction between overloads taking T and concrete types;
+matching two fully closed signatures would lose that distinction.
+
+No new runtime cache, publication field or object layout is needed. Declare
+supplemental-generic-memberref-signatures-v1 for added members on existing generic
+types and retain the exact DLL payloads for the next replay. Passing reflection
+alone is insufficient to declare those members callable from IL.

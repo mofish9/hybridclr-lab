@@ -4,7 +4,7 @@ internal sealed class ResourceUpdateCompatibility
 {
 	public const string Policy = "dhe-proven-safe-subset-v1";
 	public const string RuntimeProtocol = "dhe-runtime-protocol-v1";
-    public const string CurrentNativeRuntimeContract = "dhe-runtime-v24";
+    public const string CurrentNativeRuntimeContract = "dhe-runtime-v25";
     public static readonly string[] KnownRuntimeCapabilities =
     {
 		"aot-guard-v1",
@@ -25,6 +25,7 @@ internal sealed class ResourceUpdateCompatibility
         "closed-current-parent-vtables-v1",
         "open-generic-dispatch-definitions-v1",
         "supplemental-closed-generic-methods-v1",
+        "supplemental-generic-memberref-signatures-v1",
         "closed-interpreter-parent-vtables-v1",
         "closed-generic-method-definitions-v1",
 		"supplemental-existing-type-methods-v1",
@@ -238,7 +239,10 @@ internal sealed class ResourceUpdateCompatibility
             requiredCapabilities.Add("open-generic-dispatch-definitions-v1");
         if (added.Any(method => method.DeclaringTypeGenericParameterCount != 0 &&
                 baselineTypes.ContainsKey(method.DeclaringTypeStableId)))
+        {
             requiredCapabilities.Add("supplemental-closed-generic-methods-v1");
+            requiredCapabilities.Add("supplemental-generic-memberref-signatures-v1");
+        }
         if (current.Methods.Any(method => method.GenericParameterCount != 0 &&
                 method.DeclaringTypeGenericParameterCount != 0))
             requiredCapabilities.Add("closed-generic-method-definitions-v1");
