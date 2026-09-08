@@ -4,9 +4,14 @@
 
 Clean fixture `16107af` adds an interface method before the existing method,
 preserving old method bodies and all object/value fields. The Unity-prepared
-DLL passes 42 CLR groups and twelve declaration/slot identity checks. All six
-frozen Bases reject only the expected added interface/virtual-method changes;
-no publishable resource is produced. Native support remains to be implemented.
+DLL passes 42 CLR groups and twelve declaration/slot identity checks. The v14
+candidate now implements logical interface slots and passes all three real-header
+compile/CTest gates. Its new Unity 2021 Base/no-op workflow also passes. All six
+old frozen Bases correctly reject the missing native capability; they are not
+relabeled. The next gate uses `manifests/dhe-interface-slots-u21.json` to execute
+both resource updates on the new Base, with 42 groups and the cold 220-case suite.
+Actual changed-interface Player execution and multi-generation qualification
+remain unproven.
 See `docs/HybridCLR-DHE-Interface-Evolution.md` for exact inputs and the dispatch,
 reflection-map and publication boundaries. This does not supersede the separate
 passing field-address checkpoint below.

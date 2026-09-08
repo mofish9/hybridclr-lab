@@ -1,5 +1,19 @@
 # DHE existing interface evolution
 
+## Player validation input
+
+The v14 Unity 2021 Base/no-op workflow passes at
+`base-interface-slots-u21/project-workflow-report.json` under the artifact root
+below. Its immutable BaseId is
+`41583e0fc8e32172464733ea5be1202d8de38e225cfd50468f594ab6126be732`.
+The clean `da01f3b` C# host builds a separate one-Base registry and two accepted
+resource packages. Exact first/latest CLR references both pass 220 differential
+cases; the latest case assembly has entry-receipt instrumentation without inline
+padding. The main interface fixture DLLs and their 42-group references are
+unchanged. `manifests/dhe-interface-slots-u21.json` freezes the next cold replay,
+including consecutive and skipped updates. This preparation is not yet proof of
+changed-interface execution and does not replace the previous six-Base pass.
+
 ## Candidate implementation
 
 HybridCLR `e58946f` keeps Base interface slots and appends logical slots for

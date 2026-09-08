@@ -1,0 +1,74 @@
+{
+  "labRoot": "..",
+  "toolAssembly": "../../../artifacts/dhe-evolution-20260908/host-interface-slots-locked/HybridCLR.DheTool.dll",
+  "outputRoot": "../../../artifacts/dhe-evolution-20260908/replay-interface-slots-u21-cold",
+  "updates": [
+    "../../../artifacts/dhe-evolution-20260908/resource-interface-slots-u21-first",
+    "../../../artifacts/dhe-evolution-20260908/resource-interface-slots-u21-latest"
+  ],
+  "referenceResults": [
+    "../../../artifacts/dhe-evolution-20260908/interface-slots-reference-prepared.json",
+    "../../../artifacts/dhe-evolution-20260908/interface-slots-latest-reference.json"
+  ],
+  "evolutionCheckRequirements": [
+    [
+      "method-signature", "field-type", "generic-field-type", "inheritance",
+      "attribute-type-argument", "array-declarations", "ref-out-signature",
+      "interface-and-constrained-call", "generic-constraint", "generic-inheritance",
+      "repeated-structural-evolution", "named-attribute-field", "named-attribute-property",
+      "attribute-constructor-overload", "generic-fields-concurrent-first-touch",
+      "generic-fields-primitive", "generic-fields-reference", "generic-fields-struct",
+      "generic-fields-nullable", "generic-fields-array-and-nested-type",
+      "generic-fields-static-isolation", "generic-fields-open-and-cached-reflection",
+      "generic-fields-gc-retention", "field-address-primitive-alias", "field-address-ref-return",
+      "field-address-ref-out-boundary", "field-address-nullable-alias", "field-address-struct-alias",
+      "field-address-reference-alias", "field-address-neighbor-storage",
+      "field-address-interlocked-concurrent", "field-address-struct-reference-gc",
+      "field-address-owner-lifetime", "field-address-owner-cycle-collection", "field-address-null-owner",
+      "interface-evolution-class-dispatch", "interface-evolution-boxed-struct",
+      "interface-evolution-constrained-call", "interface-evolution-delegates",
+      "interface-evolution-reflection-invoke", "interface-evolution-map", "interface-evolution-type-identity"
+    ],
+    [
+      "method-signature", "field-type", "generic-field-type", "inheritance",
+      "attribute-type-argument", "array-declarations", "ref-out-signature",
+      "interface-and-constrained-call", "generic-constraint", "generic-inheritance",
+      "repeated-structural-evolution", "named-attribute-field", "named-attribute-property",
+      "attribute-constructor-overload", "generic-fields-concurrent-first-touch",
+      "generic-fields-primitive", "generic-fields-reference", "generic-fields-struct",
+      "generic-fields-nullable", "generic-fields-array-and-nested-type",
+      "generic-fields-static-isolation", "generic-fields-open-and-cached-reflection",
+      "generic-fields-gc-retention", "field-address-primitive-alias", "field-address-ref-return",
+      "field-address-ref-out-boundary", "field-address-nullable-alias", "field-address-struct-alias",
+      "field-address-reference-alias", "field-address-neighbor-storage",
+      "field-address-interlocked-concurrent", "field-address-struct-reference-gc",
+      "field-address-owner-lifetime", "field-address-owner-cycle-collection", "field-address-null-owner",
+      "interface-evolution-class-dispatch", "interface-evolution-boxed-struct",
+      "interface-evolution-constrained-call", "interface-evolution-delegates",
+      "interface-evolution-reflection-invoke", "interface-evolution-map", "interface-evolution-type-identity"
+    ]
+  ],
+  "requireStructuralBaseGenerations": false,
+  "layoutDiagnostics": "after",
+  "timeoutSeconds": 300,
+  "differentialManifest": "test-manifest.json",
+  "differentialGolden": "test-golden.json",
+  "differentialReferences": [
+    "../../../artifacts/dhe-evolution-20260908/differential-interface-slots-first.bin",
+    "../../../artifacts/dhe-evolution-20260908/differential-interface-slots-latest.bin"
+  ],
+  "requireInterpretedCaseEntries": [false, true],
+  "bases": [
+    {
+      "label": "u21-evolved-consecutive",
+      "playerRoot": "../../../artifacts/dhe-evolution-20260908/base-interface-slots-u21/player",
+      "buildIdentity": "../../../artifacts/dhe-evolution-20260908/base-interface-slots-u21/build-identity.json"
+    },
+    {
+      "label": "u21-evolved-skipped",
+      "playerRoot": "../../../artifacts/dhe-evolution-20260908/base-interface-slots-u21/player",
+      "buildIdentity": "../../../artifacts/dhe-evolution-20260908/base-interface-slots-u21/build-identity.json",
+      "skipFirstUpdate": true
+    }
+  ]
+}
