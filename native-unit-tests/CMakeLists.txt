@@ -156,6 +156,7 @@ function(configure_hybridclr_target target)
         "${IL2CPP_BASELIB_INCLUDE}"
         "${IL2CPP_BASELIB_PLATFORM_INCLUDE}"
         "${IL2CPP_EXTERNAL}"
+        "${IL2CPP_EXTERNAL}/bdwgc/include"
     )
 
     if (MSVC)
