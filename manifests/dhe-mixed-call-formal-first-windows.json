@@ -1,7 +1,7 @@
 {
   "labRoot": "..",
-  "toolAssembly": "../../../artifacts/dhe-evolution-20260908/host-mixed-formal-frozen/HybridCLR.DheTool.dll",
-  "outputRoot": "../../../artifacts/dhe-evolution-20260908/replay-formal-first-bound",
+  "toolAssembly": "../../../artifacts/dhe-evolution-20260908/host-mixed-integrated/HybridCLR.DheTool.dll",
+  "outputRoot": "../../../artifacts/dhe-evolution-20260908/replay-mixed-integrated",
   "updates": [
     "../../../artifacts/dhe-evolution-20260908/resource-field-two-first"
   ],
