@@ -74,7 +74,13 @@ namespace HybridCLR.Lab.Editor
             string stripped = SettingsUtil.GetAssembliesPostIl2CppStripDir(BuildTarget.StandaloneWindows64);
             foreach (string name in Hotfix)
                 File.Copy(Path.Combine(stripped, name + ".dll"), Path.Combine(output, "baseline", name + ".dll"), true);
-            File.Copy(Path.Combine(stripped, "HybridCLR.ValueLayoutNative.dll"), Path.Combine(output, "baseline", "HybridCLR.ValueLayoutNative.dll"));
+            string nativeSource = Path.Combine(stripped, "HybridCLR.ValueLayoutNative.dll");
+            string nativeBaseline = Path.Combine(output, "baseline", "HybridCLR.ValueLayoutNative.dll");
+            if (File.Exists(nativeBaseline))
+            {
+                if (Hash(nativeSource) != Hash(nativeBaseline)) throw new BuildFailedException("Ordinary AOT fixture changed during Base construction.");
+            }
+            else File.Copy(nativeSource, nativeBaseline);
             File.WriteAllText(Path.Combine(Path.GetDirectoryName(player), "probe-build.json"), JsonUtility.ToJson(new BuildReceipt
             { passed = true, unityVersion = Application.unityVersion, bytes = report.summary.totalSize.ToString(),
                 playerSha256 = Hash(player), gameAssemblySha256 = Hash(gameAssembly) }, true));
