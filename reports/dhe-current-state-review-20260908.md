@@ -1,5 +1,17 @@
 # DHE 当前实施状态与复核（2026-09-08）
 
+## 最新范围与验证结果
+
+用户已明确只支持 Unity 2022 App 和团结 2022 小游戏；Unity 2021 不再安排新构建或门禁。
+新 FGS 字段空对象修复已在两引擎上通过真实头文件 native compile/CTest、Base/no-op，
+以及 6 个独立进程的连续/跳版本热更回放。每次 61 组演化、220 cases，差异为 0。
+未变化泛型调用入口保持 AOT。当前只验证了 generic-interface 这一类 Base 世代，
+两引擎 original/evolved Base 和完整正式工具门禁仍需补齐。
+
+最新身份、保留的失败记录、工作区与回滚见
+[两引擎 Windows 验证报告](dhe-field-address-two-engines-windows.md)。
+下文保留的是此次范围调整和 FGS 修复之前的复核记录，不能作为最新提交的验收结论。
+
 ## 结论与目标
 
 现有 DHE 路线已经有真实的 Windows Player 执行证据，早先提交的运行时和

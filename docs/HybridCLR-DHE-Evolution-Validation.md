@@ -1,6 +1,21 @@
 # DHE evolution implementation and validation
 
-## Active checkpoint: existing generic interface replay passes on Unity 2021
+## Active checkpoint: Unity 2022 and Tuanjie 2022 FGS replay passes
+
+The user's current scope retires Unity 2021 from new builds and qualification.
+Clean eaa4435 passes two fresh generic-interface Bases, six unique Windows
+processes, 61 evolution groups and 220 differential cases per run, with zero
+differences. Both no-op Players and real-header native compile/CTest gates pass.
+The FGS AOT null field-address helper is repaired, and Base generator/runtime
+capability declarations now agree. Original generic callers retain AOT while
+their changed callees execute in the interpreter.
+
+See reports/dhe-field-address-two-engines-windows.md for exact identities,
+failures retained, immutable-file checks and remaining gates. The current
+checkpoint has one Base generation per engine; six-Base multi-generation
+qualification and the complete DHE goal remain unfinished.
+
+## Historical checkpoint: existing generic interface replay on Unity 2021
 
 Clean e14e2be passes three cold processes with three unique PIDs on one U21
 generic-interface Base: 61 evolution groups and 220 differential cases per run,
