@@ -39,19 +39,13 @@ internal sealed class MetaVersionSnapshot
 
     public static MetaVersionSnapshot Create(string assemblyPath)
     {
-        var context = ModuleDef.CreateModuleContext();
-        var resolver = (AssemblyResolver)context.AssemblyResolver;
-        resolver.UseGAC = false;
-        resolver.EnableFrameworkRedirect = false;
-        resolver.PostSearchPaths.Add(Path.GetDirectoryName(Path.GetFullPath(assemblyPath))!);
-        using var module = ModuleDefMD.Load(assemblyPath, context);
-        resolver.AddToCache(module);
+        using var module = ModuleDefMD.Load(assemblyPath);
         var types = module.Types.SelectMany(AllTypes).Where(type => type.Name != "<Module>")
             .Select(CreateType).OrderBy(type => type.StableId, StringComparer.Ordinal).ToArray();
         var typeIds = types.ToDictionary(type => type.Identity, type => type.StableId, StringComparer.Ordinal);
 		var typeVersions = types.ToDictionary(type => type.Identity, type => type.Version,
 			StringComparer.Ordinal);
-		HashSet<string> addressTakenFields = FindAddressTakenFields(module);
+		HashSet<string> addressTakenFields = FindAddressTakenFields(assemblyPath);
         var fields = module.Types.SelectMany(AllTypes).Where(type => type.Name != "<Module>")
 			.SelectMany(type => type.Fields.Select((field, index) => CreateField(field,
                 typeIds[type.FullName], index, addressTakenFields.Contains(FieldIdentity(field)))))
@@ -460,19 +454,42 @@ internal sealed class MetaVersionSnapshot
 	private static string FieldIdentity(FieldDef field) =>
 		(field.DeclaringType?.FullName ?? "") + "::" + field.Name + "|" + field.FieldType.FullName;
 
-	private static string FieldIdentity(IField field)
+	private static string FieldIdentity(IField field) =>
+		(field.DeclaringType?.FullName ?? "") + "::" + field.Name + "|" +
+		(field.FieldSig?.Type.FullName ?? "");
+
+	private static string AddressFieldDefinitionIdentity(IField field)
 	{
 		// A closed GenericInst owner is not the identity of its open field definition.
 		FieldDef? definition = field.ResolveFieldDef();
 		if (definition == null && field.DeclaringType?.ResolveTypeDef() is TypeDef owner)
 			definition = owner.Fields.SingleOrDefault(candidate => candidate.Name == field.Name &&
 				new SigComparer().Equals(candidate.FieldSig, field.FieldSig));
-		return definition != null ? FieldIdentity(definition) :
-			(field.DeclaringType?.FullName ?? "") + "::" + field.Name + "|" +
-			(field.FieldSig?.Type.FullName ?? "");
+		return definition != null ? FieldIdentity(definition) : FieldIdentity(field);
 	}
 
-	private static HashSet<string> FindAddressTakenFields(ModuleDefMD module)
+	private static HashSet<string> FindAddressTakenFields(string assemblyPath)
+	{
+		// Capability analysis must not alter the frozen MV fingerprint resolver or
+		// field-operand spelling: existing Base identities bind those exact bytes.
+		var context = ModuleDef.CreateModuleContext();
+		var resolver = (AssemblyResolver)context.AssemblyResolver;
+		resolver.UseGAC = false;
+		resolver.EnableFrameworkRedirect = false;
+		resolver.PostSearchPaths.Add(Path.GetDirectoryName(Path.GetFullPath(assemblyPath))!);
+		using var module = ModuleDefMD.Load(assemblyPath, context);
+		resolver.AddToCache(module);
+		try { return CollectAddressTakenFields(module); }
+		finally
+		{
+			foreach (AssemblyDef assembly in resolver.GetCachedAssemblies().Where(assembly => assembly != null))
+				foreach (ModuleDef dependency in assembly.Modules)
+					if (!ReferenceEquals(dependency, module)) dependency.Dispose();
+			resolver.Clear();
+		}
+	}
+
+	private static HashSet<string> CollectAddressTakenFields(ModuleDefMD module)
 	{
 		var fields = new HashSet<string>(StringComparer.Ordinal);
 		foreach (MethodDef method in module.Types.SelectMany(AllTypes).SelectMany(type => type.Methods)
@@ -483,7 +500,7 @@ internal sealed class MetaVersionSnapshot
 			{
 				IField? field = instruction.Operand as IField;
 				if (field != null)
-					fields.Add(FieldIdentity(field));
+					fields.Add(AddressFieldDefinitionIdentity(field));
 			}
 		}
 		return fields;

@@ -1,5 +1,25 @@
 # DHE supplemental field addresses
 
+## MV fingerprint compatibility repair
+
+The initial address scanner reused FieldIdentity(IField) and expanded the module
+resolver used by MV hashing. This unintentionally changed existing method
+fingerprints. The six-Base resource gate correctly rejected the three archived
+original Bases with MV-set and composite-identity mismatches. The failed resource
+outputs and attempted replay remain under the field-address-generations roots.
+
+Address analysis now uses a separate module/resolver and definition-identity
+helper. The original fingerprint helper and resolver are unchanged. All 24
+archived DLL/MV pairs across the original v11 and source-bound v12 generations
+reproduce byte-for-byte, while all fifteen address compatibility checks still
+pass. Neither archived identities nor the current fixture DLLs were modified.
+
+The intermediate v13 field-address Bases used the unintended fingerprint variant
+and are retained as diagnostic archives, not relabeled. Fresh candidate Bases
+must use the restored fingerprint contract before the complete six-Base cold
+replay. Native source and package remain b950d29/a8271cd; this repair changes only
+tooling, not the v13 native runtime or DHEMETA1/schema 1.
+
 ## Candidate implementation
 
 The 35-group CLR reference passes, including all original generic-field checks
