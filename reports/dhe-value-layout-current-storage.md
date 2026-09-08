@@ -10,7 +10,8 @@
 | 组件 | commit |
 |---|---|
 | HybridCLR | acd8ee541db74c1d67b141047644bb5686925d6e |
-| native 测试和锁 | a65da32 |
+| native 测试和锁 | 3c7f385 |
+| probe plan method-body selection | 59f8cc4 |
 | Unity 2022 IL2CPP，复用 | 3482c81998b5e382b59a3d6f4e5fec2d0988d22b |
 | 团结 2022 IL2CPP，复用 | df8d0123d9f5a9fce79283fe5261dba21e802aa0 |
 | package，复用 | bc319e5e376d97ed89fdd0f127d4256fa466f1ef |
@@ -54,6 +55,12 @@ Unity 2022 Player p11：
 managed-reference-gc 全部通过，`interpreterEntries=0`。同一 p11 Base 使用
 Current/Current no-op payload 的 `current-storage-p11-noop-u22-current-result.json`
 也通过 14/14，证明同身份无变化更新可以保持 AOT 路径。
+
+Unity 2022 method-only update：
+`current-storage-p11-method-update2-u22-result.json`。仅修改
+`Factory.Create` 方法体，plan 的 `changedMethodTokens` 只有该方法 token；同一
+p11 Base 加载后仍通过 14/14、Consumer 和 GC，证明 AOT Base 上的 DLL/MV 方法体
+更新路径可以工作。
 
 p8/p9/p10 的失败结果仍保留作修复链证据；它们不能替代 p11 的成功结果，也不能
 推导 Android/iOS 或团结 2022 生产结论。
