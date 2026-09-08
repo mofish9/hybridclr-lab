@@ -1,10 +1,10 @@
 {
   "labRoot": "..",
-  "toolAssembly": "../../../artifacts/dhe-evolution-20260908/host-interface-owner/HybridCLR.DheTool.dll",
-  "outputRoot": "../../../artifacts/dhe-evolution-20260908/replay-interface-owner-u21-cold",
+  "toolAssembly": "../../../artifacts/dhe-evolution-20260908/host-interface-token/HybridCLR.DheTool.dll",
+  "outputRoot": "../../../artifacts/dhe-evolution-20260908/replay-interface-token-u21-cold",
   "updates": [
-    "../../../artifacts/dhe-evolution-20260908/resource-interface-owner-u21-first",
-    "../../../artifacts/dhe-evolution-20260908/resource-interface-owner-u21-latest"
+    "../../../artifacts/dhe-evolution-20260908/resource-interface-token-u21-first",
+    "../../../artifacts/dhe-evolution-20260908/resource-interface-token-u21-latest"
   ],
   "referenceResults": [
     "../../../artifacts/dhe-evolution-20260908/interface-slots-reference-prepared.json",
@@ -61,13 +61,13 @@
   "bases": [
     {
       "label": "u21-evolved-consecutive",
-      "playerRoot": "../../../artifacts/dhe-evolution-20260908/base-interface-owner-u21/player",
-      "buildIdentity": "../../../artifacts/dhe-evolution-20260908/base-interface-owner-u21/build-identity.json"
+      "playerRoot": "../../../artifacts/dhe-evolution-20260908/base-interface-token-u21/player",
+      "buildIdentity": "../../../artifacts/dhe-evolution-20260908/base-interface-token-u21/build-identity.json"
     },
     {
       "label": "u21-evolved-skipped",
-      "playerRoot": "../../../artifacts/dhe-evolution-20260908/base-interface-owner-u21/player",
-      "buildIdentity": "../../../artifacts/dhe-evolution-20260908/base-interface-owner-u21/build-identity.json",
+      "playerRoot": "../../../artifacts/dhe-evolution-20260908/base-interface-token-u21/player",
+      "buildIdentity": "../../../artifacts/dhe-evolution-20260908/base-interface-token-u21/build-identity.json",
       "skipFirstUpdate": true
     }
   ]
