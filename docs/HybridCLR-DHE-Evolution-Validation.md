@@ -1,6 +1,28 @@
 # DHE evolution implementation and validation
 
-## Active checkpoint: repaired generic parent replay passes six Bases
+## Active checkpoint: existing generic interface replay passes on Unity 2021
+
+Clean e14e2be passes three cold processes with three unique PIDs on one U21
+generic-interface Base: 61 evolution groups and 220 differential cases per run,
+zero differences, including consecutive and skipped updates. All 19 protected
+files independently rehash unchanged; both payloads' 16 DLL/MV files remain
+identical to the preceding failed replay. Original generic callers retain AOT.
+
+The earlier 0787aad native MemberRef repair is retained. Demo source de885e1
+repairs a reproduced harness assumption: an unchanged AOT wrapper can execute
+interpreted callees without one of three fixed probes changing. Fourteen real-
+payload positive/negative checks pass, and the host independently validates the
+MV-bound execution receipt. The original failed report remains unchanged.
+
+All three current real-header native compile/CTest gates pass, but the current
+Player checkpoint covers only one U21 Base. Current multi-generation U21 and
+U22/Tuanjie replays, general virtual/value-layout evolution, Unity behavior,
+concurrency/GC/ABI, release-gate alignment and performance/memory remain pending.
+This is not the completed DHE goal or a Release qualification. See
+reports/dhe-current-state-review-20260908.md for current source/artifact identities,
+the distinction from the published opt4 line, workspace state and rollback.
+
+## Historical checkpoint: repaired generic parent replay passes six Bases
 
 Clean `5f27aa7` passes 18 cold Windows processes with 18 unique PIDs across six
 fresh v22 original/evolved Bases on all three engines. Every process executes

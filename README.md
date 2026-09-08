@@ -17,6 +17,14 @@ Their immutable inputs are recorded in `manifests/repo-lock.json`.
 
 ## Current phase
 
+This research checkout extends the published DHE line below. Its current
+implementation and validation status is in
+`reports/dhe-current-state-review-20260908.md` and
+`docs/HybridCLR-DHE-Evolution-Validation.md`. The existing-generic-interface
+checkpoint passes on one Unity 2021 Base; the complete evolution objective and
+current Release qualification remain incomplete. Historical 0.1.35 release
+evidence below does not qualify this research snapshot.
+
 The DHE workflow is maintained as a separate, explicit validation lane. Its
 integrated opt4.1 source line is documented in
 `docs/HybridCLR-DHE-Opt4-Integrated-Design.md`.
