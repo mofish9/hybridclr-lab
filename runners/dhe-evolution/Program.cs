@@ -235,6 +235,32 @@ internal static class Program
                             var records = DheRetainedCallers.Validate(routingPath, expected);
                             retainedCallers = new { path = routingPath, sha256 = Hash(routingPath), records };
                         }
+                        object? classVirtualCallers = null;
+                        if (requiredEvolutionChecks.Contains("class-virtual-NativeCallers", StringComparer.Ordinal))
+                        {
+                            const string callerAssembly = "HybridCLR.CrossAssemblyDerived";
+                            const string callerType = "HybridCLR.Lab.CrossAssemblyDerived.ClassVirtualNativeCallers";
+                            string[] callerNames = { "Stable", "Removed", "Hidden", "Abstract", "Integer", "Reference", "Value", "Generic" };
+                            JsonElement declaration = variant.GetProperty("assemblies").EnumerateArray().Single(value =>
+                                value.GetProperty("assemblyName").GetString() == callerAssembly);
+                            var callers = HybridCLR.DheTool.MetaVersionSnapshot.Create(Path.Combine(updates[index],
+                                declaration.GetProperty("dll").GetString()!)).Methods.Where(method => method.DeclaringType == callerType &&
+                                    callerNames.Contains(method.Name)).ToArray();
+                            Require(callers.Length == callerNames.Length, "Class virtual caller fixture is incomplete.");
+                            var original = DheFixtureMetaVersion.Read(File.ReadAllBytes(Path.Combine(embeddedBase,
+                                callerAssembly + ".mv.bytes")), callerAssembly);
+                            var expected = callers.ToDictionary(method => method.Name, method =>
+                            {
+                                bool existed = original.methods.TryGetValue(method.StableId, out string? version);
+                                Require(!existed || string.Equals(version, method.Version, StringComparison.OrdinalIgnoreCase),
+                                    "Changed caller cannot prove retained AOT virtual dispatch: " + method.Name);
+                                Require(existed || !original.types.ContainsKey(method.DeclaringTypeStableId),
+                                    "New caller must belong to a type absent from Base.");
+                                return !existed;
+                            });
+                            string path = evolutionEvidencePath + ".class-virtual-callers";
+                            classVirtualCallers = new { path, sha256 = Hash(path), records = DheRetainedCallers.Validate(path, expected) };
+                        }
                         object? differential = null;
                         if (differentialReferences.Length != 0)
                         {
@@ -341,6 +367,7 @@ internal static class Program
                             referenceValidated = references.Length != 0,
                             differential,
                             retainedCallers,
+                            classVirtualCallers,
                             requiredEvolutionChecks,
                             executedEvolutionChecks,
                             evolutionEvidencePath,
@@ -358,7 +385,7 @@ internal static class Program
                         errors.Add(error);
                         var artifacts = new[] { stagePath, resultPath, logPath, differentialPath,
                             differentialPath + ".exceptions.log", differentialPath + ".layout.log", evolutionEvidencePath,
-                            evolutionEvidencePath + ".generic-interface-callers" }
+                            evolutionEvidencePath + ".generic-interface-callers", evolutionEvidencePath + ".class-virtual-callers" }
                             .Where(File.Exists).ToDictionary(path => path, Hash);
                         bool immutable = originalHashes.All(pair => File.Exists(pair.Key) && Hash(pair.Key) == pair.Value);
                         failedRuns.Add(new
