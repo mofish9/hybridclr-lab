@@ -1,6 +1,20 @@
 # DHE evolution implementation and validation
 
-## Current blockers: field addresses and native Base identity
+## Latest completed checkpoint: installed source and immutable Base identity
+
+Clean `cc48992` passes 18 cold Windows processes across three archived original
+v11 Bases and three new evolved v12 Bases. Every process executes 220 cases with
+zero differences; 114 distinct immutable files independently rehash unchanged.
+Package `93f436e` and tool `7acebef` bind actual native sources into BaseId and
+verify installation before/after Unity stages. All three real Editor Base/no-op
+workflows pass. See `reports/dhe-evolution-native-source-identity-windows.md`.
+
+This closes the reproduced stale-runtime build and native identity collision for
+new workflows. The separate original generic-field fixture still fails at
+nullable-field `ldflda`; it was not weakened and is the next semantic gate.
+The established complete-suite pass is not evidence for that failed payload.
+
+## Current blocker: field addresses
 
 The source-bound `303d755` replay executes nine actual Windows processes on the
 three freshly compiled v12 runtimes. All register successfully (`loadError=OK`),
@@ -15,7 +29,8 @@ Separately, the rebuilt native binary shares its BaseId with the earlier
 incorrectly labeled binary. Package `93f436e` now captures actual installed native
 sources and generator outputs in the native manifest, which is already hashed
 into BaseId. Its 13 standalone checks pass against each engine's real old/new
-runtime. Actual new package Base builds and cold replay remain pending. See
+runtime. Actual package Base builds and established-capability cold replay then
+pass as recorded above; generic-field address execution remains failed. See
 `docs/HybridCLR-DHE-Runtime-Source-Binding.md` for the preserved failures.
 
 ## Previous blocker: actual installed runtime differs from the selected source

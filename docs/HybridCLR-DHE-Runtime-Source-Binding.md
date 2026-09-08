@@ -107,5 +107,8 @@ installed new runtime: `native-source-identity-tests-u21-finalize`,
 `native-source-identity-tests-u22`, and `native-source-identity-tests-tuanjie`.
 They check native/source/manifest changes, deterministic capture, independent
 hashes, generated-source changes, ignored receipts, missing output and mid-build
-drift. The next actual Base gate must prove package compilation in each Editor,
-new embedded Base identity, and final source identity validation.
+drift. The actual `7acebef` Base workflows now pass on all three Editors. The
+`cc48992` six-Base cold replay also passes with 220 cases per process and zero
+differences, using the established payload without new generic fields. See
+`reports/dhe-evolution-native-source-identity-windows.md` for the exact identities
+and the still-failed nullable-field address fixture.
