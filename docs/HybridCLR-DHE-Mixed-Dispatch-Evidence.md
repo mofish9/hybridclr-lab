@@ -12,8 +12,10 @@ methods; its native guard subset plus additions totals 618.
 Accept the existing changed-probe proof or an executed entry receipt bound to
 the selected Base and Current method versions, identity, presence and counters.
 Authenticate DLLs/MVs against Base identity and the selected resource manifest.
-Use changedMethodCount plus addedMethodCount for runtime counts; keep native
-guard counts for native coverage. Do not relabel unchanged entries as changed.
+Use changedMethodCount plus removedMethodCount plus addedMethodCount for runtime
+counts; keep native guard counts for native coverage. Original/evolved Bases
+also contain removed methods: their latest runtime totals are 866 and 765.
+Do not relabel unchanged entries as changed.
 No runtime ABI, layout, cache or synchronization changes are required.
 
 Unity 2022 and Tuanjie 2022 Windows Players provide the actual payload cases.

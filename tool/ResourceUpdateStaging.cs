@@ -1103,7 +1103,8 @@ internal static partial class Program
 
     private static int CountResourceChangedMethods(JsonElement selectedBase) =>
         selectedBase.GetProperty("assemblies").EnumerateArray().Sum(item =>
-            GetInt(item, "changedMethodCount") + GetInt(item, "addedMethodCount"));
+            GetInt(item, "changedMethodCount") + GetInt(item, "removedMethodCount") +
+            GetInt(item, "addedMethodCount"));
 
     private static IEnumerable<DhePlayerDispatch.AssemblyPair> ReadResourceDispatchAssemblies(
         string updateRoot, JsonElement variant, JsonElement selectedBase,

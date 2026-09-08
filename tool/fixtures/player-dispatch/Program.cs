@@ -4,8 +4,8 @@ using System.Text.Json;
 using System.Text.Json.Nodes;
 using HybridCLR.DheTool;
 
-if (args.Length is not (5 or 7))
-    throw new ArgumentException("Pass Base DLL, Current DLL, real Player result, older Base DLL and a new report path, optionally followed by tool DLL and archived registry.");
+if (args.Length is not (5 or 7 or 9))
+    throw new ArgumentException("Pass Base DLL, Current DLL, real Player result, older Base DLL and a new report path, optionally followed by tool DLL and archived registry, then latest resource manifest and multi-Base replay report.");
 var baseline = MetaVersionSnapshot.Create(args[0]);
 var current = MetaVersionSnapshot.Create(args[1]);
 var older = MetaVersionSnapshot.Create(args[3]);
@@ -49,7 +49,7 @@ var checks = new Dictionary<string, bool>
 string output = Path.GetFullPath(args[4]);
 if (File.Exists(output)) throw new IOException("Report already exists.");
 Directory.CreateDirectory(Path.GetDirectoryName(output)!);
-if (args.Length == 7)
+if (args.Length >= 7)
 {
     var tool = Assembly.LoadFrom(Path.GetFullPath(args[5]));
     var program = tool.GetType("HybridCLR.DheTool.Program", throwOnError: true)!;
@@ -72,6 +72,31 @@ if (args.Length == 7)
         checks["unknown-registry-engine-rejected"] =
             exception.InnerException?.Message.Contains("unsupported engineWorkflow",
                 StringComparison.Ordinal) == true;
+    }
+    if (args.Length == 9)
+    {
+        using var resource = JsonDocument.Parse(File.ReadAllText(args[7]));
+        using var replay = JsonDocument.Parse(File.ReadAllText(args[8]));
+        string resourceHash = Convert.ToHexString(SHA256.HashData(File.ReadAllBytes(args[7])));
+        var count = program.GetMethod("CountResourceChangedMethods", flags)!;
+        foreach (var selectedBase in resource.RootElement.GetProperty("supportedBases").EnumerateArray())
+        {
+            string baseId = selectedBase.GetProperty("baseId").GetString()!;
+            var run = replay.RootElement.GetProperty("results").EnumerateArray().Single(item =>
+                item.GetProperty("baseId").GetString() == baseId &&
+                item.GetProperty("skippedFirstUpdate").GetBoolean());
+            using var actual = JsonDocument.Parse(File.ReadAllText(run.GetProperty("resultPath").GetString()!));
+            int actualCount = actual.RootElement.GetProperty("changedMethodCount").GetInt32();
+            checks["actual-runtime-method-count-" + baseId] =
+                resourceHash.Equals(run.GetProperty("manifestSha256").GetString(), StringComparison.OrdinalIgnoreCase) &&
+                (int)count.Invoke(null, new object[] { selectedBase })! == actualCount;
+            var withoutGuards = JsonNode.Parse(selectedBase.GetRawText())!.AsObject();
+            foreach (var assembly in withoutGuards["assemblies"]!.AsArray())
+                assembly!["guardRequiredMethodCount"] = 0;
+            using var modified = JsonDocument.Parse(withoutGuards.ToJsonString());
+            checks["guard-count-is-not-runtime-count-" + baseId] =
+                (int)count.Invoke(null, new object[] { modified.RootElement })! == actualCount;
+        }
     }
 }
 File.WriteAllText(output, JsonSerializer.Serialize(new
