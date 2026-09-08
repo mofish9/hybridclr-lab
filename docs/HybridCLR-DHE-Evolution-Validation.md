@@ -1,6 +1,24 @@
 # DHE evolution implementation and validation
 
-## Current blocker: actual installed runtime differs from the selected source
+## Current blockers: field addresses and native Base identity
+
+The source-bound `303d755` replay executes nine actual Windows processes on the
+three freshly compiled v12 runtimes. All register successfully (`loadError=OK`),
+then fail the original generic-fields-nullable assertion because `ldflda` is not
+supported on supplemental instance fields. The fixture and golden remain
+unchanged. This is the next native semantic regression, not a 220-case pass.
+The original resource validator accepted this closed-generic field-address use;
+its address identity matching also needs coverage. Do not rewrite the nullable
+fixture to bypass this normal C# operation.
+
+Separately, the rebuilt native binary shares its BaseId with the earlier
+incorrectly labeled binary. Package `93f436e` now captures actual installed native
+sources and generator outputs in the native manifest, which is already hashed
+into BaseId. Its 13 standalone checks pass against each engine's real old/new
+runtime. Actual new package Base builds and cold replay remain pending. See
+`docs/HybridCLR-DHE-Runtime-Source-Binding.md` for the preserved failures.
+
+## Previous blocker: actual installed runtime differs from the selected source
 
 The `aea9d17` generic-field replay has finished: all nine processes fail during
 registration with `unsupported DHE supplemental instance field` for AddedValue.

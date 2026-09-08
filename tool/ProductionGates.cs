@@ -336,6 +336,33 @@ internal static partial class Program
                 string.Join("; ", binding.Errors));
     }
 
+    private static void ValidateFinalRuntimeSourceIdentity(string nativeManifestPath, string project)
+    {
+        var manifest = ReadJson<JsonElement>(nativeManifestPath);
+        if (!manifest.TryGetProperty("runtimeSourceIdentity", out var identity) ||
+            identity.ValueKind != JsonValueKind.Object ||
+            GetString(identity, "contract") != "dhe-native-source-v1")
+            throw new DheException("New Base native manifest must bind its actual runtime sources.");
+        string platform = OperatingSystem.IsWindows() ? "WindowsEditor" :
+            OperatingSystem.IsMacOS() ? "OSXEditor" : "LinuxEditor";
+        string installed = RuntimeSourceBinding.InstalledRoot(project, platform);
+        var actual = RuntimeSourceBinding.Validate(installed, installed);
+        if (!actual.Passed || !actual.SourceSha256.Equals(GetString(identity, "sourceSha256"),
+                StringComparison.OrdinalIgnoreCase) || actual.SourceFileCount != GetInt(identity, "sourceFileCount"))
+            throw new DheException("Final Base native manifest runtime source identity does not match the installed sources.");
+        if (!identity.TryGetProperty("generatedFiles", out var generated) ||
+            generated.ValueKind != JsonValueKind.Array || generated.GetArrayLength() != actual.GeneratedFileHashes.Count)
+            throw new DheException("Final Base native manifest generated runtime sources are incomplete.");
+        var names = new HashSet<string>(StringComparer.Ordinal);
+        foreach (var file in generated.EnumerateArray())
+        {
+            string name = GetString(file, "path") ?? "";
+            if (!names.Add(name) || !actual.GeneratedFileHashes.TryGetValue(name, out string? hash) ||
+                !hash.Equals(GetString(file, "sha256"), StringComparison.OrdinalIgnoreCase))
+                throw new DheException("Final Base native manifest generated source differs: " + name);
+        }
+    }
+
     private static bool WriteCleanCheckout(Cli cli, bool release, string project, string toolRoot, string output)
     {
         var errors = new List<string>();

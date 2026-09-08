@@ -24,6 +24,27 @@
       }
     },
     "generatedCppRoot": { "type": "string", "minLength": 1 },
+    "runtimeSourceIdentity": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["contract", "sourceSha256", "sourceFileCount", "generatedFiles"],
+      "properties": {
+        "contract": { "const": "dhe-native-source-v1" },
+        "sourceSha256": { "type": "string", "pattern": "^[0-9a-fA-F]{64}$" },
+        "sourceFileCount": { "type": "integer", "minimum": 3 },
+        "generatedFiles": {
+          "type": "array", "minItems": 3, "maxItems": 3,
+          "items": {
+            "type": "object", "additionalProperties": false,
+            "required": ["path", "sha256"],
+            "properties": {
+              "path": { "enum": ["hybridclr/generated/AssemblyManifest.cpp", "hybridclr/generated/MethodBridge.cpp", "hybridclr/generated/UnityVersion.h"] },
+              "sha256": { "type": "string", "pattern": "^[0-9a-fA-F]{64}$" }
+            }
+          }
+        }
+      }
+    },
     "compilerIdentity": {
       "type": ["object", "null"],
       "additionalProperties": false,

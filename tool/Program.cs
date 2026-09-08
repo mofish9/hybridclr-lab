@@ -2045,6 +2045,7 @@ internal static partial class Program
         ValidateNativeFinalizeEvidence(Path.Combine(output, "adapter", "native-finalize.json"),
             Path.Combine(output, "adapter", "build-final-player.json"), target, project,
             nativePath);
+        ValidateFinalRuntimeSourceIdentity(nativePath, project);
         RequireFile(playerPath, "DHE Player result");
         var identityPath = Path.Combine(output, "build-identity.json");
         ValidateBaseAotMetadataArchive(identityPath, baseAotMetadataArchive.SetId);

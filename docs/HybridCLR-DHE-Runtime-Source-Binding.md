@@ -78,3 +78,34 @@ references. Its output is `replay-generic-fields-bound-current`. This diagnostic
 still cannot qualify distinct native Base generations until the package binds
 actual native sources into its manifest. No old resources, Player binaries or
 build identities are modified.
+
+The `303d755` bound-current replay then executes all nine real processes. Every
+registration returns OK, but every run fails `generic-fields-nullable` at `ldflda`
+on a supplemental field. The exact report SHA-256 is
+`878B827EFDA8BA6E2FA24F49B094E8B790C4A0C86136CCD88062807C2D53A896`.
+This is a field-address regression reached by the original current DLL, not a
+successful generic-field or complete-suite gate. The assertions must not be
+rewritten to bypass the unsupported C# operation.
+
+## Native identity implementation
+
+Package `93f436e` captures the actual installed source file set and SHA-256 values
+in `DheNativeSourceIdentity`. Its independent source digest agrees with the C#
+host binding checker. The three generated runtime files have separate digest
+entries, so changes there also change the native manifest. No local absolute path
+or Installer receipt contributes to the digest. The existing native-manifest hash
+already contributes to BaseId; its wire algorithm and MV schema do not change.
+
+The package checks for drift after Bee finalization. The host independently
+checks the final native manifest against the installed sources for every new
+workflow, including Exploratory mode. Archived native manifests remain readable,
+but a newly built Base cannot omit this field. This is identity enforcement, not
+a claim that arbitrary runtime source advertises trustworthy capabilities.
+
+Thirteen standalone tests pass against each engine's real archived old and
+installed new runtime: `native-source-identity-tests-u21-finalize`,
+`native-source-identity-tests-u22`, and `native-source-identity-tests-tuanjie`.
+They check native/source/manifest changes, deterministic capture, independent
+hashes, generated-source changes, ignored receipts, missing output and mid-build
+drift. The next actual Base gate must prove package compilation in each Editor,
+new embedded Base identity, and final source identity validation.
