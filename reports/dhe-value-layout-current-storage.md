@@ -1,20 +1,20 @@
 # Current storage and execution metadata: Unity 2022 research checkpoint
 
 本轮仍是研究候选，尚未形成可交付的结构体热更能力。当前只推进 Unity 2022，
-其真实 headers compile/CTest 和同一身份的 Windows Player value-layout probe
-已通过；没有性能、内存或 ARM64 结论。团结 2022 尚未按本轮逻辑重新组装或验证。
+其真实 headers compile/CTest 已通过；新布局 Base 的 p11 Player 通过，但历史旧布局
+Base 消费同一 Current 资源的 p27 Player 仍失败（Array.Copy/Clone 与反射字段 owner）。
+没有性能、内存或 ARM64 结论。团结 2022 尚未按本轮逻辑重新组装或验证。
 公共资源加载流程仍未传入 Current storage plan。
 
 ## 精确身份
 
 | 组件 | commit |
 |---|---|
-| HybridCLR | acd8ee541db74c1d67b141047644bb5686925d6e |
-| native 测试和锁 | 3c7f385 |
-| probe plan method-body selection | 59f8cc4 |
-| Unity 2022 IL2CPP，复用 | 3482c81998b5e382b59a3d6f4e5fec2d0988d22b |
-| 团结 2022 IL2CPP，复用 | df8d0123d9f5a9fce79283fe5261dba21e802aa0 |
-| package，复用 | bc319e5e376d97ed89fdd0f127d4256fa466f1ef |
+| HybridCLR | 3c3510a7f89c8dca3a503dd903e4cbbeda6a3237 |
+| lab（p27 lock） | 76d33fd |
+| Unity 2022 IL2CPP | e6e602849529e8f4eb0790b0d8a3e4f5cc32ad6f |
+| 团结 2022 IL2CPP（尚未移植） | df8d0123d9f5a9fce79283fe5261dba21e802aa0 |
+| package | bc319e5e376d97ed89fdd0f127d4256fa466f1ef |
 
 HybridCLR canonical source SHA-256：
 39E75AD6C8419DB518DB04472CD191B07E2E8A184998E0092847344830C7D2EF。
@@ -43,8 +43,8 @@ HybridCLR canonical source SHA-256：
 
 ## 验证与证据限制
 
-Unity 2022 native gate：
-`native-current-storage-p10/DHE-Unity2022/native-gate.json`，
+Unity 2022 native gate（p26）：
+`native-current-storage-p26/DHE-Unity2022/native-gate.json`，
 `passed=true`、`mergeReady=true`、`surrogateExternalHeadersUsed=false`、
 `FGS tests=true`。该 gate 使用 HybridCLR `acd8ee5` 和 Unity 2022 il2cpp_plus
 `3482c81`。
@@ -64,6 +64,12 @@ p11 Base 加载后仍通过 14/14、Consumer 和 GC，证明 AOT Base 上的 DLL
 
 p8/p9/p10 的失败结果仍保留作修复链证据；它们不能替代 p11 的成功结果，也不能
 推导 Android/iOS 或团结 2022 生产结论。
+
+最新 Unity 2022 历史 Base 复测（p27）为
+`current-storage-p27-update-u22-result.json`：loadCode=0，11/14 语义项通过；
+`array-copy-and-clone` 仍为 InvalidCastException，反射字段现在可解析但
+RuntimeFieldInfo.GetValue/SetValue 报“field ... is not a field on the target object”，
+Consumer FullCopyMatches 同样失败。因此多 Base 证据仍为条件失败，不能宣称完整能力。
 
 以下路径相对 C:/hybridclr_optimize/artifacts/dhe-evolution-20260908。
 
