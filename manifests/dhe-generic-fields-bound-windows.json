@@ -1,0 +1,113 @@
+{
+  "labRoot": "..",
+  "toolAssembly": "../../../artifacts/dhe-evolution-20260908/host-runtime-binding/HybridCLR.DheTool.dll",
+  "outputRoot": "../../../artifacts/dhe-evolution-20260908/replay-generic-fields-bound",
+  "updates": [
+    "../../../artifacts/dhe-evolution-20260908/resource-generic-fields-first",
+    "../../../artifacts/dhe-evolution-20260908/resource-generic-fields-latest"
+  ],
+  "referenceResults": [
+    "../../../artifacts/dhe-evolution-20260908/reference-generic-fields-first.json",
+    "../../../artifacts/dhe-evolution-20260908/reference-generic-fields-latest.json"
+  ],
+  "evolutionCheckRequirements": [
+    [
+      "method-signature",
+      "field-type",
+      "generic-field-type",
+      "inheritance",
+      "attribute-type-argument",
+      "array-declarations",
+      "ref-out-signature",
+      "interface-and-constrained-call",
+      "generic-constraint",
+      "generic-inheritance",
+      "repeated-structural-evolution",
+      "named-attribute-field",
+      "named-attribute-property",
+      "attribute-constructor-overload",
+      "generic-fields-concurrent-first-touch",
+      "generic-fields-primitive",
+      "generic-fields-reference",
+      "generic-fields-struct",
+      "generic-fields-nullable",
+      "generic-fields-array-and-nested-type",
+      "generic-fields-static-isolation",
+      "generic-fields-open-and-cached-reflection",
+      "generic-fields-gc-retention"
+    ],
+    [
+      "method-signature",
+      "field-type",
+      "generic-field-type",
+      "inheritance",
+      "attribute-type-argument",
+      "array-declarations",
+      "ref-out-signature",
+      "interface-and-constrained-call",
+      "generic-constraint",
+      "generic-inheritance",
+      "repeated-structural-evolution",
+      "named-attribute-field",
+      "named-attribute-property",
+      "attribute-constructor-overload",
+      "generic-fields-concurrent-first-touch",
+      "generic-fields-primitive",
+      "generic-fields-reference",
+      "generic-fields-struct",
+      "generic-fields-nullable",
+      "generic-fields-array-and-nested-type",
+      "generic-fields-static-isolation",
+      "generic-fields-open-and-cached-reflection",
+      "generic-fields-gc-retention"
+    ]
+  ],
+  "requireStructuralBaseGenerations": false,
+  "layoutDiagnostics": "after",
+  "timeoutSeconds": 300,
+  "bases": [
+    {
+      "label": "u21-consecutive",
+      "playerRoot": "../../../artifacts/dhe-evolution-20260908/base-generic-fields-bound-u21/player",
+      "buildIdentity": "../../../artifacts/dhe-evolution-20260908/base-generic-fields-bound-u21/build-identity.json"
+    },
+    {
+      "label": "u21-skipped",
+      "playerRoot": "../../../artifacts/dhe-evolution-20260908/base-generic-fields-bound-u21/player",
+      "buildIdentity": "../../../artifacts/dhe-evolution-20260908/base-generic-fields-bound-u21/build-identity.json",
+      "skipFirstUpdate": true
+    },
+    {
+      "label": "u22-consecutive",
+      "playerRoot": "../../../artifacts/dhe-evolution-20260908/base-generic-fields-bound-u22/player",
+      "buildIdentity": "../../../artifacts/dhe-evolution-20260908/base-generic-fields-bound-u22/build-identity.json"
+    },
+    {
+      "label": "u22-skipped",
+      "playerRoot": "../../../artifacts/dhe-evolution-20260908/base-generic-fields-bound-u22/player",
+      "buildIdentity": "../../../artifacts/dhe-evolution-20260908/base-generic-fields-bound-u22/build-identity.json",
+      "skipFirstUpdate": true
+    },
+    {
+      "label": "tuanjie-consecutive",
+      "playerRoot": "../../../artifacts/dhe-evolution-20260908/base-generic-fields-bound-tuanjie/player",
+      "buildIdentity": "../../../artifacts/dhe-evolution-20260908/base-generic-fields-bound-tuanjie/build-identity.json"
+    },
+    {
+      "label": "tuanjie-skipped",
+      "playerRoot": "../../../artifacts/dhe-evolution-20260908/base-generic-fields-bound-tuanjie/player",
+      "buildIdentity": "../../../artifacts/dhe-evolution-20260908/base-generic-fields-bound-tuanjie/build-identity.json",
+      "skipFirstUpdate": true
+    }
+  ],
+  "differentialManifest": "test-manifest.json",
+  "differentialGolden": "test-golden.json",
+  "differentialReferences": [
+    "../../../artifacts/dhe-evolution-20260908/differential-reference-generic-fields-first.bin",
+    "../../../artifacts/dhe-evolution-20260908/differential-reference-generic-fields-latest.bin"
+  ],
+  "requireInterpretedCaseEntries": [
+    false,
+    true
+  ]
+}

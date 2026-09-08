@@ -47,3 +47,27 @@ archives must not be rewritten or relabeled.
 This check does not by itself audit generated bridge semantics or prove all
 historical Base identities. Direct package APIs and custom build callbacks still
 need their own complete native-source identity binding before final handoff.
+
+## Source-bound build and Base identity collision
+
+The package Installer installs the selected v12 tree on all three projects.
+Their old installed trees are preserved as `stale-installed-runtime-<engine>.zip`.
+Clean lab `8313cc6` builds `base-generic-fields-bound-<engine>` on each engine;
+all three no-op Players and schema gates pass, with actual source binding checks
+before and after every Unity stage. These are exploratory diagnostics, not
+completed generic-field qualification.
+
+The Unity 2021 rebuilt Base has the same BaseId and native-manifest hash as its
+previous incorrectly labeled Base, despite different GameAssembly.dll bytes.
+The BaseId is `98bfcbf6394faa2c4e4b258bdcbbeac889da80ad02cdb3ae58245814ea362c52`.
+Old DLL SHA-256 is `86B4D85F222A24A9930620A1B1DA67F35118DB93A4E71310A271952F590F23C7`;
+new DLL SHA-256 is `4994D90313CE3D6C07309ADC480F52FD67C545DE16742C427E7F8BBAA0665870`.
+The native manifest lacks the installed runtime source digest. Its own hash is
+already included in BaseId, so the package must bind the actual runtime sources
+there. Merely fixing host preflight cannot distinguish these existing archives.
+
+`manifests/dhe-generic-fields-bound-windows.json` replays the exact original
+generic-field resources on the newly compiled binaries, solely to diagnose the
+v12 implementation. This reuse is possible because of the reproduced BaseId
+collision; it is not a valid distinct-Base lifecycle release or qualification.
+No old resources, Player binaries or build identities are modified.
