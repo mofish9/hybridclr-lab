@@ -11,15 +11,15 @@
     "hybridclr_unity": {
       "upstream": "https://github.com/focus-creative-games/hybridclr_unity.git",
       "fork": "https://github.com/mofish9/hybridclr_unity.git",
-      "tag": "fb69cb671278fdc1b400814e62b224e6c1652953",
-      "commit": "fb69cb671278fdc1b400814e62b224e6c1652953",
+      "tag": "b30b4727de987e8fa8cf86f517668abb609109b9",
+      "commit": "b30b4727de987e8fa8cf86f517668abb609109b9",
       "localBranch": "optimize/v8.13.0"
     },
     "hybridclr": {
       "upstream": "https://github.com/focus-creative-games/hybridclr.git",
       "fork": "https://github.com/mofish9/hybridclr.git",
-      "tag": "323dc3ad6f0f3eb36a448912a1a6f5f36bee21bb",
-      "commit": "323dc3ad6f0f3eb36a448912a1a6f5f36bee21bb",
+      "tag": "ece84190fe2aa08f424e2726955e940ba110a22f",
+      "commit": "ece84190fe2aa08f424e2726955e940ba110a22f",
       "localBranch": "optimize/v8.13.0"
     },
     "il2cpp_plus": {

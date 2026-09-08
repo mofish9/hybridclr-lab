@@ -76,3 +76,37 @@ dotnet run --project tool/fixtures/generic-interface/GenericInterfaceTests.cspro
 The builder records symbols, source commit/tree/status and assembly hashes, and
 preserves the metadata-stress seed. Native, package and installed-source locks
 remain those of v22; no runtime change is justified by this offline gate alone.
+
+## Reproduced native no-op failure
+
+The clean 2217e78 workflow builds the v22 U21 Player successfully, then its
+unchanged Base/Current startup fails seven existing cross-interface groups.
+Registration is OK, changedMethodCount=0, and noOpAotBehaviorValidated=true.
+The failure is DHE interface implementation has no callable entry for the
+already-native generic interface method EchoAdded<T>. The failed BaseId is
+d04df52b4b9bdc70ca043af70f85b05a9db8c6bb5f023ea143378f3966ccd3d0.
+Its dhe-player-result.json SHA-256 is
+277B3DEE4839ACDF7DD8599D94DFFE148730205C417964D68AACD313BFA921C4.
+Preserve base-existing-generic-interface-u21 and both frozen raw input sets.
+
+IL2CPP's generic virtual/interface callers first request the target method
+definition from the vtable, then apply the caller's method arguments through
+GetGenericVirtualMethod. An open native generic method definition legitimately
+has no callable pointer. The DHE resolver currently requires a pointer before
+returning this definition, so it fails before ordinary generic inflation runs.
+The same requirement exists in the inherited virtual-slot resolver.
+
+For an is_generic target, return a method-only dispatch record and defer callable
+selection to existing IL2CPP generic inflation. Continue requiring a callable
+entry for every nongeneric target; retain missing/abstract method rejection.
+Audit every consumer: codegen generic calls, Object/Class virtual resolution,
+ldvirtftn and interface maps read the method before inflating it. Do not insert a
+callable stub for an open definition or force unchanged methods into IL.
+
+Cache identity/lifetime and metadata lock ownership stay unchanged; completed
+method-only records are still inserted last. No object layout or new publication
+field is needed. Require open-generic-dispatch-definitions-v1 when Current retains
+an already-native generic virtual/interface method. Previously proven Bases that
+do not contain those methods remain eligible. New package/source identities must
+be bound before three-engine compilation and rebuilding this exact Base fixture.
+Actual no-op plus resource replay must verify the repair; it is not yet qualified.

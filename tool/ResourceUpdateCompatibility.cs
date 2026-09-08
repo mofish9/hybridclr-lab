@@ -4,7 +4,7 @@ internal sealed class ResourceUpdateCompatibility
 {
 	public const string Policy = "dhe-proven-safe-subset-v1";
 	public const string RuntimeProtocol = "dhe-runtime-protocol-v1";
-    public const string CurrentNativeRuntimeContract = "dhe-runtime-v22";
+    public const string CurrentNativeRuntimeContract = "dhe-runtime-v23";
     public static readonly string[] KnownRuntimeCapabilities =
     {
 		"aot-guard-v1",
@@ -23,6 +23,7 @@ internal sealed class ResourceUpdateCompatibility
         "inherited-interface-dispatch-v1",
         "base-virtual-slots-on-current-descendants-v1",
         "closed-current-parent-vtables-v1",
+        "open-generic-dispatch-definitions-v1",
 		"supplemental-existing-type-methods-v1",
 		"removed-existing-type-methods-v1",
 		"existing-type-method-signature-replacement-v1",
@@ -229,6 +230,9 @@ internal sealed class ResourceUpdateCompatibility
             requiredCapabilities.Add("existing-interface-method-slots-v1");
         if (RequiresClosedCurrentParentVtables(addedTypes, baseline, current, currentAssemblySet))
             requiredCapabilities.Add("closed-current-parent-vtables-v1");
+        if (current.Methods.Any(method => method.IsVirtual && method.GenericParameterCount != 0 &&
+                baselineMethods.ContainsKey(method.StableId)))
+            requiredCapabilities.Add("open-generic-dispatch-definitions-v1");
         // A Current MemberRef declaration can name an interface method absent
         // from the Base definition table. Older slot-only runtimes cannot
         // resolve that declaration during atomic multi-image registration.

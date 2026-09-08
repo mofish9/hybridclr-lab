@@ -100,7 +100,7 @@ foreach (string name in new[] { "Integer", "Reference", "Value" })
 }
 foreach (string name in names) checks[name + "-compatible"] = analyses[name].Compatible;
 foreach (string capability in new[] { "existing-interface-method-slots-v1", "inherited-interface-dispatch-v1",
-    "base-virtual-slots-on-current-descendants-v1" })
+    "base-virtual-slots-on-current-descendants-v1", "open-generic-dispatch-definitions-v1" })
 {
     checks[capability + "-required"] = analyses[owner].RequiredRuntimeCapabilities.Contains(capability);
     checks[capability + "-missing-Base-rejected"] = !ResourceUpdateCompatibility.CanExecuteUpdate(
@@ -108,6 +108,13 @@ foreach (string capability in new[] { "existing-interface-method-slots-v1", "inh
         ResourceUpdateCompatibility.KnownRuntimeCapabilities.Where(value => value != capability),
         analyses[owner].RequiredRuntimeCapabilities);
 }
+const string openGenericCapability = "open-generic-dispatch-definitions-v1";
+var noOp = ResourceUpdateCompatibility.Analyze(baseline[owner], baseline[owner], currentAssemblySet: baseline.Values);
+checks["native-generic-no-op-requires-definition-dispatch"] = noOp.RequiredRuntimeCapabilities.Contains(openGenericCapability);
+checks["native-generic-no-op-old-Base-rejected"] = !ResourceUpdateCompatibility.CanExecuteUpdate(
+    ResourceUpdateCompatibility.RuntimeProtocol, "dhe-runtime-v22",
+    ResourceUpdateCompatibility.KnownRuntimeCapabilities.Where(value => value != openGenericCapability),
+    noOp.RequiredRuntimeCapabilities);
 string routingPath = Path.Combine(analysisOutput, "caller-routing.txt");
 var expectedRouting = new Dictionary<string, bool> { ["Integer"] = false, ["Reference"] = false, ["Value"] = false };
 bool RoutingRejects()
