@@ -1,5 +1,23 @@
 # DHE existing interface evolution
 
+## Completed six-Base checkpoint
+
+Clean `4eef487` passes the original/evolved v16 matrix on Unity 2021, Unity 2022
+and Tuanjie: 18 cold processes, 42 evolution groups and 220 differential cases
+per process, zero differences. All 114 protected files independently rehash
+unchanged and all 24 Base MV snapshots reproduce byte-for-byte. The first
+resource retains the case methods in AOT; latest/skipped runs have 220 interpreted
+entry receipts each. Evolved Base InterfaceCall, DelegateCall and GenericConstrained
+fingerprints remain unchanged; 23 fixture/compatibility checks pass.
+
+Original-generation no-op Players also pass, but the initial enclosing workflows
+fail the report schema because their structural entry does not exist. The schema
+now accepts only the complete empty/unexecuted entry when both structural
+expectations are false. Twenty-six positive/negative checks and separate schema
+gates pass. No Base or failed workflow report is rewritten. Full evidence and
+remaining capability work are in `reports/dhe-interface-generations-windows.md`.
+The sections below preserve the investigation history, not current failures.
+
 ## Completed Unity 2021 checkpoint
 
 Clean `c68b8c9` passes all three cold processes on the new evolved v16 Base.

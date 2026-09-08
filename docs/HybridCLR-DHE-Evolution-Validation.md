@@ -1,40 +1,27 @@
 # DHE evolution implementation and validation
 
-## Current capability work: existing interface slots
+## Latest completed checkpoint: interface slots across six Bases
 
-Clean `c68b8c9` passes the v16 Unity 2021 evolved Base replay: three cold processes,
-42 evolution groups and 220 cases each, zero differences. First case entries stay
-AOT and latest/skipped entries are interpreted. All three native gates and evolved
-Base/no-op workflows pass. Same-runtime original-generation Bases and the shared
-six-Base resources are the next gate; this single-Base result is not a multi-Base
-or unrestricted-interface qualification. See the interface document for hashes.
+Clean `4eef487` passes 18 cold Windows processes with 18 unique PIDs across
+original/evolved v16 Bases on all three engines. Every process executes 42
+evolution groups and 220 differential cases with zero differences. First case
+entries stay AOT; latest and skipped-latest entries are interpreted. All 114
+protected files independently rehash unchanged, and all 24 Base MV snapshots
+reproduce exactly. See `reports/dhe-interface-generations-windows.md`.
 
-The v15 replay (`d086ef2`) now registers successfully in all three processes and
-passes 38/42 groups, including reflection interface invocation and maps. Four
-IL-call groups still fail because method-token caching retains the hidden Current
-interface identity. Candidate `8cbc13a` normalizes cached method identity using
-the existing published logical map. New v16 execution is pending; the full gate
-remains failed, and both earlier failures are preserved.
+The two reproduced native failures were repaired without changing the interface
+payload: MethodImpl declaration owners and cached IL method identities now use
+the canonical logical view. All three real-header compile/CTest gates pass.
+Original no-op Players passed but their workflow schema rejected an absent
+structural entry; the repaired schema passes 26 checks and all three separate
+revalidation gates. Original failed workflow reports remain unchanged.
 
-The first v14 changed-interface replay (`2c2f6bd`) fails all three Unity 2021
-processes during atomic registration: the explicit Added implementation cannot
-match the interface declaration. Candidate `fd3b112` normalizes MethodImpl
-declaration owners to Base identity; v15 revalidation is pending. The original
-failed resources, Base and replay are preserved. No interface Player pass exists.
-
-Clean fixture `16107af` adds an interface method before the existing method,
-preserving old method bodies and all object/value fields. The Unity-prepared
-DLL passes 42 CLR groups and twelve declaration/slot identity checks. The v14
-candidate now implements logical interface slots and passes all three real-header
-compile/CTest gates. Its new Unity 2021 Base/no-op workflow also passes. All six
-old frozen Bases correctly reject the missing native capability; they are not
-relabeled. The next gate uses `manifests/dhe-interface-slots-u21.json` to execute
-both resource updates on the new Base, with 42 groups and the cold 220-case suite.
-Actual changed-interface Player execution and multi-generation qualification
-remain unproven.
-See `docs/HybridCLR-DHE-Interface-Evolution.md` for exact inputs and the dispatch,
-reflection-map and publication boundaries. This does not supersede the separate
-passing field-address checkpoint below.
+This is a Windows correctness checkpoint, not full DHE or performance release.
+Next interface coverage includes generic/inherited interfaces, inherited
+implementations and cross-assembly dispatch. General class virtual/layout
+evolution, Unity-facing behavior, sidecar expansion, external AOT availability,
+GC/concurrency/ABI stress and performance/memory remain required. Earlier
+checkpoints and failures below are historical; they are not current blockers.
 
 ## Latest completed checkpoint: stable field addresses and mixed Bases
 
