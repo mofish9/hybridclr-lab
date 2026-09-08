@@ -1,5 +1,21 @@
 # DHE evolution implementation and validation
 
+## Active checkpoint: six-Base cross-interface replay is failed
+
+Clean d19b649 runs both frozen resource updates against original/evolved Bases
+on all three Windows engines. The three evolved Bases pass nine runs with all
+52 groups and 220 differential cases, zero differences. The three original
+Bases fail nine runs at generic-inheritance on a newly interpreted descendant.
+All six construction/no-op workflows pass, as do the repaired real-header native
+gates. This is not a completed six-Base correctness gate or a release.
+
+The review retained the previous runtime implementation and repaired shared log
+reading, codegen header dependencies and Demo compiler-scope wiring. All 114
+protected files independently rehash unchanged. Full identities, failed evidence,
+the remaining failure-PID recording gap and next native investigation are in
+`reports/dhe-cross-interface-generations-current-windows.md`. All entries below
+are historical checkpoints and must not be read as the active status.
+
 ## Latest focused checkpoint: cross-assembly interfaces on Unity 2021
 
 Clean `3270829` passes three cold Windows processes on one evolved v19 Base:
