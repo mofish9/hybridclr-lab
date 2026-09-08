@@ -2,6 +2,13 @@
 
 ## Current capability work: existing interface slots
 
+Clean `c68b8c9` passes the v16 Unity 2021 evolved Base replay: three cold processes,
+42 evolution groups and 220 cases each, zero differences. First case entries stay
+AOT and latest/skipped entries are interpreted. All three native gates and evolved
+Base/no-op workflows pass. Same-runtime original-generation Bases and the shared
+six-Base resources are the next gate; this single-Base result is not a multi-Base
+or unrestricted-interface qualification. See the interface document for hashes.
+
 The v15 replay (`d086ef2`) now registers successfully in all three processes and
 passes 38/42 groups, including reflection interface invocation and maps. Four
 IL-call groups still fail because method-token caching retains the hidden Current

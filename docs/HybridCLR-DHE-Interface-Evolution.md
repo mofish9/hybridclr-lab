@@ -1,5 +1,22 @@
 # DHE existing interface evolution
 
+## Completed Unity 2021 checkpoint
+
+Clean `c68b8c9` passes all three cold processes on the new evolved v16 Base.
+Each executes all 42 evolution groups and 220 differential cases, with zero
+differences. The first case payload stays AOT (zero entry receipts); both latest
+runs record 220 interpreted entries. All 19 distinct protected files independently
+rehash unchanged. Report `replay-interface-token-u21-cold/report.json` has SHA-256
+`791C0260FC910432EA6D0469414F4B2928993E939790147BABF3956F177B0CD0`.
+
+This closes both preserved Unity 2021 failures for the unchanged interface payloads.
+All three native gates under `native-interface-token` pass with real headers.
+The evolved Unity 2022/Tuanjie Base/no-op workflows also pass; their resource
+execution and the same-runtime original/evolved six-Base replay are next. The
+new config is `manifests/dhe-interface-generations-windows.json`. Existing v11/v13
+Bases are not relabeled; original-generation code is compiled into fresh v16
+Bases. General interface/generic/layout and Unity-facing behavior remain open.
+
 ## Token dispatch repair
 
 Clean replay `d086ef2` on the fresh v15 Base closes the registration failure.

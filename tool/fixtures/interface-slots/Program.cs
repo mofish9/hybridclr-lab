@@ -26,6 +26,12 @@ var checks = new Dictionary<string, bool>
 };
 var before = MetaVersionSnapshot.Create(paths[1]);
 var after = MetaVersionSnapshot.Create(paths[2]);
+foreach (string name in new[] { "InterfaceCall", "DelegateCall", "GenericConstrained" })
+{
+    MetaVersionMethod caller = before.Methods.Single(method => method.DeclaringType == prefix + "DheCapabilityCases" &&
+        method.Name == name);
+    checks["evolved-" + name + "-unchanged"] = after.Methods.Single(method => method.StableId == caller.StableId).Version == caller.Version;
+}
 foreach (string name in new[] { "IIntOperation", "IntOperationStruct", "DheEvolutionOperation" })
 {
     TypeDef baseType = Type(evolved, name);
