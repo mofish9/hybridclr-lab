@@ -54,6 +54,13 @@ release such a resource and must not be reported as a passing Player.
    Preserve one public logical identity without confusing native and Current
    physical representations. Publish registration only after the complete set
    is prepared; audit release/acquire and rollback of partial initialization.
+   First separate Base method identity from Current execution metadata in the
+   registration transaction. Explicit internal Current bindings must force
+   interpretation even if the MV method version is unchanged, preserve native
+   Base pointers, reject invalid bindings before preparation, and roll back
+   partial Current preparation. Block entry through an incompatible Base ABI;
+   only a matching static primitive/reference frame can use that native guard.
+   This internal mechanism alone does not enable value-layout resource loading.
 4. Freeze native/package/engine/tool identities, run real-header compile/CTest,
    managed differential and two-engine Windows Base/no-op/resource tests.
    Extend the multi-Base matrix with an evolved value-layout Base consuming the

@@ -846,6 +846,131 @@ namespace
 		secondChanged.isInterpterImpl = false;
 		std::free(secondKlass);
 
+
+#if defined(HYBRIDCLR_DHE_HAS_CURRENT_EXECUTION)
+        // Layout-dependent methods can keep the same MV fingerprint while
+        // requiring a distinct Current signature and interpreter frame.
+        MethodInfo originalChanged = changed;
+        MethodInfo originalUnchanged = unchanged;
+        Il2CppImage executionImage{};
+        executionImage.assembly = &assembly;
+        Il2CppClass* executionClass = static_cast<Il2CppClass*>(std::calloc(1, sizeof(Il2CppClass)));
+        CHECK(executionClass != nullptr);
+        if (!executionClass) { std::free(klass); return; }
+        executionClass->image = &executionImage;
+        Il2CppType scalarType{};
+        scalarType.type = IL2CPP_TYPE_I4;
+        changed.flags = METHOD_ATTRIBUTE_STATIC;
+        changed.return_type = &scalarType;
+        MethodInfo physicalCurrent = changed;
+        physicalCurrent.klass = executionClass;
+        physicalCurrent.token = 0x06000009;
+        physicalCurrent.isInterpterImpl = false;
+        physicalCurrent.initInterpCallMethodPointer = 1;
+        physicalCurrent.methodPointerCallByInterp = reinterpret_cast<Il2CppMethodPointer>(InterpreterProbeMethod);
+        auto executionBase = baseMetaVersion;
+        auto executionCurrent = executionBase;
+        executionCurrent.methods[0].token = physicalCurrent.token;
+        hybridclr::dhe::MetaVersionRegistration executionRegistration(
+            &assembly, &executionBase, &executionCurrent);
+        executionRegistration.currentExecutions.push_back({ changed.token, &physicalCurrent });
+        CHECK(executionBase.methods[0].version == executionCurrent.methods[0].version);
+        CHECK(hybridclr::dhe::PrepareAndRegisterMetaVersions({ executionRegistration }));
+        CHECK(hybridclr::dhe::IsChangedMethod(&changed));
+        CHECK(!changed.isInterpterImpl);
+        CHECK(physicalCurrent.isInterpterImpl);
+        CHECK(hybridclr::dhe::ResolveInterpreterMethod(&changed) == &physicalCurrent);
+        CHECK(hybridclr::dhe::ResolveInterpreterMethod(&physicalCurrent) == &physicalCurrent);
+        CHECK(hybridclr::dhe::CanEnterWithBaseAbi(&changed));
+        CHECK(hybridclr::dhe::ShouldDispatchToInterpreter(&changed));
+        CHECK(!hybridclr::dhe::IsChangedMethod(&unchanged));
+        CHECK(hybridclr::dhe::ResolveInterpreterMethod(&unchanged) == &unchanged);
+        CHECK(changed.methodPointerCallByInterp == originalChanged.methodPointerCallByInterp);
+        hybridclr::dhe::ResetForTests();
+        physicalCurrent.isInterpterImpl = false;
+
+        auto invalidExecution = executionRegistration;
+        invalidExecution.currentExecutions.push_back(invalidExecution.currentExecutions[0]);
+        CHECK(!hybridclr::dhe::PrepareAndRegisterMetaVersions({ invalidExecution }));
+        invalidExecution = executionRegistration;
+        invalidExecution.currentExecutions[0].baseMethodToken = 0x06000099;
+        CHECK(!hybridclr::dhe::PrepareAndRegisterMetaVersions({ invalidExecution }));
+        invalidExecution = executionRegistration;
+        invalidExecution.currentExecutions[0].currentMethod = nullptr;
+        CHECK(!hybridclr::dhe::PrepareAndRegisterMetaVersions({ invalidExecution }));
+        uint32_t currentToken = physicalCurrent.token;
+        physicalCurrent.token = 0x06000055;
+        CHECK(!hybridclr::dhe::PrepareAndRegisterMetaVersions({ executionRegistration }));
+        physicalCurrent.token = currentToken;
+        physicalCurrent.klass = klass; // A Base alias is not a Current representation.
+        CHECK(!hybridclr::dhe::PrepareAndRegisterMetaVersions({ executionRegistration }));
+        physicalCurrent.klass = executionClass;
+        Il2CppAssembly wrongExecutionAssembly{};
+        executionImage.assembly = &wrongExecutionAssembly;
+        CHECK(!hybridclr::dhe::PrepareAndRegisterMetaVersions({ executionRegistration }));
+        executionImage.assembly = &assembly;
+        CHECK(!hybridclr::dhe::IsDheAssembly(&assembly));
+        CHECK(!physicalCurrent.isInterpterImpl && !changed.isInterpterImpl);
+
+        // Never prepare Base's original typed ABI using a differently laid-out
+        // Current return value, or an instance receiver of a different class.
+        Il2CppType valueType{};
+        valueType.type = IL2CPP_TYPE_VALUETYPE;
+        changed.return_type = &valueType;
+        physicalCurrent.return_type = &valueType;
+        CHECK(hybridclr::dhe::PrepareAndRegisterMetaVersions({ executionRegistration }));
+        CHECK(!hybridclr::dhe::CanEnterWithBaseAbi(&changed));
+        CHECK(hybridclr::dhe::CanEnterWithBaseAbi(&physicalCurrent));
+        CHECK(hybridclr::dhe::ResolveInterpreterMethod(&changed) == &physicalCurrent);
+        hybridclr::dhe::ResetForTests();
+        physicalCurrent.isInterpterImpl = false;
+        changed.flags = 0;
+        physicalCurrent.flags = 0;
+        changed.return_type = &scalarType;
+        physicalCurrent.return_type = &scalarType;
+        CHECK(hybridclr::dhe::PrepareAndRegisterMetaVersions({ executionRegistration }));
+        CHECK(!hybridclr::dhe::CanEnterWithBaseAbi(&changed));
+        hybridclr::dhe::ResetForTests();
+        physicalCurrent.isInterpterImpl = false;
+
+        // Failure while preparing a later Current entry restores earlier
+        // Current state, leaves Base state intact, and publishes nothing.
+        auto extraBaseMethod = executionBase.methods[0];
+        extraBaseMethod.stableId.fill(21);
+        extraBaseMethod.token = unchanged.token;
+        executionBase.methods.push_back(extraBaseMethod);
+        auto extraCurrentMethod = extraBaseMethod;
+        extraCurrentMethod.token = 0x0600000a;
+        executionCurrent.methods.push_back(extraCurrentMethod);
+        MethodInfo secondPhysicalCurrent = physicalCurrent;
+        secondPhysicalCurrent.token = extraCurrentMethod.token;
+        secondPhysicalCurrent.initInterpCallMethodPointer = 1;
+        secondPhysicalCurrent.methodPointerCallByInterp = nullptr;
+        executionRegistration.currentExecutions.push_back({ unchanged.token, &secondPhysicalCurrent });
+        CHECK(!hybridclr::dhe::PrepareAndRegisterMetaVersions({ executionRegistration }));
+        CHECK(!hybridclr::dhe::IsDheAssembly(&assembly));
+        CHECK(!physicalCurrent.isInterpterImpl && !secondPhysicalCurrent.isInterpterImpl);
+        CHECK(!changed.isInterpterImpl && !unchanged.isInterpterImpl);
+        secondPhysicalCurrent.methodPointerCallByInterp = reinterpret_cast<Il2CppMethodPointer>(InterpreterProbeMethod);
+        CHECK(hybridclr::dhe::PrepareAndRegisterMetaVersions({ executionRegistration }));
+        std::atomic<int> currentReadFailures{ 0 };
+        std::vector<std::thread> currentReaders;
+        for (int reader = 0; reader < 4; ++reader)
+            currentReaders.emplace_back([&]() {
+                for (int sample = 0; sample < 10000; ++sample)
+                    if (hybridclr::dhe::ResolveInterpreterMethod(&changed) != &physicalCurrent ||
+                        hybridclr::dhe::ResolveInterpreterMethod(&unchanged) != &secondPhysicalCurrent ||
+                        !physicalCurrent.isInterpterImpl || !secondPhysicalCurrent.isInterpterImpl)
+                        currentReadFailures.fetch_add(1, std::memory_order_relaxed);
+            });
+        for (auto& reader : currentReaders) reader.join();
+        CHECK(currentReadFailures.load(std::memory_order_relaxed) == 0);
+        hybridclr::dhe::ResetForTests();
+        changed = originalChanged;
+        unchanged = originalUnchanged;
+        std::free(executionClass);
+#endif
+
 		// Tombstones publish removed Base types and methods without requiring
 		// an interpreter body. Old native method entries remain resolvable only so
 		// their universal guards can raise MissingMethodException.
