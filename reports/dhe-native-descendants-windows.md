@@ -132,6 +132,11 @@ Installer 暂时重置的 OptimizeSize 配置已恢复，两个实际 Player 都
 native-descendants-compression-audit.json。期间有并行构建，不能把 C: 空闲差值
 单独归因于压缩。此项本地存储维护不是跨平台工作流依赖。
 
+本轮回放结束后，replay-native-descendants-ten 也启用了透明压缩。
+前后 7,315 个文件、11,465,348,896 个逻辑字节的内容摘要完全一致，报告和 Player
+全部保留。记录在 native-descendants-ten-compression-audit.json；完成时 C: 可用
+空间约 10.15 GiB，之前约 5.03 GiB。没有留下本任务的 Editor、Player 或压缩进程。
+
 ## 下一步与回滚
 
 继续推进已有值类型布局变化、基类替换、更多虚方法 Base 世代、
