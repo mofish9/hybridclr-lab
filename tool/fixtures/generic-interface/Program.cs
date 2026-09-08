@@ -66,8 +66,8 @@ if (args.Length == 5 && args[0] == "build" && args[1] is "base" or "current")
     }, jsonOptions));
     return 0;
 }
-if (args.Length != 4 || args[0] != "analyze")
-    throw new ArgumentException("Use build base|current <lab> <immutable seed> <new output>, or analyze <Base DLLs> <Current DLLs> <new output>.");
+if (args.Length is not (4 or 5) || args[0] != "analyze")
+    throw new ArgumentException("Use build base|current <lab> <immutable seed> <new output>, or analyze <Base DLLs> <Current DLLs> <new output> [older Base DLLs].");
 string baselineRoot = Path.GetFullPath(args[1]), currentRoot = Path.GetFullPath(args[2]), analysisOutput = NewOutput(args[3]);
 var baseline = names.ToDictionary(name => name, name => MetaVersionSnapshot.Create(Path.Combine(baselineRoot, name + ".dll")));
 var current = names.ToDictionary(name => name, name => MetaVersionSnapshot.Create(Path.Combine(currentRoot, name + ".dll")));
@@ -100,7 +100,8 @@ foreach (string name in new[] { "Integer", "Reference", "Value" })
 }
 foreach (string name in names) checks[name + "-compatible"] = analyses[name].Compatible;
 foreach (string capability in new[] { "existing-interface-method-slots-v1", "inherited-interface-dispatch-v1",
-    "base-virtual-slots-on-current-descendants-v1", "open-generic-dispatch-definitions-v1" })
+    "base-virtual-slots-on-current-descendants-v1", "open-generic-dispatch-definitions-v1",
+    "supplemental-closed-generic-methods-v1", "closed-generic-method-definitions-v1" })
 {
     checks[capability + "-required"] = analyses[owner].RequiredRuntimeCapabilities.Contains(capability);
     checks[capability + "-missing-Base-rejected"] = !ResourceUpdateCompatibility.CanExecuteUpdate(
@@ -115,6 +116,20 @@ checks["native-generic-no-op-old-Base-rejected"] = !ResourceUpdateCompatibility.
     ResourceUpdateCompatibility.RuntimeProtocol, "dhe-runtime-v22",
     ResourceUpdateCompatibility.KnownRuntimeCapabilities.Where(value => value != openGenericCapability),
     noOp.RequiredRuntimeCapabilities);
+if (args.Length == 5)
+{
+    var older = MetaVersionSnapshot.Create(Path.Combine(args[4], owner + ".dll"));
+    var analysis = ResourceUpdateCompatibility.Analyze(older, current[owner], currentAssemblySet: current.Values);
+    foreach (string capability in new[] { "closed-interpreter-parent-vtables-v1", "closed-generic-method-definitions-v1" })
+    {
+        checks["older-Base-" + capability + "-required"] = analysis.RequiredRuntimeCapabilities.Contains(capability);
+        checks["older-Base-" + capability + "-missing-rejected"] = !ResourceUpdateCompatibility.CanExecuteUpdate(
+            ResourceUpdateCompatibility.RuntimeProtocol, "dhe-runtime-v23",
+            ResourceUpdateCompatibility.KnownRuntimeCapabilities.Where(value => value != capability), analysis.RequiredRuntimeCapabilities);
+    }
+    checks["new-generic-type-does-not-require-supplemental-method-members"] =
+        !analysis.RequiredRuntimeCapabilities.Contains("supplemental-closed-generic-methods-v1");
+}
 string routingPath = Path.Combine(analysisOutput, "caller-routing.txt");
 var expectedRouting = new Dictionary<string, bool> { ["Integer"] = false, ["Reference"] = false, ["Value"] = false };
 bool RoutingRejects()
@@ -141,7 +156,7 @@ bool passed = checks.Values.All(value => value);
 File.WriteAllText(Path.Combine(analysisOutput, "report.json"), JsonSerializer.Serialize(new
 {
     passed, scope = "Actual generic-interface fixture identities and capability negotiation; not Player execution",
-    inputs = new[] { baselineRoot, currentRoot }.SelectMany(root => names.Select(name =>
+    inputs = new[] { baselineRoot, currentRoot }.Concat(args.Length == 5 ? new[] { Path.GetFullPath(args[4]) } : Array.Empty<string>()).SelectMany(root => names.Select(name =>
         new { path = Path.Combine(root, name + ".dll"), sha256 = Hash(Path.Combine(root, name + ".dll")) })),
     checks, analyses = analyses.Select(item => new { assembly = item.Key, item.Value.Compatible,
         item.Value.RequiredRuntimeCapabilities, item.Value.UnsupportedChanges }),

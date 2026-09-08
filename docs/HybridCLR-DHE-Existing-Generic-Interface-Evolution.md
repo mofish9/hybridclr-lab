@@ -110,3 +110,43 @@ an already-native generic virtual/interface method. Previously proven Bases that
 do not contain those methods remain eligible. New package/source identities must
 be bound before three-engine compilation and rebuilding this exact Base fixture.
 Actual no-op plus resource replay must verify the repair; it is not yet qualified.
+
+## Resource replay exposes three remaining generic metadata gaps
+
+HybridCLR ece8419 / package b30b472 (v23) pass all three real-header compile/CTest
+gates and the unchanged U21 Base/no-op workflow. The repaired BaseId is
+ba753d9042e6f8a3aabc34008d2faf4dca17f5ef12cb3dbc17ab13c3fa3632d1.
+The packaged command rejects the failed v22 no-op Base with exactly the new
+open-definition capability error and emits no final manifest/plan.
+
+Clean 74e9714 then fails all nine resource runs across three U21 generations.
+Original/evolved v22 Bases execute 58/61 groups; the v23 generic-interface Base
+executes 53/61. The prior native generic caller group succeeds on the latter,
+recording Integer/Reference/Value as unchanged with 3/3/2 AOT entries respectively.
+The entire replay is failed. All nine process IDs are unique and all 57 protected
+files independently rehash unchanged. Report SHA-256:
+36701FCE3875678BD420EE89BA07C29960F6D96806F3CFF0A07972DB08F00610.
+
+1. GetFirst/Next/CountSupplementalMethod look up only an exact Base class pointer.
+   Closed generic classes therefore omit methods registered on their definitions,
+   causing AddedValue/EchoGeneric lookup failure and incomplete reflection maps.
+   Inflate the immutable supplemental method list per closed class, cache a complete
+   vector under g_MetadataLock, and use it consistently for iteration and counts.
+   Vector/node addresses must remain stable; never publish a partly inflated list.
+2. ComputeVTable's opt3 parent-slab shortcut takes a generic parent's uninflated
+   definition table for a nongeneric child. Its inherited generic interface offsets
+   retain open arguments and cannot match the requested closed interface. Exclude
+   generic-instance parents from that shortcut and use existing full vtable setup.
+   Retain the shortcut for nongeneric parents; no new cache or publication is needed.
+3. All three engine RuntimeMethodInfo implementations leave class_inst handling in
+   GetGenericMethodDefinition_impl unimplemented. For DHE methods, strip only method
+   arguments and retain class arguments through GenericMetadata::Inflate. Reuse the
+   existing reflection cache and preserve the reflected type. Leave external ordinary
+   AOT behavior outside this DHE hook unchanged.
+
+These fixes need separate capabilities for closed supplemental methods, interpreted
+generic-parent tables, and closed generic method definitions. Require them from actual
+method/type declarations, including wholly new DHE types where relevant. Keep the
+61-group DLL payloads and failed Bases unchanged. Rebuild supported Base generations
+with matched sources, run the same payloads, and then extend the Windows engine matrix.
+None of these source diagnoses constitutes passing execution evidence.

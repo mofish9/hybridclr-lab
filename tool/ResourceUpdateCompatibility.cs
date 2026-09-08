@@ -4,7 +4,7 @@ internal sealed class ResourceUpdateCompatibility
 {
 	public const string Policy = "dhe-proven-safe-subset-v1";
 	public const string RuntimeProtocol = "dhe-runtime-protocol-v1";
-    public const string CurrentNativeRuntimeContract = "dhe-runtime-v23";
+    public const string CurrentNativeRuntimeContract = "dhe-runtime-v24";
     public static readonly string[] KnownRuntimeCapabilities =
     {
 		"aot-guard-v1",
@@ -24,6 +24,9 @@ internal sealed class ResourceUpdateCompatibility
         "base-virtual-slots-on-current-descendants-v1",
         "closed-current-parent-vtables-v1",
         "open-generic-dispatch-definitions-v1",
+        "supplemental-closed-generic-methods-v1",
+        "closed-interpreter-parent-vtables-v1",
+        "closed-generic-method-definitions-v1",
 		"supplemental-existing-type-methods-v1",
 		"removed-existing-type-methods-v1",
 		"existing-type-method-signature-replacement-v1",
@@ -233,6 +236,16 @@ internal sealed class ResourceUpdateCompatibility
         if (current.Methods.Any(method => method.IsVirtual && method.GenericParameterCount != 0 &&
                 baselineMethods.ContainsKey(method.StableId)))
             requiredCapabilities.Add("open-generic-dispatch-definitions-v1");
+        if (added.Any(method => method.DeclaringTypeGenericParameterCount != 0 &&
+                baselineTypes.ContainsKey(method.DeclaringTypeStableId)))
+            requiredCapabilities.Add("supplemental-closed-generic-methods-v1");
+        if (current.Methods.Any(method => method.GenericParameterCount != 0 &&
+                method.DeclaringTypeGenericParameterCount != 0))
+            requiredCapabilities.Add("closed-generic-method-definitions-v1");
+        if (addedTypes.Any(type => current.TypeParents.TryGetValue(type.Identity, out var parent) &&
+                parent.AssemblyName == current.AssemblyName && parent.DefinitionName != null &&
+                parent.DefinitionName != parent.TypeName && !baseline.Types.Any(original => original.Identity == parent.DefinitionName)))
+            requiredCapabilities.Add("closed-interpreter-parent-vtables-v1");
         // A Current MemberRef declaration can name an interface method absent
         // from the Base definition table. Older slot-only runtimes cannot
         // resolve that declaration during atomic multi-image registration.
