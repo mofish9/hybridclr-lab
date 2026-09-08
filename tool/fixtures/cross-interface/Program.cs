@@ -64,6 +64,17 @@ var analyses = names.ToDictionary(name => name, name => ResourceUpdateCompatibil
 foreach (string name in names)
     checks[name + "-compatible"] = analyses[name].Compatible;
 checks["cross-interface-native-capability-required"] = analyses[names[0]].RequiredRuntimeCapabilities.Contains("existing-interface-method-slots-v1");
+const string declarationCapability = "cross-assembly-interface-declarations-v1";
+checks["cross-assembly-declaration-capability-required"] = analyses[names[0]].RequiredRuntimeCapabilities.Contains(declarationCapability);
+checks["slot-only-runtime-rejected"] = !ResourceUpdateCompatibility.CanExecuteUpdate(
+    ResourceUpdateCompatibility.RuntimeProtocol, "dhe-runtime-v16",
+    ResourceUpdateCompatibility.KnownRuntimeCapabilities.Where(value => value != declarationCapability),
+    analyses[names[0]].RequiredRuntimeCapabilities);
+checks["candidate-capabilities-satisfy-declarations"] = ResourceUpdateCompatibility.CanExecuteUpdate(
+    ResourceUpdateCompatibility.RuntimeProtocol, ResourceUpdateCompatibility.CurrentNativeRuntimeContract,
+    ResourceUpdateCompatibility.KnownRuntimeCapabilities, analyses[names[0]].RequiredRuntimeCapabilities);
+checks["missing-assembly-set-requires-declaration-capability"] = ResourceUpdateCompatibility.Analyze(
+    baseline[names[0]], current[names[0]]).RequiredRuntimeCapabilities.Contains(declarationCapability);
 bool passed = checks.Values.All(value => value);
 Directory.CreateDirectory(output);
 File.WriteAllText(Path.Combine(output, "report.json"), JsonSerializer.Serialize(new

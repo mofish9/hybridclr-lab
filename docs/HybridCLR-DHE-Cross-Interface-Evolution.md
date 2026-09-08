@@ -62,3 +62,21 @@ match its own exact Base/current MV; latest requires all 220 interpreted receipt
 This does not resolve the scanner's RVA sensitivity or qualify AOT retention as
 optimal. Removing that sensitivity while preserving immutable Base contracts is
 separate unfinished work; the old all-AOT assertion did not pass.
+
+## Reproduced native registration failure
+
+Clean `a4f1b2e` ran all 18 processes against the six unchanged v16 Bases.
+Every process failed registration with `MethodNotFind
+HybridCLR.Lab.ManagedCases.ICrossAssemblyLazyVTableContract::Added`.
+The complete failed replay is retained at `replay-cross-interface-generations-cold`.
+CLR references still pass all 52 groups and 220 golden cases.
+
+The candidate repair resolves MethodImpl MemberRef declarations from the staged
+Current definition table while preserving the public Base container identity.
+It does not enumerate unpublished logical MethodInfo aliases or change a class
+layout. The existing global metadata lock and atomic registration own this table;
+no additional cache, publication field or lock is introduced. The new v17 contract
+declares `cross-assembly-interface-declarations-v1`. Resource compatibility requires
+it when an existing interface gains methods and another Current assembly references
+that interface; missing assembly-set context is conservative. v16 capability sets
+are rejected by the focused test. Actual repaired Player execution is still pending.

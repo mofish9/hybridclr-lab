@@ -4,7 +4,7 @@ internal sealed class ResourceUpdateCompatibility
 {
 	public const string Policy = "dhe-proven-safe-subset-v1";
 	public const string RuntimeProtocol = "dhe-runtime-protocol-v1";
-    public const string CurrentNativeRuntimeContract = "dhe-runtime-v16";
+    public const string CurrentNativeRuntimeContract = "dhe-runtime-v17";
     public static readonly string[] KnownRuntimeCapabilities =
     {
 		"aot-guard-v1",
@@ -19,6 +19,7 @@ internal sealed class ResourceUpdateCompatibility
         "supplemental-existing-generic-type-fields-v1",
         "supplemental-instance-field-addresses-v1",
         "existing-interface-method-slots-v1",
+        "cross-assembly-interface-declarations-v1",
 		"supplemental-existing-type-methods-v1",
 		"removed-existing-type-methods-v1",
 		"existing-type-method-signature-replacement-v1",
@@ -223,6 +224,17 @@ internal sealed class ResourceUpdateCompatibility
         };
         if (requiresInterfaceSlots)
             requiredCapabilities.Add("existing-interface-method-slots-v1");
+        // A Current MemberRef declaration can name an interface method absent
+        // from the Base definition table. Older slot-only runtimes cannot
+        // resolve that declaration during atomic multi-image registration.
+        var evolvedInterfaces = added.Where(method => method.DeclaringTypeIsInterface &&
+            baselineTypes.ContainsKey(method.DeclaringTypeStableId)).Select(method => method.DeclaringType)
+            .ToHashSet(StringComparer.Ordinal);
+        if (evolvedInterfaces.Count != 0 && (currentAssemblySet == null || currentAssemblySet.Any(assembly =>
+                assembly.AssemblyName != current.AssemblyName && evolvedInterfaces.Any(name =>
+                    assembly.TypeReferenceScopes.TryGetValue(name, out string? scope) &&
+                    scope.Split('\n').Any(identity => identity.Split(',')[0] == current.AssemblyName)))))
+            requiredCapabilities.Add("cross-assembly-interface-declarations-v1");
         if (!new HashSet<string>(baseline.AssemblyReferences.Values, StringComparer.Ordinal)
                 .SetEquals(current.AssemblyReferences.Values))
             requiredCapabilities.Add("assembly-reference-evolution-v1");
