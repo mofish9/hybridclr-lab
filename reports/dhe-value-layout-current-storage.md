@@ -1,9 +1,9 @@
 # Current storage and execution metadata: Unity 2022 research checkpoint
 
 本轮仍是研究候选，尚未形成可交付的结构体热更能力。当前只推进 Unity 2022，
-其真实 headers compile/CTest 已通过，但同一身份的 Windows Player 仍在泛型
-字段别名和 sidecar GC 生命周期处失败；没有性能、内存或 ARM64 结论。团结 2022
-尚未按本轮逻辑重新组装或验证。公共资源加载流程仍未传入 Current storage plan。
+其真实 headers compile/CTest 和同一身份的 Windows Player value-layout probe
+已通过；没有性能、内存或 ARM64 结论。团结 2022 尚未按本轮逻辑重新组装或验证。
+公共资源加载流程仍未传入 Current storage plan。
 
 ## 精确身份
 
@@ -48,12 +48,15 @@ Unity 2022 native gate：
 `FGS tests=true`。该 gate 使用 HybridCLR `acd8ee5` 和 Unity 2022 il2cpp_plus
 `3482c81`。
 
-Unity 2022 Player p10：
-`current-storage-p10-update-u22-result.json`。Current image 加载成功
-（`loadCode=0`），普通嵌套值、数组、Nullable、装箱、集合、跨程序集和重排等
-路径完成；`generic-values` 与 `generic-layout-addition` 返回 NullReference，
-随后 `managed-reference-gc` 在 sidecar 触达后未完成。该结果是失败证据，不能
-写成 Player correctness 通过。
+Unity 2022 Player p11：
+`current-storage-p11-update-u22-result.json`。Current image 加载成功
+（`loadCode=0`），14/14 value-layout cases、Consumer、NativeRoundTrip 和
+managed-reference-gc 全部通过，`interpreterEntries=0`。同一 p11 Base 使用
+Current/Current no-op payload 的 `current-storage-p11-noop-u22-current-result.json`
+也通过 14/14，证明同身份无变化更新可以保持 AOT 路径。
+
+p8/p9/p10 的失败结果仍保留作修复链证据；它们不能替代 p11 的成功结果，也不能
+推导 Android/iOS 或团结 2022 生产结论。
 
 以下路径相对 C:/hybridclr_optimize/artifacts/dhe-evolution-20260908。
 
