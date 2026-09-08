@@ -1,6 +1,25 @@
 # DHE evolution implementation and validation
 
-## Active checkpoint: class virtual evolution across eight Windows Bases
+## Active checkpoint: ordinary AOT descendants across ten Windows Bases
+
+Clean 5efbb2c passes 30 unique Windows processes across eight unchanged archived
+Bases and two new native-descendant Bases on Unity 2022 and Tuanjie 2022. Every
+run executes 71 evolution groups and 220 differential cases with zero differences.
+The two new Bases also execute nine ordinary AOT boundary groups on every update;
+their no-op workflows pass with zero interpreter entries. The ordinary plugin is
+compiled once against Base, never hotfixed, and remains byte-identical across
+the runtime fix. All 16 DLL/MV payload files match the failed reproduction and
+the preceding eight-Base checkpoint. Independent checks rehash 551 files.
+
+HybridCLR 760634e maps immutable native slots to Current declarations when walking
+virtual base methods, preserves intermediate native overrides for attributes,
+and stops at new-slot declarations at every level. Both real-header compile/CTest
+profiles pass. See reports/dhe-native-descendants-windows.md for exact identities,
+failed artifacts, workspace state and rollback. This is conditional correctness;
+value-type layouts, additional inheritance/Base generations, Unity behavior and
+performance/release qualification remain open. The full DHE goal is not complete.
+
+## Historical checkpoint: class virtual evolution across eight Windows Bases
 
 Clean 8634f3c passes 24 unique processes across six unchanged v26 Bases and two
 new class-virtual v27 Bases, on Unity 2022 and Tuanjie 2022. Each run executes

@@ -3,14 +3,16 @@
 ## 最新范围与验证结果
 
 用户已明确只支持 Unity 2022 App 和团结 2022 小游戏；Unity 2021 不再安排新构建或门禁。
-当前两引擎各有 original/evolved/generic-interface/class-virtual 四类受支持测试 Base。
-八 Base 的 24 个独立进程完成连续/跳版本回放，每次 71 组演化、220 cases，差异为 0。
-新 Base/no-op/schema 全通过，解释器入口为 0。已有普通类的新增虚/抽象方法、增加与
-删除 override、泛型虚调用和反射场景通过，8 个未变化调用入口保留 AOT。外部 AOT
-派生类反射、值类型布局等仍需继续推进，完整 DHE 目标尚未完成。
+当前两引擎各有 original/evolved/generic-interface/class-virtual/native-descendants
+五类受支持测试 Base。十 Base 的 30 个独立进程完成连续/跳版本回放，每次 71 组演化、
+220 cases，差异为 0。新 Base/no-op/schema 全通过，解释器入口为 0。
+普通 AOT 派生类跨 Current 父表查找基方法的错误已修复；新 Base 的六次热更各有
+9 组普通 AOT 边界检查通过，测试程序集始终不参与热更。四个含 class-virtual 类型
+的 Base 各验证 8 个未变化 caller 保留 AOT。551 个证据/受保护文件独立复核通过。
+已有值类型布局、更多继承世代、Unity 行为等仍需推进，完整 DHE 目标尚未完成。
 
 最新身份、保留的失败记录、工作区与回滚见
-[类虚方法与八 Base 验证报告](dhe-class-virtual-windows.md)。
+[普通 AOT 派生类与十 Base 验证报告](dhe-native-descendants-windows.md)。
 下文保留的是此次范围调整和 FGS 修复之前的复核记录，不能作为最新提交的验收结论。
 
 ## 结论与目标
