@@ -37,6 +37,19 @@ await Check("applicable-unexecuted-probe-rejected", Change(evolved, value =>
 await Check("structural-failure-rejected", Change(evolved, value => value["structuralPassed"] = false), false);
 await Check("evolved-nine-probes-rejected", Change(evolved, value =>
     Probes(value).Add(JsonNode.Parse(Probes(value)[0]!.ToJsonString()))), false);
+JsonObject withEntry = Change(evolved, value => value["structuralEntryDispatch"] = new JsonObject
+{
+    ["methodIdentity"] = "structural-entry", ["methodStableId"] = new string('1', 64),
+    ["presentInBase"] = true, ["expectedChanged"] = false, ["nativeChanged"] = false,
+    ["executed"] = true, ["interpreterEntries"] = 0,
+});
+await Check("executed-structural-entry-shape", withEntry, true);
+await Check("unexecuted-structural-entry-shape-rejected", Change(withEntry, value =>
+    value["structuralEntryDispatch"]!["executed"] = false), false);
+await Check("missing-structural-entry-counter-rejected", Change(withEntry, value =>
+    value["structuralEntryDispatch"]!.AsObject().Remove("interpreterEntries")), false);
+await Check("negative-structural-entry-counter-rejected", Change(withEntry, value =>
+    value["structuralEntryDispatch"]!["interpreterEntries"] = -1), false);
 File.WriteAllText(Path.Combine(output, "report.json"), JsonSerializer.Serialize(new
 {
     passed = failures == 0,

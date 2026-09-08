@@ -35,6 +35,25 @@ bool Rejects(Action action)
     try { action(); return false; }
     catch (InvalidDataException) { return true; }
 }
+var structuralOnly = Read(after);
+structuralOnly.methods[DheFixturePolicy.MethodId(DheFixturePolicy.StructuralEntry)] = new string('1', 64);
+var structuralEntry = DheFixturePolicy.RecordEntryDispatch(current, structuralOnly,
+    DheFixturePolicy.StructuralEntry, true, 1);
+checks["structural-only-change-exercises-interpreter"] = structuralEntry.ChangedBaseEntryExecuted &&
+    !DheFixturePolicy.MethodChanged(current, structuralOnly, DheFixturePolicy.Calculator + "::Add|System.Int32 (System.Int32)");
+checks["unchanged-structural-entry-is-not-a-changed-probe"] = !DheFixturePolicy.RecordEntryDispatch(current, current,
+    DheFixturePolicy.StructuralEntry, false, 0).ChangedBaseEntryExecuted;
+checks["changed-structural-entry-needs-native-mapping"] = Rejects(() => DheFixturePolicy.RecordEntryDispatch(current,
+    structuralOnly, DheFixturePolicy.StructuralEntry, false, 1));
+checks["changed-structural-entry-needs-execution"] = Rejects(() => DheFixturePolicy.RecordEntryDispatch(current,
+    structuralOnly, DheFixturePolicy.StructuralEntry, true, 0));
+checks["unchanged-structural-entry-cannot-be-relabeled"] = Rejects(() => DheFixturePolicy.RecordEntryDispatch(current,
+    current, DheFixturePolicy.StructuralEntry, true, 1));
+structuralEntry.executed = false;
+checks["unexecuted-structural-entry-rejected"] = Rejects(() => DheFixturePolicy.ValidateEntryDispatch(current, structuralOnly, structuralEntry));
+structuralEntry.executed = true;
+structuralEntry.methodStableId = new string('0', 64);
+checks["structural-entry-identity-mismatch-rejected"] = Rejects(() => DheFixturePolicy.ValidateEntryDispatch(current, structuralOnly, structuralEntry));
 int calls = 0;
 var callbacks = DheFixturePolicy.LegacyProbes.ToDictionary(probe => probe.Check,
     probe => (Action)(() => { calls++; throw new MissingMethodException(); }), StringComparer.Ordinal);

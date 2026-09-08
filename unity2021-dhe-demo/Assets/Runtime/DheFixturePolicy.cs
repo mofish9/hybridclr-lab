@@ -11,6 +11,7 @@ namespace HybridCLR.Lab
     {
         public const string Calculator = "HybridCLR.Lab.ManagedCasesAot.DheDemoCalculator";
         public const string StructuralType = "HybridCLR.Lab.ManagedCasesAot.DheAddedReferenceType";
+        public const string StructuralEntry = Calculator + "::ExerciseCurrentMembers|System.Int32 (System.Int32)";
 
         public static readonly LegacyProbe[] LegacyProbes =
         {
@@ -85,6 +86,51 @@ namespace HybridCLR.Lab
                 }
                 return result;
             }).ToArray();
+        }
+
+        public static EntryDispatchEvidence RecordEntryDispatch(DheFixtureMetaVersion baseline,
+            DheFixtureMetaVersion current, string identity, bool nativeChanged, int interpreterEntries)
+        {
+            var result = new EntryDispatchEvidence
+            {
+                methodIdentity = identity,
+                methodStableId = MethodId(identity),
+                presentInBase = baseline.methods.ContainsKey(MethodId(identity)),
+                expectedChanged = MethodChanged(baseline, current, identity),
+                nativeChanged = nativeChanged,
+                executed = true,
+                interpreterEntries = interpreterEntries,
+            };
+            ValidateEntryDispatch(baseline, current, result);
+            return result;
+        }
+
+        public static void ValidateEntryDispatch(DheFixtureMetaVersion baseline,
+            DheFixtureMetaVersion current, EntryDispatchEvidence evidence)
+        {
+            if (evidence == null || evidence.methodIdentity != StructuralEntry ||
+                evidence.methodStableId != MethodId(evidence.methodIdentity) || !evidence.executed ||
+                evidence.interpreterEntries < 0 ||
+                evidence.presentInBase != baseline.methods.ContainsKey(evidence.methodStableId) ||
+                evidence.expectedChanged != MethodChanged(baseline, current, evidence.methodIdentity) ||
+                (evidence.presentInBase && evidence.nativeChanged != evidence.expectedChanged) ||
+                (evidence.presentInBase && evidence.expectedChanged && evidence.interpreterEntries == 0))
+                throw new InvalidDataException("Executed structural entry disagrees with Base/Current MV or dispatch counters.");
+        }
+
+        [Serializable]
+        public sealed class EntryDispatchEvidence
+        {
+            public string methodIdentity = string.Empty;
+            public string methodStableId = string.Empty;
+            public bool presentInBase;
+            public bool expectedChanged;
+            public bool nativeChanged;
+            public bool executed;
+            public int interpreterEntries;
+
+            public bool ChangedBaseEntryExecuted => presentInBase && expectedChanged &&
+                nativeChanged && executed && interpreterEntries > 0;
         }
 
         public static void ValidateLegacyEvidence(DheFixtureMetaVersion baseline,

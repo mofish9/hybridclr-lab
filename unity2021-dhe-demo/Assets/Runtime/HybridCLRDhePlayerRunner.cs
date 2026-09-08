@@ -357,6 +357,9 @@ namespace HybridCLR.Lab
             bool newHotfixValidated = !newHotfixPlanned || newHotfixExecuted;
             int crossSecondaryReflectionResult = ExecuteSecondaryChanged(
                 loadedAssemblies, "HybridCLR.CrossAssemblyDerived", "HybridCLR.Lab.CrossAssemblyDerived.CrossAssemblyLazyVTableProbe");
+            int workflowInterpreterEntryCount = RuntimeApi.GetDifferentialInterpreterEntryCount();
+            int workflowAotEntryCount = RuntimeApi.GetDifferentialAotEntryCount();
+            int workflowAotBridgeCallCount = RuntimeApi.GetDifferentialAotBridgeCallCount();
             bool currentHashValidated = ByteArraysEqual(currentHash, expectedCurrentHash);
             bool baselineHashValidated = ByteArraysEqual(baselineHash, expectedBaselineHash);
             string embeddedSnapshotHash = HybridCLRDheBuildIdentity.AotSnapshotSha256;
@@ -445,13 +448,14 @@ namespace HybridCLR.Lab
                 mainAotEntryCount > 0;
             bool stableDispatchValidated = stableChanged == stableExpectedChanged &&
                 instanceStableChanged == instanceStableExpectedChanged;
-            bool representativeChanged = addChanged || multiBaseProbeChanged;
+            bool representativeChanged = addChanged || multiBaseProbeChanged ||
+                structural.entryDispatch?.ChangedBaseEntryExecuted == true;
             bool changedBehaviorValidated = changedMethodCount == 0
                 ? noOpAotBehaviorValidated && structural.passed && newHotfixValidated
                 : (representativeChanged && !identityUnchangedChanged && stableDispatchValidated &&
                     mainBehaviorConsistencyValidated && capabilityConsistencyValidated &&
-                    multiAssemblyConsistencyValidated && mainInterpreterEntryCount > 0 &&
-                    mainAotEntryCount > 0 && structural.passed && newHotfixValidated);
+                    multiAssemblyConsistencyValidated && workflowInterpreterEntryCount > 0 &&
+                    workflowAotEntryCount > 0 && structural.passed && newHotfixValidated);
             bool transactionEvidenceValid = changedMethodCount == 0 || retryValidated;
             string transactionStatus = changedMethodCount == 0
                 ? "notApplicable"
@@ -658,6 +662,10 @@ namespace HybridCLR.Lab
                 changedMethodCount = changedMethodCount,
                 expectedChangedMethodCount = changedMethodCount,
                 dispatchProbeValidated = dispatchProbeValidated,
+                structuralEntryDispatch = structural.entryDispatch,
+                mainInterpreterEntryCount = mainInterpreterEntryCount,
+                mainAotEntryCount = mainAotEntryCount,
+                mainAotBridgeCallCount = mainAotBridgeCallCount,
                 noOpAotBehaviorValidated = noOpAotBehaviorValidated,
                 changedProbeChanged = representativeChanged,
                 unchangedProbeChanged = identityUnchangedChanged,
@@ -697,9 +705,9 @@ namespace HybridCLR.Lab
 				changedInstanceCallingUnchangedMethod = instanceAddViaStableChanged
 					? instanceStableChanged ? "interpreter + interpreter callee" : "interpreter + AOT callee"
 					: "aot",
-                interpreterEntryCount = mainInterpreterEntryCount,
-                aotBridgeCallCount = mainAotBridgeCallCount,
-                aotEntryCount = mainAotEntryCount,
+                interpreterEntryCount = workflowInterpreterEntryCount,
+                aotBridgeCallCount = workflowAotBridgeCallCount,
+                aotEntryCount = workflowAotEntryCount,
                 mvValidated = true,
                 currentHashValidated = currentHashValidated,
                  baselineHashValidated = baselineHashValidated,
@@ -1139,7 +1147,7 @@ namespace HybridCLR.Lab
 						string.Equals(Convert.ToString(evolvedProperty.GetValue(memberObject)),
 							"property-1500", StringComparison.Ordinal);
 					result.currentMemberDirectResult = Convert.ToInt32(
-						exerciseCurrentMembers.Invoke(memberObject, new object[] { 3 }));
+						InvokeStructuralEntry(exerciseCurrentMembers, memberObject, baseline, current, result));
 				}
 				if (result.logicalEventsValidated)
 				{
@@ -1478,6 +1486,18 @@ namespace HybridCLR.Lab
                 result.error = exception.ToString();
             }
             return result;
+        }
+
+        private static object InvokeStructuralEntry(MethodInfo method, object instance,
+            MetaVersionInfo baseline, MetaVersionInfo current, StructuralRun structural)
+        {
+            bool nativeChanged = RuntimeApi.IsDifferentialMethodChanged(method);
+            int before = RuntimeApi.GetDifferentialInterpreterEntryCount();
+            object value = method.Invoke(instance, new object[] { 3 });
+            structural.entryDispatch = DheFixturePolicy.RecordEntryDispatch(baseline, current,
+                DheFixturePolicy.StructuralEntry, nativeChanged,
+                RuntimeApi.GetDifferentialInterpreterEntryCount() - before);
+            return value;
         }
 
         private static long ExecuteMetadataStress(Dictionary<string, LoadedDheAssembly> loadedAssemblies)
@@ -1952,6 +1972,7 @@ namespace HybridCLR.Lab
 
         private sealed class StructuralRun
         {
+            public DheFixturePolicy.EntryDispatchEvidence entryDispatch;
             public bool expected;
             public bool passed;
             public string error;
@@ -2075,6 +2096,10 @@ namespace HybridCLR.Lab
             public int changedMethodCount;
             public int expectedChangedMethodCount;
             public bool dispatchProbeValidated;
+            public DheFixturePolicy.EntryDispatchEvidence structuralEntryDispatch;
+            public int mainInterpreterEntryCount;
+            public int mainAotEntryCount;
+            public int mainAotBridgeCallCount;
             public bool noOpAotBehaviorValidated;
             public bool changedProbeChanged;
             public bool unchangedProbeChanged;

@@ -258,6 +258,13 @@ internal static class Program
                         }
                         Require(result.GetProperty("selectedPayloadCurrentAssemblySetSha256").GetString() ==
                             variant.GetProperty("currentAssemblySetSha256").GetString(), "Player selected the wrong current payload.");
+                        if (result.TryGetProperty("structuralEntryDispatch", out JsonElement dispatch) && dispatch.ValueKind == JsonValueKind.Object)
+                        {
+                            var evidence = JsonSerializer.Deserialize<DheFixturePolicy.EntryDispatchEvidence>(dispatch.GetRawText(), JsonOptions)!;
+                            DheFixturePolicy.ValidateEntryDispatch(baseMv, currentMv, evidence);
+                            Require(evidence.interpreterEntries <= result.GetProperty("interpreterEntryCount").GetInt32(),
+                                "Structural entry count exceeds the complete workflow count.");
+                        }
                         Require(result.GetProperty("interpreterEntryCount").GetInt32() > 0 &&
                             result.GetProperty("aotEntryCount").GetInt32() > 0, "Both execution paths must be exercised.");
                         Require(originalHashes.All(pair => Hash(pair.Key) == pair.Value), "Player modified immutable Base files.");

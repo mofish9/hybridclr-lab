@@ -59,6 +59,22 @@
     "dispatchProbeError": { "type": ["string", "null"] },
     "interpreterEntryCount": { "type": "integer", "minimum": 0 },
     "aotEntryCount": { "type": "integer", "minimum": 0 },
+    "mainInterpreterEntryCount": { "type": "integer", "minimum": 0 },
+    "mainAotEntryCount": { "type": "integer", "minimum": 0 },
+    "mainAotBridgeCallCount": { "type": "integer", "minimum": 0 },
+    "structuralEntryDispatch": {
+      "type": ["object", "null"],
+      "required": ["methodIdentity", "methodStableId", "presentInBase", "expectedChanged", "nativeChanged", "executed", "interpreterEntries"],
+      "properties": {
+        "methodIdentity": { "type": "string", "minLength": 1 },
+        "methodStableId": { "type": "string", "pattern": "^[0-9a-fA-F]{64}$" },
+        "presentInBase": { "type": "boolean" },
+        "expectedChanged": { "type": "boolean" },
+        "nativeChanged": { "type": "boolean" },
+        "executed": { "const": true },
+        "interpreterEntries": { "type": "integer", "minimum": 0 }
+      }
+    },
     "structuralExpected": { "type": "boolean" },
     "structuralDispatchExpected": { "type": "boolean" },
     "structuralLegacyProbes": {

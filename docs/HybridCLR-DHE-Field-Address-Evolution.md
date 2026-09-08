@@ -20,7 +20,23 @@ All three actual-header compile/CTest profiles pass at lab `aa95683`, HybridCLR
 `b950d29`, package `a8271cd`, with unchanged engine hooks. Unity 2021's fresh Base
 and no-op Player pass. Unity 2022's first Base workflow fails while restoring
 its compiler with File.Replace; the transaction remains recoverable and the
-failed record is preserved. Field-address Player execution is still pending.
+failed record is preserved. Tuanjie's Base and no-op Player also pass.
+
+The clean `bbcd455` Unity 2021 replay executes all 35 groups on each of three
+actual processes, including the unchanged nullable regression, ref aliases,
+owner lifetime and unreachable cycles. The latest and skipped-latest runs pass
+overall, but the first resource fails the old outer dispatch assertion: Add and
+CurrentValue legitimately remain AOT while ExerciseCurrentMembers changes.
+Its old report sampled interpreter counters before structural execution. The
+overall replay remains failed and unchanged under `replay-field-address-u21`.
+
+The lab candidate records the actual invoked structural entry, validates its
+native changed flag against immutable Base/Current MV, and requires interpreter
+entries when that existing Base entry changes. Overall counters now include the
+structural workload; earlier main-only counts remain separately named. The
+replay independently verifies the new entry record. Forty-three generation/
+dispatch checks and nineteen schema checks pass. New validation Players are
+required; old archives must not be rewritten or relabeled.
 
 The first offline
 test intentionally remains failed: it compared raw netstandard input with a
