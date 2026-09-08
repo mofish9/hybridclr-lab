@@ -236,7 +236,7 @@ internal static class Program
                             retainedCallers = new { path = routingPath, sha256 = Hash(routingPath), records };
                         }
                         object? classVirtualCallers = null;
-                        if (requiredEvolutionChecks.Contains("class-virtual-NativeCallers", StringComparer.Ordinal))
+                        if (requiredEvolutionChecks.Contains("class-virtual-native-callers", StringComparer.Ordinal))
                         {
                             const string callerAssembly = "HybridCLR.CrossAssemblyDerived";
                             const string callerType = "HybridCLR.Lab.CrossAssemblyDerived.ClassVirtualNativeCallers";
