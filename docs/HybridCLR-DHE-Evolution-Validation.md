@@ -1,5 +1,17 @@
 # DHE evolution implementation and validation
 
+## Latest completed checkpoint: stable field addresses and mixed Bases
+
+Clean `92b7ff4` passes 18 cold Windows processes across three archived v11
+originals and three fresh v13 evolved Bases. Each executes all 35 evolution
+groups and 220 differential cases with zero differences. This closes the
+nullable-field `ldflda` failure documented below for the fixed payloads, not
+unrestricted managed evolution. The MV scanner repair preserves all 24 Base
+snapshots byte-for-byte; 114 protected files independently rehash unchanged.
+See `reports/dhe-field-address-generations-windows.md`. Existing interface/vtable
+and value-type layout evolution, independent sidecar expansion, broader field
+addresses, Unity integration and performance/memory remain open.
+
 ## Latest completed checkpoint: installed source and immutable Base identity
 
 Clean `cc48992` passes 18 cold Windows processes across three archived original

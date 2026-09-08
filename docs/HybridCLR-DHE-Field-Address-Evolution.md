@@ -1,5 +1,16 @@
 # DHE supplemental field addresses
 
+## Completed Windows checkpoint
+
+Clean `92b7ff4` passes the stable-MV six-Base replay: 18 independent Windows
+processes, all 35 evolution groups and 220 differential cases per process,
+zero differences and no pre-touch. The three new v13 Base/no-op workflows pass;
+the three archived v11 originals consume the same resources. All 24 Base DLL/MV
+pairs reproduce exactly and 114 protected files independently rehash unchanged.
+See `reports/dhe-field-address-generations-windows.md` for exact identities.
+The failures below are preserved historical diagnosis, not the current outcome.
+Sidecar capacity expansion, broader evolution and performance remain open.
+
 ## MV fingerprint compatibility repair
 
 The initial address scanner reused FieldIdentity(IField) and expanded the module
