@@ -25,8 +25,8 @@
     "il2cpp_plus": {
       "upstream": "https://github.com/focus-creative-games/il2cpp_plus.git",
       "fork": "https://github.com/mofish9/il2cpp_plus.git",
-      "tag": "84d6911ec8d8e4287fbc6c35963d973ef611befa",
-      "commit": "84d6911ec8d8e4287fbc6c35963d973ef611befa",
+      "tag": "df8d0123d9f5a9fce79283fe5261dba21e802aa0",
+      "commit": "df8d0123d9f5a9fce79283fe5261dba21e802aa0",
       "localBranch": "optimize/tuanjie-1.10-v8.13.0"
     }
   },

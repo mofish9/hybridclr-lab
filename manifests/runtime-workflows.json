@@ -14,8 +14,8 @@
         "externalHeadersTreeSha256": "EBCDC7C61490DEFAD29B65D003FC0451F870316982A4CE75AEC4F8515A1D91D6"
       },
       "il2cppPlus": {
-        "tag": "84d6911ec8d8e4287fbc6c35963d973ef611befa",
-        "commit": "84d6911ec8d8e4287fbc6c35963d973ef611befa",
+        "tag": "df8d0123d9f5a9fce79283fe5261dba21e802aa0",
+        "commit": "df8d0123d9f5a9fce79283fe5261dba21e802aa0",
         "path": "../repos/il2cpp_plus"
       },
       "fullGenericSharing": "required",
@@ -44,8 +44,8 @@
         "externalHeadersTreeSha256": "D0037168A9A28B05FD8DF11EDA27812DAEAA458DC0CDFAD7765F3BE75E83EE99"
       },
       "il2cppPlus": {
-        "tag": "361d59048509ac06190c21eddb40a05dc1c248f5",
-        "commit": "361d59048509ac06190c21eddb40a05dc1c248f5",
+        "tag": "3482c81998b5e382b59a3d6f4e5fec2d0988d22b",
+        "commit": "3482c81998b5e382b59a3d6f4e5fec2d0988d22b",
         "path": "../repos/il2cpp_plus"
       },
       "fullGenericSharing": "required",
