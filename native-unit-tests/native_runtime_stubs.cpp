@@ -30,6 +30,16 @@
 #include "hybridclr/metadata/MetadataUtil.h"
 #include "native_test_hooks.h"
 
+#if __has_include("hybridclr/metadata/DheInterfaceSlots.h")
+namespace hybridclr { namespace dhe {
+    bool TryGetInterfaceInvokeData(const Il2CppClass*, const Il2CppClass*,
+        uint16_t, const VirtualInvokeData*&)
+    {
+        return false;
+    }
+} }
+#endif
+
 #if defined(_WIN32)
 #ifndef WIN32_LEAN_AND_MEAN
 #define WIN32_LEAN_AND_MEAN

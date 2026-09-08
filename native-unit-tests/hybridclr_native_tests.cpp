@@ -40,6 +40,11 @@ static_assert(std::is_constructible<hybridclr::dhe::MetaVersionRegistration,
 #define HYBRIDCLR_LAB_HAS_GENERIC_FIELD_METADATA 1
 #endif
 
+#if __has_include("hybridclr/metadata/DheInterfaceSlots.h")
+#include "hybridclr/metadata/DheInterfaceSlots.h"
+#define HYBRIDCLR_LAB_HAS_INTERFACE_SLOTS 1
+#endif
+
 #if __has_include("hybridclr/transform/OptimizationFacts.h")
 #include "hybridclr/transform/OptimizationFacts.h"
 #define HYBRIDCLR_LAB_HAS_OPTIMIZATION_FACTS 1
@@ -1878,8 +1883,34 @@ static void TestDheGenericFieldIdentity()
 }
 #endif
 
+#if HYBRIDCLR_LAB_HAS_INTERFACE_SLOTS
+static void TestDheInterfaceSlots()
+{
+    using hybridclr::metadata::BindDheInterfaceSlot;
+    MethodInfo apply{}, added{}, other{};
+    std::vector<const MethodInfo*> slots(1, nullptr);
+    uint16_t logical = UINT16_MAX;
+    CHECK(BindDheInterfaceSlot(slots, UINT16_MAX, &added, logical));
+    CHECK(logical == 1 && slots[0] == nullptr && slots[1] == &added);
+    CHECK(BindDheInterfaceSlot(slots, 0, &apply, logical));
+    CHECK(logical == 0 && slots[0] == &apply && slots[1] == &added);
+    CHECK(!BindDheInterfaceSlot(slots, 0, &other, logical));
+    CHECK(!BindDheInterfaceSlot(slots, UINT16_MAX, &apply, logical));
+    CHECK(!BindDheInterfaceSlot(slots, 4, &other, logical));
+    CHECK(!BindDheInterfaceSlot(slots, UINT16_MAX, nullptr, logical));
+    std::vector<const MethodInfo*> removed(2, nullptr);
+    CHECK(BindDheInterfaceSlot(removed, 1, &apply, logical));
+    CHECK(removed[0] == nullptr && removed[1] == &apply);
+    std::vector<const MethodInfo*> full(UINT16_MAX, nullptr);
+    CHECK(!BindDheInterfaceSlot(full, UINT16_MAX, &added, logical));
+}
+#endif
+
 int main()
 {
+#if HYBRIDCLR_LAB_HAS_INTERFACE_SLOTS
+    TestDheInterfaceSlots();
+#endif
 #if HYBRIDCLR_LAB_HAS_FIELD_ADDRESSES
     using namespace hybridclr::interpreter;
     CHECK(sizeof(IRDheLdfldaVarVar) == 16);

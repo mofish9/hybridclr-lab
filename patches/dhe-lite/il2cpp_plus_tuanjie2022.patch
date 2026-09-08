@@ -60,6 +60,134 @@ index cbbe9a5..bcde0a2 100644
  
          uint8_t* fieldAddress;
  
+diff --git a/libil2cpp/icalls/mscorlib/System/RuntimeType.cpp b/libil2cpp/icalls/mscorlib/System/RuntimeType.cpp
+index ee5d2c5..0bac26d 100644
+--- a/libil2cpp/icalls/mscorlib/System/RuntimeType.cpp
++++ b/libil2cpp/icalls/mscorlib/System/RuntimeType.cpp
+@@ -1158,18 +1158,9 @@ namespace System
+         vm::Class::Init(klass);
+         const VirtualInvokeData* invokeDataStart = NULL;
+ 
+-        // So this part is tricky. GetInterfaceInvokeDataFromVTable takes an object pointer in order to support
+-        // COM peculiarities, like being able to return invoke data for an interface only if native side implements it
+-        // So here we create a fake object of the class we want to query and pass that to GetInterfaceInvokeDataFromVTable
+-        // It is safe because the only fields GetInterfaceInvokeDataFromVTable accesses are the klass and identity fields
+-        if (!klass->is_import_or_windows_runtime)
+-        {
+-            Il2CppObject fakeObject = {};
+-            fakeObject.klass = klass;
+-            invokeDataStart = &vm::ClassInlines::GetInterfaceInvokeDataFromVTable(&fakeObject, iklass, 0);
+-        }
+ #if !IL2CPP_TRIM_COM
+-        else
++        // DHE logical slots need not be a contiguous native vtable slice.
++        if (klass->is_import_or_windows_runtime)
+         {
+             Il2CppComObject fakeComObject;
+             memset(&fakeComObject, 0, sizeof(fakeComObject));
+@@ -1192,9 +1183,12 @@ namespace System
+                 Il2CppReflectionMethod* member = il2cpp_method_get_object(method, iklass);
+                 il2cpp_array_setref(*methods, virtualMethodIndex, member);
+ 
+-                const MethodInfo* targetMethod = invokeDataStart[i].method;
++                const VirtualInvokeData* invokeData = klass->is_import_or_windows_runtime
++                    ? invokeDataStart + i
++                    : vm::ClassInlines::GetInterfaceInvokeDataFromVTable(klass, iklass, method->slot);
++                const MethodInfo* targetMethod = invokeData ? invokeData->method : NULL;
+ 
+-                if (vm::Method::IsAmbiguousMethodInfo(targetMethod) || vm::Method::IsEntryPointNotFoundMethodInfo(targetMethod))
++                if (!targetMethod || vm::Method::IsAmbiguousMethodInfo(targetMethod) || vm::Method::IsEntryPointNotFoundMethodInfo(targetMethod))
+                 {
+                     // Method is an ambiguous default interface method (more than one DIM matched)
+                     // Or there is no valid method in this slot
+diff --git a/libil2cpp/metadata/CustomAttributeDataReader.cpp b/libil2cpp/metadata/CustomAttributeDataReader.cpp
+index 63989b2..08971f1 100644
+--- a/libil2cpp/metadata/CustomAttributeDataReader.cpp
++++ b/libil2cpp/metadata/CustomAttributeDataReader.cpp
+@@ -7,6 +7,7 @@
+ #include "vm/Exception.h"
+ #include "vm/GlobalMetadata.h"
+ #include "vm/MetadataCache.h"
++#include "hybridclr/metadata/MetadataModule.h"
+ 
+ // Custom attribute metadata format
+ //
+@@ -153,6 +154,7 @@ namespace metadata
+         {
+             MethodIndex ctorIndex = utils::Read32(ctorBuffer);
+             *attributeCtor = il2cpp::vm::MetadataCache::GetMethodInfoFromMethodDefinitionIndex(image, ctorIndex);
++            *attributeCtor = hybridclr::metadata::MetadataModule::ResolveDheCustomAttributeConstructor(*attributeCtor);
+             return true;
+         }
+ 
+@@ -308,12 +310,24 @@ namespace metadata
+             std::tie(klass, propertyIndex) = ReadCustomAttributeNamedArgumentClassAndIndex(&iter->dataBuffer, attrClass);
+ 
+             IL2CPP_ASSERT(iter->dataBuffer <= bufferEnd);
+-            IL2CPP_ASSERT(propertyIndex < klass->property_count);
++            if (propertyIndex < klass->property_count)
++            {
+ #if !IL2CPP_ENABLE_LAZY_INIT
+-            propArg.prop = klass->properties[propertyIndex];
++                propArg.prop = klass->properties[propertyIndex];
+ #else
+-            propArg.prop = il2cpp::vm::Class::GetOrSetupOneProperty(const_cast<Il2CppClass*>(klass), propertyIndex);
++                propArg.prop = il2cpp::vm::Class::GetOrSetupOneProperty(const_cast<Il2CppClass*>(klass), propertyIndex);
+ #endif
++            }
++            else
++            {
++                propArg.prop = hybridclr::metadata::MetadataModule::GetDheCustomAttributeProperty(
++                    const_cast<Il2CppClass*>(klass), propertyIndex);
++                if (!propArg.prop)
++                {
++                    SetInvalidDataException(exc);
++                    return false;
++                }
++            }
+             visitor->VisitProperty(propArg, i);
+         }
+ 
+diff --git a/libil2cpp/metadata/GenericMethod.cpp b/libil2cpp/metadata/GenericMethod.cpp
+index 60bd694..4b34986 100644
+--- a/libil2cpp/metadata/GenericMethod.cpp
++++ b/libil2cpp/metadata/GenericMethod.cpp
+@@ -386,11 +386,14 @@ namespace metadata
+             newMethod->virtualMethodPointerCallByInterp = newMethod->virtualMethodPointer;
+         }
+ 
+-        bool isAotImplByInterp = hybridclr::metadata::MetadataModule::IsImplementedByInterpreter(newMethod);
++        // Test the original lookup, not a subsequently installed unresolved-call stub.
++        bool isAotImplByInterp = hybridclr::metadata::MetadataModule::IsImplementedByInterpreter(
++            newMethod, methodPointers.methodPointer == nullptr);
+         bool isAdjustorThunkMethod = IS_CLASS_VALUE_TYPE(newMethod->klass) && hybridclr::metadata::IsInstanceMethod(newMethod);
+         bool needsInterpreterAotFallback = indirectCallViaInvokers
+             ? !newMethod->hasFullGenericSharingAotInvoker
+-            : newMethod->methodPointer == nullptr ||
++            // An unresolved call stub is not an AOT implementation.
++            : methodPointers.methodPointer == nullptr || newMethod->methodPointer == nullptr ||
+                 newMethod->methodPointer == AnUnresolvedCallStubWasNotFound ||
+                 newMethod->methodPointer == (Il2CppMethodPointer)AnUnresolvedCallStubWasNotFoundValueType;
+         if (isInterpMethod || (isAotImplByInterp && needsInterpreterAotFallback))
+diff --git a/libil2cpp/vm/Assembly.cpp b/libil2cpp/vm/Assembly.cpp
+index 330e08a..c206a57 100644
+--- a/libil2cpp/vm/Assembly.cpp
++++ b/libil2cpp/vm/Assembly.cpp
+@@ -1,4 +1,5 @@
+ #include "il2cpp-config.h"
++#include "hybridclr/metadata/MetadataModule.h"
+ #include "vm/Assembly.h"
+ #include "vm/AssemblyName.h"
+ #include "vm/MetadataCache.h"
+@@ -85,6 +86,8 @@ namespace vm
+ 
+     void Assembly::GetReferencedAssemblies(const Il2CppAssembly* assembly, AssemblyNameVector* target)
+     {
++        if (hybridclr::metadata::MetadataModule::TryGetDheReferencedAssemblies(assembly, *target))
++            return;
+         for (int32_t sourceIndex = 0; sourceIndex < assembly->referencedAssemblyCount; sourceIndex++)
+         {
+             const Il2CppAssembly* refAssembly = MetadataCache::GetReferencedAssembly(assembly, sourceIndex);
 diff --git a/libil2cpp/vm/Class.cpp b/libil2cpp/vm/Class.cpp
 index 11f3077..edde1e6 100644
 --- a/libil2cpp/vm/Class.cpp
@@ -261,6 +389,28 @@ index 11f3077..edde1e6 100644
          if (!*iter)
          {
              Class::SetupProperties(klass);
+diff --git a/libil2cpp/vm/ClassInlines.cpp b/libil2cpp/vm/ClassInlines.cpp
+index acd6131..ac70a3f 100644
+--- a/libil2cpp/vm/ClassInlines.cpp
++++ b/libil2cpp/vm/ClassInlines.cpp
+@@ -5,6 +5,7 @@
+ #include "vm/RCW.h"
+ #include "gc/GCHandle.h"
+ #include "metadata/GenericMethod.h"
++#include "hybridclr/DheRuntime.h"
+ 
+ namespace il2cpp
+ {
+@@ -131,6 +132,9 @@ namespace vm
+ 
+     const VirtualInvokeData* ClassInlines::GetInterfaceInvokeDataFromVTable(Il2CppClass* klass, const Il2CppClass* itf, Il2CppMethodSlot slot)
+     {
++        const VirtualInvokeData* dheData;
++        if (hybridclr::dhe::TryGetInterfaceInvokeData(klass, itf, slot, dheData))
++            return dheData;
+         IL2CPP_ASSERT(slot < itf->method_count);
+ 
+         //quick pass
 diff --git a/libil2cpp/vm/Field.cpp b/libil2cpp/vm/Field.cpp
 index 5132306..0025e1a 100644
 --- a/libil2cpp/vm/Field.cpp
@@ -325,7 +475,7 @@ index 5132306..0025e1a 100644
      }
  
 diff --git a/libil2cpp/vm/GlobalMetadata.cpp b/libil2cpp/vm/GlobalMetadata.cpp
-index 8811ed3..3baf273 100644
+index 8811ed3..dde764e 100644
 --- a/libil2cpp/vm/GlobalMetadata.cpp
 +++ b/libil2cpp/vm/GlobalMetadata.cpp
 @@ -1088,6 +1088,14 @@ static CustomAttributeIndex GetCustomAttributeIndex(const Il2CppImage* image, ui
@@ -358,6 +508,15 @@ index 8811ed3..3baf273 100644
      return CreateCustomAttributeDataReader(GetCustomAttributeTypeToken(image, token), image);
  }
  
+@@ -1380,7 +1396,7 @@ Il2CppMetadataParameterInfo il2cpp::vm::GlobalMetadata::GetParameterInfo(const I
+     IL2CPP_ASSERT(methodDefinition != NULL);
+     IL2CPP_ASSERT(paramIndex >= 0 && paramIndex < methodDefinition->parameterCount);
+ 
+-    const Il2CppParameterDefinition* parameterDefinition = GetParameterDefinitionFromIndex(klass, methodDefinition->parameterStart + paramIndex);
++    const Il2CppParameterDefinition* parameterDefinition = GetParameterDefinitionFromIndex(methodDefinition, methodDefinition->parameterStart + paramIndex);
+ 
+     return {
+             GetStringFromIndex(parameterDefinition->nameIndex),
 diff --git a/libil2cpp/vm/Image.cpp b/libil2cpp/vm/Image.cpp
 index 2018e43..97dbcfd 100644
 --- a/libil2cpp/vm/Image.cpp
@@ -471,3 +630,75 @@ index 2018e43..97dbcfd 100644
          }
  
          return NULL;
+diff --git a/libil2cpp/vm/Reflection.cpp b/libil2cpp/vm/Reflection.cpp
+index 4a48e8f..072bff2 100644
+--- a/libil2cpp/vm/Reflection.cpp
++++ b/libil2cpp/vm/Reflection.cpp
+@@ -1,4 +1,5 @@
+ #include "il2cpp-config.h"
++#include "hybridclr/metadata/MetadataModule.h"
+ #include "il2cpp-class-internals.h"
+ #include "il2cpp-object-internals.h"
+ #include "il2cpp-tabledefs.h"
+@@ -439,7 +440,7 @@ namespace vm
+         if (vm::Reflection::IsAnyMethod(obj))
+         {
+             Il2CppReflectionMethod* method = (Il2CppReflectionMethod*)obj;
+-            return std::make_tuple(vm::Method::GetToken(method->method), method->method->klass->image);
++            return std::make_tuple(vm::Method::GetToken(method->method), hybridclr::metadata::MetadataModule::GetDheMethodMetadataImage(method->method));
+         }
+         if (vm::Reflection::IsProperty(obj))
+         {
+@@ -461,13 +462,13 @@ namespace vm
+         {
+             Il2CppReflectionParameter* parameter = (Il2CppReflectionParameter*)obj;
+             Il2CppReflectionMethod* method = (Il2CppReflectionMethod*)parameter->MemberImpl;
+-            const Il2CppImage* image = method->method->klass->image;
++            const Il2CppImage* image = hybridclr::metadata::MetadataModule::GetDheMethodMetadataImage(method->method);
+ #if !SUPPORT_METHOD_RETURN_TYPE_CUSTOM_ATTRIBUTE
+             if (parameter->PositionImpl == -1)
+-                return std::make_tuple(0x8000000, method->method->klass->image); // This is what mono returns as a fixed value.
++                return std::make_tuple(0x8000000, image); // This is what mono returns as a fixed value.
+ 
+ #endif
+-            return std::make_tuple(vm::Method::GetParameterToken(method->method, parameter->PositionImpl), method->method->klass->image);
++            return std::make_tuple(vm::Method::GetParameterToken(method->method, parameter->PositionImpl), image);
+         }
+         if (IsAssembly(obj))
+         {
+@@ -503,7 +504,7 @@ namespace vm
+         if (method->method->is_inflated)
+             methodWithParameterAttributeInformation = method->method->genericMethod->methodDefinition;
+ 
+-        auto reader = il2cpp::vm::MetadataCache::GetCustomAttributeDataReader(methodWithParameterAttributeInformation->klass->image, Method::GetParameterToken(method->method, parameter->PositionImpl));
++        auto reader = il2cpp::vm::MetadataCache::GetCustomAttributeDataReader(hybridclr::metadata::MetadataModule::GetDheMethodMetadataImage(methodWithParameterAttributeInformation), Method::GetParameterToken(method->method, parameter->PositionImpl));
+         return HasAttribute(reader, attributeClass);
+     }
+ 
+@@ -608,7 +609,7 @@ namespace vm
+         if (il2cpp::vm::Reflection::IsAnyMethod(obj))
+         {
+             const MethodInfo* method = ((Il2CppReflectionMethod*)obj)->method;
+-            return { method->klass->image, method->token };
++            return { hybridclr::metadata::MetadataModule::GetDheMethodMetadataImage(method), method->token };
+         }
+         else if (il2cpp::vm::Reflection::IsProperty(obj))
+         {
+@@ -629,7 +630,7 @@ namespace vm
+         {
+             Il2CppReflectionParameter* parameter = (Il2CppReflectionParameter*)obj;
+             Il2CppReflectionMethod* method = (Il2CppReflectionMethod*)parameter->MemberImpl;
+-            return { method->method->klass->image, il2cpp::vm::Method::GetParameterToken(method->method, parameter->PositionImpl) };
++            return { hybridclr::metadata::MetadataModule::GetDheMethodMetadataImage(method->method), il2cpp::vm::Method::GetParameterToken(method->method, parameter->PositionImpl) };
+         }
+         else if (IsAssembly(obj))
+         {
+@@ -742,7 +743,7 @@ namespace vm
+ 
+     bool Reflection::HasAttribute(const MethodInfo *method, Il2CppClass *attributeClass)
+     {
+-        auto reader = il2cpp::vm::MetadataCache::GetCustomAttributeDataReader(method->klass->image, Method::GetToken(method));
++        auto reader = il2cpp::vm::MetadataCache::GetCustomAttributeDataReader(hybridclr::metadata::MetadataModule::GetDheMethodMetadataImage(method), Method::GetToken(method));
+         return HasAttribute(reader, attributeClass);
+     }
+ 
