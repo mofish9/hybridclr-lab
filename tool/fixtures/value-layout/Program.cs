@@ -5,6 +5,7 @@ using System.Text.Json;
 using HybridCLR.DheTool;
 
 string[] assemblies = { "HybridCLR.ValueLayoutModel", "HybridCLR.ValueLayoutOther", "HybridCLR.ValueLayoutConsumer" };
+const string nativeAssembly = "HybridCLR.ValueLayoutNative";
 var json = new JsonSerializerOptions { WriteIndented = true };
 string Hash(string path) => Convert.ToHexString(SHA256.HashData(File.ReadAllBytes(path)));
 void NewOutput(string path)
@@ -36,7 +37,7 @@ if (args.Length == 3 && args[0] == "build")
     Console.WriteLine(Run("dotnet", lab, "build", "managed-cases/HybridCLR.ValueLayoutConsumer/HybridCLR.ValueLayoutConsumer.csproj",
         "-c", "Release", "--no-incremental", "--nologo", "-o", Path.Combine(output, "consumer"),
         "-p:DheValueLayoutBaseRoot=" + Path.Combine(output, "base")));
-    foreach (string name in assemblies.Skip(1))
+    foreach (string name in assemblies.Skip(1).Append(nativeAssembly))
         foreach (string version in new[] { "base", "current" })
             File.Copy(Path.Combine(output, "consumer", name + ".dll"), Path.Combine(output, version, name + ".dll"));
     File.WriteAllText(Path.Combine(output, "build.json"), JsonSerializer.Serialize(new
@@ -47,7 +48,7 @@ if (args.Length == 3 && args[0] == "build")
             Hash(Path.Combine(output, "current", assemblies[2] + ".dll")),
         inputs = new[] { "base", "current" }.Select(version => new
         {
-            version, assemblies = assemblies.Select(name => new { name,
+            version, assemblies = assemblies.Append(nativeAssembly).Select(name => new { name,
                 sha256 = Hash(Path.Combine(output, version, name + ".dll")) }).ToArray()
         }).ToArray(),
     }, json));
@@ -68,7 +69,7 @@ if (args.Length == 3 && args[0] == "reference")
     File.WriteAllText(report, JsonSerializer.Serialize(new
     {
         passed, scope = "CLR value semantics; not a DHE Player result", root, records, unchangedConsumer,
-        assemblies = assemblies.Select(name => new { name, sha256 = Hash(Path.Combine(root, name + ".dll")) }).ToArray(),
+        assemblies = assemblies.Append(nativeAssembly).Select(name => new { name, sha256 = Hash(Path.Combine(root, name + ".dll")) }).ToArray(),
     }, json));
     foreach (string record in records) Console.WriteLine(record);
     Console.WriteLine("unchanged-consumer\t" + unchangedConsumer);
@@ -81,7 +82,8 @@ NewOutput(outputReport);
 string[] Paths(string root) => assemblies.Select(name => Path.Combine(root, name + ".dll")).ToArray();
 var before = Paths(baseline).Select(MetaVersionSnapshot.Create).ToDictionary(value => value.AssemblyName);
 var after = Paths(current).Select(MetaVersionSnapshot.Create).ToDictionary(value => value.AssemblyName);
-var impact = DheValueLayoutImpact.Analyze(Paths(baseline), Paths(current));
+string[] nativePaths = { Path.Combine(baseline, nativeAssembly + ".dll") };
+var impact = DheValueLayoutImpact.Analyze(Paths(baseline), Paths(current), nativePaths);
 var comparisons = assemblies.ToDictionary(name => name, name => ResourceUpdateCompatibility.Analyze(before[name], after[name],
     currentAssemblySet: after.Values));
 var checks = new Dictionary<string, bool>();
@@ -90,9 +92,9 @@ var methods = after[owner].Methods.Where(method => method.DeclaringType == prefi
 DheValueLayoutMethodImpact? Decision(string name) => impact.Methods.SingleOrDefault(method =>
     method.AssemblyName == owner && method.MethodIdentity == methods[name].Identity);
 string[] affected = { "DirectCopy", "NestedCopy", "LocalNestedCopy", "GenericCopy", "NullableCopy", "ForwardBox",
-    "GenericForwardBox", "ArrayElement", "RefRoundTrip", "ContainerNeighbor", "GenericContainerNeighbor" };
+    "GenericForwardBox", "ArrayElement", "RefRoundTrip", "ContainerNeighbor", "GenericContainerNeighbor", "NativeRoundTrip" };
 foreach (string name in affected) checks["impact-" + name] = Decision(name)?.Decision == "interpret";
-foreach (string name in new[] { "Unrelated", "UnchangedCopy", "OtherAssemblyCopy", "UnchangedGenericCopy" })
+foreach (string name in new[] { "Unrelated", "UnchangedCopy", "OtherAssemblyCopy", "UnchangedGenericCopy", "ExternalGenericInt", "ReferenceOnly" })
     checks["retained-" + name] = Decision(name) == null;
 checks["open-generic-context-explicit"] = Decision("OpenGenericCopy")?.Decision == "inspect-generic-context";
 checks["all-five-direct-value-layouts-found"] = impact.ChangedValueTypes.Length == 5;
@@ -101,6 +103,11 @@ checks["reference-container-layout-found"] = impact.Layouts.Any(type => type.Typ
 checks["derived-reference-layout-found"] = impact.Layouts.Any(type => type.TypeIdentity.EndsWith("|HybridCLR.Lab.ValueLayout.InlineChild"));
 checks["reference-indirection-does-not-grow-owner"] = !impact.Layouts.Any(type => type.TypeIdentity.EndsWith("|HybridCLR.Lab.ValueLayout.ReferenceOwner"));
 checks["same-full-name-other-assembly-is-unaffected"] = !impact.ChangedValueTypes.Any(type => type.StartsWith("HybridCLR.ValueLayoutOther|"));
+checks["ordinary-inline-layout-needs-bridge"] = impact.Layouts.Any(type =>
+    type.TypeIdentity == nativeAssembly + "|HybridCLR.Lab.ValueLayoutNative.NativeInlineOwner" && type.RequiresOrdinaryAotBridge);
+checks["ordinary-methods-never-treated-as-hotfix"] = impact.Methods.Any(method => method.AssemblyName == nativeAssembly) &&
+    impact.Methods.Where(method => method.AssemblyName == nativeAssembly).All(method => method.Decision == "native-abi-bridge");
+checks["ordinary-dll-reused"] = Hash(nativePaths[0]) == Hash(Path.Combine(current, nativeAssembly + ".dll"));
 checks["consumer-dll-reused"] = Hash(Path.Combine(baseline, owner + ".dll")) == Hash(Path.Combine(current, owner + ".dll"));
 checks["current-workflow-still-rejects-unsupported-storage"] = !comparisons[assemblies[0]].Compatible &&
     comparisons[assemblies[0]].UnsupportedChanges.Any(reason => reason.StartsWith("added-instance-field-on-existing-value-type:"));
@@ -110,10 +117,14 @@ var riskVersions = affected.Select(name =>
     return new { name, bodyUnchanged = old.BodyVersion == methods[name].BodyVersion, versionUnchanged = old.Version == methods[name].Version };
 }).ToArray();
 checks["existing-method-fingerprints-miss-cross-assembly-layout-risk"] = riskVersions.All(value => value.bodyUnchanged && value.versionUnchanged);
-var noOp = DheValueLayoutImpact.Analyze(Paths(baseline), Paths(baseline));
+var noOp = DheValueLayoutImpact.Analyze(Paths(baseline), Paths(baseline), nativePaths);
 checks["no-op-has-no-layout-obligations"] = noOp.ChangedValueTypes.Length == 0 && noOp.Methods.Length == 0 && noOp.Layouts.Length == 0;
 checks["input-order-independent"] = JsonSerializer.Serialize(impact) == JsonSerializer.Serialize(
-    DheValueLayoutImpact.Analyze(Paths(baseline).Reverse(), Paths(current).Reverse()));
+    DheValueLayoutImpact.Analyze(Paths(baseline).Reverse(), Paths(current).Reverse(), nativePaths));
+bool incompleteRejected = false;
+try { DheValueLayoutImpact.Analyze(Paths(baseline), Paths(current).Skip(1), nativePaths); }
+catch (InvalidDataException) { incompleteRejected = true; }
+checks["incomplete-hotfix-set-rejected"] = incompleteRejected;
 bool analysisPassed = checks.Values.All(value => value);
 Directory.CreateDirectory(Path.GetDirectoryName(outputReport)!);
 File.WriteAllText(outputReport, JsonSerializer.Serialize(new

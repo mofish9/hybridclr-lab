@@ -1,5 +1,6 @@
 extern alias OtherValues;
 using System;
+using System.Collections.Generic;
 using System.Runtime.CompilerServices;
 using HybridCLR.Lab.ValueLayout;
 using OtherPayload = OtherValues::HybridCLR.Lab.ValueLayout.Payload;
@@ -32,6 +33,8 @@ namespace HybridCLR.Lab.ValueLayoutConsumer
         [MethodImpl(MethodImplOptions.NoInlining)]
         public static int GenericContainerNeighbor(GenericOwner<Payload> owner) => owner.Neighbor;
         [MethodImpl(MethodImplOptions.NoInlining)]
+        public static Payload NativeRoundTrip(Payload value) => ValueLayoutNative.NativeBoundary.Echo(value);
+        [MethodImpl(MethodImplOptions.NoInlining)]
         public static int Unrelated(int value) => value + 1;
         [MethodImpl(MethodImplOptions.NoInlining)]
         public static UnchangedValue UnchangedCopy(UnchangedValue value) => value;
@@ -39,6 +42,10 @@ namespace HybridCLR.Lab.ValueLayoutConsumer
         public static OtherPayload OtherAssemblyCopy(OtherPayload value) => value;
         [MethodImpl(MethodImplOptions.NoInlining)]
         public static GenericValue<int> UnchangedGenericCopy(GenericValue<int> value) => value;
+        [MethodImpl(MethodImplOptions.NoInlining)]
+        public static int ExternalGenericInt(List<int> values) => values[0];
+        [MethodImpl(MethodImplOptions.NoInlining)]
+        public static int ReferenceOnly(ReferenceOwner owner) => owner.Neighbor;
         [MethodImpl(MethodImplOptions.NoInlining)]
         public static T OpenGenericCopy<T>(T value) => value;
 
@@ -59,6 +66,8 @@ namespace HybridCLR.Lab.ValueLayoutConsumer
                 Unrelated(41) == 42 && UnchangedCopy(new UnchangedValue { Value = 43 }).Value == 43 &&
                 OtherAssemblyCopy(new OtherPayload { Count = 47 }).Count == 47 &&
                 UnchangedGenericCopy(new GenericValue<int> { Value = 53 }).Value == 53 &&
+                NativeRoundTrip(value).Count == 17 && ExternalGenericInt(new List<int> { 59 }) == 59 &&
+                ReferenceOnly(new ReferenceOwner { Neighbor = 61 }) == 61 &&
                 OpenGenericCopy(value).Count == 17;
         }
     }

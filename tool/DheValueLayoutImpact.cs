@@ -6,18 +6,19 @@ namespace HybridCLR.DheTool;
 // runtime/storage implementation must satisfy these obligations before release.
 public sealed record DheValueLayoutMethodImpact(string AssemblyName, string MethodIdentity,
     string Decision, string[] ChangedValueTypes);
-public sealed record DheValueLayoutTypeImpact(string TypeIdentity, string[] ChangedValueTypes);
+public sealed record DheValueLayoutTypeImpact(string TypeIdentity, bool RequiresOrdinaryAotBridge,
+    string[] ChangedValueTypes);
 public sealed record DheValueLayoutImpactResult(string[] ChangedValueTypes,
     DheValueLayoutTypeImpact[] Layouts, DheValueLayoutMethodImpact[] Methods);
 
 public static class DheValueLayoutImpact
 {
     public static DheValueLayoutImpactResult Analyze(IEnumerable<string> baselinePaths,
-        IEnumerable<string> currentPaths)
+        IEnumerable<string> currentPaths, IEnumerable<string>? ordinaryAotPaths = null)
     {
         var baseline = baselinePaths.Select(MetaVersionSnapshot.Create).ToDictionary(
             value => value.AssemblyName, StringComparer.Ordinal);
-        using var analysis = new Analysis(currentPaths);
+        using var analysis = new Analysis(currentPaths, ordinaryAotPaths ?? Array.Empty<string>());
         return analysis.Run(baseline);
     }
 
@@ -31,24 +32,27 @@ public static class DheValueLayoutImpact
     private sealed class Analysis : IDisposable
     {
         private readonly Dictionary<string, ModuleDefMD> modules = new(StringComparer.Ordinal);
+        private readonly HashSet<string> hotfixAssemblies = new(StringComparer.Ordinal);
         private readonly HashSet<string> changed = new(StringComparer.Ordinal);
         private readonly Dictionary<string, HashSet<string>> layouts = new(StringComparer.Ordinal);
         private readonly Dictionary<string, bool> genericLayouts = new(StringComparer.Ordinal);
         private readonly HashSet<string> visiting = new(StringComparer.Ordinal);
 
-        public Analysis(IEnumerable<string> paths)
+        public Analysis(IEnumerable<string> paths, IEnumerable<string> ordinaryAotPaths)
         {
             try
             {
-                foreach (string path in paths)
+                foreach (var input in paths.Select(path => (Path: path, Hotfix: true))
+                    .Concat(ordinaryAotPaths.Select(path => (Path: path, Hotfix: false))))
                 {
-                    var module = ModuleDefMD.Load(path);
+                    var module = ModuleDefMD.Load(input.Path);
                     string name = module.Assembly?.Name.String ?? throw new InvalidDataException("Missing assembly.");
                     if (!modules.TryAdd(name, module))
                     {
                         module.Dispose();
                         throw new InvalidDataException("Duplicate current assembly: " + name);
                     }
+                    if (input.Hotfix) hotfixAssemblies.Add(name);
                 }
             }
             catch { Dispose(); throw; }
@@ -56,6 +60,8 @@ public static class DheValueLayoutImpact
 
         public DheValueLayoutImpactResult Run(Dictionary<string, MetaVersionSnapshot> baseline)
         {
+            if (baseline.Keys.Any(name => !hotfixAssemblies.Contains(name)))
+                throw new InvalidDataException("Layout analysis requires Current input for every Base hotfix assembly.");
             foreach (var entry in modules)
             {
                 if (!baseline.TryGetValue(entry.Key, out var before)) continue;
@@ -72,7 +78,12 @@ public static class DheValueLayoutImpact
             var methods = new List<DheValueLayoutMethodImpact>();
             foreach (var entry in modules.OrderBy(entry => entry.Key, StringComparer.Ordinal))
             {
-                if (!baseline.TryGetValue(entry.Key, out var before)) continue;
+                bool ordinary = !hotfixAssemblies.Contains(entry.Key);
+                if (!baseline.TryGetValue(entry.Key, out var before))
+                {
+                    if (!ordinary) continue;
+                    before = MetaVersionSnapshot.Create(entry.Value.Location);
+                }
                 var oldMethods = before.Methods.Select(method => method.Identity).ToHashSet(StringComparer.Ordinal);
                 foreach (TypeDef type in entry.Value.GetTypes().Where(type => type.Name != "<Module>"))
                 {
@@ -122,7 +133,7 @@ public static class DheValueLayoutImpact
                         }
                         if (dependencies.Count != 0 || openContext)
                             methods.Add(new(entry.Key, identity,
-                                method.IsPinvokeImpl ? "native-abi-bridge" :
+                                ordinary || method.IsPinvokeImpl ? "native-abi-bridge" :
                                 dependencies.Count != 0 ? "interpret" : "inspect-generic-context",
                                 dependencies.OrderBy(value => value, StringComparer.Ordinal).ToArray()));
                     }
@@ -131,6 +142,7 @@ public static class DheValueLayoutImpact
             return new(changed.OrderBy(value => value, StringComparer.Ordinal).ToArray(),
                 layouts.Where(entry => entry.Value.Count != 0).OrderBy(entry => entry.Key, StringComparer.Ordinal)
                     .Select(entry => new DheValueLayoutTypeImpact(entry.Key,
+                        !hotfixAssemblies.Contains(entry.Key.Split('|')[0]),
                         entry.Value.OrderBy(value => value, StringComparer.Ordinal).ToArray())).ToArray(),
                 methods.OrderBy(method => method.AssemblyName, StringComparer.Ordinal)
                     .ThenBy(method => method.MethodIdentity, StringComparer.Ordinal).ToArray());

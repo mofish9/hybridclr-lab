@@ -1,15 +1,10 @@
 <Project Sdk="Microsoft.NET.Sdk">
-  <PropertyGroup>
-    <TargetFramework>netstandard2.1</TargetFramework>
-    <Nullable>disable</Nullable>
-  </PropertyGroup>
+  <PropertyGroup><TargetFramework>netstandard2.1</TargetFramework><Nullable>disable</Nullable></PropertyGroup>
   <ItemGroup>
     <Reference Include="HybridCLR.ValueLayoutModel">
       <HintPath>$(DheValueLayoutBaseRoot)/HybridCLR.ValueLayoutModel.dll</HintPath>
       <Private>false</Private>
     </Reference>
-    <ProjectReference Include="../HybridCLR.ValueLayoutOther/HybridCLR.ValueLayoutOther.csproj" Aliases="OtherValues" />
-    <ProjectReference Include="../HybridCLR.ValueLayoutNative/HybridCLR.ValueLayoutNative.csproj" />
   </ItemGroup>
   <Target Name="RequireImmutableBase" BeforeTargets="ResolveReferences">
     <Error Condition="'$(DheValueLayoutBaseRoot)' == '' Or !Exists('$(DheValueLayoutBaseRoot)/HybridCLR.ValueLayoutModel.dll')"
