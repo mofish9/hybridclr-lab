@@ -252,6 +252,9 @@ namespace HybridCLR.Lab.ManagedCasesAot
     public interface IIntOperation
     {
         int Apply(int value);
+#if DHE_INTERFACE_EVOLUTION_CURRENT
+        int Added(int value);
+#endif
     }
 
     public readonly struct IntOperationStruct : IIntOperation
@@ -260,6 +263,9 @@ namespace HybridCLR.Lab.ManagedCasesAot
         {
             return value * 2;
         }
+#if DHE_INTERFACE_EVOLUTION_CURRENT
+        public int Added(int value) => value * 5;
+#endif
     }
 
     public class VirtualOperationBase

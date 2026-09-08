@@ -232,6 +232,9 @@ namespace HybridCLR.Lab.ManagedCasesAot
             DheFieldAddressEvolutionAssertions.Validate(Check);
 #endif
 #endif
+#if DHE_INTERFACE_EVOLUTION_CURRENT
+            DheInterfaceEvolutionAssertions.Validate(Check);
+#endif
             Require(errors.Count == 0, "new type declarations: " + string.Join("; ", errors));
         }
 
@@ -331,6 +334,9 @@ namespace HybridCLR.Lab.ManagedCasesAot
     public sealed class DheEvolutionOperation : IIntOperation
     {
         public int Apply(int value) => value + 3000;
+#if DHE_INTERFACE_EVOLUTION_CURRENT
+        int IIntOperation.Added(int value) => value + 5000;
+#endif
     }
     public delegate void DheEvolutionMove(ref DheDemoCalculator source, out DheDemoCalculator target);
 }
