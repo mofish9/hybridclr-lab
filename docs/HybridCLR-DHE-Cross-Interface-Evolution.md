@@ -16,6 +16,16 @@ MV schema, capabilities and archived Players must remain unchanged. New source
 identities must be bound before building the two missing Tuanjie Bases. Reuse
 already successful v19/v20 Bases by their actual identities and capabilities.
 
+The repaired `base-cross-virtual-tuanjie-codegen` then completes native compilation
+but its Demo adapter opens a second compiler session for guard finalization in
+the same Editor process. Replacing the compiler DLL fails with an IOException;
+the original DLL is recovered and independently matches the Editor SHA. Preserve
+that failure. The Demo now supplies the existing package NativeFinalizeOptions
+and callback for both phases, so generation and finalization share the existing
+compiler scope. The first phase also rebuilds native guards before staging its
+identity. No compiler patch, retry policy, fixture DLL or acceptance check changes.
+Actual complete workflow and the frozen six-Base replay remain the acceptance.
+
 ## Objective and fixed inputs
 
 Extend the completed 42-group interface checkpoint without modifying its six

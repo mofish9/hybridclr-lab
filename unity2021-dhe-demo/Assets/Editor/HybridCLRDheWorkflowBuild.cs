@@ -186,15 +186,14 @@ namespace HybridCLR.Lab.Editor
                 CleanBuild = scriptsOnly,
                 Scenes = new[] { "Assets/Scenes/HybridCLRLab.unity" },
                 BuildPlayerCallback = options => BuildWithBaseProbes(options, baselineRoot),
-                NativeFinalizeOptions = scriptsOnly ? null : CreateNativeFinalizeOptions(outputRoot, true),
-                AndroidArtifactLogPath = scriptsOnly ? null :
-                    Path.Combine(outputRoot, "native", "android-artifact.log"),
-                NativeFinalizeResultCallback = scriptsOnly ? null : result => nativeResult = result,
+                // Keep generation and guard finalization in the package-owned
+                // compiler scope, including the first identity-staging build.
+                NativeFinalizeOptions = CreateNativeFinalizeOptions(outputRoot, true),
+                AndroidArtifactLogPath = Path.Combine(outputRoot, "native", "android-artifact.log"),
+                NativeFinalizeResultCallback = result => nativeResult = result,
             });
             if (scriptsOnly)
             {
-                nativeResult = DheBuildPipeline.FinalizeProjectNativeCode(
-                    CreateNativeFinalizeOptions(outputRoot, false));
                 StageBuildIdentity(target, baselineRoot, outputRoot, nativeResult);
             }
             else ValidateFinalNativeIdentity(outputRoot, nativeResult);
