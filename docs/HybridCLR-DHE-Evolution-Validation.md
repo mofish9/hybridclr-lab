@@ -2,6 +2,12 @@
 
 ## Current capability work: existing interface slots
 
+The first v14 changed-interface replay (`2c2f6bd`) fails all three Unity 2021
+processes during atomic registration: the explicit Added implementation cannot
+match the interface declaration. Candidate `fd3b112` normalizes MethodImpl
+declaration owners to Base identity; v15 revalidation is pending. The original
+failed resources, Base and replay are preserved. No interface Player pass exists.
+
 Clean fixture `16107af` adds an interface method before the existing method,
 preserving old method bodies and all object/value fields. The Unity-prepared
 DLL passes 42 CLR groups and twelve declaration/slot identity checks. The v14

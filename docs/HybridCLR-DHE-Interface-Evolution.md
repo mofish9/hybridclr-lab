@@ -1,5 +1,23 @@
 # DHE existing interface evolution
 
+## Reproduced explicit declaration failure
+
+Clean replay `2c2f6bd` runs three processes on the new v14 Unity 2021 Base.
+All fail atomic registration with `VTableSetUp fail` for the explicit
+`IIntOperation.Added` implementation, before any evolution or differential case.
+The failed replay remains in `replay-interface-slots-u21-cold`; neither accepted
+resource nor successful Base/no-op evidence proves changed-interface execution.
+
+MethodImpl MethodDef references keep their hidden Current declaring type, whereas
+the interface list has already resolved to canonical Base identity. HybridCLR
+`fd3b112` normalizes only the declaration owner through the existing homologous
+type resolver. It retains the Current method definition and physical implementation
+owner, including their generic context. Ordinary interpreter images are unchanged;
+no layout, publication or locking changes are introduced. Package `2ec4821`
+identifies this separate native candidate as v15, with the same capabilities and
+unchanged MV format. A fresh Base and the unchanged payloads must reproduce or
+close the failure; three-engine and multi-generation execution remain required.
+
 ## Player validation input
 
 The v14 Unity 2021 Base/no-op workflow passes at

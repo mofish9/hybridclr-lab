@@ -1907,7 +1907,7 @@ index 2bb9800..0b35e18 100644
          else
          {
 diff --git a/hybridclr/metadata/InterpreterImage.cpp b/hybridclr/metadata/InterpreterImage.cpp
-index dd45bcd..20b8667 100644
+index dd45bcd..17eaa41 100644
 --- a/hybridclr/metadata/InterpreterImage.cpp
 +++ b/hybridclr/metadata/InterpreterImage.cpp
 @@ -1,4 +1,6 @@
@@ -2074,7 +2074,20 @@ index dd45bcd..20b8667 100644
  	}
  
  	void InterpreterImage::ConvertILCustomAttributeData2Il2CppFormat(const MethodInfo* ctorMethod, BlobReader& reader)
-@@ -2929,7 +3015,7 @@ namespace metadata
+@@ -2031,6 +2117,12 @@ namespace metadata
+ 			MethodImpl& impl = methodImpls[i];
+ 			ReadMethodRefInfoFromToken(gc, nullptr, DecodeMethodDefOrRefCodedIndexTableType(data.methodBody), DecodeMethodDefOrRefCodedIndexRowIndex(data.methodBody), impl.body);
+ 			ReadMethodRefInfoFromToken(gc, nullptr, DecodeMethodDefOrRefCodedIndexTableType(data.methodDeclaration), DecodeMethodDefOrRefCodedIndexRowIndex(data.methodDeclaration), impl.declaration);
++			if (_homologousTypeReferenceImage)
++			{
++				// MethodDef references retain the hidden Current owner, while the
++				// interface list uses Base identity. Keep the Current declaration.
++				impl.declaration.containerType = ResolveHomologousType(impl.declaration.containerType);
++			}
+ 		}
+ 		return methodImpls;
+ 	}
+@@ -2929,7 +3021,7 @@ namespace metadata
  		IL2CPP_ASSERT(rowIndex > 0);
  		EnsureFieldMetadataInitializedLocked(rowIndex - 1);
  		const FieldDetail& fd = GetFieldDetailFromRawIndex(rowIndex - 1);
@@ -2083,7 +2096,7 @@ index dd45bcd..20b8667 100644
  		ret.field = &fd.fieldDef;
  	}
  
-@@ -3236,6 +3322,7 @@ namespace metadata
+@@ -3236,6 +3328,7 @@ namespace metadata
  
  	void InterpreterImage::InitVTables()
  	{
@@ -2091,7 +2104,7 @@ index dd45bcd..20b8667 100644
  		_vtableTreesByTypeDefinition.assign(_typesDefines.size(), nullptr);
  		_vtableInitializableTypeCount = 0;
  		// <Module> is never materialized, and interfaces do not enter ComputeVTable.
-@@ -3419,7 +3506,7 @@ namespace metadata
+@@ -3419,7 +3512,7 @@ namespace metadata
  		{
  			return nullptr;
  		}
@@ -2100,7 +2113,7 @@ index dd45bcd..20b8667 100644
  		if (!type)
  		{
  			std::string stdTypeName = il2cpp::utils::StringUtils::Utf16ToUtf8(fullName->chars);
-@@ -3429,6 +3516,60 @@ namespace metadata
+@@ -3429,6 +3522,60 @@ namespace metadata
  		return type;
  	}
  
@@ -2161,7 +2174,7 @@ index dd45bcd..20b8667 100644
  
  	Il2CppObject* InterpreterImage::ReadBoxedValue(BlobReader& reader)
  	{
-@@ -3611,7 +3752,7 @@ namespace metadata
+@@ -3611,7 +3758,7 @@ namespace metadata
  		{
  			Il2CppString* enumTypeName = ReadSerString(reader);
  
@@ -2170,7 +2183,7 @@ index dd45bcd..20b8667 100644
  			if (!enumType)
  			{
  				std::string stdStrName = il2cpp::utils::StringUtils::Utf16ToUtf8(enumTypeName->chars);
-@@ -3691,7 +3832,7 @@ namespace metadata
+@@ -3691,7 +3838,7 @@ namespace metadata
  			Il2CppTypeDefinition* typeDef = GetTypeDefinitionByTypeDetail(&type);
  			if (typeDef->namespaceIndex == encodedNamespaceIndex && typeDef->nameIndex == encodedNameIndex)
  			{
@@ -2179,7 +2192,7 @@ index dd45bcd..20b8667 100644
  			}
  		}
  		if (!raiseExceptionIfNotFound)
-@@ -3706,5 +3847,12 @@ namespace metadata
+@@ -3706,5 +3853,12 @@ namespace metadata
  			CStringToStringView(_il2cppImage->nameNoExt)));
  		return nullptr;
  	}
