@@ -1,5 +1,16 @@
 # DHE evolution implementation and validation
 
+## Current capability work: existing interface slots
+
+Clean fixture `16107af` adds an interface method before the existing method,
+preserving old method bodies and all object/value fields. The Unity-prepared
+DLL passes 42 CLR groups and twelve declaration/slot identity checks. All six
+frozen Bases reject only the expected added interface/virtual-method changes;
+no publishable resource is produced. Native support remains to be implemented.
+See `docs/HybridCLR-DHE-Interface-Evolution.md` for exact inputs and the dispatch,
+reflection-map and publication boundaries. This does not supersede the separate
+passing field-address checkpoint below.
+
 ## Latest completed checkpoint: stable field addresses and mixed Bases
 
 Clean `92b7ff4` passes 18 cold Windows processes across three archived v11

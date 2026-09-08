@@ -1,5 +1,48 @@
 # DHE existing interface evolution
 
+## Reproduced checkpoint
+
+Clean fixture source `16107af` compiles with zero warnings/errors and passes all
+42 CLR evolution groups before and after ordinary Unity 2021 Current preparation.
+The previous 35 groups are unchanged; seven new groups cover explicit class and
+boxed-struct dispatch, constrained calls, delegates, reflection invocation,
+GetInterfaceMap and type identity. The preparation stops after preflight and
+does not build a new Base Player. The project-local compiler is restored and
+its transaction journal is absent.
+
+The prepared input passes twelve independent declaration checks. Both original
+and evolved Bases expose Apply at interface slot 0. Current exposes Added at 0
+and Apply at 1. The three affected types retain their physical fields and their
+original Apply method fingerprints. The class implementation is explicit and
+the value-type implementation is implicit. This is a genuine slot collision,
+not an unrelated value-layout or old-method-body change.
+
+Resource validation rejects all six frozen Bases with only the expected added
+interface/virtual-method reasons; guard coverage still passes. Original Bases
+have two reasons (IIntOperation and IntOperationStruct); evolved Bases add the
+existing DheEvolutionOperation explicit implementation as a third reason.
+No resource-update or runtime-plan manifest is emitted. The validator and native
+runtime are unchanged. This is an unsupported-capability reproduction, not a
+Player pass or an implementation of interface evolution.
+
+Paths are relative to `C:/hybridclr_optimize/artifacts/dhe-evolution-20260908`:
+
+| Artifact | SHA-256 |
+|---|---|
+| `prepare-interface-slots-u21/current/HybridCLR.ManagedCasesAot.dll` | `BDA9EE5E5364DB54952EE7A11651D85819CD04DA34A2662A111D758DC59BDDCA` |
+| `interface-slots-reference-prepared.json` | `CC3DDAAFF8447DC8F5978E979824C780BBD5D9D6423B597BEE7EE01D4CA80A1C` |
+| `interface-slots-prepared-identity/report.json` | `B2A2499E73A917FE74BB91855C367987A58C6383D6CB88996CD62E1F4C492AA1` |
+| `resource-interface-slots-rejected/dhe-resource-update-validation.json` | `A2CE5448D39E3C736137B6D1C0CC73233456289DA24058D20B2F76D83FDF5D86` |
+
+`interface-slots-reference-prepared-checks.ids` records all 42 executed groups.
+`registry-field-address-stable-generations.json` is the unchanged six-Base input.
+Raw inputs are `artifacts/evolution-interface-slots-raw` under the lab worktree.
+The earlier append-only experiment remains under the `interface-evolution-*`,
+`prepare-interface-evolution-u21` and `resource-interface-evolution-rejected`
+paths; its evidence is not relabeled as a slot-collision test. Generated Demo
+inputs from those two preceding states are preserved in stashes `e2a94af` and
+`5af8f3c`; older stashes and all archived Players remain untouched.
+
 ## Objective and acceptance
 
 An immutable Base already contains IIntOperation and its value-type implementation.
@@ -43,6 +86,15 @@ layout and old slots; native callers require explicitly covered lookup hooks.
 Publication must prepare complete maps under existing metadata synchronization,
 publish once with release/acquire ordering, and roll back failed multi-assembly
 registration without leaving partial mappings. A Windows pass is not ARM64 proof.
+
+The current Interpreter GET_OBJECT_VIRTUAL_METHOD and Class::GetVirtualMethod
+both reach ClassInlines' slot-based interface lookup. RuntimeType::GetInterfaceMapData
+additionally fetches the start of the old contiguous vtable slice and indexes it
+using the reflected method count. Adding logical method enumeration without
+repairing this consumer can read beyond the original interface slice. Audit the
+homologous InterpreterImage/VTableSetUp path too: a new receiver type can implement
+an interface that already belongs to Base. Slot selection must retain canonical
+type identity while distinguishing native Base slots from logical Current slots.
 
 Unity 2021 uses ordinary bridges and its own supplemental AOT metadata. Unity
 2022 and Tuanjie also require FGS and their real headers. After a native repair,
