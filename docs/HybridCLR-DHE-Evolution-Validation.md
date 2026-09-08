@@ -1,5 +1,21 @@
 # DHE evolution implementation and validation
 
+## Latest focused checkpoint: cross-assembly interfaces on Unity 2021
+
+Clean `3270829` passes three cold Windows processes on one evolved v19 Base:
+all 52 evolution groups and 220 differential cases, zero differences. First
+resource case routing is mixed (208 retained AOT, 12 conservative RVA changes);
+latest and skipped-latest each record 220 interpreted entry receipts. All 19
+distinct protected files independently rehash unchanged. The original cross-image
+caller stays AOT and returns `derived:26:34`. This is not yet a six-Base checkpoint.
+See `reports/dhe-cross-interface-u21-windows.md` and the cross-interface design.
+
+The current source includes a Tuanjie-only header repair and a v20 package identity;
+the v19 Unity 2021 Player remains immutable and eligible by its actual capabilities.
+Other engines and original generations are pending. The remaining generic interface
+definition, virtual/layout, Unity serialization, GC/ABI and performance work below
+is still required for the full goal.
+
 ## Latest completed checkpoint: interface slots across six Bases
 
 Clean `4eef487` passes 18 cold Windows processes with 18 unique PIDs across
