@@ -16,11 +16,23 @@ assembly resolution uses the input directory, not host GAC/framework redirects.
 Runtime contract v13 advertises `supplemental-instance-field-addresses-v1`;
 old Base capabilities remain unchanged. MV stays DHEMETA1/schema 1.
 
-Native compilation and actual Player validation are pending. The first offline
+All three actual-header compile/CTest profiles pass at lab `aa95683`, HybridCLR
+`b950d29`, package `a8271cd`, with unchanged engine hooks. Unity 2021's fresh Base
+and no-op Player pass. Unity 2022's first Base workflow fails while restoring
+its compiler with File.Replace; the transaction remains recoverable and the
+failed record is preserved. Field-address Player execution is still pending.
+
+The first offline
 test intentionally remains failed: it compared raw netstandard input with a
 Unity-prepared Base. Its original failure is retained; the same input must pass
 through the ordinary Unity Current generation before compatibility qualification.
-Neighbor stores alone do not yet independently prove a sidecar capacity expansion.
+The source-order fixture still did not generate a same-type token collision
+after Unity processing. The compatibility fixture now optionally reorders only
+TypeDefs in a new payload, proves an actual collision, and compares every method,
+type and field semantic hash with the prepared input. All fifteen checks pass
+for that payload; both it and its next-release variant pass all 35 CLR groups.
+The old failed payloads remain unchanged. Neighbor stores alone do not yet
+independently prove a sidecar capacity expansion.
 No full-evolution, performance or production conclusion is claimed.
 
 ## Reproduction and objective
