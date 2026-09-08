@@ -4,7 +4,7 @@ internal sealed class ResourceUpdateCompatibility
 {
 	public const string Policy = "dhe-proven-safe-subset-v1";
 	public const string RuntimeProtocol = "dhe-runtime-protocol-v1";
-    public const string CurrentNativeRuntimeContract = "dhe-runtime-v12";
+    public const string CurrentNativeRuntimeContract = "dhe-runtime-v13";
     public static readonly string[] KnownRuntimeCapabilities =
     {
 		"aot-guard-v1",
@@ -17,6 +17,7 @@ internal sealed class ResourceUpdateCompatibility
 		"supplemental-existing-type-instance-fields-v1",
         "supplemental-existing-type-static-fields-v1",
         "supplemental-existing-generic-type-fields-v1",
+        "supplemental-instance-field-addresses-v1",
 		"supplemental-existing-type-methods-v1",
 		"removed-existing-type-methods-v1",
 		"existing-type-method-signature-replacement-v1",
@@ -152,9 +153,7 @@ internal sealed class ResourceUpdateCompatibility
         {
 			if (baselineTypes[field.DeclaringTypeStableId].IsPrivateImplementationDetails)
                 continue;
-			if (!field.IsStatic && allAddressTakenFields.Contains(field.Identity))
-				unsupported.Add("added-instance-field-address-taken:" + field.Identity);
-			else if (!field.IsStatic && !IsSupportedInstanceFieldAddition(field))
+			if (!field.IsStatic && !IsSupportedInstanceFieldAddition(field))
 				unsupported.Add(UnsupportedInstanceFieldReason(field) + ":" + field.Identity);
             else if (field.IsStatic && (field.IsThreadStatic || field.HasRva))
                 unsupported.Add("added-threadstatic-or-rva-field-on-existing-type:" +
@@ -227,6 +226,9 @@ internal sealed class ResourceUpdateCompatibility
         if (addedFields.Any(field => baselineTypes.ContainsKey(field.DeclaringTypeStableId) &&
                 !field.IsStatic))
             requiredCapabilities.Add("supplemental-existing-type-instance-fields-v1");
+        if (addedFields.Any(field => baselineTypes.ContainsKey(field.DeclaringTypeStableId) &&
+                !field.IsStatic && allAddressTakenFields.Contains(field.Identity)))
+            requiredCapabilities.Add("supplemental-instance-field-addresses-v1");
         if (addedFields.Any(field => baselineTypes.ContainsKey(field.DeclaringTypeStableId) &&
                 field.IsStatic))
             requiredCapabilities.Add("supplemental-existing-type-static-fields-v1");
@@ -394,14 +396,12 @@ internal sealed class ResourceUpdateCompatibility
 	private static bool IsSupportedInstanceFieldAddition(MetaVersionField field) =>
 		!field.IsStatic && !field.IsLiteral && !field.IsThreadStatic &&
 		!field.DeclaringTypeIsValueType && !field.HasRva &&
-		!field.AddressTaken && !field.HasUnsupportedSidecarType;
+		!field.HasUnsupportedSidecarType;
 
 	private static string UnsupportedInstanceFieldReason(MetaVersionField field)
 	{
 		if (field.DeclaringTypeIsValueType)
 			return "added-instance-field-on-existing-value-type";
-		if (field.AddressTaken)
-			return "added-instance-field-address-taken";
 		if (field.HasUnsupportedSidecarType)
 			return "added-instance-field-has-pointer-or-byref-type";
 		return "unsupported-added-instance-field-on-existing-type";

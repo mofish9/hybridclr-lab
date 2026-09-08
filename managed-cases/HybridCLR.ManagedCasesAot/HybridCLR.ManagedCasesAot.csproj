@@ -8,6 +8,10 @@
     <LangVersion>latest</LangVersion>
   </PropertyGroup>
   <ItemGroup>
+    <!-- Keep new assertion types after the existing structural type's FieldDefs. -->
+    <Compile Remove="DheGenericFieldEvolutionAssertions.cs;DheFieldAddressEvolutionAssertions.cs" />
+    <Compile Include="DheGenericFieldEvolutionAssertions.cs" />
+    <Compile Include="DheFieldAddressEvolutionAssertions.cs" />
     <Compile Include="../HybridCLR.ManagedCases/PerformanceWorkload.cs" Link="PerformanceWorkload.cs" />
     <ProjectReference Include="../../managed-contracts/HybridCLR.BoundaryContracts/HybridCLR.BoundaryContracts.csproj" />
   </ItemGroup>

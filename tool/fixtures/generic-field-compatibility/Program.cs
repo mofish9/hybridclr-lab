@@ -30,7 +30,12 @@ var added = current.Fields.Where(field => field.DeclaringTypeIsGeneric &&
     field.Identity.Contains("DheAddedGenericType", StringComparison.Ordinal) && field.Name.StartsWith("Added", StringComparison.Ordinal)).ToArray();
 checks["fixture-adds-two-instance-and-two-static-fields"] = added.Count(field => field.IsStatic) == 2 && added.Count(field => !field.IsStatic) == 2;
 var address = ResourceUpdateCompatibility.Analyze(evolved, current, added.Where(field => !field.IsStatic).Select(field => field.Identity));
-checks["field-address-still-rejected"] = address.UnsupportedChanges.Count(value => value.StartsWith("added-instance-field-address-taken:", StringComparison.Ordinal)) == 2;
+checks["field-address-requires-capability"] = address.Compatible &&
+    address.RequiredRuntimeCapabilities.Contains("supplemental-instance-field-addresses-v1");
+checks["field-address-old-runtime-rejected"] = !ResourceUpdateCompatibility.CanExecuteUpdate(
+    ResourceUpdateCompatibility.RuntimeProtocol, "dhe-runtime-v12",
+    ResourceUpdateCompatibility.KnownRuntimeCapabilities.Where(value => value != "supplemental-instance-field-addresses-v1"),
+    address.RequiredRuntimeCapabilities);
 var removed = ResourceUpdateCompatibility.Analyze(current, evolved);
 checks["generic-removal-requires-capability"] = removed.RequiredRuntimeCapabilities.Contains(capability);
 string threadStaticPath = Path.Combine(output, "thread-static.dll");

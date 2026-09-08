@@ -1,5 +1,5 @@
 diff --git a/hybridclr/DheRuntime.cpp b/hybridclr/DheRuntime.cpp
-index 7103ed2b422f2359d5f0e7d50a045623422c911d..86a98f17327c768d39536be55c3f6aeeca6db73f 100644
+index 7103ed2..86a98f1 100644
 --- a/hybridclr/DheRuntime.cpp
 +++ b/hybridclr/DheRuntime.cpp
 @@ -18,21 +18,32 @@
@@ -750,7 +750,7 @@ index 7103ed2b422f2359d5f0e7d50a045623422c911d..86a98f17327c768d39536be55c3f6aee
  }
 +}
 diff --git a/hybridclr/DheRuntime.h b/hybridclr/DheRuntime.h
-index e143176b6237283efcd8872209fab37b1323fd98..54f5f11d0774cb42ef0a0fe3ac5735e57ef6944f 100644
+index e143176..54f5f11 100644
 --- a/hybridclr/DheRuntime.h
 +++ b/hybridclr/DheRuntime.h
 @@ -6,43 +6,91 @@
@@ -871,7 +871,7 @@ index e143176b6237283efcd8872209fab37b1323fd98..54f5f11d0774cb42ef0a0fe3ac5735e5
  }
 +}
 diff --git a/hybridclr/Il2CppCompatibleDef.cpp b/hybridclr/Il2CppCompatibleDef.cpp
-index b213b60f3df08dbc59e83484779336ffd51b245f..32ce2c56a2d463047155826d00fa3d6fa3ba5b92 100644
+index b213b60..32ce2c5 100644
 --- a/hybridclr/Il2CppCompatibleDef.cpp
 +++ b/hybridclr/Il2CppCompatibleDef.cpp
 @@ -157,7 +157,8 @@ namespace hybridclr
@@ -894,7 +894,7 @@ index b213b60f3df08dbc59e83484779336ffd51b245f..32ce2c56a2d463047155826d00fa3d6f
  			ResolvedInterpreterCallMethodPointers resolved;
  			if (implementedByInterpreter)
 diff --git a/hybridclr/Il2CppCompatibleDef.h b/hybridclr/Il2CppCompatibleDef.h
-index d192de22c52632ec86f737f40a933a81a9e18f24..cf6f58f131daeb946a51f8071dc79f551c154745 100644
+index d192de2..cf6f58f 100644
 --- a/hybridclr/Il2CppCompatibleDef.h
 +++ b/hybridclr/Il2CppCompatibleDef.h
 @@ -168,9 +168,10 @@ namespace hybridclr
@@ -911,7 +911,7 @@ index d192de22c52632ec86f737f40a933a81a9e18f24..cf6f58f131daeb946a51f8071dc79f55
  		return InitAndGetInterpreterDirectlyCallMethodPointer(method) != nullptr;
  	}
 diff --git a/hybridclr/RuntimeApi.cpp b/hybridclr/RuntimeApi.cpp
-index e4f38ae5c26f2d25fd28229fed56bf6ac0a91425..9095781ad332d6dd31476714bdae13f7cb4b8726 100644
+index e4f38ae..9095781 100644
 --- a/hybridclr/RuntimeApi.cpp
 +++ b/hybridclr/RuntimeApi.cpp
 @@ -1,6 +1,10 @@
@@ -1256,7 +1256,7 @@ index e4f38ae5c26f2d25fd28229fed56bf6ac0a91425..9095781ad332d6dd31476714bdae13f7
  
  	int32_t RuntimeApi::IsDifferentialMethodChanged(Il2CppReflectionMethod* method)
 diff --git a/hybridclr/RuntimeApi.h b/hybridclr/RuntimeApi.h
-index 0664ff5d58854a95688f996ff8f4f25086a046f8..0e73745eb89aa8182c22e35cb96c5fd115b0e3e1 100644
+index 0664ff5..0e73745 100644
 --- a/hybridclr/RuntimeApi.h
 +++ b/hybridclr/RuntimeApi.h
 @@ -11,8 +11,8 @@ namespace hybridclr
@@ -1271,32 +1271,35 @@ index 0664ff5d58854a95688f996ff8f4f25086a046f8..0e73745eb89aa8182c22e35cb96c5fd1
  		static int32_t GetDifferentialInterpreterEntryCount();
  		static int32_t GetDifferentialAotBridgeCallCount();
 diff --git a/hybridclr/interpreter/Instruction.cpp b/hybridclr/interpreter/Instruction.cpp
-index 6bc9e0d4a7be13aa9d4e2543956e6b127c1d5aef..9e4ae1055d4306a19bc91ee0d8184a3cdc57ea29 100644
+index 6bc9e0d..d07eae0 100644
 --- a/hybridclr/interpreter/Instruction.cpp
 +++ b/hybridclr/interpreter/Instruction.cpp
-@@ -919,6 +919,8 @@ namespace interpreter
+@@ -919,7 +919,10 @@ namespace interpreter
  		32,
  		32,
  		16,
 +		16,
 +		16,
  
++        16,
          //!!!}}INST_SIZE
      };
+ }
 diff --git a/hybridclr/interpreter/Instruction.h b/hybridclr/interpreter/Instruction.h
-index 50e803f42ba3f3585fc0b4e775093621ccc7c8cb..d7c75a2c0bc6bf4b9084f87dff2f6914305054c7 100644
+index 50e803f..188cfee 100644
 --- a/hybridclr/interpreter/Instruction.h
 +++ b/hybridclr/interpreter/Instruction.h
-@@ -935,6 +935,8 @@ namespace interpreter
+@@ -935,6 +935,9 @@ namespace interpreter
  		ConvertVarVar_i4_i8_Add_i8_LdlocVarVar_2,
  		LdcVarConst_4_Add_i4_LdlocVarVar_2,
  		LdcVarConst_4_Add_i4_Ret_4,
 +		DheLdfldVarVar,
 +		DheStfldVarVar,
++		DheLdfldaVarVar,
  
  		//!!!}}OPCODE
  	};
-@@ -10825,6 +10827,34 @@ namespace interpreter
+@@ -10825,6 +10828,47 @@ namespace interpreter
  	};
  
  
@@ -1327,12 +1330,25 @@ index 50e803f42ba3f3585fc0b4e775093621ccc7c8cb..d7c75a2c0bc6bf4b9084f87dff2f6914
 +		uint8_t __pad15;
 +	};
 +
++	struct IRDheLdfldaVarVar : IRCommon
++	{
++		uint16_t dst;
++		uint16_t obj;
++		uint8_t __pad6;
++		uint8_t __pad7;
++		uint32_t field;
++		uint8_t __pad12;
++		uint8_t __pad13;
++		uint8_t __pad14;
++		uint8_t __pad15;
++	};
++
 +
  	//!!!}}INST
  #pragma pack(pop)
  
 diff --git a/hybridclr/interpreter/InterpreterModule.cpp b/hybridclr/interpreter/InterpreterModule.cpp
-index 944aaef6d90b63d1d4ed3dee5e45901b3edd8d1d..0b440a17eab3ea58c2cc40f4c8f773c1e5f797c9 100644
+index 944aaef..0b440a1 100644
 --- a/hybridclr/interpreter/InterpreterModule.cpp
 +++ b/hybridclr/interpreter/InterpreterModule.cpp
 @@ -300,7 +300,12 @@ namespace interpreter
@@ -1350,10 +1366,10 @@ index 944aaef6d90b63d1d4ed3dee5e45901b3edd8d1d..0b440a17eab3ea58c2cc40f4c8f773c1
  		}
  		if (method && method->klass && method->klass->image &&
 diff --git a/hybridclr/interpreter/Interpreter_Execute.cpp b/hybridclr/interpreter/Interpreter_Execute.cpp
-index 81332ad01e584ed32c783f75417a74cf65bb5430..58c262982c65f328f50c912446dba866dc839435 100644
+index 81332ad..037374f 100644
 --- a/hybridclr/interpreter/Interpreter_Execute.cpp
 +++ b/hybridclr/interpreter/Interpreter_Execute.cpp
-@@ -12496,6 +12496,38 @@ const int32_t kMaxRetValueTypeStackObjectSize = 1024;
+@@ -12496,6 +12496,53 @@ const int32_t kMaxRetValueTypeStackObjectSize = 1024;
  					SET_RET_AND_LEAVE_FRAME(4, 8);
  					continue;
  				}
@@ -1382,10 +1398,25 @@ index 81332ad01e584ed32c783f75417a74cf65bb5430..58c262982c65f328f50c912446dba866
 +					Il2CppObject* __instance = *(Il2CppObject**)(localVarBase + __obj);
 +					CHECK_NOT_NULL_THROW(__instance);
 +					if (!MetadataModule::TrySetDheSupplementalInstanceFieldValue(
-+						__instance, __field, localVarBase + __data))
++						__instance, __field, localVarBase + __data, true))
 +					{
 +						RaiseExecutionEngineException("DHE instance field is not registered.");
 +					}
++					ip += 16;
++					continue;
++				}
++				case HiOpcodeEnum::DheLdfldaVarVar:
++				{
++					uint16_t __dst = *(uint16_t*)(ip + 2);
++					uint16_t __obj = *(uint16_t*)(ip + 4);
++					FieldInfo* __field = reinterpret_cast<FieldInfo*>(
++						imi->resolveDatas[*(uint32_t*)(ip + 8)]);
++					Il2CppObject* __instance = *(Il2CppObject**)(localVarBase + __obj);
++					CHECK_NOT_NULL_THROW(__instance);
++					void* __address;
++					if (!MetadataModule::TryGetDheSupplementalInstanceFieldAddress(__instance, __field, &__address))
++						RaiseExecutionEngineException("DHE instance field is not registered.");
++					*(void**)(localVarBase + __dst) = __address;
 +					ip += 16;
 +					continue;
 +				}
@@ -1393,7 +1424,7 @@ index 81332ad01e584ed32c783f75417a74cf65bb5430..58c262982c65f328f50c912446dba866
  #pragma endregion
  				default:
 diff --git a/hybridclr/interpreter/MemoryUtil.h b/hybridclr/interpreter/MemoryUtil.h
-index 8617e3d69baa61483622610971e392404c999c02..0552b19bf38c82251bc7bdb8c102102698624db5 100644
+index 8617e3d..0552b19 100644
 --- a/hybridclr/interpreter/MemoryUtil.h
 +++ b/hybridclr/interpreter/MemoryUtil.h
 @@ -141,6 +141,21 @@ namespace interpreter
@@ -1419,7 +1450,7 @@ index 8617e3d69baa61483622610971e392404c999c02..0552b19bf38c82251bc7bdb8c1021026
  	{
  		switch (size)
 diff --git a/hybridclr/metadata/AOTHomologousImage.h b/hybridclr/metadata/AOTHomologousImage.h
-index a74d8105cce1812ba2e3f9f6976ecb7a05232473..f583687bcb2c04f07c9dce6a03e5fa9beeeda65c 100644
+index a74d810..f583687 100644
 --- a/hybridclr/metadata/AOTHomologousImage.h
 +++ b/hybridclr/metadata/AOTHomologousImage.h
 @@ -42,9 +42,144 @@ namespace metadata
@@ -1570,7 +1601,7 @@ index a74d8105cce1812ba2e3f9f6976ecb7a05232473..f583687bcb2c04f07c9dce6a03e5fa9b
 \ No newline at end of file
 +}
 diff --git a/hybridclr/metadata/Assembly.cpp b/hybridclr/metadata/Assembly.cpp
-index 4d889abb60f0a3cff239afc1c59292a2a08dbb92..4080d30dc31bc42a881bda15940f38794b8e4f17 100644
+index 4d889ab..4080d30 100644
 --- a/hybridclr/metadata/Assembly.cpp
 +++ b/hybridclr/metadata/Assembly.cpp
 @@ -230,11 +230,52 @@ namespace metadata
@@ -1633,7 +1664,7 @@ index 4d889abb60f0a3cff239afc1c59292a2a08dbb92..4080d30dc31bc42a881bda15940f3879
  		if (targetAssembly)
 diff --git a/hybridclr/metadata/DheCustomAttributeMetadata.h b/hybridclr/metadata/DheCustomAttributeMetadata.h
 new file mode 100644
-index 0000000000000000000000000000000000000000..2825f58438d5bbc77aedf8c44eb6f7d94fa24489
+index 0000000..2825f58
 --- /dev/null
 +++ b/hybridclr/metadata/DheCustomAttributeMetadata.h
 @@ -0,0 +1,59 @@
@@ -1698,7 +1729,7 @@ index 0000000000000000000000000000000000000000..2825f58438d5bbc77aedf8c44eb6f7d9
 +}
 diff --git a/hybridclr/metadata/DheGenericFieldMetadata.h b/hybridclr/metadata/DheGenericFieldMetadata.h
 new file mode 100644
-index 0000000000000000000000000000000000000000..c34042ac72dff099c4461f17c108e53920f06e2f
+index 0000000..c34042a
 --- /dev/null
 +++ b/hybridclr/metadata/DheGenericFieldMetadata.h
 @@ -0,0 +1,26 @@
@@ -1729,7 +1760,7 @@ index 0000000000000000000000000000000000000000..c34042ac72dff099c4461f17c108e539
 +}
 +}
 diff --git a/hybridclr/metadata/Image.cpp b/hybridclr/metadata/Image.cpp
-index 2bb98002b1a6f7cb62c265ff684163733a373628..c47f92c16d6ec7636f833fc5d48947fa5504e3de 100644
+index 2bb9800..0b35e18 100644
 --- a/hybridclr/metadata/Image.cpp
 +++ b/hybridclr/metadata/Image.cpp
 @@ -22,6 +22,7 @@
@@ -1768,16 +1799,20 @@ index 2bb98002b1a6f7cb62c265ff684163733a373628..c47f92c16d6ec7636f833fc5d48947fa
          default:
          {
              return false;
-@@ -968,7 +990,7 @@ namespace metadata
-             if (cur->token == fieldDef->token)
+@@ -965,10 +987,9 @@ namespace metadata
+         void* iter = nullptr;
+         for (const FieldInfo* cur = nullptr; (cur = il2cpp::vm::Class::GetFields(klass, &iter)) != nullptr; )
+         {
+-            if (cur->token == fieldDef->token)
++            if (cur->token == fieldDef->token && std::strcmp(cur->name, name) == 0)
              {
-                 IL2CPP_ASSERT(std::strcmp(cur->name, name) == 0);
+-                IL2CPP_ASSERT(std::strcmp(cur->name, name) == 0);
 -                return cur;
 +                return MetadataModule::ResolveDheSupplementalField(cur);
              }
          }
          RaiseMissingFieldException(&type, name);
-@@ -992,6 +1014,39 @@ namespace metadata
+@@ -992,6 +1013,39 @@ namespace metadata
                      return GetMethodInfo(type, methodDef, genericInstantiation, genericContext);
                  }
              }
@@ -1818,7 +1853,7 @@ index 2bb98002b1a6f7cb62c265ff684163733a373628..c47f92c16d6ec7636f833fc5d48947fa
          else
          {
 diff --git a/hybridclr/metadata/InterpreterImage.cpp b/hybridclr/metadata/InterpreterImage.cpp
-index dd45bcd37a62a507895153443d7d1a081e07d76f..9b25f7d333cf9358b23c0e34bbe697ed84b7561d 100644
+index dd45bcd..9b25f7d 100644
 --- a/hybridclr/metadata/InterpreterImage.cpp
 +++ b/hybridclr/metadata/InterpreterImage.cpp
 @@ -1,4 +1,6 @@
@@ -2096,7 +2131,7 @@ index dd45bcd37a62a507895153443d7d1a081e07d76f..9b25f7d333cf9358b23c0e34bbe697ed
  }
  }
 diff --git a/hybridclr/metadata/InterpreterImage.h b/hybridclr/metadata/InterpreterImage.h
-index 4ba0c6ac530fd182207d53e4382cf9c2ddb46e34..876f351656c8bb37ef4f56f19d364631ce3584d8 100644
+index 4ba0c6a..876f351 100644
 --- a/hybridclr/metadata/InterpreterImage.h
 +++ b/hybridclr/metadata/InterpreterImage.h
 @@ -21,6 +21,7 @@ namespace metadata
@@ -2161,7 +2196,7 @@ index 4ba0c6ac530fd182207d53e4382cf9c2ddb46e34..876f351656c8bb37ef4f56f19d364631
  		static bool IsMetadataPublished(const int32_t* initialized)
  		{
 diff --git a/hybridclr/metadata/MetadataModule.cpp b/hybridclr/metadata/MetadataModule.cpp
-index 9c240fa21166fc29f0e99a45e34b865000a84e55..ae2a26d2f97eb2d5ff8a508b903560c944f313cc 100644
+index 9c240fa..67e4b6f 100644
 --- a/hybridclr/metadata/MetadataModule.cpp
 +++ b/hybridclr/metadata/MetadataModule.cpp
 @@ -1,4 +1,5 @@
@@ -2170,7 +2205,7 @@ index 9c240fa21166fc29f0e99a45e34b865000a84e55..ae2a26d2f97eb2d5ff8a508b903560c9
  
  #include "os/Atomic.h"
  #include "os/Mutex.h"
-@@ -7,9 +8,15 @@
+@@ -7,9 +8,16 @@
  #include "vm/String.h"
  #include "vm/Assembly.h"
  #include "vm/Class.h"
@@ -2180,13 +2215,14 @@ index 9c240fa21166fc29f0e99a45e34b865000a84e55..ae2a26d2f97eb2d5ff8a508b903560c9
 +#include "vm/Field.h"
  #include "vm/Image.h"
  #include "vm/MetadataLock.h"
++#include "vm/MetadataCache.h"
 +#include "gc/GarbageCollector.h"
 +#include "gc/GCHandle.h"
 +#include "gc/WriteBarrier.h"
  #include "utils/Logging.h"
  #include "utils/MemoryMappedFile.h"
  #include "utils/Memory.h"
-@@ -22,6 +29,10 @@
+@@ -22,6 +30,10 @@
  #include "SuperSetAOTHomologousImage.h"
  #include "MetadataPool.h"
  
@@ -2197,7 +2233,7 @@ index 9c240fa21166fc29f0e99a45e34b865000a84e55..ae2a26d2f97eb2d5ff8a508b903560c9
  using namespace il2cpp;
  
  namespace hybridclr
-@@ -29,6 +40,195 @@ namespace hybridclr
+@@ -29,6 +41,279 @@ namespace hybridclr
  
  namespace metadata
  {
@@ -2228,6 +2264,16 @@ index 9c240fa21166fc29f0e99a45e34b865000a84e55..ae2a26d2f97eb2d5ff8a508b903560c9
 +			uint32_t slot;
 +			FieldInfo* logicalField;
 +		};
++
++		struct DheFieldCellLayout
++		{
++			Il2CppClass* klass;
++			FieldInfo* value;
++			int32_t ownerOffset;
++		};
++
++		// Cell layouts are immutable after publication under g_MetadataLock.
++		std::unordered_map<Il2CppClass*, DheFieldCellLayout> s_dheFieldCellLayouts;
 +
 +		std::mutex s_dheSidecarMutex;
 +		std::unordered_map<const FieldInfo*, DheInstanceFieldSlot> s_dheInstanceFieldSlots;
@@ -2389,11 +2435,85 @@ index 9c240fa21166fc29f0e99a45e34b865000a84e55..ae2a26d2f97eb2d5ff8a508b903560c9
 +			Il2CppArray* values = EnsureDheSidecarValuesLocked(entry, slot + 1);
 +			il2cpp_array_setref(values, slot, value);
 +		}
++
++		DheFieldCellLayout GetDheFieldCellLayoutLocked(const Il2CppType* type)
++		{
++			Il2CppClass* fieldType = il2cpp::vm::Class::FromIl2CppType(type);
++			auto existing = s_dheFieldCellLayouts.find(fieldType);
++			if (existing != s_dheFieldCellLayouts.end())
++				return existing->second;
++
++			const Il2CppAssembly* assembly = il2cpp::vm::Assembly::GetLoadedAssembly("HybridCLR.Runtime");
++			Il2CppClass* definition = assembly ? il2cpp::vm::Class::FromName(
++				assembly->image, "HybridCLR", "DheFieldCell`1") : nullptr;
++			if (!definition || !definition->is_generic)
++				RaiseExecutionEngineException("DHE requires the preserved HybridCLR.DheFieldCell<T> runtime type.");
++			const Il2CppType* argument = &fieldType->byval_arg;
++			Il2CppClass* cellClass = il2cpp::vm::MetadataCache::GetGenericInstanceType(definition, &argument, 1);
++			if (!cellClass)
++				RaiseExecutionEngineException("DHE field cell generic instantiation failed.");
++			il2cpp::vm::Class::Init(cellClass);
++			FieldInfo* owner = il2cpp::vm::Class::GetFieldFromName(cellClass, "Owner");
++			FieldInfo* value = il2cpp::vm::Class::GetFieldFromName(cellClass, "Value");
++			if (!owner || !value || owner->type->type != IL2CPP_TYPE_OBJECT ||
++				(owner->type->attrs & FIELD_ATTRIBUTE_STATIC) || (value->type->attrs & FIELD_ATTRIBUTE_STATIC) ||
++				owner->offset < static_cast<int32_t>(sizeof(Il2CppObject)) ||
++				value->offset < static_cast<int32_t>(sizeof(Il2CppObject)) ||
++				il2cpp::vm::Class::FromIl2CppType(value->type) != fieldType)
++				RaiseExecutionEngineException("DHE field cell layout is missing or incompatible.");
++			uint32_t valueSize = fieldType->byval_arg.valuetype
++				? il2cpp::vm::Class::GetValueSize(fieldType, nullptr) : sizeof(Il2CppObject*);
++			uint64_t ownerEnd = static_cast<uint64_t>(owner->offset) + sizeof(Il2CppObject*);
++			uint64_t valueEnd = static_cast<uint64_t>(value->offset) + valueSize;
++			if (ownerEnd > cellClass->instance_size || valueEnd > cellClass->instance_size ||
++				(owner->offset < valueEnd && value->offset < ownerEnd))
++				RaiseExecutionEngineException("DHE field cell storage overlaps or exceeds its managed layout.");
++			DheFieldCellLayout layout = { cellClass, value, owner->offset };
++			s_dheFieldCellLayouts.emplace(fieldType, layout);
++			return layout;
++		}
++
++		bool TryGetDheFieldCell(Il2CppObject* obj, const FieldInfo* field,
++			Il2CppObject*& cell, FieldInfo*& valueField)
++		{
++			uint32_t slot;
++			FieldInfo* logicalField;
++			{
++				std::lock_guard<std::mutex> lock(s_dheSidecarMutex);
++				if (!TryGetDheFieldSlotLocked(field, slot, logicalField))
++					return false;
++			}
++			if (!obj)
++				il2cpp::vm::Exception::RaiseNullReferenceException();
++			// Never enter engine Field APIs under the sidecar mutex: they reenter DHE.
++			il2cpp::os::FastAutoLock metadataLock(&il2cpp::vm::g_MetadataLock);
++			DheFieldCellLayout layout = GetDheFieldCellLayoutLocked(logicalField->type);
++			valueField = layout.value;
++			{
++				std::lock_guard<std::mutex> lock(s_dheSidecarMutex);
++				cell = GetDheSidecarValueLocked(obj, slot);
++				if (cell)
++					return true;
++			}
++			Il2CppObject* created = il2cpp::vm::Object::New(layout.klass);
++			gc::WriteBarrier::GenericStore(reinterpret_cast<Il2CppObject**>(
++				reinterpret_cast<uint8_t*>(created) + layout.ownerOffset), obj);
++			{
++				std::lock_guard<std::mutex> lock(s_dheSidecarMutex);
++				cell = GetDheSidecarValueLocked(obj, slot);
++				if (!cell)
++				{
++					SetDheSidecarValueLocked(obj, slot, created);
++					cell = created;
++				}
++			}
++			return true;
++		}
 +	}
  
  
  
-@@ -41,9 +241,444 @@ namespace metadata
+@@ -41,9 +326,411 @@ namespace metadata
  
      Image* MetadataModule::GetUnderlyingInterpreterImage(const MethodInfo* methodInfo)
      {
@@ -2438,7 +2558,7 @@ index 9c240fa21166fc29f0e99a45e34b865000a84e55..ae2a26d2f97eb2d5ff8a508b903560c9
 +        }
 +        AOTHomologousImage* homologous = AOTHomologousImage::FindImageByAssembly(image->assembly);
 +        return homologous && homologous->GetTargetAssembly()->image == image ? homologous : nullptr;
-+    }
+     }
 +
 +	const PropertyInfo* MetadataModule::GetDheCustomAttributeProperty(Il2CppClass* klass, uint32_t index)
 +	{
@@ -2513,7 +2633,7 @@ index 9c240fa21166fc29f0e99a45e34b865000a84e55..ae2a26d2f97eb2d5ff8a508b903560c9
 +        {
 +            homologous->GetSupplementalTypes(types);
 +        }
-     }
++    }
 +
 +    Il2CppClass* MetadataModule::GetFirstDheSupplementalNestedType(Il2CppClass* klass,
 +        void** iter)
@@ -2688,95 +2808,62 @@ index 9c240fa21166fc29f0e99a45e34b865000a84e55..ae2a26d2f97eb2d5ff8a508b903560c9
 +	bool MetadataModule::TryGetDheSupplementalInstanceFieldValue(Il2CppObject* obj,
 +		FieldInfo* field, void* value)
 +	{
-+		uint32_t slot;
-+		FieldInfo* logicalField;
-+		Il2CppObject* stored;
-+		{
-+			std::lock_guard<std::mutex> lock(s_dheSidecarMutex);
-+			if (!TryGetDheFieldSlotLocked(field, slot, logicalField))
-+				return false;
-+			stored = GetDheSidecarValueLocked(obj, slot);
-+		}
-+		if (!stored)
-+		{
-+			il2cpp::vm::Field::SetValueRaw(logicalField->type, value, nullptr, false);
-+			return true;
-+		}
-+		Il2CppClass* fieldType = il2cpp::vm::Class::FromIl2CppType(logicalField->type);
-+		if (il2cpp::vm::Class::IsNullable(fieldType))
-+		{
-+			il2cpp::vm::Object::UnboxNullable(stored, fieldType, value);
-+		}
-+		else
-+		{
-+			il2cpp::vm::Field::SetValueRaw(logicalField->type, value,
-+				fieldType->byval_arg.valuetype ? il2cpp::vm::Object::Unbox(stored) : stored, false);
-+		}
++		Il2CppObject* cell;
++		FieldInfo* valueField;
++		if (!TryGetDheFieldCell(obj, field, cell, valueField))
++			return false;
++		il2cpp::vm::Field::GetValue(cell, valueField, value);
 +		return true;
 +	}
 +
 +	bool MetadataModule::TrySetDheSupplementalInstanceFieldValue(Il2CppObject* obj,
-+		const FieldInfo* field, void* value)
++		const FieldInfo* field, void* value, bool dereferencePointer)
 +	{
-+		uint32_t slot;
-+		FieldInfo* logicalField;
-+		{
-+			std::lock_guard<std::mutex> lock(s_dheSidecarMutex);
-+			if (!TryGetDheFieldSlotLocked(field, slot, logicalField))
-+			{
-+				return false;
-+			}
-+		}
-+		Il2CppClass* fieldType = il2cpp::vm::Class::FromIl2CppType(logicalField->type);
-+		Il2CppObject* boxed = il2cpp::vm::Object::Box(fieldType, value);
-+		// Sidecar allocation can enter engine metadata; keep one lock order.
-+		il2cpp::os::FastAutoLock metadataLock(&il2cpp::vm::g_MetadataLock);
-+		std::lock_guard<std::mutex> lock(s_dheSidecarMutex);
-+		SetDheSidecarValueLocked(obj, slot, boxed);
++		Il2CppObject* cell;
++		FieldInfo* valueField;
++		if (!TryGetDheFieldCell(obj, field, cell, valueField))
++			return false;
++		il2cpp::vm::Field::SetValueRaw(valueField->type,
++			reinterpret_cast<uint8_t*>(cell) + valueField->offset, value, dereferencePointer);
++		return true;
++	}
++
++	bool MetadataModule::TryGetDheSupplementalInstanceFieldAddress(Il2CppObject* obj,
++		const FieldInfo* field, void** address)
++	{
++		Il2CppObject* cell;
++		FieldInfo* valueField;
++		if (!TryGetDheFieldCell(obj, field, cell, valueField))
++			return false;
++		*address = reinterpret_cast<uint8_t*>(cell) + valueField->offset;
 +		return true;
 +	}
 +
 +	bool MetadataModule::TryGetDheSupplementalInstanceFieldValueObject(Il2CppObject* obj,
 +		FieldInfo* field, Il2CppObject** value)
 +	{
-+		uint32_t slot;
-+		FieldInfo* logicalField;
-+		Il2CppObject* stored;
-+		{
-+			std::lock_guard<std::mutex> lock(s_dheSidecarMutex);
-+			if (!TryGetDheFieldSlotLocked(field, slot, logicalField))
-+				return false;
-+			stored = GetDheSidecarValueLocked(obj, slot);
-+		}
-+		Il2CppClass* fieldType = il2cpp::vm::Class::FromIl2CppType(logicalField->type);
-+		if (!stored && fieldType->byval_arg.valuetype && !il2cpp::vm::Class::IsNullable(fieldType))
-+		{
-+			stored = il2cpp::vm::Object::New(fieldType);
-+		}
-+		else if (stored && fieldType->byval_arg.valuetype)
-+		{
-+			stored = il2cpp::vm::Object::Box(stored->klass, il2cpp::vm::Object::Unbox(stored));
-+		}
-+		*value = stored;
++		Il2CppObject* cell;
++		FieldInfo* valueField;
++		if (!TryGetDheFieldCell(obj, field, cell, valueField))
++			return false;
++		*value = il2cpp::vm::Field::GetValueObject(valueField, cell);
 +		return true;
 +	}
 +
 +	bool MetadataModule::TrySetDheSupplementalInstanceFieldValueObject(Il2CppObject* obj,
 +		FieldInfo* field, Il2CppObject* value)
 +	{
-+		uint32_t slot;
-+		FieldInfo* logicalField;
-+		{
-+			std::lock_guard<std::mutex> lock(s_dheSidecarMutex);
-+			if (!TryGetDheFieldSlotLocked(field, slot, logicalField))
-+				return false;
-+		}
-+		Il2CppClass* fieldType = il2cpp::vm::Class::FromIl2CppType(logicalField->type);
-+		if (value && fieldType->byval_arg.valuetype)
-+			value = il2cpp::vm::Object::Box(value->klass, il2cpp::vm::Object::Unbox(value));
-+		il2cpp::os::FastAutoLock metadataLock(&il2cpp::vm::g_MetadataLock);
-+		std::lock_guard<std::mutex> lock(s_dheSidecarMutex);
-+		SetDheSidecarValueLocked(obj, slot, value);
++		Il2CppObject* cell;
++		FieldInfo* valueField;
++		if (!TryGetDheFieldCell(obj, field, cell, valueField))
++			return false;
++		Il2CppClass* fieldType = il2cpp::vm::Class::FromIl2CppType(valueField->type);
++		if (il2cpp::vm::Class::IsNullable(fieldType))
++			il2cpp::vm::Object::UnboxNullableWithWriteBarrier(value, fieldType,
++				reinterpret_cast<uint8_t*>(cell) + valueField->offset);
++		else
++			il2cpp::vm::Field::SetValue(cell, valueField,
++				value && fieldType->byval_arg.valuetype ? il2cpp::vm::Object::Unbox(value) : value);
 +		return true;
 +	}
 +
@@ -2842,10 +2929,10 @@ index 9c240fa21166fc29f0e99a45e34b865000a84e55..ae2a26d2f97eb2d5ff8a508b903560c9
  }
  }
 diff --git a/hybridclr/metadata/MetadataModule.h b/hybridclr/metadata/MetadataModule.h
-index 4989130b77c9159106aa4aa854f7c5e8b030b45f..b36639c23571d738a2108411a6822e22a61d41d8 100644
+index 4989130..23b27f4 100644
 --- a/hybridclr/metadata/MetadataModule.h
 +++ b/hybridclr/metadata/MetadataModule.h
-@@ -52,6 +52,103 @@ namespace metadata
+@@ -52,6 +52,106 @@ namespace metadata
  		}
  		
  		static Image* GetUnderlyingInterpreterImage(const MethodInfo* method);
@@ -2915,7 +3002,10 @@ index 4989130b77c9159106aa4aa854f7c5e8b030b45f..b36639c23571d738a2108411a6822e22
 +			FieldInfo* field, void* value);
 +
 +		static bool TrySetDheSupplementalInstanceFieldValue(Il2CppObject* obj,
-+			const FieldInfo* field, void* value);
++			const FieldInfo* field, void* value, bool dereferencePointer = false);
++
++		static bool TryGetDheSupplementalInstanceFieldAddress(Il2CppObject* obj,
++			const FieldInfo* field, void** address);
 +
 +		static bool TryGetDheSupplementalInstanceFieldValueObject(Il2CppObject* obj,
 +			FieldInfo* field, Il2CppObject** value);
@@ -2949,7 +3039,7 @@ index 4989130b77c9159106aa4aa854f7c5e8b030b45f..b36639c23571d738a2108411a6822e22
  
  
  		static const char* GetStringFromEncodeIndex(StringIndex index)
-@@ -242,6 +339,9 @@ namespace metadata
+@@ -242,6 +342,9 @@ namespace metadata
  			return GetImage(DecodeImageIndex(index))->GetFieldOrParameterDefalutValueByRawIndex(DecodeMetadataIndex(index));
  		}
  
@@ -2959,7 +3049,7 @@ index 4989130b77c9159106aa4aa854f7c5e8b030b45f..b36639c23571d738a2108411a6822e22
  #if HYBRIDCLR_UNITY_2020
  		static bool HasAttribute(const Il2CppImage* image, uint32_t token, Il2CppClass* attribute)
  		{
-@@ -254,18 +354,22 @@ namespace metadata
+@@ -254,18 +357,22 @@ namespace metadata
  		}
  #endif
  
@@ -2987,7 +3077,7 @@ index 4989130b77c9159106aa4aa854f7c5e8b030b45f..b36639c23571d738a2108411a6822e22
  				return true;
  			}
 diff --git a/hybridclr/metadata/MetadataUtil.cpp b/hybridclr/metadata/MetadataUtil.cpp
-index 602b33d309bad4ae2438e40269f01a9b11c1b2ee..c8a4fb63b2341d0d6eef407536b185dc9b7abdcf 100644
+index 602b33d..c8a4fb6 100644
 --- a/hybridclr/metadata/MetadataUtil.cpp
 +++ b/hybridclr/metadata/MetadataUtil.cpp
 @@ -717,8 +717,8 @@ namespace metadata
@@ -3002,7 +3092,7 @@ index 602b33d309bad4ae2438e40269f01a9b11c1b2ee..c8a4fb63b2341d0d6eef407536b185dc
  
  	const Il2CppGenericContainer* GetGenericContainerFromIl2CppType(const Il2CppType* type)
 diff --git a/hybridclr/metadata/SuperSetAOTHomologousImage.cpp b/hybridclr/metadata/SuperSetAOTHomologousImage.cpp
-index 368288240e065503bb671b3e03cddbb6925fd3d0..50b456db0489d0432e37eff5f47303315dbdd0c7 100644
+index 3682882..50b456d 100644
 --- a/hybridclr/metadata/SuperSetAOTHomologousImage.cpp
 +++ b/hybridclr/metadata/SuperSetAOTHomologousImage.cpp
 @@ -3,11 +3,15 @@
@@ -3807,7 +3897,7 @@ index 368288240e065503bb671b3e03cddbb6925fd3d0..50b456db0489d0432e37eff5f4730331
  }
 -
 diff --git a/hybridclr/metadata/SuperSetAOTHomologousImage.h b/hybridclr/metadata/SuperSetAOTHomologousImage.h
-index 53eb614f5c6e59ff8de8985913a6a234585cb2b0..115a862505ecd886392381fac13185f1f5ec3fba 100644
+index 53eb614..115a862 100644
 --- a/hybridclr/metadata/SuperSetAOTHomologousImage.h
 +++ b/hybridclr/metadata/SuperSetAOTHomologousImage.h
 @@ -3,6 +3,8 @@
@@ -3937,7 +4027,7 @@ index 53eb614f5c6e59ff8de8985913a6a234585cb2b0..115a862505ecd886392381fac13185f1
 \ No newline at end of file
 +}
 diff --git a/hybridclr/transform/Transform.cpp b/hybridclr/transform/Transform.cpp
-index d92980080c589f3111ff681bcac7cfbacf3b4a6b..a5208975907ea3b0f9819d318ffbc73fa3efc328 100644
+index d929800..a520897 100644
 --- a/hybridclr/transform/Transform.cpp
 +++ b/hybridclr/transform/Transform.cpp
 @@ -24,11 +24,12 @@ namespace transform
@@ -3966,7 +4056,7 @@ index d92980080c589f3111ff681bcac7cfbacf3b4a6b..a5208975907ea3b0f9819d318ffbc73f
  		ctx.TransformBody(0, 0, *result);
  		metadata::MethodBodyCache::EnableShrinkMethodBodyCache(true);
 diff --git a/hybridclr/transform/TransformContext.cpp b/hybridclr/transform/TransformContext.cpp
-index 8d02cff68d81221ff9bc4816f018f558286a7373..8c85deca30dc882b2088445365856dd6e11b59ee 100644
+index 8d02cff..c031831 100644
 --- a/hybridclr/transform/TransformContext.cpp
 +++ b/hybridclr/transform/TransformContext.cpp
 @@ -4003,7 +4003,7 @@ else \
@@ -3999,18 +4089,25 @@ index 8d02cff68d81221ff9bc4816f018f558286a7373..8c85deca30dc882b2088445365856dd6
  				PopStack();
  				PushStackByType(fieldInfo->type);
  
-@@ -5348,6 +5358,10 @@ else \
+@@ -5348,6 +5358,17 @@ else \
  				uint32_t token = (uint32_t)GetI4LittleEndian(ip + 1);
  				FieldInfo* fieldInfo = const_cast<FieldInfo*>(image->GetFieldInfoFromToken(tokenCache, token, klassContainer, methodContainer, genericContext));
  				IL2CPP_ASSERT(fieldInfo);
 +				if (hybridclr::metadata::MetadataModule::IsDheSupplementalInstanceField(fieldInfo))
 +				{
-+					RaiseExecutionEngineException("ldflda is not supported for DHE supplemental instance fields.");
++					CreateAddIR(ir, DheLdfldaVarVar);
++					ir->dst = GetEvalStackTopOffset();
++					ir->obj = ir->dst;
++					ir->field = GetOrAddResolveDataIndex(fieldInfo);
++					PopStack();
++					PushStackByReduceType(NATIVE_INT_REDUCE_TYPE);
++					ip += 5;
++					continue;
 +				}
  
  				uint16_t topIdx = GetEvalStackTopOffset();
  				uint32_t fieldOffset = GetFieldOffset(fieldInfo);
-@@ -5381,8 +5395,18 @@ else \
+@@ -5381,8 +5402,18 @@ else \
  				FieldInfo* fieldInfo = const_cast<FieldInfo*>(image->GetFieldInfoFromToken(tokenCache, token, klassContainer, methodContainer, genericContext));
  				IL2CPP_ASSERT(fieldInfo);
  
@@ -4031,7 +4128,7 @@ index 8d02cff68d81221ff9bc4816f018f558286a7373..8c85deca30dc882b2088445365856dd6
  				PopStackN(2);
  				ip += 5;
  				continue;
-@@ -6599,7 +6623,7 @@ ir->ele = ele.locOffset;
+@@ -6599,7 +6630,7 @@ ir->ele = ele.locOffset;
  					{
  						// impl in self
  						const MethodInfo* implMethod = image->FindImplMethod(conKlass, shareMethod);
@@ -4040,7 +4137,7 @@ index 8d02cff68d81221ff9bc4816f018f558286a7373..8c85deca30dc882b2088445365856dd6
  						{
  							shareMethod = implMethod;
  							goto LabelCall;
-@@ -6909,17 +6933,18 @@ ir->ele = ele.locOffset;
+@@ -6909,17 +6940,18 @@ ir->ele = ele.locOffset;
  
  	bool TransformContext::TransformSubMethodBody(TransformContext& callingCtx, const MethodInfo* methodInfo, int32_t depth, int32_t localVarOffset)
  	{

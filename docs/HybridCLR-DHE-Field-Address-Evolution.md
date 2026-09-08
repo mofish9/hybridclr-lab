@@ -1,5 +1,28 @@
 # DHE supplemental field addresses
 
+## Candidate implementation
+
+The 35-group CLR reference passes, including all original generic-field checks
+and twelve address groups. Native candidates now use preserved package-owned
+`DheFieldCell<T>` objects with normal engine GC descriptors. A cell is published
+once per logical owner/field slot and retained through the existing ephemeron
+storage. Both direct and reflected writes update its inline Value. The new
+interpreter address opcode returns that Value address. Reference stores distinguish
+interpreter stack-address input from the engine Field API's object-pointer input.
+
+The candidate also requires token/name agreement in field lookup and resolves
+closed-generic field identities through the actual declaring definition. Cross
+assembly resolution uses the input directory, not host GAC/framework redirects.
+Runtime contract v13 advertises `supplemental-instance-field-addresses-v1`;
+old Base capabilities remain unchanged. MV stays DHEMETA1/schema 1.
+
+Native compilation and actual Player validation are pending. The first offline
+test intentionally remains failed: it compared raw netstandard input with a
+Unity-prepared Base. Its original failure is retained; the same input must pass
+through the ordinary Unity Current generation before compatibility qualification.
+Neighbor stores alone do not yet independently prove a sidecar capacity expansion.
+No full-evolution, performance or production conclusion is claimed.
+
 ## Reproduction and objective
 
 The original generic-fields-nullable assertion reaches `ldflda` when ordinary

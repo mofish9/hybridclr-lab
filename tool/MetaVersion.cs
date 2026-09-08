@@ -39,7 +39,13 @@ internal sealed class MetaVersionSnapshot
 
     public static MetaVersionSnapshot Create(string assemblyPath)
     {
-        using var module = ModuleDefMD.Load(assemblyPath);
+        var context = ModuleDef.CreateModuleContext();
+        var resolver = (AssemblyResolver)context.AssemblyResolver;
+        resolver.UseGAC = false;
+        resolver.EnableFrameworkRedirect = false;
+        resolver.PostSearchPaths.Add(Path.GetDirectoryName(Path.GetFullPath(assemblyPath))!);
+        using var module = ModuleDefMD.Load(assemblyPath, context);
+        resolver.AddToCache(module);
         var types = module.Types.SelectMany(AllTypes).Where(type => type.Name != "<Module>")
             .Select(CreateType).OrderBy(type => type.StableId, StringComparer.Ordinal).ToArray();
         var typeIds = types.ToDictionary(type => type.Identity, type => type.StableId, StringComparer.Ordinal);
@@ -454,9 +460,17 @@ internal sealed class MetaVersionSnapshot
 	private static string FieldIdentity(FieldDef field) =>
 		(field.DeclaringType?.FullName ?? "") + "::" + field.Name + "|" + field.FieldType.FullName;
 
-	private static string FieldIdentity(IField field) =>
-		(field.DeclaringType?.FullName ?? "") + "::" + field.Name + "|" +
-		(field.FieldSig?.Type.FullName ?? "");
+	private static string FieldIdentity(IField field)
+	{
+		// A closed GenericInst owner is not the identity of its open field definition.
+		FieldDef? definition = field.ResolveFieldDef();
+		if (definition == null && field.DeclaringType?.ResolveTypeDef() is TypeDef owner)
+			definition = owner.Fields.SingleOrDefault(candidate => candidate.Name == field.Name &&
+				new SigComparer().Equals(candidate.FieldSig, field.FieldSig));
+		return definition != null ? FieldIdentity(definition) :
+			(field.DeclaringType?.FullName ?? "") + "::" + field.Name + "|" +
+			(field.FieldSig?.Type.FullName ?? "");
+	}
 
 	private static HashSet<string> FindAddressTakenFields(ModuleDefMD module)
 	{

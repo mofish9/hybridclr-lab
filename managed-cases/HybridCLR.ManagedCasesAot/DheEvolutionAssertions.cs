@@ -228,6 +228,9 @@ namespace HybridCLR.Lab.ManagedCasesAot
             });
 #if DHE_GENERIC_FIELDS_CURRENT
             DheGenericFieldEvolutionAssertions.Validate(Check);
+#if DHE_FIELD_ADDRESSES_CURRENT
+            DheFieldAddressEvolutionAssertions.Validate(Check);
+#endif
 #endif
             Require(errors.Count == 0, "new type declarations: " + string.Join("; ", errors));
         }

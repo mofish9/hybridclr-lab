@@ -1880,6 +1880,14 @@ static void TestDheGenericFieldIdentity()
 
 int main()
 {
+#if HYBRIDCLR_LAB_HAS_FIELD_ADDRESSES
+    using namespace hybridclr::interpreter;
+    CHECK(sizeof(IRDheLdfldaVarVar) == 16);
+    CHECK(offsetof(IRDheLdfldaVarVar, dst) == 2);
+    CHECK(offsetof(IRDheLdfldaVarVar, obj) == 4);
+    CHECK(offsetof(IRDheLdfldaVarVar, field) == 8);
+    CHECK(g_instructionSizes[static_cast<uint16_t>(HiOpcodeEnum::DheLdfldaVarVar)] == 16);
+#endif
 #if HYBRIDCLR_LAB_HAS_GENERIC_FIELD_METADATA
     TestDheGenericFieldIdentity();
 #endif
