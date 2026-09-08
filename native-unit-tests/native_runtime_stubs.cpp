@@ -32,6 +32,13 @@
 
 #if __has_include("hybridclr/metadata/DheInterfaceSlots.h")
 namespace hybridclr { namespace dhe {
+    // Metadata dispatch is compiled separately; real execution is covered by
+    // the immutable Windows Players, not these standalone runtime stubs.
+    bool TryGetVirtualInvokeData(const Il2CppClass*, uint16_t, const VirtualInvokeData*&)
+    {
+        return false;
+    }
+
     bool TryGetInterfaceInvokeData(const Il2CppClass*, const Il2CppClass*,
         uint16_t, const VirtualInvokeData*&)
     {

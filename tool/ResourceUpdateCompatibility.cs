@@ -4,7 +4,7 @@ internal sealed class ResourceUpdateCompatibility
 {
 	public const string Policy = "dhe-proven-safe-subset-v1";
 	public const string RuntimeProtocol = "dhe-runtime-protocol-v1";
-    public const string CurrentNativeRuntimeContract = "dhe-runtime-v18";
+    public const string CurrentNativeRuntimeContract = "dhe-runtime-v19";
     public static readonly string[] KnownRuntimeCapabilities =
     {
 		"aot-guard-v1",
@@ -21,6 +21,7 @@ internal sealed class ResourceUpdateCompatibility
         "existing-interface-method-slots-v1",
         "cross-assembly-interface-declarations-v1",
         "inherited-interface-dispatch-v1",
+        "base-virtual-slots-on-current-descendants-v1",
 		"supplemental-existing-type-methods-v1",
 		"removed-existing-type-methods-v1",
 		"existing-type-method-signature-replacement-v1",
@@ -242,7 +243,10 @@ internal sealed class ResourceUpdateCompatibility
         if (evolvedInterfaces.Count != 0 && (currentAssemblySet == null || currentAssemblySet.Any(assembly =>
                 assembly.TypeParents.Values.Any(parent => parent.AssemblyName == current.AssemblyName &&
                     interfaceOwners.Contains(parent.TypeName)))))
+        {
             requiredCapabilities.Add("inherited-interface-dispatch-v1");
+            requiredCapabilities.Add("base-virtual-slots-on-current-descendants-v1");
+        }
         if (!new HashSet<string>(baseline.AssemblyReferences.Values, StringComparer.Ordinal)
                 .SetEquals(current.AssemblyReferences.Values))
             requiredCapabilities.Add("assembly-reference-evolution-v1");

@@ -103,3 +103,30 @@ requires it when an evolved interface's implementing/referencing type has a deri
 type in the Current assembly set. Missing set context is conservative. Class
 virtual slots on newly interpreted descendants and generic inflation need actual
 Player verification; no result is assumed from this source-level repair.
+
+## Native descendant virtual-slot translation
+
+The v18 Base/no-op workflow and all three real-header gates pass. The cold
+`replay-cross-inheritance-u21-cold` replay at `d2bb273` registers successfully and
+restores the unchanged AOT probe result `derived:26:34`. Each run executes 50/52
+groups. Child-interface and generic-interface-type groups fail with
+`GetTypeValueSize unknown type:30`: the newly interpreted subclasses inherit the
+Current vtable, but Base Compute declarations still carry the original native slot.
+That slot selects the generic EchoAdded method. All failed artifacts stay intact.
+
+The next repair translates Base virtual slots on interpreter descendants through
+the nearest native ancestor's logical method identities. The mapping selects the
+Current ancestor position, then the actual descendant override. Direct and generic
+AOT calls, ldvirtftn, interpreter virtual calls, and Class/Object reflection paths
+must share the hook on all three engine lines. Ordinary native receivers retain
+their original table; no object layout or Base slot is rewritten. Unsupported
+missing implementations throw MissingMethodException before an invalid native call.
+
+The new per-class/slot cache contains immutable metadata and function pointers,
+never managed instances. Lookup and insertion both use g_MetadataLock; a fully
+initialized entry is inserted last, and unordered_map node addresses remain stable
+through rehash. This adds no lock ordering edge beyond existing DHE interface
+resolution. Cold startup, repeated calls, generics and all existing field/GC groups
+remain required. The new virtual-call hook adds unmeasured overhead, which must be
+included in the eventual AOT-retention and performance qualification. A passing
+subset is not sufficient to publish the capability.

@@ -81,6 +81,12 @@ checks["declaration-only-runtime-rejected"] = !ResourceUpdateCompatibility.CanEx
     ResourceUpdateCompatibility.RuntimeProtocol, "dhe-runtime-v17",
     ResourceUpdateCompatibility.KnownRuntimeCapabilities.Where(value => value != inheritedCapability),
     analyses[names[0]].RequiredRuntimeCapabilities);
+const string descendantCapability = "base-virtual-slots-on-current-descendants-v1";
+checks["descendant-virtual-slot-capability-required"] = analyses[names[0]].RequiredRuntimeCapabilities.Contains(descendantCapability);
+checks["interface-only-inheritance-runtime-rejected"] = !ResourceUpdateCompatibility.CanExecuteUpdate(
+    ResourceUpdateCompatibility.RuntimeProtocol, "dhe-runtime-v18",
+    ResourceUpdateCompatibility.KnownRuntimeCapabilities.Where(value => value != descendantCapability),
+    analyses[names[0]].RequiredRuntimeCapabilities);
 bool passed = checks.Values.All(value => value);
 Directory.CreateDirectory(output);
 File.WriteAllText(Path.Combine(output, "report.json"), JsonSerializer.Serialize(new
