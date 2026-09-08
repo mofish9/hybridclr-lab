@@ -35,7 +35,7 @@
       "repository": "il2cpp_plus",
       "sourceMode": "integrated",
       "baseCommit": "bf15337e189ae7da5876aa51c9b896a36c52a155",
-      "integratedCommit": "f1e30b18e0df76c3cf920e51bc698bbc2e0814cd",
+      "integratedCommit": "d164f7da5a3e0a0a96d24dbc8dee4dd4529020f6",
       "expectedTreeSha256": "89EA37FEE34FB5D56294D6C2E959F357D8D213FC0636D92B61FDC6A2B5A53E1B",
       "engineWorkflows": [
         "Unity2022Fgs"
