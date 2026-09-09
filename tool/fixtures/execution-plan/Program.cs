@@ -183,6 +183,21 @@ bool duplicateRejected = false;
 try { StageBinding(boundBase); }
 catch (TargetInvocationException error) when (error.InnerException is InvalidDataException) { duplicateRejected = true; }
 cases["staging-rejects-duplicate-selection"] = duplicateRejected;
+var validateSchema = toolAssembly.GetType("HybridCLR.DheTool.Program").GetMethod("ValidateJsonSchema", BindingFlags.Static | BindingFlags.NonPublic);
+foreach (string file in new[] { "dhe-resource-update.schema.json", "dhe-resource-update-validation.schema.json", "dhe-runtime-plan.schema.json" })
+{
+    using var schema = JsonDocument.Parse(File.ReadAllText(Path.Combine(Path.GetFullPath("../../../../../..", AppContext.BaseDirectory), "schemas", file)));
+    bool SchemaAccepts(JsonNode value)
+    {
+        using var instance = JsonDocument.Parse(value?.ToJsonString() ?? "null");
+        var failures = new List<string>();
+        validateSchema.Invoke(null, new object[] { schema.RootElement.GetProperty("$defs").GetProperty("executionPlan"), instance.RootElement, schema.RootElement, "$", failures });
+        return failures.Count == 0;
+    }
+    cases["schema-valid-plan-" + file] = SchemaAccepts(supportedBases[0]["assemblyModes"][0]["executionPlan"]);
+    cases["schema-no-plan-" + file] = SchemaAccepts(null);
+    cases["schema-duplicate-rejected-" + file] = !SchemaAccepts(boundBase["assemblyModes"][0]["executionPlan"]);
+}
 string[] assemblyNames = identities[0].AssemblyNames;
 string[] BaseFiles(string version) => assemblyNames.Select(name => Path.Combine(root,
     version == "old" ? "base-old-reflection" : "base-new", "baseline", name + ".dll")).ToArray();

@@ -4,6 +4,59 @@
   "title": "HybridCLR DHE Resource Update Compatibility Validation",
   "type": "object",
   "additionalProperties": false,
+  "$defs": {
+    "executionPlan": {
+      "type": [
+        "object",
+        "null"
+      ],
+      "required": [
+        "schemaVersion",
+        "assemblyName",
+        "baseMetaVersionSha256",
+        "currentMetaVersionSha256",
+        "currentStorageTypeTokens",
+        "currentExecutionMethodTokens"
+      ],
+      "additionalProperties": false,
+      "properties": {
+        "schemaVersion": {
+          "const": 1
+        },
+        "assemblyName": {
+          "type": "string",
+          "minLength": 1,
+          "pattern": "^[^\\r\\n|/\\\\]+$"
+        },
+        "baseMetaVersionSha256": {
+          "type": "string",
+          "pattern": "^[0-9a-fA-F]{64}$"
+        },
+        "currentMetaVersionSha256": {
+          "type": "string",
+          "pattern": "^[0-9a-fA-F]{64}$"
+        },
+        "currentStorageTypeTokens": {
+          "type": "array",
+          "uniqueItems": true,
+          "items": {
+            "type": "integer",
+            "minimum": 33554434,
+            "maximum": 50331647
+          }
+        },
+        "currentExecutionMethodTokens": {
+          "type": "array",
+          "uniqueItems": true,
+          "items": {
+            "type": "integer",
+            "minimum": 100663297,
+            "maximum": 117440511
+          }
+        }
+      }
+    }
+  },
   "required": ["schemaVersion", "format", "generatedAtUtc", "passed", "compatibilityPolicy", "runtimeProtocol", "currentAssemblySetSha256", "baseRegistrySha256", "baseRegistryEntryCount", "baseRegistryAuditPath", "baseRegistryAuditSha256", "baseRegistryId", "baseRegistryRevision", "baseRegistryParentSha256", "baseRegistryParentAuditPath", "baseRegistryParentAuditSha256", "baseRegistryRetiredBaseCount", "baseRegistryLineageValidated", "candidateBaseCount", "compatibleBaseCount", "bases", "errors"],
   "allOf": [
     {
@@ -78,7 +131,8 @@
               "required": ["assemblyName", "executionMode"],
               "properties": {
                 "assemblyName": { "type": "string", "minLength": 1 },
-                "executionMode": { "enum": ["dhe-differential", "interpreter-only"] }
+                "executionMode": { "enum": ["dhe-differential", "interpreter-only"] },
+                "executionPlan": { "$ref": "#/$defs/executionPlan" }
               }
             }
           },
