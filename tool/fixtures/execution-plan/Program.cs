@@ -228,6 +228,9 @@ foreach (var sourceSet in new[] { BaseFiles("old"), currentFiles })
         if (!source.EndsWith("HybridCLR.ValueLayoutModel.dll")) { File.Copy(source, target); continue; }
         using var module = ModuleDefMD.Load(source);
         TypeDef owner = module.Find("HybridCLR.Lab.ValueLayout.Factory", false);
+        module.Find("HybridCLR.Lab.ValueLayout.Payload", false).Methods.Add(new MethodDefUser("NativeStub",
+            MethodSig.CreateStatic(module.CorLibTypes.Int32), dnlib.DotNet.MethodImplAttributes.Runtime | dnlib.DotNet.MethodImplAttributes.InternalCall,
+            dnlib.DotNet.MethodAttributes.Public | dnlib.DotNet.MethodAttributes.Static));
         owner.Fields.Add(new FieldDefUser("StaticPayload", new FieldSig(module.Find("HybridCLR.Lab.ValueLayout.Payload", false).ToTypeSig()),
             dnlib.DotNet.FieldAttributes.Public | dnlib.DotNet.FieldAttributes.Static));
         owner.Fields.Add(new FieldDefUser("StaticReference", new FieldSig(module.Find("HybridCLR.Lab.ValueLayout.InlineOwner", false).ToTypeSig()),
@@ -247,6 +250,8 @@ foreach (var sourceSet in new[] { BaseFiles("old"), currentFiles })
 var staticCompilation = ResourceExecutionPlanner.Compile(mutated[0], mutated[1], Array.Empty<string>());
 cases["static-value-storage-obligation-explicit"] = staticCompilation.UnsupportedChanges.Any(value => value.Contains("StaticPayload"));
 cases["static-reference-does-not-grow-storage"] = !staticCompilation.UnsupportedChanges.Any(value => value.Contains("StaticReference"));
+cases["non-il-storage-member-requires-bridge"] = staticCompilation.UnsupportedChanges.Any(value =>
+    value.StartsWith("current-storage-native-member:") && value.Contains("NativeStub"));
 var addedSnapshot = MetaVersionSnapshot.Create(mutated[1].Single(path => path.EndsWith("HybridCLR.ValueLayoutModel.dll")));
 cases["new-method-is-not-a-base-entry"] = !staticCompilation.Plans[addedSnapshot.AssemblyName].CurrentExecutionMethodTokens.Contains(
     addedSnapshot.Methods.Single(method => method.Name == "NewHelper").Token);

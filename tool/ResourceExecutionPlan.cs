@@ -74,7 +74,9 @@ internal static class ResourceExecutionPlanner
             foreach (var type in selectedTypes)
                 if (baseTypes[type.StableId].Flags != type.Flags)
                     errors.Add("current-storage-type-kind-change:" + entry.Key + ":" + type.Identity);
-            foreach (var method in selectedMethods.Where(method => (method.Flags & 4u) != 0))
+            foreach (var method in selectedMethods.Where(method =>
+                !((method.Flags & 2u) != 0 && (baseMethods[method.StableId].Flags & 2u) != 0) &&
+                (!CanExecute(method.Flags) || !CanExecute(baseMethods[method.StableId].Flags))))
                 errors.Add("current-storage-native-member:" + entry.Key + ":" + method.Identity);
             // Added methods have no Base guard. Abstract members have no call frame.
             uint[] executable = selectedMethods.Where(method => CanExecute(method.Flags) && CanExecute(baseMethods[method.StableId].Flags))
