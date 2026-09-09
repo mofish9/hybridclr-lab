@@ -104,6 +104,10 @@ unity-atomic 和 unity-json.log 记录 JsonUtility 的空计划问题。这些�
 
 ## 剩余目标与回滚边界
 
+后续进展：真实 Unity Current 的双 Base 结构热更、默认值和初始化修复证据见
+[dhe-resource-evolution-initialization.md](dhe-resource-evolution-initialization.md)。
+以下仍按本报告原始身份保留，不能当作该后续候选的当前状态。
+
 1. 继续用正式 Unity Current 生成路径验证实际代码/结构变化，以及多 Base 同一 Current
    的完整资源加载；当前最终闭环只有一个新 Base 和无变化资源。
 2. 完成静态值存储与普通 AOT 值类型/native ABI 边界。不能仅凭 identity-return 测试
