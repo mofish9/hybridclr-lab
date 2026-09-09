@@ -31,22 +31,26 @@ string Run(string executable, string root, params string[] arguments)
     if (process.ExitCode != 0) throw new InvalidOperationException(result);
     return result;
 }
-if (args.Length == 2 && args[0] == "probe-audit")
+if (args.Length == 2 && (args[0] == "probe-audit" || args[0] == "api-audit"))
 {
+    bool publicApi = args[0] == "api-audit";
     string root = Path.GetFullPath(args[1]);
     string reportPath = Path.Combine(root, "audit.json"); NewOutput(reportPath);
     JsonElement Read(string path) => JsonSerializer.Deserialize<JsonElement>(File.ReadAllText(Path.Combine(root, path)));
     var auditChecks = new Dictionary<string, bool>();
-    var runtime = Read("runtime-fixed/DHE-Unity2022/runtime-manifest.json");
-    string runtimeHash = Hash(Path.Combine(root, "runtime-fixed/DHE-Unity2022/runtime-manifest.json"));
-    var native = Read("native-fixed/DHE-Unity2022/native-gate.json");
+    string runtimePath = (publicApi ? "runtime-reflection" : "runtime-fixed") + "/DHE-Unity2022/runtime-manifest.json";
+    string nativePath = (publicApi ? "native-reflection" : "native-fixed") + "/DHE-Unity2022/native-gate.json";
+    string oldBase = publicApi ? "base-old-reflection" : "base-old-fixed";
+    var runtime = Read(runtimePath);
+    string runtimeHash = Hash(Path.Combine(root, runtimePath));
+    var native = Read(nativePath);
     auditChecks["real-headers-native"] = native.GetProperty("passed").GetBoolean() && native.GetProperty("mergeReady").GetBoolean() &&
         !native.GetProperty("surrogateExternalHeadersUsed").GetBoolean() && native.GetProperty("nativeExitCode").GetInt32() == 0 &&
         native.GetProperty("runtimeManifestSha256").GetString()!.Equals(runtimeHash, StringComparison.OrdinalIgnoreCase);
     var runCases = new[] {
-        (Base: "base-old-fixed", Payload: "payload-method-old", Report: "method-old-fixed-result.json", Revision: 73),
-        (Base: "base-old-fixed", Payload: "payload-noop-old", Report: "noop-old-result.json", Revision: 41),
-        (Base: "base-old-fixed", Payload: "payload-latest-old", Report: "latest-old-result.json", Revision: 73),
+        (Base: oldBase, Payload: "payload-method-old", Report: "method-old-fixed-result.json", Revision: 73),
+        (Base: oldBase, Payload: "payload-noop-old", Report: "noop-old-result.json", Revision: 41),
+        (Base: oldBase, Payload: "payload-latest-old", Report: publicApi ? "latest-old-reflection-result.json" : "latest-old-result.json", Revision: 73),
         (Base: "base-new", Payload: "payload-latest-new", Report: "latest-new-result.json", Revision: 73),
         (Base: "base-new", Payload: "payload-noop-new", Report: "noop-new-result.json", Revision: 41),
     };
@@ -66,6 +70,10 @@ if (args.Length == 2 && args[0] == "probe-audit")
     foreach (var item in runCases)
     {
         var result = Read(item.Report);
+        if (publicApi)
+            auditChecks[item.Report + "-public-api"] = result.GetProperty("rejectedInvalidPlans").GetInt32() == 5 &&
+                result.GetProperty("reflectionSignaturePassed").GetBoolean() && result.GetProperty("reflectionValueCallsPassed").GetBoolean() &&
+                result.GetProperty("scope").GetString()!.StartsWith("Public RuntimeApi", StringComparison.Ordinal);
         string[] records = result.GetProperty("records").EnumerateArray().Select(record => record.GetString()!).ToArray();
         var reference = Read(item.Payload == "payload-method-old" ? "reference-method.json" :
             item.Payload == "payload-noop-old" ? "reference-base.json" : "reference-layout.json");
@@ -86,7 +94,7 @@ if (args.Length == 2 && args[0] == "probe-audit")
                 snapshot.ToBinary().SequenceEqual(File.ReadAllBytes(Path.Combine(root, item.Payload, "base", name + ".mv")));
         });
     }
-    auditChecks["different-base-layouts"] = MetaVersionSnapshot.Create(Path.Combine(root, "base-old-fixed/baseline/HybridCLR.ValueLayoutModel.dll"))
+    auditChecks["different-base-layouts"] = MetaVersionSnapshot.Create(Path.Combine(root, oldBase, "baseline/HybridCLR.ValueLayoutModel.dll"))
         .Types.Single(type => type.Identity == "HybridCLR.Lab.ValueLayout.Payload").Version !=
         MetaVersionSnapshot.Create(Path.Combine(root, "base-new/baseline/HybridCLR.ValueLayoutModel.dll"))
         .Types.Single(type => type.Identity == "HybridCLR.Lab.ValueLayout.Payload").Version;
@@ -107,9 +115,11 @@ if (args.Length == 2 && args[0] == "probe-audit")
         !Read("wrong-expected-result.json").GetProperty("passed").GetBoolean() &&
         Read("wrong-expected-result.json").GetProperty("directRevision").GetInt32() == 73;
     File.WriteAllText(reportPath, JsonSerializer.Serialize(new {
-        passed = auditChecks.Values.All(value => value), scope = "Guarded Windows storage probe, not public resource workflow qualification",
+        passed = auditChecks.Values.All(value => value),
+        scope = publicApi ? "Public RuntimeApi and ordinary reflection; resource build/staging/loader not qualified" :
+            "Guarded Windows storage probe, not public resource workflow qualification",
         auditChecks, runtimeSource = runtime.GetProperty("source"), runtimeManifestSha256 = runtimeHash,
-        nativeGateSha256 = Hash(Path.Combine(root, "native-fixed/DHE-Unity2022/native-gate.json")),
+        nativeGateSha256 = Hash(Path.Combine(root, nativePath)),
         toolSha256 = Hash(typeof(MetaVersionSnapshot).Assembly.Location),
         results = runCases.Select(item => new { path = item.Report, sha256 = Hash(Path.Combine(root, item.Report)) }).ToArray(),
     }, json));
