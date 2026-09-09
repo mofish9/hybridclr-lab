@@ -48,3 +48,10 @@ Full core-library analysis also exposed duplicate AssemblyRef rows when the
 planner unnecessarily created hotfix MVs for ordinary AOT modules. Ordinary AOT
 is frozen input: use its retained method/field definitions directly as the
 reference inventory and reserve MV generation for actual hotfix assemblies.
+
+After resource generation passed, the Player reached a selected generic cctor
+through Runtime::ClassInit's Base MethodInfo and correctly rejected its old
+call frame. Keep the canonical initialization owner, but resolve the selected
+Current execution method before invoking the cctor. The cctor signature is
+static void(), so this does not pass a changed Base value ABI. Rebuild new Bases
+for this native change and preserve the earlier immutable pair and failure.
