@@ -99,8 +99,8 @@
     },
     "runtimeSource": { "type": ["string", "null"] }
   },
-  "dependentRequired": {
-    "aotAnalysisSnapshotSha256": ["aotAnalysisSnapshot"],
-    "aotAnalysisSnapshot": ["aotAnalysisSnapshotSha256"]
-  }
+  "allOf": [
+    { "if": { "required": ["aotAnalysisSnapshotSha256"] }, "then": { "required": ["aotAnalysisSnapshot"] } },
+    { "if": { "required": ["aotAnalysisSnapshot"] }, "then": { "required": ["aotAnalysisSnapshotSha256"] } }
+  ]
 }
