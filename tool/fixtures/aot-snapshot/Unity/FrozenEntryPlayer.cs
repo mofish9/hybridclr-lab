@@ -37,7 +37,7 @@ namespace HybridCLR.Lab.Snapshot
             {
                 Save("base-aot-entry");
                 var plan = JsonUtility.FromJson<Plan>(File.ReadAllText(Argument("-frozenEntryPlan")));
-                Check("research-plan-bound-to-base", !plan.releaseReady && plan.format == "hybridclr.frozen-entry-probe" && plan.baseId == DheBuildIdentity.BaseId);
+                Check("research-plan-bound-to-base", !plan.releaseReady && plan.format == "hybridclr.frozen-entry-probe" && plan.baseId == DheBuildIdentity.Create().BaseId);
                 object original = CreateValue();
                 RuntimeApi.ResetDifferentialDispatchCounters();
                 object baseline = NativeBoundary.FrozenCopyBox(original);
