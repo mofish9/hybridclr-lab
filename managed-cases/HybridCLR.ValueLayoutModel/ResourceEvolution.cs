@@ -207,6 +207,7 @@ namespace HybridCLR.Lab.ValueLayout
             records.Add("generic-added=" + ResourceGenericState<string>.Added + ":" + ResourceGenericState<int>.Added);
 #endif
             records.Add("sentinel=" + Factory.UnchangedRevision());
+            records.AddRange(StaticValueEvolution.Run());
             return records.ToArray();
         }
     }

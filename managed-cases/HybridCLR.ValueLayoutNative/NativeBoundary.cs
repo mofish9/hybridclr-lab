@@ -11,5 +11,7 @@ namespace HybridCLR.Lab.ValueLayoutNative
         public static Payload Echo(Payload value) => value;
         [MethodImpl(MethodImplOptions.NoInlining)]
         public static long ResourceResult() => new ResourceChild().Compute();
+        [MethodImpl(MethodImplOptions.NoInlining)]
+        public static int StaticNeighbor() => StaticValueState.UnchangedStorage;
     }
 }

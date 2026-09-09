@@ -10,6 +10,7 @@
     <Compile Include="../../MetaVersion.cs" Link="MetaVersion.cs" />
     <Compile Include="../../ResourceUpdateCompatibility.cs" Link="ResourceUpdateCompatibility.cs" />
     <Compile Include="../../DheValueLayoutImpact.cs" Link="DheValueLayoutImpact.cs" />
+    <Compile Include="../../ResourceExecutionPlan.cs" Link="ResourceExecutionPlan.cs" />
     <Reference Include="dnlib"><HintPath>../../dnlib.dll</HintPath></Reference>
   </ItemGroup>
 </Project>

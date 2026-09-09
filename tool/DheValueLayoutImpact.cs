@@ -20,7 +20,11 @@ public sealed record DheValueLayoutImpactResult(string[] ChangedValueTypes,
     DheValueLayoutTypeImpact[] Layouts, DheValueLayoutMethodImpact[] Methods)
 {
     public string[] ChangedStaticValueFields { get; init; } = Array.Empty<string>();
+    public DheStaticValueFieldImpact[] StaticValueFields { get; init; } = Array.Empty<DheStaticValueFieldImpact>();
 }
+
+public sealed record DheStaticValueFieldImpact(string Identity, string AssemblyName,
+    bool OrdinaryAot, bool ThreadStatic, bool HasRva);
 
 public static class DheValueLayoutImpact
 {
@@ -89,6 +93,7 @@ public static class DheValueLayoutImpact
 
             var methods = new List<DheValueLayoutMethodImpact>();
             var staticFields = new SortedSet<string>(StringComparer.Ordinal);
+            var staticDetails = new List<DheStaticValueFieldImpact>();
             foreach (var entry in modules.OrderBy(entry => entry.Key, StringComparer.Ordinal))
             {
                 bool ordinary = !hotfixAssemblies.Contains(entry.Key);
@@ -110,7 +115,11 @@ public static class DheValueLayoutImpact
                         Inline(field.FieldType, Context.Empty, dependencies, ref open);
                         string identity = field.DeclaringType.FullName + "::" + field.Name + "|" + field.FieldType.FullName;
                         if (dependencies.Count != 0 && oldFields.Contains(identity))
+                        {
                             staticFields.Add(entry.Key + ":" + identity);
+                            staticDetails.Add(new(entry.Key + ":" + identity, entry.Key, ordinary,
+                                field.CustomAttributes.Any(attribute => attribute.TypeFullName == "System.ThreadStaticAttribute"), field.HasFieldRVA));
+                        }
                     }
                     foreach (MethodDef method in type.Methods)
                     {
@@ -175,7 +184,8 @@ public static class DheValueLayoutImpact
                     }).ToArray(),
                 methods.OrderBy(method => method.AssemblyName, StringComparer.Ordinal)
                     .ThenBy(method => method.MethodIdentity, StringComparer.Ordinal).ToArray())
-            { ChangedStaticValueFields = staticFields.ToArray() };
+            { ChangedStaticValueFields = staticFields.ToArray(),
+                StaticValueFields = staticDetails.OrderBy(field => field.Identity, StringComparer.Ordinal).ToArray() };
         }
 
         private void MethodSignature(MethodSig? signature, Context context,

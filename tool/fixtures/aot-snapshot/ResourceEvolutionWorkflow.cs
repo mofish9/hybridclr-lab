@@ -26,8 +26,9 @@ internal static class ResourceEvolutionWorkflow
         var records = (string[])model.GetType("HybridCLR.Lab.ValueLayout.ResourceEvolutionProbe", true).GetMethod("Run").Invoke(null, null);
         var native = AssemblyLoadContext.Default.LoadFromAssemblyPath(nativePath);
         long ordinary = (long)native.GetType("HybridCLR.Lab.ValueLayoutNative.NativeBoundary", true).GetMethod("ResourceResult").Invoke(null, null);
+        int neighbor = (int)native.GetType("HybridCLR.Lab.ValueLayoutNative.NativeBoundary", true).GetMethod("StaticNeighbor").Invoke(null, null);
         bool passed = records.Contains("static-initializations=1") && records.Contains("static-reflection=1");
-        File.WriteAllText(report, JsonSerializer.Serialize(new { passed, records, ordinaryAotReferenceResult = ordinary,
+        File.WriteAllText(report, JsonSerializer.Serialize(new { passed, records, ordinaryAotReferenceResult = ordinary, ordinaryAotStaticNeighbor = neighbor,
             scope = "CLR reference of actual Unity stripped input", current, nativePath,
             inputs = Names.Select(name => new { name, sha256 = Hash(Path.Combine(current, name + ".dll")) }), nativeSha256 = Hash(nativePath) }, Json));
         return passed ? 0 : 1;
@@ -99,7 +100,8 @@ internal static class ResourceEvolutionWorkflow
         var reference = Read(Path.Combine(output, "reference-current.json"));
         bool Matches(JsonElement player, JsonElement expected) => player.GetProperty("passed").GetBoolean() &&
             player.GetProperty("records").EnumerateArray().Select(item => item.GetString()).SequenceEqual(expected.GetProperty("records").EnumerateArray().Select(item => item.GetString())) &&
-            player.GetProperty("ordinaryAotReferenceResult").GetInt64() == expected.GetProperty("ordinaryAotReferenceResult").GetInt64();
+            player.GetProperty("ordinaryAotReferenceResult").GetInt64() == expected.GetProperty("ordinaryAotReferenceResult").GetInt64() &&
+            player.GetProperty("ordinaryAotStaticNeighbor").GetInt32() == expected.GetProperty("ordinaryAotStaticNeighbor").GetInt32();
         foreach (string version in new[] { "old", "new" })
         {
             string run = Path.Combine(output, "base-" + version), build = Path.Combine(run, "base"), stage = Path.Combine(output, "stage-" + version);

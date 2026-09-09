@@ -17,6 +17,7 @@ namespace HybridCLR.Lab.Snapshot
             public int loadedAssemblies, revision, sentinel;
             public string[] records;
             public long ordinaryAotReferenceResult;
+            public int ordinaryAotStaticNeighbor;
         }
         private sealed class Provider : IDheRuntimeAssetProvider
         {
@@ -65,6 +66,7 @@ namespace HybridCLR.Lab.Snapshot
                     result.records = (string[])probe.GetMethod("Run").Invoke(null, null);
                     var native = System.Reflection.Assembly.Load("HybridCLR.ValueLayoutNative").GetType("HybridCLR.Lab.ValueLayoutNative.NativeBoundary");
                     result.ordinaryAotReferenceResult = (long)native.GetMethod("ResourceResult").Invoke(null, null);
+                    result.ordinaryAotStaticNeighbor = (int)native.GetMethod("StaticNeighbor").Invoke(null, null);
                 }
                 int expectedIndex = Array.IndexOf(args, "-expectedRevision");
                 int expectedRevision = expectedIndex < 0 ? 41 : int.Parse(args[expectedIndex + 1]);

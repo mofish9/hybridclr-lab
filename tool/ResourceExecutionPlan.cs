@@ -51,8 +51,12 @@ internal static class ResourceExecutionPlanner
         var impact = DheValueLayoutImpact.Analyze(beforeFiles, afterFiles, ordinaryAotPaths);
         var errors = new SortedSet<string>(StringComparer.Ordinal);
         var plans = new Dictionary<string, ResourceExecutionPlan>(StringComparer.Ordinal);
-        foreach (string field in impact.ChangedStaticValueFields)
-            errors.Add("current-storage-static-value-field:" + field);
+        foreach (var field in impact.StaticValueFields)
+        {
+            if (field.OrdinaryAot) errors.Add("current-storage-ordinary-aot-static-field:" + field.Identity);
+            if (field.ThreadStatic) errors.Add("current-storage-thread-static-value-field:" + field.Identity);
+            if (field.HasRva) errors.Add("current-storage-rva-static-value-field:" + field.Identity);
+        }
         // A Base-native method which embeds or copies the changed value layout
         // needs a verified native ABI bridge, not a hotfix interpreter selection.
         foreach (var layout in impact.Layouts.Where(item => item.RequiresOrdinaryAotBridge))

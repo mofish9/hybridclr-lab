@@ -1212,6 +1212,11 @@ internal static partial class Program
                 "resource-update-plan-integrity-v1",
                 "resource-update-aot-metadata-set-selection-v1",
             };
+            if (execution.Impact.StaticValueFields.Any(field => !field.OrdinaryAot))
+            {
+                requiredRuntimeCapabilities.Add("current-static-value-storage-v1");
+                requiredRuntimeCapabilities.Add("shared-type-initialization-v1");
+            }
             if (runtimeAotMetadataSets.Single(set => string.Equals(set.AotMetadataSetId,
                     aotMetadataSetId, StringComparison.OrdinalIgnoreCase)).Assemblies.Length > 0)
                 requiredRuntimeCapabilities.Add("resource-update-aot-metadata-path-v1");
