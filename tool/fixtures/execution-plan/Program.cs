@@ -103,7 +103,8 @@ JsonNode manifestDocument = Node(new { schemaVersion = 1, format = "hybridclr.dh
     runtimeProtocol = "dhe-runtime-protocol-v1", compatibilityValidated = true, playerUpdateRequired = false, guardCoverageValidated = true,
     currentAssemblySetSha256 = currentSetHash, runtimeAssetRoot = assets, baseMetaVersionAssetRoot = baseRoot,
     runtimePlan = "dhe-runtime-plan.json", validation = "validation.json", supportedBases = supportedBases.ToArray() });
-void RunCase(string name, int baseIndex, Action<JsonNode, JsonNode, JsonNode, Provider> mutate, bool expected, bool reset = true)
+void RunCase(string name, int baseIndex, Action<JsonNode, JsonNode, JsonNode, Provider> mutate, bool expected,
+    bool reset = true, bool expectPlans = true)
 {
     if (reset) { DheRuntime.Reset(); RuntimeApi.Calls = 0; RuntimeApi.LastTypes = RuntimeApi.LastMethods = null; }
     var provider = providers[baseIndex].Copy();
@@ -122,7 +123,8 @@ void RunCase(string name, int baseIndex, Action<JsonNode, JsonNode, JsonNode, Pr
         if (accepted)
         {
             var expectedModes = plan["baseSelections"][baseIndex]["assemblyModes"].AsArray();
-            accepted = RuntimeApi.Calls == 1 && RuntimeApi.LastTypes != null && names.Select((item, index) =>
+            accepted = !expectPlans ? RuntimeApi.Calls == 1 && RuntimeApi.LastTypes == null && RuntimeApi.LastMethods == null :
+                RuntimeApi.Calls == 1 && RuntimeApi.LastTypes != null && names.Select((item, index) =>
             {
                 var mode = expectedModes.Single(value => value["assemblyName"].GetValue<string>() == item);
                 return RuntimeApi.LastTypes[index].SequenceEqual(mode["executionPlan"]["currentStorageTypeTokens"].AsArray().Select(token => token.GetValue<uint>())) &&
@@ -135,6 +137,11 @@ void RunCase(string name, int baseIndex, Action<JsonNode, JsonNode, JsonNode, Pr
 }
 RunCase("old-base-public-loader", 0, null, true);
 RunCase("new-base-same-current-public-loader", 1, null, true);
+RunCase("method-only-base-keeps-mv-dispatch-without-plan", 1, (m, v, p, _) =>
+{
+    foreach (var table in new[] { m["supportedBases"][1]["assemblyModes"], v["bases"][1]["assemblyModes"], p["baseSelections"][1]["assemblyModes"] })
+        foreach (var mode in table.AsArray()) mode.AsObject().Remove("executionPlan");
+}, true, expectPlans: false);
 RunCase("plan-manifest-selection-mismatch", 0, (_, _, plan, _) =>
     plan["baseSelections"][0]["assemblyModes"][0]["executionPlan"]["currentStorageTypeTokens"] = new JsonArray(), false);
 RunCase("manifest-validation-selection-mismatch", 0, (_, validation, _, _) =>
