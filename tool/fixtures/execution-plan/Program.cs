@@ -251,9 +251,23 @@ var addedSnapshot = MetaVersionSnapshot.Create(mutated[1].Single(path => path.En
 cases["new-method-is-not-a-base-entry"] = !staticCompilation.Plans[addedSnapshot.AssemblyName].CurrentExecutionMethodTokens.Contains(
     addedSnapshot.Methods.Single(method => method.Name == "NewHelper").Token);
 Directory.CreateDirectory(Path.GetDirectoryName(output));
+string packageRoot = Assembly.GetExecutingAssembly().GetCustomAttributes<AssemblyMetadataAttribute>()
+    .Single(attribute => attribute.Key == "DhePackageRoot").Value;
+string GitHead(string directory)
+{
+    var start = new System.Diagnostics.ProcessStartInfo("git") { UseShellExecute = false, RedirectStandardOutput = true, CreateNoWindow = true };
+    foreach (string argument in new[] { "-C", directory, "rev-parse", "HEAD" }) start.ArgumentList.Add(argument);
+    using var process = System.Diagnostics.Process.Start(start);
+    string value = process.StandardOutput.ReadToEnd(); process.WaitForExit();
+    if (process.ExitCode != 0) throw new IOException("Cannot bind source identity: " + directory);
+    return value.Trim();
+}
 File.WriteAllText(output, JsonSerializer.Serialize(new { passed = cases.Values.All(value => value),
     scope = "Package resource validation and native argument selection on .NET host; native calls are recorded, not executed",
-    cases, errors, sourceInputs = root }, json));
+    cases, errors, sourceInputs = root, labHead = GitHead(Path.GetFullPath("../../../../../..", AppContext.BaseDirectory)),
+    packageHead = GitHead(packageRoot), hostSha256 = Hash(File.ReadAllBytes(Assembly.GetExecutingAssembly().Location)),
+    toolSha256 = Hash(File.ReadAllBytes(args[2])), packageSources = new[] { "DheRuntime.cs", "DheExecutionPlan.cs", "LoadImageErrorCode.cs", "HomologousImageMode.cs" }
+        .Select(name => new { path = name, sha256 = Hash(File.ReadAllBytes(Path.Combine(packageRoot, "Runtime", name))) }).ToArray() }, json));
 foreach (var check in cases) Console.WriteLine(check.Key + ": " + check.Value + (check.Value ? "" : " " + errors[check.Key]));
 return cases.Values.All(value => value) ? 0 : 1;
 

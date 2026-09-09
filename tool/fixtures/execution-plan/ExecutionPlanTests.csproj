@@ -10,6 +10,10 @@
     <Error Condition="'$(DhePackageRoot)' == ''" Text="Pass -p:DhePackageRoot with the package source being tested." />
   </Target>
   <ItemGroup>
+    <AssemblyAttribute Include="System.Reflection.AssemblyMetadataAttribute">
+      <_Parameter1>DhePackageRoot</_Parameter1>
+      <_Parameter2>$(DhePackageRoot)</_Parameter2>
+    </AssemblyAttribute>
     <Compile Include="$(DhePackageRoot)/Runtime/DheExecutionPlan.cs" Link="Package/DheExecutionPlan.cs" />
     <Compile Include="$(DhePackageRoot)/Runtime/DheRuntime.cs" Link="Package/DheRuntime.cs" />
     <Compile Include="$(DhePackageRoot)/Runtime/LoadImageErrorCode.cs" Link="Package/LoadImageErrorCode.cs" />
