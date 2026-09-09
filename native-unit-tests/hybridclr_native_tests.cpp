@@ -779,6 +779,8 @@ namespace
             baseMetaVersion, currentMetaVersion));
 		CHECK(changed.isInterpterImpl);
 		CHECK(hybridclr::dhe::IsDheAssembly(&assembly));
+        CHECK(hybridclr::dhe::IsMutableDheAssembly(&assembly));
+        CHECK(!hybridclr::dhe::IsFrozenAotExecutionSource(&assembly));
         CHECK(hybridclr::dhe::IsChangedMethod(&changed));
         CHECK(hybridclr::dhe::IsChangedMethod(&reorderedCurrentChanged));
         CHECK(!hybridclr::dhe::IsChangedMethod(&reorderedCurrentUnchanged));
@@ -1050,6 +1052,9 @@ namespace
         physicalCurrent.token = changed.token;
         CHECK(hybridclr::dhe::PrepareAndRegisterMetaVersions({ frozenRegistration }));
         CHECK(hybridclr::dhe::IsFrozenAotExecutionSource(&assembly));
+        CHECK(hybridclr::dhe::IsDheAssembly(&assembly));
+        CHECK(!hybridclr::dhe::IsMutableDheAssembly(&assembly));
+        CHECK(!hybridclr::dhe::IsMutableDheAssembly(nullptr));
         CHECK(hybridclr::dhe::ResolveCurrentExecutionMethod(&changed) == &physicalCurrent);
         CHECK(!hybridclr::dhe::IsChangedMethod(&unchanged));
         hybridclr::dhe::ResetForTests();

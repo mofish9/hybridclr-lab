@@ -20,6 +20,8 @@ namespace HybridCLR.Lab.Snapshot
             var args = Environment.GetCommandLineArgs(); int index = Array.IndexOf(args, name);
             return index >= 0 && index + 1 < args.Length ? args[index + 1] : null;
         }
+        [System.Runtime.CompilerServices.MethodImpl(System.Runtime.CompilerServices.MethodImplOptions.NoInlining)]
+        private static string FormatException(Exception error) => error.Message + ":" + error.ToString();
         [RuntimeInitializeOnLoadMethod(RuntimeInitializeLoadType.AfterSceneLoad)]
         private static void Run()
         {
@@ -62,6 +64,9 @@ namespace HybridCLR.Lab.Snapshot
                 Save("load-frozen-and-mutable");
                 result.loadCode = (int)RuntimeApi.LoadDifferentialHybridAssembliesWithMetaVersionAndExecutionPlanAndSources(dlls, before, after, types, methods, kinds, excluded);
                 Check("native-source-transaction", result.loadCode == 0);
+                Save("frozen-corlib-virtual-behavior");
+                Check("unaffected-exception-virtuals", FormatException(new InvalidOperationException("frozen-virtual-sentinel"))
+                    .Contains("frozen-virtual-sentinel"));
                 Save("direct-current-copy");
                 object current = CreateValue();
                 FieldInfo extra = current.GetType().GetField("Extra"), reference = current.GetType().GetField("Reference");
