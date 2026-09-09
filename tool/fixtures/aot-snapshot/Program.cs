@@ -8,6 +8,35 @@ using HybridCLR.DheTool;
 using System.Text.Json.Nodes;
 
 if (args.Length > 0 && args[0] == "unity-workflow") return UnityWorkflow.Run(args.Skip(1).ToArray());
+if (args.Length == 4 && args[0] == "compare")
+{
+    if (Directory.Exists(args[3])) throw new IOException("Comparison output must be new.");
+    Directory.CreateDirectory(args[3]);
+    var normalized = new List<byte[]>();
+    foreach (string file in args.Skip(1).Take(2))
+    {
+        using var module = ModuleDefMD.Load(file);
+        var bytes = DheAotAnalysisSnapshot.Normalize(File.ReadAllBytes(file), "HybridCLR.Lab.Snapshot.DheBuildIdentity", out _, out _);
+        normalized.Add(bytes); File.WriteAllBytes(Path.Combine(args[3], normalized.Count + ".dll"), bytes);
+        using var stream = new MemoryStream(bytes); using var pe = new System.Reflection.PortableExecutable.PEReader(stream);
+        var summary = new
+        {
+            file, module.Name, module.Mvid, module.RuntimeVersion, module.Cor20HeaderFlags, length = bytes.Length,
+            moduleAttributes = module.CustomAttributes.Select(attribute => new { attribute.TypeFullName, blob = Convert.ToHexString(attribute.GetBlob()) }),
+            assembly = module.Assembly.FullName,
+            assemblyAttributes = module.Assembly.CustomAttributes.Select(attribute => new { attribute.TypeFullName, blob = Convert.ToHexString(attribute.GetBlob()) }),
+            types = module.GetTypes().Select(type => type.FullName), exports = module.ExportedTypes.Select(type => type.FullName),
+            references = module.GetAssemblyRefs().Select(reference => reference.FullName),
+            sections = pe.PEHeaders.SectionHeaders.Select(section => new { section.Name, section.PointerToRawData, section.SizeOfRawData }),
+            debugEntries = pe.ReadDebugDirectory(),
+        };
+        File.WriteAllText(Path.Combine(args[3], normalized.Count + ".json"), JsonSerializer.Serialize(summary, new JsonSerializerOptions { WriteIndented = true }));
+    }
+    Console.WriteLine(JsonSerializer.Serialize(new { sizes = normalized.Select(bytes => bytes.Length),
+        differentOffsets = Enumerable.Range(0, Math.Min(normalized[0].Length, normalized[1].Length))
+            .Where(index => normalized[0][index] != normalized[1][index]).Take(100).ToArray() }));
+    return 0;
+}
 if (args.Length != 3) throw new ArgumentException("<real Unity stripped AOT root> <new output root> <tool DLL>");
 string input = Path.GetFullPath(args[0]), output = Path.GetFullPath(args[1]);
 if (Directory.Exists(output)) throw new IOException("Output must be new.");
