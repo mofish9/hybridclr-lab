@@ -37,3 +37,10 @@ retention, neighboring unchanged state and its ordinary AOT caller, cctor counts
 closed generic owners and generic value arguments. Base/no-op paths must keep
 passing. Bind the same actual Unity-stripped DLLs and final snapshot/native
 identity. No performance claim, ARM64 inference, or live object migration claim.
+
+The first full snapshot run failed before resource generation because Int32's
+core-library backing field recursively resolved to its own definition. Primitive
+CorLibTypeSig storage is intrinsic and must terminate layout/signature traversal.
+Extend policy tests with the actual complete stripped AOT inventory. Reuse frozen
+Bases for tool-only fixes through the workflow's optional existing-matrix path;
+verify package/runtime/Player hashes before reuse and preserve failed outputs.

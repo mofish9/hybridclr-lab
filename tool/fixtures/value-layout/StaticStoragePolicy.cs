@@ -6,13 +6,13 @@ internal static class StaticStoragePolicy
 {
     public static int Run(string[] args)
     {
-        if (args.Length != 3) throw new ArgumentException("static-storage-policy <Base DLL root> <Current DLL root> <new output>");
+        if (args.Length != 3 && args.Length != 4) throw new ArgumentException("static-storage-policy <Base DLL root> <Current DLL root> <new output> [full AOT snapshot assemblies]");
         string baseline = Path.GetFullPath(args[0]), current = Path.GetFullPath(args[1]), output = Path.GetFullPath(args[2]);
         if (Directory.Exists(output)) throw new IOException("Output must be new.");
         Directory.CreateDirectory(output);
         string[] names = { "HybridCLR.ValueLayoutModel", "HybridCLR.ValueLayoutOther", "HybridCLR.ValueLayoutConsumer" };
         string[] Paths(string root) => names.Select(name => Path.Combine(root, name + ".dll")).ToArray();
-        string native = Path.Combine(baseline, "HybridCLR.ValueLayoutNative.dll");
+        string native = Path.Combine(args.Length == 4 ? Path.GetFullPath(args[3]) : baseline, "HybridCLR.ValueLayoutNative.dll");
         var accepted = ResourceExecutionPlanner.Compile(Paths(baseline), Paths(current), new[] { native });
         var checks = new Dictionary<string, bool>
         {
@@ -43,6 +43,15 @@ internal static class StaticStoragePolicy
         }
         var ordinary = ResourceExecutionPlanner.Compile(Paths(baseline), Paths(current), new[] { nativeWithStatic });
         checks["ordinary-static-storage-still-rejected"] = ordinary.UnsupportedChanges.Any(reason => reason.StartsWith("current-storage-ordinary-aot-static-field:"));
+        if (args.Length == 4)
+        {
+            string[] fullAot = Directory.GetFiles(Path.GetFullPath(args[3]), "*.dll")
+                .Where(path => !names.Contains(Path.GetFileNameWithoutExtension(path))).ToArray();
+            var full = ResourceExecutionPlanner.Compile(Paths(baseline), Paths(current), fullAot);
+            checks["full-stripped-aot-snapshot-accepted"] = full.UnsupportedChanges.Length == 0;
+            checks["full-snapshot-does-not-invent-primitive-layout-changes"] =
+                full.Impact.Layouts.All(layout => !layout.TypeIdentity.StartsWith("mscorlib|"));
+        }
         bool passed = checks.Values.All(value => value);
         File.WriteAllText(Path.Combine(output, "result.json"), JsonSerializer.Serialize(new { passed, checks, impact = accepted.Impact,
             accepted.UnsupportedChanges, threadErrors = thread.UnsupportedChanges, ordinaryErrors = ordinary.UnsupportedChanges }, new JsonSerializerOptions { WriteIndented = true }));

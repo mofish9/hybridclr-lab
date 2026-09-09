@@ -202,7 +202,7 @@ public static class DheValueLayoutImpact
 
         private void Signature(TypeSig? signature, Context context, HashSet<string> dependencies, ref bool open)
         {
-            if (signature == null) return;
+            if (signature == null || signature is CorLibTypeSig) return;
             if (signature is GenericSig variable)
             {
                 Bound[] arguments = variable is GenericVar ? context.Types : context.Methods;
@@ -249,6 +249,9 @@ public static class DheValueLayoutImpact
 
         private void Inline(TypeSig signature, Context context, HashSet<string> result, ref bool open)
         {
+            // ECMA primitive storage is intrinsic. Core-library definitions such
+            // as Int32.m_value : int are not recursive user-defined value layouts.
+            if (signature is CorLibTypeSig) return;
             if (signature is GenericSig variable)
             {
                 Bound[] arguments = variable is GenericVar ? context.Types : context.Methods;

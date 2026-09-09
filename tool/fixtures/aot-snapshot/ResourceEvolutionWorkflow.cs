@@ -35,9 +35,10 @@ internal static class ResourceEvolutionWorkflow
     }
     public static int Run(string[] args)
     {
-        if (args.Length != 5) throw new ArgumentException("evolution-workflow <lab> <package> <Unity.exe> <runtime manifest> <new output>");
+        if (args.Length != 5 && args.Length != 6) throw new ArgumentException("evolution-workflow <lab> <package> <Unity.exe> <runtime manifest> <new output> [existing immutable matrix]");
         string lab = Path.GetFullPath(args[0]), package = Path.GetFullPath(args[1]), editor = Path.GetFullPath(args[2]),
             runtimeManifest = Path.GetFullPath(args[3]), output = Path.GetFullPath(args[4]); Fresh(output); Directory.CreateDirectory(output);
+        string baseMatrix = args.Length == 6 ? Path.GetFullPath(args[5]) : output;
         string host = Assembly.GetExecutingAssembly().Location, tool = Path.Combine(lab, "tool/bin/Release/net6.0/HybridCLR.DheTool.dll");
         string Execute(string exe, params string[] arguments)
         {
@@ -55,6 +56,9 @@ internal static class ResourceEvolutionWorkflow
         }
         string labHead = Execute("git", "-C", lab, "rev-parse", "HEAD");
         if (Execute("git", "-C", lab, "status", "--porcelain").Length != 0) throw new InvalidDataException("Commit sources before evolution verification.");
+        string currentProject = Path.Combine(baseMatrix, "current-project"), currentBuild = Path.Combine(baseMatrix, "current-build");
+        if (args.Length == 5)
+        {
         foreach (string version in new[] { "old", "new", "current" })
             Execute("dotnet", "build", "managed-cases/HybridCLR.ValueLayoutModel/HybridCLR.ValueLayoutModel.csproj", "-c", "Release", "--nologo", "--no-incremental",
                 "-o", Path.Combine(output, "sdk", version), "-p:DefineConstants=" + (version == "current" ? "DHE_RESOURCE_CURRENT" : version == "new" ? "DHE_RESOURCE_BASE_NEW" : "DHE_RESOURCE_BASE_OLD"));
@@ -69,18 +73,34 @@ internal static class ResourceEvolutionWorkflow
 
         // Compile Current in a separate project. Neither Base's captured input,
         // generated C++ evidence, embedded MV nor Player is changed by this step.
-        string currentProject = Path.Combine(output, "current-project"), currentBuild = Path.Combine(output, "current-build");
         Execute("dotnet", Path.Combine(lab, "tool/fixtures/value-layout/bin/Release/net6.0/ValueLayoutTests.dll"), "probe-project",
             lab, package, "Unity2022Fgs", Path.Combine(output, "sdk/current"), currentProject);
         Execute(editor, "-batchmode", "-nographics", "-quit", "-projectPath", currentProject,
             "-executeMethod", "HybridCLR.Lab.Editor.CurrentStorageProbeBuild.Prepare", "-probeRuntime",
             Read(runtimeManifest).GetProperty("stagedLibil2cpp").GetString(), "-probeOutput", currentBuild,
             "-logFile", Path.Combine(output, "current-prepare.log"));
+        }
+        else
+        {
+            string packageHead = Execute("git", "-C", package, "rev-parse", "HEAD");
+            if (Execute("git", "-C", package, "status", "--porcelain").Length != 0)
+                throw new InvalidDataException("Package must be clean.");
+            foreach (string version in new[] { "old", "new" })
+            {
+                string root = Path.Combine(baseMatrix, "base-" + version);
+                var binding = Read(Path.Combine(root, "result.json"));
+                if (!binding.GetProperty("passed").GetBoolean() || binding.GetProperty("packageHead").GetString() != packageHead ||
+                    binding.GetProperty("runtimeManifestSha256").GetString() != Hash(runtimeManifest) ||
+                    binding.GetProperty("playerSha256").GetString() != Hash(Path.Combine(root, "base/player/Snapshot.exe")) ||
+                    binding.GetProperty("gameAssemblySha256").GetString() != Hash(Path.Combine(root, "base/player/GameAssembly.dll")))
+                    throw new InvalidDataException("Frozen Base identity changed or does not match this package/runtime: " + root);
+            }
+        }
         string current = Path.Combine(currentBuild, "generated-current");
         var snapshots = new Dictionary<string, AotAnalysisSnapshot>();
         foreach (string version in new[] { "old", "new" })
         {
-            string baseRoot = Path.Combine(output, "base-" + version, "base"), identityPath = Path.Combine(baseRoot, "build-identity.json");
+            string baseRoot = Path.Combine(baseMatrix, "base-" + version, "base"), identityPath = Path.Combine(baseRoot, "build-identity.json");
             var identity = Read(identityPath);
             snapshots.Add(version, AotAnalysisSnapshot.Read(identityPath, identity,
                 identity.GetProperty("aotAssemblyNames").EnumerateArray().Select(item => item.GetString()), Names));
@@ -90,7 +110,7 @@ internal static class ResourceEvolutionWorkflow
         }
         Execute("dotnet", host, "evolution-reference", current,
             snapshots["old"].OrdinaryAssemblyPaths.Single(path => Path.GetFileNameWithoutExtension(path) == Native), Path.Combine(output, "reference-current.json"));
-        string Pair(string suffix) => string.Join(",", new[] { "old", "new" }.Select(version => Path.Combine(output, "base-" + version, "base", suffix)));
+        string Pair(string suffix) => string.Join(",", new[] { "old", "new" }.Select(version => Path.Combine(baseMatrix, "base-" + version, "base", suffix)));
         string resource = Path.Combine(output, "resource-current");
         Execute("dotnet", tool, "resource-update", "-CurrentRoot", current, "-SettingsFile", Path.Combine(currentProject, "ProjectSettings/HybridCLRSettings.asset"),
             "-BaseRoots", Pair("baseline"), "-BaseNativeManifests", Pair("native/dhe-native-manifest.json"), "-BaseBuildIdentities", Pair("build-identity.json"),
@@ -104,7 +124,7 @@ internal static class ResourceEvolutionWorkflow
             player.GetProperty("ordinaryAotStaticNeighbor").GetInt32() == expected.GetProperty("ordinaryAotStaticNeighbor").GetInt32();
         foreach (string version in new[] { "old", "new" })
         {
-            string run = Path.Combine(output, "base-" + version), build = Path.Combine(run, "base"), stage = Path.Combine(output, "stage-" + version);
+            string run = Path.Combine(baseMatrix, "base-" + version), build = Path.Combine(run, "base"), stage = Path.Combine(output, "stage-" + version);
             checks["base-reference-" + version] = Matches(Read(Path.Combine(run, "player-result.json")), Read(Path.Combine(output, "reference-" + version + ".json")));
             checks["base-noop-reference-" + version] = Matches(Read(Path.Combine(run, "resource-player-result.json")), Read(Path.Combine(output, "reference-" + version + ".json")));
             string embedded = Path.Combine(build, "player/Snapshot_Data/StreamingAssets/SnapshotDHE");
@@ -125,7 +145,8 @@ internal static class ResourceEvolutionWorkflow
         checks["one-current-payload"] = manifest.GetProperty("payloadModel").GetString() == "single-current-payload" &&
             manifest.GetProperty("supportedBases").EnumerateArray().Select(item => item.GetProperty("currentAssemblySetSha256").GetString()).Distinct().Count() == 1;
         File.WriteAllText(Path.Combine(output, "result.json"), JsonSerializer.Serialize(new { passed = checks.Values.All(value => value), checks,
-            labHead, packageHead = Execute("git", "-C", package, "rev-parse", "HEAD"), hostSha256 = Hash(host), toolSha256 = Hash(tool),
+            labHead, baseEvidenceRoot = baseMatrix, currentRoot = current,
+            packageHead = Execute("git", "-C", package, "rev-parse", "HEAD"), hostSha256 = Hash(host), toolSha256 = Hash(tool),
             runtimeManifestSha256 = Hash(runtimeManifest), resourceManifestSha256 = Hash(Path.Combine(resource, "dhe-resource-update.json")),
             expectedRecords = reference.GetProperty("records"), scope = "Unity2022 resource evolution across two immutable Bases; not native value ABI qualification" }, Json));
         foreach (var item in checks) Console.WriteLine(item.Key + ": " + item.Value);
