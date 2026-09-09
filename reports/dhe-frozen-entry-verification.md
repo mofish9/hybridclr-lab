@@ -141,3 +141,12 @@ that graph; restarting the Player is required because cached references cannot
 be safely freed or rebound. No partial dispatch is intentionally published.
 Validation must exercise original and permuted orders, MV failure/retry and
 cross-assembly cycles; no passing result is implied by this design note.
+
+The first phased candidate `fa416e3` passed native compile/CTest and Base Player
+checks, but `dhe-frozen-entry-proof-05` failed during the initial invalid-MV probe
+with `MissingMethodException: IEnumerable<char>::GetEnumerator`. It did not reach
+the expected MV rejection or the layout assertions. Review found the new private
+registry also made frozen corlib visible to Current virtual declaration mapping.
+Candidate `1bc8547` restricts frozen `GetDheCurrentType` to explicit physical
+selections; unaffected frozen interface/Object declarations keep their Base
+identity during preparation as well as after dispatch publication.
