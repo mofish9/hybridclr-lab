@@ -79,6 +79,11 @@ context remap、泛型实例 Current layout 以及 changed generic execution bri
 源码提交为 HybridCLR `38c5f09`。尚未重新完成 no-op、method-only、多 Base 连续更新
 和性能/内存门禁，因此仍是有条件通过。
 
+补充回归：既有 p11 Base Player 使用其匹配的 method-only 与 no-op payload 重跑均
+通过（`current-storage-p11-method-update2-u22-rerun.json`、
+`current-storage-p11-noop-u22-current-rerun.json`）。这些 payload 的 Base 身份
+不同于 p48，作为历史流程证据保留。
+
 多 Base 复测：同一份 `current-storage-raw-p38` Current 资源分别加载到 p11 和 p48
 Windows Base Player，两个结果均为 `loadCode=0`、14/14、`consumerPassed=true`。
 这证明当前资源身份可以被两种不同 Base 消费；连续多次更新和更多历史 Base 仍待
