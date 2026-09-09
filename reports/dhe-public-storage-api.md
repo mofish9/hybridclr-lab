@@ -1,5 +1,8 @@
 # DHE 公共加载 API 与普通反射验证
 
+后续资源选择计划的接入状态见 [dhe-resource-execution-plans.md](dhe-resource-execution-plans.md)。
+本报告仍只代表下文列出的原生 API/Player 组合。
+
 Unity 2022 Windows 的公共 RuntimeApi 加载、普通反射和多 Base 样例有条件通过。
 本轮解决了研究探针掩盖的反射调用约定缺口，并保留未变化方法的 AOT 路径。
 这不是完整资源工作流发布：DheRuntime、resource-update 和 staging 尚未接通
