@@ -25,3 +25,38 @@ No performance, ARM64, live replacement of existing instances, or release claim.
 Preserve failed artifacts. Commit candidate sources before bound Player builds.
 Rollback boundaries are fixture/runner changes and any separately committed
 runtime/Unity hook fixes discovered by these cases. Do not publish tags or CAT.
+
+## Default metadata and type initialization repair
+
+The first two-Base run passed resource loading but failed exact CLR records:
+an added optional parameter returned Missing, and a changed initializer ran
+twice when it accessed both Base and added Current static storage.
+
+Parameter reflection must separate logical Member identity, selected execution
+signature, and Current metadata (name, flags and constants). Register immutable
+logical-to-Current method metadata mappings during homologous image preparation;
+read them only after the existing DHE acquire publication. Decode constants with
+the image owning the method definition, including inflated methods. This must
+also work when only a default changes and the method body remains AOT.
+
+Choose one initialization owner: a matched Base with a cctor retains ownership;
+otherwise Current owns the new cctor. Current-only types own themselves. Resolve
+both Base and hidden Current entry points to that owner before completion checks.
+Keep IL2CPP's existing lock, recursion/thread state, atomic completion publication
+and cached exception on that single class; do not copy completion flags or run a
+second initializer. Generic instantiations preserve their arguments and have
+independent initialization state. Storage addresses remain unchanged.
+
+The mapping is derived from immutable image metadata after acquire publication,
+so preparation failure introduces no Base initialization-state mutations to
+undo. Metadata and classes retain their existing process lifetime. Startup must
+install DHE before business code touches these types; replacing already-running
+initializers remains outside this validation. No x64-to-ARM64 inference is made.
+New/removed cctors and ordinary AOT callers require explicit tests because native
+code may omit an initialization call for a Base that originally had no cctor.
+Any such uncovered path must stay a failed gate, not be described as supported.
+
+The repair has no throughput claim. Primary acceptance remains zero differential
+for defaults, repeated/reflection access, recursion, exceptions and concurrent
+first touch across both Bases. Runtime mapping and Unity VM hooks are separate
+candidate commits and can be rolled back together without changing old evidence.
