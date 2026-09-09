@@ -1,0 +1,15 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <OutputType>Exe</OutputType>
+    <TargetFramework>net6.0</TargetFramework>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <Nullable>disable</Nullable>
+  </PropertyGroup>
+  <Target Name="RequirePackage" BeforeTargets="PrepareForBuild">
+    <Error Condition="'$(DhePackageRoot)' == ''" Text="Pass the package source as DhePackageRoot." />
+  </Target>
+  <ItemGroup>
+    <Compile Include="$(DhePackageRoot)/Editor/Commands/DheAotAnalysisSnapshot.cs" Link="Package/DheAotAnalysisSnapshot.cs" />
+    <Reference Include="dnlib"><HintPath>../../dnlib.dll</HintPath></Reference>
+  </ItemGroup>
+</Project>
