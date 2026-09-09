@@ -7,6 +7,7 @@ using HybridCLR.Editor.Commands;
 using HybridCLR.DheTool;
 using System.Text.Json.Nodes;
 
+if (args.Length > 0 && args[0] == "unity-workflow") return UnityWorkflow.Run(args.Skip(1).ToArray());
 if (args.Length != 3) throw new ArgumentException("<real Unity stripped AOT root> <new output root> <tool DLL>");
 string input = Path.GetFullPath(args[0]), output = Path.GetFullPath(args[1]);
 if (Directory.Exists(output)) throw new IOException("Output must be new.");

@@ -9,6 +9,7 @@
     <Error Condition="'$(DhePackageRoot)' == ''" Text="Pass the package source as DhePackageRoot." />
   </Target>
   <ItemGroup>
+    <Compile Remove="Unity/**/*.cs" />
     <Compile Include="$(DhePackageRoot)/Editor/Commands/DheAotAnalysisSnapshot.cs" Link="Package/DheAotAnalysisSnapshot.cs" />
     <Compile Include="../../AotAnalysisSnapshot.cs" Link="Tool/AotAnalysisSnapshot.cs" />
     <Reference Include="dnlib"><HintPath>../../dnlib.dll</HintPath></Reference>
