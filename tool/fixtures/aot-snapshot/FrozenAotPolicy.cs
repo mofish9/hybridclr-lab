@@ -98,8 +98,11 @@ internal static class FrozenAotPolicy
         var nativeSource = snapshot.Assemblies.Single(source => source.AssemblyName == "HybridCLR.ValueLayoutNative");
         var syntheticNativePath = Path.Combine(output, "synthetic-native.dll");
         File.Copy(native, syntheticNativePath);
+        string syntheticManifestPath = Path.Combine(output, "synthetic-manifest.json");
+        File.Copy(snapshot.ManifestPath, syntheticManifestPath);
         var syntheticSnapshot = snapshot with
         {
+            ManifestPath = syntheticManifestPath,
             Assemblies = snapshot.Assemblies.Select(source => source.AssemblyName == nativeSource.AssemblyName
                 ? source with { Path = syntheticNativePath, Sha256 = Hash(File.ReadAllBytes(syntheticNativePath)) }
                 : source).ToArray()
