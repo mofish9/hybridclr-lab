@@ -176,8 +176,16 @@ foreach (string name in assemblyNames)
     var compatibility = ResourceUpdateCompatibility.Analyze(before, current,
         currentStorageTypes: current.Types.Where(type => plan.CurrentStorageTypeTokens.Contains(type.Token)).Select(type => type.StableId),
         currentExecutionMethodTokens: plan.CurrentExecutionMethodTokens);
-    cases["compiler-layout-compatibility-" + name] = compatibility.Compatible;
-    errors["compiler-layout-compatibility-" + name] = string.Join(";", compatibility.UnsupportedChanges);
+    string[] layoutReasons = { "added-instance-field-on-existing-value-type:", "removed-instance-field-on-existing-value-type:",
+        "existing-field-metadata-change:", "existing-type-layout-or-vtable-change:" };
+    cases["compiler-layout-rejections-resolved-" + name] = !compatibility.UnsupportedChanges.Any(reason =>
+        layoutReasons.Any(prefix => reason.StartsWith(prefix, StringComparison.Ordinal)));
+    // These historical probe inputs compare a Unity-stripped Base with an SDK
+    // Current DLL. Retargeted framework references are a separate real gate;
+    // storage selection must not silently remove that identity rejection.
+    cases["compiler-keeps-reference-scope-gate-" + name] = !compatibility.Compatible &&
+        compatibility.UnsupportedChanges.Any(reason => reason.StartsWith("existing-type-reference-scope-change:"));
+    errors["compiler-layout-rejections-resolved-" + name] = string.Join(";", compatibility.UnsupportedChanges);
 }
 var consumer = MetaVersionSnapshot.Create(currentFiles.Single(path => path.EndsWith("HybridCLR.ValueLayoutConsumer.dll")));
 var consumerTokens = compiled.Plans[consumer.AssemblyName].CurrentExecutionMethodTokens;
