@@ -130,6 +130,19 @@ if (args.Length == 6 && args[0] == "probe-build")
 {
     string lab = Path.GetFullPath(args[1]), editor = Path.GetFullPath(args[2]),
         project = Path.GetFullPath(args[3]), runtime = Path.GetFullPath(args[4]), output = Path.GetFullPath(args[5]);
+    string sourceHead = Run("git", lab, "rev-parse", "HEAD").Trim();
+    if (!string.IsNullOrWhiteSpace(Run("git", lab, "status", "--porcelain")))
+        throw new InvalidDataException("Commit the fixture sources before building a Player.");
+    string toolHash = Hash(typeof(MetaVersionSnapshot).Assembly.Location);
+    var fixtureSources = new[] { (Name: "CurrentStorageRuntime.cs", Folder: "Assets"),
+        (Name: "CurrentStorageProbeBuild.cs", Folder: "Assets/Editor") }.Select(item =>
+    {
+        string source = Path.Combine(lab, "tool/fixtures/value-layout/Unity", item.Name);
+        string copied = Path.Combine(project, item.Folder, item.Name);
+        string hash = Hash(source);
+        if (Hash(copied) != hash) throw new InvalidDataException("Refresh the project fixture before building: " + item.Name);
+        return new { path = copied, sha256 = hash };
+    }).ToArray();
     NewOutput(output);
     Directory.CreateDirectory(output);
     string manifest = Path.Combine(Path.GetDirectoryName(runtime)!, "runtime-manifest.json");
@@ -157,9 +170,11 @@ if (args.Length == 6 && args[0] == "probe-build")
         if (Hash(Path.Combine(output, "baseline", entry.assemblyName + ".dll")) != entry.baselineSha256)
             throw new InvalidDataException("Final Base differs from guarded metadata: " + entry.assemblyName);
     if (Hash(manifest) != runtimeHash) throw new InvalidDataException("Runtime manifest changed during build.");
+    if (fixtureSources.Any(item => Hash(item.path) != item.sha256))
+        throw new InvalidDataException("Fixture source changed during build.");
     File.WriteAllText(Path.Combine(output, "build-binding.json"), JsonSerializer.Serialize(new
     {
-        labHead = Run("git", lab, "rev-parse", "HEAD").Trim(), runtimeManifestSha256 = runtimeHash,
+        labHead = sourceHead, toolSha256 = toolHash, fixtureSources, runtimeManifestSha256 = runtimeHash,
         playerSha256 = Hash(Path.Combine(output, "player-executable", "CurrentStorage.exe")),
         gameAssemblySha256 = Hash(Path.Combine(output, "player-executable", "GameAssembly.dll")),
         nativeManifestSha256 = Hash(Path.Combine(output, "native-manifest.json")), assemblies = entries,
