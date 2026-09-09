@@ -82,7 +82,7 @@ foreach (string file in Directory.GetFiles(baseline, "*.dll"))
 void Reject(string name, Action action)
 {
     try { action(); checks[name] = false; }
-    catch (Exception error) when (error is IOException || error is ArgumentException)
+    catch (Exception error) when (error is IOException || error is InvalidDataException || error is ArgumentException)
     { checks[name] = true; errors[name] = error.Message; }
 }
 void Changed(string name, string assembly, Action<ModuleDefMD> mutation)
