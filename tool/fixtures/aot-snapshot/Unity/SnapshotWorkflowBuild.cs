@@ -10,6 +10,16 @@ namespace HybridCLR.Lab.Editor
     // Fixture callbacks only. All Base build phases use the package runner.
     public static class SnapshotWorkflowBuild
     {
+        [Serializable] private sealed class Mode { public string assemblyName; public string executionMode; public DheExecutionPlan executionPlan; }
+        public static void InspectJson()
+        {
+            foreach (string source in new[] { "{\"assemblyName\":\"Example\",\"executionPlan\":null}", "{\"assemblyName\":\"Example\"}",
+                "{\"assemblyName\":\"Example\",\"executionPlan\":{}}" })
+            {
+                Mode mode = JsonUtility.FromJson<Mode>(source);
+                Debug.Log("SNAPSHOT_JSON " + source + " planIsNull=" + (mode.executionPlan == null) + " parsed=" + JsonUtility.ToJson(mode));
+            }
+        }
         public static void Prepare() => DheProjectWorkflowRunner.Prepare(Adapter());
         public static void StageRuntimePlan() => DheProjectWorkflowRunner.StageRuntimePlan(Adapter());
         public static void BuildScriptsOnly() => DheProjectWorkflowRunner.BuildScriptsOnly(Adapter());
