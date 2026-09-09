@@ -36,6 +36,19 @@ internal static class FrozenEntryWorkflow
             var copy = Add("FrozenCopyBox", module.CorLibTypes.Object, module.CorLibTypes.Object);
             foreach (var instruction in new[] { Instruction.Create(OpCodes.Ldarg_0), Instruction.Create(OpCodes.Unbox_Any, payload),
                 Instruction.Create(OpCodes.Box, payload), Instruction.Create(OpCodes.Ret) }) copy.Body.Instructions.Add(instruction);
+            var modelScope = payload is TypeRef reference ? reference.ResolutionScope :
+                throw new InvalidDataException("Native fixture Payload must be a TypeRef.");
+            var nestedType = new TypeRefUser(module, "HybridCLR.Lab.ValueLayout", "Nested", modelScope);
+            var genericDefinition = new TypeRefUser(module, "HybridCLR.Lab.ValueLayout", "GenericValue`1", modelScope);
+            var genericType = new TypeSpecUser(new GenericInstSig(new ValueTypeSig(genericDefinition), new ValueTypeSig(payload)));
+            var referenceGenericType = new TypeSpecUser(new GenericInstSig(new ValueTypeSig(genericDefinition), module.CorLibTypes.Object));
+            foreach (var pair in new[] { ("FrozenNestedCopyBox", (ITypeDefOrRef)nestedType), ("FrozenGenericCopyBox", (ITypeDefOrRef)genericType),
+                ("FrozenReferenceGenericCopyBox", (ITypeDefOrRef)referenceGenericType) })
+            {
+                var valueCopy = Add(pair.Item1, module.CorLibTypes.Object, module.CorLibTypes.Object);
+                foreach (var instruction in new[] { Instruction.Create(OpCodes.Ldarg_0), Instruction.Create(OpCodes.Unbox_Any, pair.Item2),
+                    Instruction.Create(OpCodes.Box, pair.Item2), Instruction.Create(OpCodes.Ret) }) valueCopy.Body.Instructions.Add(instruction);
+            }
             var inline = Add("FrozenInlineBox", module.CorLibTypes.Object, module.CorLibTypes.Object);
             foreach (var instruction in new[] { Instruction.Create(OpCodes.Newobj, container.Methods.Single(method => method.IsInstanceConstructor)),
                 Instruction.Create(OpCodes.Dup), Instruction.Create(OpCodes.Ldarg_0), Instruction.Create(OpCodes.Unbox_Any, payload),

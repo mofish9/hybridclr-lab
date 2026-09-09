@@ -41,6 +41,20 @@ namespace HybridCLR.Lab.Snapshot
                 var plan = JsonUtility.FromJson<Plan>(File.ReadAllText(Argument("-frozenEntryPlan")));
                 Check("research-plan-bound-to-base", !plan.releaseReady && plan.format == "hybridclr.frozen-entry-probe" && plan.baseId == DheBuildIdentity.Create().BaseId);
                 object original = CreateValue();
+                Type ModelType(string name) => typeof(ValueLayout.Factory).Assembly.GetType("HybridCLR.Lab.ValueLayout." + name, true);
+                object originalNested = Activator.CreateInstance(ModelType("Nested"));
+                originalNested.GetType().GetField("Value").SetValue(originalNested, original);
+                originalNested.GetType().GetField("Tail").SetValue(originalNested, 163);
+                object originalGeneric = Activator.CreateInstance(ModelType("GenericValue`1").MakeGenericType(original.GetType()));
+                originalGeneric.GetType().GetField("Value").SetValue(originalGeneric, original);
+                originalGeneric.GetType().GetField("Marker").SetValue(originalGeneric, (short)167);
+                object oldReference = new object();
+                object originalReferenceGeneric = Activator.CreateInstance(ModelType("GenericValue`1").MakeGenericType(typeof(object)));
+                originalReferenceGeneric.GetType().GetField("Value").SetValue(originalReferenceGeneric, oldReference);
+                originalReferenceGeneric.GetType().GetField("Marker").SetValue(originalReferenceGeneric, (short)179);
+                object originalOther = Activator.CreateInstance(ModelType("Retyped"));
+                originalOther.GetType().GetField("Value").SetValue(originalOther, 173);
+                var oldWeak = new WeakReference(original);
                 RuntimeApi.ResetDifferentialDispatchCounters();
                 object baseline = NativeBoundary.FrozenCopyBox(original);
                 Check("base-direct-copy-aot", RuntimeApi.GetDifferentialAotEntryCount() > 0 && RuntimeApi.GetDifferentialInterpreterEntryCount() == 0);
@@ -158,6 +172,30 @@ namespace HybridCLR.Lab.Snapshot
                         Check("old-box-copy-retains-original-value", (int)migrated.GetType().GetField("Count").GetValue(migrated) == 17);
                         Check("old-box-copy-defaults-added-fields", (long)extra.GetValue(migrated) == 0L && reference.GetValue(migrated) == null);
                         Check("old-box-copy-is-independent", !ReferenceEquals(original, migrated) && (int)original.GetType().GetField("Count").GetValue(original) == 17);
+                        extra.SetValue(migrated, 181L); reference.SetValue(migrated, marker);
+                        object repeated = NativeBoundary.FrozenCopyBox(original);
+                        Check("old-box-repeated-copy-is-independent", (long)extra.GetValue(repeated) == 0L && reference.GetValue(repeated) == null);
+                        object nestedCopy = NativeBoundary.FrozenNestedCopyBox(originalNested);
+                        object nestedValue = nestedCopy.GetType().GetField("Value").GetValue(nestedCopy);
+                        Check("old-nested-copy-preserves-fields", (int)nestedCopy.GetType().GetField("Tail").GetValue(nestedCopy) == 163 &&
+                            (int)nestedValue.GetType().GetField("Count").GetValue(nestedValue) == 17 && (long)extra.GetValue(nestedValue) == 0L && reference.GetValue(nestedValue) == null);
+                        object genericCopyResult = NativeBoundary.FrozenGenericCopyBox(originalGeneric);
+                        object genericValue = genericCopyResult.GetType().GetField("Value").GetValue(genericCopyResult);
+                        Check("old-generic-copy-preserves-fields", (short)genericCopyResult.GetType().GetField("Marker").GetValue(genericCopyResult) == 167 &&
+                            (int)genericValue.GetType().GetField("Count").GetValue(genericValue) == 17 && (long)extra.GetValue(genericValue) == 0L && reference.GetValue(genericValue) == null);
+                        RuntimeApi.ResetDifferentialDispatchCounters();
+                        object referenceGenericCopy = NativeBoundary.FrozenReferenceGenericCopyBox(originalReferenceGeneric);
+                        Check("unaffected-generic-reference-copy-remains-aot", RuntimeApi.GetDifferentialAotEntryCount() > 0 && RuntimeApi.GetDifferentialInterpreterEntryCount() == 0);
+                        Check("old-generic-copy-preserves-reference-identity", ReferenceEquals(referenceGenericCopy.GetType().GetField("Value").GetValue(referenceGenericCopy), oldReference) &&
+                            (short)referenceGenericCopy.GetType().GetField("Marker").GetValue(referenceGenericCopy) == 179);
+                        bool wrongTypeRejected = false;
+                        try { NativeBoundary.FrozenCopyBox(originalOther); }
+                        catch (InvalidCastException) { wrongTypeRejected = true; }
+                        Check("unrelated-old-box-still-rejected", wrongTypeRejected);
+                        GC.Collect(); GC.WaitForPendingFinalizers(); GC.Collect();
+                        Check("old-and-current-boxes-survive-gc", oldWeak.IsAlive && (int)original.GetType().GetField("Count").GetValue(original) == 17 &&
+                            (long)extra.GetValue(migrated) == 181L && ReferenceEquals(reference.GetValue(migrated), marker));
+                        GC.KeepAlive(original); GC.KeepAlive(migrated);
                         break;
                     default: throw new ArgumentException("Unknown frozen entry capability: " + result.capability);
                 }
