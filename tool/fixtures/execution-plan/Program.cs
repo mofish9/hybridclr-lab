@@ -247,16 +247,26 @@ foreach (string file in new[] { "dhe-resource-update.schema.json", "dhe-resource
 {
     using var schema = JsonDocument.Parse(File.ReadAllText(Path.Combine(Path.GetFullPath("../../../../../..", AppContext.BaseDirectory), "schemas", file)));
     cases["schema-unique-keys-" + file] = UniqueProperties(schema.RootElement);
-    bool SchemaAccepts(JsonNode value)
+    bool SchemaAccepts(JsonNode value, string definition = "executionPlan")
     {
         using var instance = JsonDocument.Parse(value?.ToJsonString() ?? "null");
         var failures = new List<string>();
-        validateSchema.Invoke(null, new object[] { schema.RootElement.GetProperty("$defs").GetProperty("executionPlan"), instance.RootElement, schema.RootElement, "$", failures });
+        validateSchema.Invoke(null, new object[] { schema.RootElement.GetProperty("$defs").GetProperty(definition), instance.RootElement, schema.RootElement, "$", failures });
         return failures.Count == 0;
     }
     cases["schema-valid-plan-" + file] = SchemaAccepts(supportedBases[0]["assemblyModes"][0]["executionPlans"][0]);
     cases["schema-no-plan-" + file] = SchemaAccepts(null);
     cases["schema-duplicate-rejected-" + file] = !SchemaAccepts(boundBase["assemblyModes"][0]["executionPlans"][0]);
+    var frozenManifest = Clone(manifestDocument);
+    AddFrozen(frozenManifest, Clone(validationDocument), Clone(planDocument), providers[0].Copy());
+    var frozenRecord = frozenManifest["supportedBases"][0]["frozenAotSources"][0];
+    cases["schema-frozen-source-" + file] = SchemaAccepts(frozenRecord, "frozenAotSource");
+    var invalidFrozen = Clone(frozenRecord); invalidFrozen.AsObject().Remove("genericContextMethodTokens");
+    cases["schema-missing-frozen-conditions-" + file] = !SchemaAccepts(invalidFrozen, "frozenAotSource");
+    invalidFrozen = Clone(frozenRecord); invalidFrozen["genericContextMethodTokens"].AsArray().Add(JsonValue.Create(frozenToken));
+    cases["schema-duplicate-frozen-conditions-" + file] = !SchemaAccepts(invalidFrozen, "frozenAotSource");
+    invalidFrozen = Clone(frozenRecord); invalidFrozen["genericContextMethodTokens"] = new JsonArray(JsonValue.Create(0x02000002u));
+    cases["schema-wrong-frozen-condition-table-" + file] = !SchemaAccepts(invalidFrozen, "frozenAotSource");
     if (file == "dhe-runtime-plan.schema.json")
     {
         bool CompletePlanAccepted(JsonNode value)
