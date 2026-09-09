@@ -76,9 +76,10 @@ namespace HybridCLR.Lab.Snapshot
                 }
                 int expectedIndex = Array.IndexOf(args, "-expectedRevision");
                 int expectedRevision = expectedIndex < 0 ? 41 : int.Parse(args[expectedIndex + 1]);
-                result.passed = result.loadedAssemblies == 3 && result.revision == expectedRevision && result.sentinel == 5 &&
-                    (!result.resourceUpdate || !RuntimeApi.IsDifferentialMethodChanged(typeof(ValueLayout.Factory).GetMethod("UnchangedRevision"))) &&
-                    (!result.resourceUpdate || result.ordinaryAotEchoExtra == 90000000001L);
+                result.passed = result.loadedAssemblies == 3 && result.revision == expectedRevision &&
+                    result.sentinel == 5 && (!result.resourceUpdate ||
+                    (!RuntimeApi.IsDifferentialMethodChanged(typeof(ValueLayout.Factory).GetMethod("UnchangedRevision")) &&
+                     result.ordinaryAotEchoExtra == 90000000001L));
             }
             catch (Exception exception) { result.error = exception.ToString(); }
             File.WriteAllText(args[index + 1], JsonUtility.ToJson(result, true));
