@@ -5,6 +5,22 @@
   "type": "object",
   "additionalProperties": false,
   "$defs": {
+    "frozenAotSource": {
+      "type": "object", "additionalProperties": false,
+      "required": ["assemblyName", "source", "sourceSha256", "baseMetaVersion", "baseMetaVersionSha256", "currentStorageTypeTokens", "currentExecutionMethodTokens", "excludedBaseTypeTokens", "genericContextMethodTokens", "sourceKind"],
+      "properties": {
+        "assemblyName": { "type": "string", "minLength": 1 },
+        "source": { "type": "string", "minLength": 1 },
+        "sourceSha256": { "type": "string", "pattern": "^[0-9a-fA-F]{64}$" },
+        "baseMetaVersion": { "type": "string", "minLength": 1 },
+        "baseMetaVersionSha256": { "type": "string", "pattern": "^[0-9a-fA-F]{64}$" },
+        "currentStorageTypeTokens": { "type": "array", "uniqueItems": true, "items": { "type": "integer", "minimum": 33554434, "maximum": 50331647 } },
+        "currentExecutionMethodTokens": { "type": "array", "uniqueItems": true, "items": { "type": "integer", "minimum": 100663297, "maximum": 117440511 } },
+        "excludedBaseTypeTokens": { "type": "array", "uniqueItems": true, "items": { "type": "integer", "minimum": 33554434, "maximum": 50331647 } },
+        "genericContextMethodTokens": { "type": "array", "uniqueItems": true, "items": { "type": "integer", "minimum": 100663297, "maximum": 117440511 } },
+        "sourceKind": { "const": "frozen-base-aot" }
+      }
+    },
     "executionPlan": {
       "type": [
         "object",
@@ -128,6 +144,7 @@
           "il2cppCodeGeneration": { "enum": ["OptimizeSpeed", "OptimizeSize"] },
           "payloadVariantId": { "type": "string", "pattern": "^[A-Za-z0-9._-]{1,64}$" },
           "currentAssemblySetSha256": { "type": "string", "pattern": "^[0-9a-fA-F]{64}$" },
+          "frozenAotSources": { "type": "array", "items": { "$ref": "#/$defs/frozenAotSource" } },
           "assemblyModes": {
             "type": "array",
             "items": {

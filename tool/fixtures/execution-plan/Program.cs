@@ -43,7 +43,8 @@ foreach (string version in new[] { "old", "new" })
     {
         IdentityVersion = 1, Target = "StandaloneWindows64", EngineWorkflow = "Unity2022Fgs", Il2CppCodeGeneration = "OptimizeSize",
         AotSnapshotKind = "managed-assembly-plus-generated-cpp-v1", ManagedAssemblySetSha256 = HashText("managed" + version),
-        AotAssemblyNames = names, AotAssemblySetSha256 = HashText(string.Concat(names.OrderBy(name => name, StringComparer.Ordinal).Select(name => name + "\n"))),
+        AotAssemblyNames = names.Concat(new[] { "HybridCLR.ValueLayoutNative" }).ToArray(),
+        AotAssemblySetSha256 = HashText(string.Concat(names.Concat(new[] { "HybridCLR.ValueLayoutNative" }).OrderBy(name => name, StringComparer.Ordinal).Select(name => name + "\n"))),
         AotSnapshotSha256 = HashText("snapshot" + version), BaseMetaVersionSetSha256 = SetHash(beforeBytes),
         AotAnalysisSnapshotSha256 = HashText("analysis-snapshot" + version),
         NativeGuardSourceSha256 = HashText("guard" + version), NativeManifestSha256 = HashText("native" + version),
@@ -83,7 +84,7 @@ foreach (string version in new[] { "old", "new" })
     {
         baseId = identity.BaseId, target = identity.Target, engineWorkflow = identity.EngineWorkflow, il2cppCodeGeneration = identity.Il2CppCodeGeneration,
         managedAssemblySetSha256 = identity.ManagedAssemblySetSha256, aotAssemblySetSha256 = identity.AotAssemblySetSha256,
-        aotAssemblyNames = names, aotSnapshotSha256 = identity.AotSnapshotSha256, baseMetaVersionSetSha256 = identity.BaseMetaVersionSetSha256,
+        aotAssemblyNames = identity.AotAssemblyNames, aotSnapshotSha256 = identity.AotSnapshotSha256, baseMetaVersionSetSha256 = identity.BaseMetaVersionSetSha256,
         aotAnalysisSnapshotSha256 = identity.AotAnalysisSnapshotSha256,
         nativeGuardSourceSha256 = identity.NativeGuardSourceSha256, nativeManifestSha256 = identity.NativeManifestSha256,
         runtimeProtocol = identity.RuntimeProtocol, nativeRuntimeContract = identity.RuntimeContract, runtimeCapabilities = identity.RuntimeCapabilities,
@@ -127,12 +128,13 @@ void RunCase(string name, int baseIndex, Action<JsonNode, JsonNode, JsonNode, Pr
         if (accepted)
         {
             var expectedModes = plan["baseSelections"][baseIndex]["assemblyModes"].AsArray();
+            int frozenCount = plan["baseSelections"][baseIndex]["frozenAotSources"]?.AsArray().Count ?? 0;
             accepted = !expectPlans ? RuntimeApi.Calls == 1 && RuntimeApi.LastTypes == null && RuntimeApi.LastMethods == null :
                 RuntimeApi.Calls == 1 && RuntimeApi.LastTypes != null && names.Select((item, index) =>
             {
                 var mode = expectedModes.Single(value => value["assemblyName"].GetValue<string>() == item);
-                return RuntimeApi.LastTypes[index].SequenceEqual(mode["executionPlans"][0]["currentStorageTypeTokens"].AsArray().Select(token => token.GetValue<uint>())) &&
-                    RuntimeApi.LastMethods[index].SequenceEqual(mode["executionPlans"][0]["currentExecutionMethodTokens"].AsArray().Select(token => token.GetValue<uint>()));
+                return RuntimeApi.LastTypes[index + frozenCount].SequenceEqual(mode["executionPlans"][0]["currentStorageTypeTokens"].AsArray().Select(token => token.GetValue<uint>())) &&
+                    RuntimeApi.LastMethods[index + frozenCount].SequenceEqual(mode["executionPlans"][0]["currentExecutionMethodTokens"].AsArray().Select(token => token.GetValue<uint>()));
             }).All(value => value);
         }
     }
@@ -172,6 +174,44 @@ RunCase("wrong-base-provider", 0, (_, _, _, provider) =>
 }, false);
 RunCase("duplicate-base-selection", 0, (_, _, p, _) => p["baseSelections"].AsArray().Add(Clone(p["baseSelections"][0])), false);
 RunCase("valid-retry-without-reset-after-rejection", 0, null, true, reset: false);
+const string frozenName = "HybridCLR.ValueLayoutNative";
+byte[] frozenDll = File.ReadAllBytes(Path.Combine(root, "base-old-reflection/baseline", frozenName + ".dll"));
+var frozenSnapshot = MetaVersionSnapshot.Create(Path.Combine(root, "base-old-reflection/baseline", frozenName + ".dll"));
+byte[] frozenMv = frozenSnapshot.ToBinary();
+uint frozenToken = frozenSnapshot.Methods.First(method => method.Name == "Echo").Token;
+void AddFrozen(JsonNode manifest, JsonNode validation, JsonNode plan, Provider provider)
+{
+    var row = Node(new { assemblyName = frozenName, source = assets + "frozen.dll", sourceSha256 = Hash(frozenDll),
+        baseMetaVersion = baseRoot + "frozen.mv", baseMetaVersionSha256 = Hash(frozenMv),
+        currentStorageTypeTokens = Array.Empty<uint>(), currentExecutionMethodTokens = new[] { frozenToken },
+        excludedBaseTypeTokens = Array.Empty<uint>(), genericContextMethodTokens = new[] { frozenToken }, sourceKind = "frozen-base-aot" });
+    provider.Bytes[assets + "frozen.dll"] = frozenDll; provider.Bytes[baseRoot + "frozen.mv"] = frozenMv;
+    foreach (var record in new[] { manifest["supportedBases"][0], validation["bases"][0], plan["baseSelections"][0] })
+        record["frozenAotSources"] = new JsonArray(Clone(row));
+    foreach (var record in new[] { manifest["supportedBases"][0], validation["bases"][0] })
+        record["requiredRuntimeCapabilities"].AsArray().Add(JsonValue.Create("frozen-generic-context-dispatch-v1"));
+}
+// These host checks verify protocol transport and binding only. The native
+// registry separately rejects conditional records for non-generic methods.
+RunCase("frozen-conditional-selection-forwarded", 0, AddFrozen, true);
+cases["frozen-source-kind-and-conditions-forwarded"] = RuntimeApi.LastSourceKinds?.First() == 1 &&
+    RuntimeApi.LastConditional?[0].SequenceEqual(new[] { frozenToken }) == true;
+RunCase("frozen-condition-plan-mismatch", 0, (m, v, p, provider) =>
+{ AddFrozen(m, v, p, provider); p["baseSelections"][0]["frozenAotSources"][0]["genericContextMethodTokens"] = new JsonArray(); }, false);
+RunCase("frozen-source-validation-mismatch", 0, (m, v, p, provider) =>
+{ AddFrozen(m, v, p, provider); v["bases"][0]["frozenAotSources"][0]["sourceSha256"] = emptyHash; }, false);
+RunCase("frozen-condition-outside-selection", 0, (m, v, p, provider) =>
+{
+    AddFrozen(m, v, p, provider);
+    foreach (var record in new[] { m["supportedBases"][0], v["bases"][0], p["baseSelections"][0] })
+        record["frozenAotSources"][0]["genericContextMethodTokens"] = new JsonArray(JsonValue.Create(0x06ffffffu));
+}, false);
+RunCase("frozen-capability-cannot-be-omitted", 0, (m, v, p, provider) =>
+{
+    AddFrozen(m, v, p, provider);
+    foreach (var record in new[] { m["supportedBases"][0], v["bases"][0] })
+        record["requiredRuntimeCapabilities"].AsArray().RemoveAt(record["requiredRuntimeCapabilities"].AsArray().Count - 1);
+}, false);
 var toolAssembly = Assembly.LoadFrom(Path.GetFullPath(args[2]));
 var stagingCanonical = toolAssembly.GetType("HybridCLR.DheTool.Program", throwOnError: true)
     .GetMethod("CanonicalResourceAssemblyModes", BindingFlags.Static | BindingFlags.NonPublic);

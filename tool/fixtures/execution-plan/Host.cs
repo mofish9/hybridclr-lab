@@ -41,6 +41,8 @@ namespace HybridCLR
     {
         public static int Calls;
         public static uint[][] LastTypes, LastMethods;
+        public static uint[][] LastConditional;
+        public static int[] LastSourceKinds;
         public static LoadImageErrorCode LoadMetadataForAOTAssembly(byte[] bytes, HomologousImageMode mode)
         { Calls++; return LoadImageErrorCode.OK; }
         public static LoadImageErrorCode LoadDifferentialHybridAssembliesWithMetaVersion(byte[][] dlls, byte[][] before, byte[][] after)
@@ -48,6 +50,10 @@ namespace HybridCLR
         public static LoadImageErrorCode LoadDifferentialHybridAssembliesWithMetaVersionAndExecutionPlan(
             byte[][] dlls, byte[][] before, byte[][] after, uint[][] types, uint[][] methods)
         { Calls++; LastTypes = types; LastMethods = methods; return LoadImageErrorCode.OK; }
+        public static LoadImageErrorCode LoadDifferentialHybridAssemblySources(
+            byte[][] dlls, byte[][] before, byte[][] after, uint[][] types, uint[][] methods,
+            int[] sourceKinds, uint[][] excluded, uint[][] conditional)
+        { Calls++; LastTypes = types; LastMethods = methods; LastConditional = conditional; LastSourceKinds = sourceKinds; return LoadImageErrorCode.OK; }
         public static LoadImageErrorCode LoadDifferentialHybridAssembliesWithMetaVersionAndExecutionPlanAndSources(
             byte[][] dlls, byte[][] before, byte[][] after, uint[][] types, uint[][] methods,
             int[] sourceKinds, uint[][] excluded)

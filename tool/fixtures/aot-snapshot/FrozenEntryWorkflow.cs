@@ -84,7 +84,7 @@ internal static class FrozenEntryWorkflow
         var records = new List<object>();
         string payloadRoot = Path.Combine(output, "frozen-entry-payload"); Directory.CreateDirectory(payloadRoot);
         string Hash(string file) => Convert.ToHexString(SHA256.HashData(File.ReadAllBytes(file)));
-        void Add(string name, string source, int kind, uint[] types, uint[] methods, uint[] excluded)
+        void Add(string name, string source, int kind, uint[] types, uint[] methods, uint[] excluded, uint[] conditional)
         {
             string dll = Path.Combine(payloadRoot, name + ".dll"), before = Path.Combine(payloadRoot, name + ".base.mv"), next = Path.Combine(payloadRoot, name + ".current.mv");
             File.Copy(source, dll);
@@ -101,15 +101,15 @@ internal static class FrozenEntryWorkflow
                 invalidBefore = Path.Combine(payloadRoot, name + ".invalid-base.mv");
                 invalid.WriteBinary(invalidBefore); invalidBeforeSha256 = Hash(invalidBefore);
             }
-            records.Add(new { name, dll, before, after = next, sourceKind = kind, types, methods, excluded,
+            records.Add(new { name, dll, before, after = next, sourceKind = kind, types, methods, excluded, conditional,
                 dllSha256 = Hash(dll), beforeSha256 = Hash(before), afterSha256 = Hash(next), invalidBefore, invalidBeforeSha256 });
         }
         foreach (var plan in frozen.Assemblies)
             Add(plan.AssemblyName, snapshot.Assemblies.Single(source => source.AssemblyName == plan.AssemblyName).Path, 1,
-                plan.ExecutionPlan.CurrentStorageTypeTokens, plan.ExecutionPlan.CurrentExecutionMethodTokens, plan.ExcludedBaseTypeTokens);
+                plan.ExecutionPlan.CurrentStorageTypeTokens, plan.ExecutionPlan.CurrentExecutionMethodTokens, plan.ExcludedBaseTypeTokens, plan.GenericContextMethodTokens);
         foreach (string name in names)
             Add(name, Path.Combine(current, name + ".dll"), 0, mutable.Plans[name].CurrentStorageTypeTokens,
-                mutable.Plans[name].CurrentExecutionMethodTokens, Array.Empty<uint>());
+                mutable.Plans[name].CurrentExecutionMethodTokens, Array.Empty<uint>(), Array.Empty<uint>());
         string planPath = Path.Combine(output, "frozen-entry-plan.json");
         File.WriteAllText(planPath, JsonSerializer.Serialize(new { format = "hybridclr.frozen-entry-probe", releaseReady = false,
             baseId = identity.GetProperty("baseId").GetString(), records }, Json));

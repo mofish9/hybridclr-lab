@@ -10,7 +10,10 @@ internal sealed record FrozenAotMethod(uint Token, string Identity, string[] Rea
 internal sealed record FrozenAotObligation(string Kind, string AssemblyName, uint Token, string Identity);
 internal sealed record FrozenAotAssemblyPlan(string AssemblyName, string SnapshotSha256,
     string SourceDllSha256, string SourceMetaVersionSha256, uint[] ExcludedBaseTypeTokens,
-    uint[] StaticValueFieldTokens, ResourceExecutionPlan ExecutionPlan, FrozenAotMethod[] Methods);
+    uint[] StaticValueFieldTokens, ResourceExecutionPlan ExecutionPlan, FrozenAotMethod[] Methods)
+{
+    public uint[] GenericContextMethodTokens { get; init; } = Array.Empty<uint>();
+}
 internal sealed record FrozenAotCompilation(FrozenAotAssemblyPlan[] Assemblies, FrozenAotObligation[] Obligations,
     DheValueLayoutImpactResult Impact);
 
@@ -113,7 +116,11 @@ internal static class FrozenAotAdaptation
             foreach (var method in entries) Obligation("base-native-guard-required", method.Token, method.Identity);
             plans.Add(new(source.AssemblyName, snapshot.Sha256, source.Sha256, mvHash,
                 source.ExcludedTypeTokens.ToArray(), statics.Where(field => !Excluded(field.DeclaringTypeToken))
-                    .Select(field => field.FieldToken).Distinct().OrderBy(token => token).ToArray(), plan, entries));
+                    .Select(field => field.FieldToken).Distinct().OrderBy(token => token).ToArray(), plan, entries)
+            {
+                GenericContextMethodTokens = entries.Where(method => method.Reasons.Length == 1 &&
+                    method.Reasons[0] == "generic-argument-storage").Select(method => method.Token).OrderBy(token => token).ToArray()
+            });
         }
         return new(plans.OrderBy(plan => plan.AssemblyName, StringComparer.Ordinal).ToArray(),
             obligations.Distinct().OrderBy(item => item.AssemblyName, StringComparer.Ordinal).ThenBy(item => item.Kind, StringComparer.Ordinal)

@@ -583,6 +583,21 @@ namespace
         CurrentImageSource badSource = frozen;
         badSource.baseSourceHash.fill(99);
         rejectsFrozen(base, badSource, {}, {});
+#if defined(HYBRIDCLR_DHE_HAS_FROZEN_GENERIC_CONTEXT)
+        auto conditionalSource = frozen;
+        conditionalSource.genericContextMethodTokens = { base.methods[0].token };
+        CHECK(BuildCurrentImagePlan(base, base, {}, { base.methods[0].token }, samePlan, conditionalSource));
+        CHECK(!(samePlan.source == frozen));
+        rejectsFrozen(base, conditionalSource, {}, {}); // Cannot bypass an unselected entry.
+        rejectsFrozen(base, conditionalSource, { base.types[0].token }, { base.methods[0].token });
+        conditionalSource.genericContextMethodTokens.push_back(base.methods[0].token);
+        rejectsFrozen(base, conditionalSource, {}, { base.methods[0].token });
+        conditionalSource.genericContextMethodTokens = { 0x06000000 };
+        rejectsFrozen(base, conditionalSource, {}, {});
+        conditionalSource = CurrentImageSource{};
+        conditionalSource.genericContextMethodTokens = { base.methods[0].token };
+        rejectsFrozen(base, conditionalSource, {}, { base.methods[0].token });
+#endif
         badSource.baseSourceHash.fill(0);
         rejectsFrozen(base, badSource, {}, {});
         badSource = frozen; badSource.kind = static_cast<CurrentImageSourceKind>(99);
@@ -1059,6 +1074,31 @@ namespace
         CHECK(!hybridclr::dhe::IsChangedMethod(&unchanged));
         hybridclr::dhe::ResetForTests();
         physicalCurrent.isInterpterImpl = false;
+#if defined(HYBRIDCLR_DHE_HAS_FROZEN_GENERIC_CONTEXT)
+        frozenRegistration.source.genericContextMethodTokens = { changed.token };
+        CHECK(!hybridclr::dhe::PrepareAndRegisterMetaVersions({ frozenRegistration })); // Non-generic.
+        int genericContainerMarker = 0;
+        klass->genericContainerHandle = reinterpret_cast<Il2CppMetadataGenericContainerHandle>(&genericContainerMarker);
+        executionClass->genericContainerHandle = klass->genericContainerHandle;
+        CHECK(hybridclr::dhe::PrepareAndRegisterMetaVersions({ frozenRegistration }));
+        const Il2CppType* arguments[] = { &scalarType };
+        Il2CppGenericInst inst{}; inst.type_argc = 1; inst.type_argv = arguments;
+        Il2CppGenericMethod generic{}; generic.methodDefinition = &changed; generic.context.class_inst = &inst;
+        MethodInfo closed = changed; closed.is_inflated = true; closed.genericMethod = &generic;
+        CHECK(!hybridclr::dhe::IsChangedMethod(&closed));
+        CHECK(!hybridclr::dhe::ShouldDispatchToInterpreter(&closed));
+        CHECK(hybridclr::dhe::CanEnterWithBaseAbi(&closed));
+        CHECK(hybridclr::dhe::ResolveInterpreterMethod(&closed) == &closed);
+        CHECK(hybridclr::dhe::ResolveCurrentExecutionMethod(&closed) == &closed);
+        CHECK(hybridclr::dhe::IsChangedMethod(&physicalCurrent));
+        Il2CppType unresolved{}; unresolved.type = IL2CPP_TYPE_VAR; arguments[0] = &unresolved;
+        CHECK(hybridclr::dhe::IsChangedMethod(&closed));
+        CHECK(!hybridclr::dhe::CanEnterWithBaseAbi(&closed));
+        hybridclr::dhe::ResetForTests();
+        klass->genericContainerHandle = executionClass->genericContainerHandle = nullptr;
+        frozenRegistration.source.genericContextMethodTokens.clear();
+        physicalCurrent.isInterpterImpl = false;
+#endif
         frozenCurrent.methods[0].version.fill(99);
         CHECK(!hybridclr::dhe::PrepareAndRegisterMetaVersions({ frozenRegistration }));
         CHECK(!hybridclr::dhe::IsDheAssembly(&assembly) && !physicalCurrent.isInterpterImpl);

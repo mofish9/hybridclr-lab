@@ -57,6 +57,7 @@ internal static class FrozenAotMaterialize
                 currentStorageTypeTokens = plan.ExecutionPlan.CurrentStorageTypeTokens,
                 currentExecutionMethodTokens = plan.ExecutionPlan.CurrentExecutionMethodTokens,
                 excludedBaseTypeTokens = plan.ExcludedBaseTypeTokens,
+                genericContextMethodTokens = plan.GenericContextMethodTokens,
                 sourceKind = "frozen-base-aot"
             });
         }

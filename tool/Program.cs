@@ -1379,8 +1379,15 @@ internal static partial class Program
                         !IsHex(mvHash, 64, 64) ||
                         !source.TryGetProperty("currentStorageTypeTokens", out JsonElement sourceTypes) ||
                         !source.TryGetProperty("currentExecutionMethodTokens", out JsonElement sourceMethods) ||
-                        !source.TryGetProperty("excludedBaseTypeTokens", out JsonElement excluded))
+                        !source.TryGetProperty("excludedBaseTypeTokens", out JsonElement excluded) ||
+                        !source.TryGetProperty("genericContextMethodTokens", out JsonElement conditional))
                         throw new DheException("Frozen AOT source record is invalid: " + baseId + "/" + sourceName);
+                    uint[] methodTokens = sourceMethods.EnumerateArray().Select(value => value.GetUInt32()).ToArray();
+                    uint[] conditionalTokens = conditional.EnumerateArray().Select(value => value.GetUInt32()).ToArray();
+                    if (!conditionalTokens.SequenceEqual(conditionalTokens.Distinct().OrderBy(token => token)) ||
+                        conditionalTokens.Any(token => (token >> 24) != 6 || (token & 0xffffffu) == 0 || !methodTokens.Contains(token)))
+                        throw new DheException("Frozen generic context selection is invalid: " + baseId + "/" + sourceName);
+                    if (conditionalTokens.Length != 0) requiredRuntimeCapabilities.Add("frozen-generic-context-dispatch-v1");
                     string sourceRelative = "payload/frozen-aot/" + baseId.ToLowerInvariant() + "/" + sourceName + ".dll.bytes";
                     string mvRelative = "payload/frozen-aot/" + baseId.ToLowerInvariant() + "/" + sourceName + ".mv.bytes";
                     string sourceTarget = ResolveContainedPath(outputRoot, sourceRelative, "frozen AOT source");
@@ -1401,6 +1408,7 @@ internal static partial class Program
                         currentStorageTypeTokens = sourceTypes,
                         currentExecutionMethodTokens = sourceMethods,
                         excludedBaseTypeTokens = excluded,
+                        genericContextMethodTokens = conditional,
                         sourceKind = "frozen-base-aot",
                     });
                 }

@@ -11,7 +11,7 @@ namespace HybridCLR.Lab.Snapshot
 {
     public static class FrozenEntryPlayer
     {
-        [Serializable] private class Record { public string name, dll, before, after, dllSha256, beforeSha256, afterSha256, invalidBefore, invalidBeforeSha256; public int sourceKind; public uint[] types, methods, excluded; }
+        [Serializable] private class Record { public string name, dll, before, after, dllSha256, beforeSha256, afterSha256, invalidBefore, invalidBeforeSha256; public int sourceKind; public uint[] types, methods, excluded, conditional; }
         [Serializable] private class Plan { public string format, baseId; public bool releaseReady; public Record[] records; }
         [Serializable] private class Check { public string name; public bool passed; }
         [Serializable] private class Result { public bool passed; public string stage, error, capability; public int loadCode = -1, failedBatchAotCount, failedBatchInterpreterCount; public bool failedBatchExtraVisible; public Check[] checks; }
@@ -60,6 +60,7 @@ namespace HybridCLR.Lab.Snapshot
                 var methods = plan.records.Select(row => row.methods).ToArray();
                 var kinds = plan.records.Select(row => row.sourceKind).ToArray();
                 var excluded = plan.records.Select(row => row.excluded).ToArray();
+                var conditional = plan.records.Select(row => row.conditional ?? Array.Empty<uint>()).ToArray();
                 Check("frozen-and-mutable-batch", kinds.Contains(1) && kinds.Contains(0));
                 int retryIndex = Array.FindIndex(plan.records, row => !string.IsNullOrEmpty(row.invalidBefore));
                 if (retryIndex >= 0)
@@ -67,8 +68,8 @@ namespace HybridCLR.Lab.Snapshot
                     Save("invalid-base-registration");
                     var invalid = (byte[][])before.Clone();
                     invalid[retryIndex] = Read(plan.records[retryIndex].invalidBefore, plan.records[retryIndex].invalidBeforeSha256);
-                    var failure = RuntimeApi.LoadDifferentialHybridAssembliesWithMetaVersionAndExecutionPlanAndSources(
-                        dlls, invalid, after, types, methods, kinds, excluded);
+                    var failure = RuntimeApi.LoadDifferentialHybridAssemblySources(
+                        dlls, invalid, after, types, methods, kinds, excluded, conditional);
                     Check("invalid-base-rejected-after-metadata-preparation", failure == LoadImageErrorCode.DHE_MV_REGISTRATION_FAILED);
                     RuntimeApi.ResetDifferentialDispatchCounters();
                     object retained = NativeBoundary.FrozenCopyBox(original);
@@ -78,9 +79,18 @@ namespace HybridCLR.Lab.Snapshot
                     Check("failed-batch-keeps-base-dispatch", result.failedBatchAotCount > 0 && result.failedBatchInterpreterCount == 0);
                     Check("failed-batch-keeps-base-field-view", !result.failedBatchExtraVisible);
                     Check("failed-batch-keeps-base-value", (int)retained.GetType().GetField("Count").GetValue(retained) == 17);
+                    int conditionalIndex = Array.FindIndex(conditional, tokens => tokens.Length != 0);
+                    if (conditionalIndex >= 0)
+                    {
+                        var changedConditions = (uint[][])conditional.Clone();
+                        changedConditions[conditionalIndex] = Array.Empty<uint>();
+                        var changedRetry = RuntimeApi.LoadDifferentialHybridAssemblySources(
+                            dlls, before, after, types, methods, kinds, excluded, changedConditions);
+                        Check("retry-rejects-changed-generic-conditions", changedRetry == LoadImageErrorCode.HOMOLOGOUS_ASSEMBLY_HAS_LOADED);
+                    }
                 }
                 Save("load-frozen-and-mutable");
-                result.loadCode = (int)RuntimeApi.LoadDifferentialHybridAssembliesWithMetaVersionAndExecutionPlanAndSources(dlls, before, after, types, methods, kinds, excluded);
+                result.loadCode = (int)RuntimeApi.LoadDifferentialHybridAssemblySources(dlls, before, after, types, methods, kinds, excluded, conditional);
                 Check("native-source-transaction", result.loadCode == 0);
                 Save("frozen-corlib-virtual-behavior");
                 Check("unaffected-exception-virtuals", FormatException(new InvalidOperationException("frozen-virtual-sentinel"))
@@ -117,7 +127,9 @@ namespace HybridCLR.Lab.Snapshot
                         object nullable = nullableCopy.Invoke(null, new object[] { current });
                         Check("nullable-copy-preserves-added-fields", PreservesCurrent(nullable));
                         Check("nullable-empty-remains-null", nullableCopy.Invoke(null, new object[] { null }) == null);
+                        RuntimeApi.ResetDifferentialDispatchCounters();
                         Check("unaffected-nullable-long", UnchangedNullable(90000000149L) == 90000000149L && UnchangedNullable(null) == -1L);
+                        Check("unaffected-nullable-long-remains-aot", RuntimeApi.GetDifferentialAotEntryCount() > 0 && RuntimeApi.GetDifferentialInterpreterEntryCount() == 0);
                         break;
                     case "generics":
                         var genericCopy = consumer.GetMethod("GenericCopy");
