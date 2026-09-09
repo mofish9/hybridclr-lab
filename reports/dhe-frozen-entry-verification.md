@@ -150,3 +150,11 @@ registry also made frozen corlib visible to Current virtual declaration mapping.
 Candidate `1bc8547` restricts frozen `GetDheCurrentType` to explicit physical
 selections; unaffected frozen interface/Object declarations keep their Base
 identity during preparation as well as after dispatch publication.
+
+Candidate `d6aab95` additionally keeps generic signatures in their logical
+TypeDef/TypeRef domain while matching Base fields and methods. The previous
+candidate changed `Nullable<long>` to an execution Current generic during
+signature decode, causing `ParallelLoopResult::_lowestBreakIteration` to be
+reported as an unsupported supplemental field before MV rejection. Runtime
+execution sites still remap selected physical owners; this change only removes
+the premature remap from signature matching.
