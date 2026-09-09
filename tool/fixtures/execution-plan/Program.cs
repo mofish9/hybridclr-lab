@@ -184,9 +184,18 @@ try { StageBinding(boundBase); }
 catch (TargetInvocationException error) when (error.InnerException is InvalidDataException) { duplicateRejected = true; }
 cases["staging-rejects-duplicate-selection"] = duplicateRejected;
 var validateSchema = toolAssembly.GetType("HybridCLR.DheTool.Program").GetMethod("ValidateJsonSchema", BindingFlags.Static | BindingFlags.NonPublic);
+bool UniqueProperties(JsonElement value)
+{
+    if (value.ValueKind == JsonValueKind.Array) return value.EnumerateArray().All(UniqueProperties);
+    if (value.ValueKind != JsonValueKind.Object) return true;
+    var properties = value.EnumerateObject().ToArray();
+    return properties.Select(property => property.Name).Distinct(StringComparer.Ordinal).Count() == properties.Length &&
+        properties.All(property => UniqueProperties(property.Value));
+}
 foreach (string file in new[] { "dhe-resource-update.schema.json", "dhe-resource-update-validation.schema.json", "dhe-runtime-plan.schema.json" })
 {
     using var schema = JsonDocument.Parse(File.ReadAllText(Path.Combine(Path.GetFullPath("../../../../../..", AppContext.BaseDirectory), "schemas", file)));
+    cases["schema-unique-keys-" + file] = UniqueProperties(schema.RootElement);
     bool SchemaAccepts(JsonNode value)
     {
         using var instance = JsonDocument.Parse(value?.ToJsonString() ?? "null");
@@ -197,6 +206,23 @@ foreach (string file in new[] { "dhe-resource-update.schema.json", "dhe-resource
     cases["schema-valid-plan-" + file] = SchemaAccepts(supportedBases[0]["assemblyModes"][0]["executionPlan"]);
     cases["schema-no-plan-" + file] = SchemaAccepts(null);
     cases["schema-duplicate-rejected-" + file] = !SchemaAccepts(boundBase["assemblyModes"][0]["executionPlan"]);
+    if (file == "dhe-runtime-plan.schema.json")
+    {
+        bool CompletePlanAccepted(JsonNode value)
+        {
+            using var instance = JsonDocument.Parse(value.ToJsonString());
+            var failures = new List<string>();
+            validateSchema.Invoke(null, new object[] { schema.RootElement, instance.RootElement, schema.RootElement, "$", failures });
+            return failures.Count == 0;
+        }
+        cases["runtime-schema-complete-plan"] = CompletePlanAccepted(planDocument);
+        var invalidRelease = Clone(planDocument);
+        invalidRelease["mode"] = "Release"; invalidRelease["releaseReady"] = false; invalidRelease["releaseChannelId"] = "test";
+        invalidRelease["releaseRevision"] = 1; invalidRelease["parentReleaseLedgerSha256"] = null;
+        cases["runtime-schema-release-contract-preserved"] = !CompletePlanAccepted(invalidRelease);
+        var invalidSelection = Clone(planDocument); invalidSelection["selection"] = "embedded-base-metaversion";
+        cases["runtime-schema-base-selection-contract-preserved"] = !CompletePlanAccepted(invalidSelection);
+    }
 }
 string[] assemblyNames = identities[0].AssemblyNames;
 string[] BaseFiles(string version) => assemblyNames.Select(name => Path.Combine(root,
