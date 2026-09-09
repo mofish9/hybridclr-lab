@@ -5,6 +5,30 @@ Android/iOS qualification, or a performance result.
 
 ## Current Verified State
 
+As of 2026-09-10, runtime `42ecf89981f856c0bef2373153d1d5f7f1bb3ff3`,
+Unity 2022 IL2CPP `8a13baf1ec45068fbb9535beea03425b717f501b`, package
+`e48be87b4a0dad0375a823b6ebb548a467c32f37` and fixture lab
+`c29e3212fc6ddbeea78cfd2bbdeac6db941a4190` passed the real-header Unity 2022
+native gate and proof-12 Windows core (35 checks). The same immutable Player
+passes old-values (45), nullable (39), generics (37), and arrays-byref (38).
+Swapped old-values (45) and reversed nullable (39) also pass. All counts include
+the core checks; they are not independent case counts to add together.
+
+The previously failing unaffected Nullable<long> now retains AOT. Old boxed
+Payload, nested and generic values can be copied into independent Current
+storage while preserving retained fields and defaulting added fields. See
+[generic dispatch](dhe-generic-context-dispatch.md) and
+[boxed value copy](dhe-boxed-value-copy.md) for exact evidence and limitations.
+
+This is still a diagnostic native-source workflow, not formal resource release
+admission. Remaining gates include full ordinary-AOT guard/ABI coverage,
+authenticated resource staging, broader old-state and reflection behavior,
+cyclic/concurrent publication, and distinct immutable Bases consuming one latest
+resource set on this candidate. Windows correctness precedes the Tuanjie port;
+Unity 2021 is outside the current user scope. No performance or mobile claim.
+
+## Earlier checkpoints (historical identities)
+
 Runtime `d6aab95d8aa12f467abcfdc9105cd87a29309580`, Unity 2022 IL2CPP
 `8a13baf1ec45068fbb9535beea03425b717f501b`, package
 `2d4c3845d8716087c49ec9d50176abd4e1253548`, fixture lab

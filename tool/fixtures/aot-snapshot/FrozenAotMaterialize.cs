@@ -28,18 +28,18 @@ internal static class FrozenAotMaterialize
             ?? throw new InvalidDataException("Base identity does not contain an authenticated AOT snapshot.");
         string[] baselines = identity.GetProperty("assemblies").EnumerateArray()
             .Select(row => row.GetProperty("baselinePath").GetString()!).ToArray();
-        string[] current = hotfixNames.Select(name => Path.Combine(currentRoot, name + ".dll")).ToArray();
+        string[] current = Directory.GetFiles(currentRoot, "*.dll");
+        string currentSetHash = FrozenAotSourcePlan.CurrentSetHash(current);
         var compilation = FrozenAotAdaptation.Compile(snapshot, baselines, current);
         var records = new List<object>();
         foreach (var plan in compilation.Assemblies)
         {
             var source = snapshot.Assemblies.Single(item => item.AssemblyName == plan.AssemblyName);
-            string sourceRelative = "FrozenAot/" + identity.GetProperty("baseId").GetString()!.ToLowerInvariant() + "/" + plan.AssemblyName + ".dll";
-            string mvRelative = plan.AssemblyName + ".mv.bytes";
+            string sourcePrefix = "payload/frozen-aot/" + identity.GetProperty("baseId").GetString()!.ToLowerInvariant() + "/";
+            string sourceRelative = sourcePrefix + plan.AssemblyName + ".dll.bytes";
+            string mvRelative = sourcePrefix + plan.AssemblyName + ".mv.bytes";
             string sourcePath = Path.Combine(outputRoot, sourceRelative.Replace('/', Path.DirectorySeparatorChar));
-            string mvPath = Path.Combine(outputRoot, baseMetaAssetRoot.TrimEnd('/')
-                .Substring(runtimeAssetRoot.TrimEnd('/').Length).TrimStart('/')
-                .Replace('/', Path.DirectorySeparatorChar), mvRelative);
+            string mvPath = Path.Combine(outputRoot, mvRelative.Replace('/', Path.DirectorySeparatorChar));
             Directory.CreateDirectory(Path.GetDirectoryName(sourcePath)!);
             Directory.CreateDirectory(Path.GetDirectoryName(mvPath)!);
             File.Copy(source.Path, sourcePath);
@@ -52,7 +52,7 @@ internal static class FrozenAotMaterialize
                 baseMetaVersionFile = mvPath,
                 source = runtimeAssetRoot + sourceRelative,
                 sourceSha256 = Hash(File.ReadAllBytes(sourcePath)),
-                baseMetaVersion = baseMetaAssetRoot + mvRelative,
+                baseMetaVersion = runtimeAssetRoot + mvRelative,
                 baseMetaVersionSha256 = Hash(File.ReadAllBytes(mvPath)),
                 currentStorageTypeTokens = plan.ExecutionPlan.CurrentStorageTypeTokens,
                 currentExecutionMethodTokens = plan.ExecutionPlan.CurrentExecutionMethodTokens,
@@ -67,6 +67,7 @@ internal static class FrozenAotMaterialize
             format = "hybridclr.dhe-frozen-aot-source-plan.json",
             baseId = identity.GetProperty("baseId").GetString(),
             aotAnalysisSnapshotSha256 = snapshot.Sha256,
+            currentAssemblySetSha256 = currentSetHash,
             runtimeAssetRoot,
             baseMetaVersionAssetRoot = baseMetaAssetRoot,
             sourceCount = records.Count,
@@ -74,6 +75,8 @@ internal static class FrozenAotMaterialize
             obligations = compilation.Obligations,
             scope = "Materialized Base assets and source-bound execution records; Player integration remains a separate gate"
         };
+        if (FrozenAotSourcePlan.CurrentSetHash(current) != currentSetHash)
+            throw new InvalidDataException("Current payload changed during frozen source materialization.");
         string planPath = Path.Combine(outputRoot, "frozen-aot-source-plan.json");
         File.WriteAllText(planPath, JsonSerializer.Serialize(document, Json));
         Console.WriteLine("Materialized frozen AOT sources: " + records.Count + "; plan=" + planPath);
@@ -93,6 +96,10 @@ internal static class FrozenAotMaterialize
         JsonObject? match = selections.OfType<JsonObject>().SingleOrDefault(item =>
             string.Equals(item["baseId"]?.GetValue<string>(), baseId, StringComparison.OrdinalIgnoreCase));
         if (match == null) throw new InvalidDataException("Runtime plan has no matching Base selection: " + baseId);
+        string currentSetHash = source["currentAssemblySetSha256"]?.GetValue<string>();
+        if (string.IsNullOrEmpty(currentSetHash) || !string.Equals(currentSetHash,
+                match["currentAssemblySetSha256"]?.GetValue<string>(), StringComparison.OrdinalIgnoreCase))
+            throw new InvalidDataException("Frozen source plan does not match the selected Current payload.");
         JsonArray sources = source["sources"] as JsonArray ?? throw new InvalidDataException("Frozen source plan has no sources.");
         match["frozenAotSources"] = JsonNode.Parse(sources.ToJsonString())!;
         Directory.CreateDirectory(Path.GetDirectoryName(outputPath)!);

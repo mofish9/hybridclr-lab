@@ -21,6 +21,7 @@
     <Compile Include="../../ResourceExecutionPlan.cs" Link="Tool/ResourceExecutionPlan.cs" />
     <Compile Include="../../DheValueLayoutImpact.cs" Link="Tool/DheValueLayoutImpact.cs" />
     <Compile Include="../../FrozenAotAdaptation.cs" Link="Tool/FrozenAotAdaptation.cs" />
+    <Compile Include="../../FrozenAotSourcePlan.cs" Link="Tool/FrozenAotSourcePlan.cs" />
     <Reference Include="dnlib"><HintPath>../../dnlib.dll</HintPath></Reference>
   </ItemGroup>
 </Project>

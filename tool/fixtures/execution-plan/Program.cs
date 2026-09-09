@@ -181,11 +181,12 @@ byte[] frozenMv = frozenSnapshot.ToBinary();
 uint frozenToken = frozenSnapshot.Methods.First(method => method.Name == "Echo").Token;
 void AddFrozen(JsonNode manifest, JsonNode validation, JsonNode plan, Provider provider)
 {
-    var row = Node(new { assemblyName = frozenName, source = assets + "frozen.dll", sourceSha256 = Hash(frozenDll),
-        baseMetaVersion = baseRoot + "frozen.mv", baseMetaVersionSha256 = Hash(frozenMv),
+    string prefix = assets + "payload/frozen-aot/" + identities[0].BaseId.ToLowerInvariant() + "/" + frozenName;
+    var row = Node(new { assemblyName = frozenName, source = prefix + ".dll.bytes", sourceSha256 = Hash(frozenDll),
+        baseMetaVersion = prefix + ".mv.bytes", baseMetaVersionSha256 = Hash(frozenMv),
         currentStorageTypeTokens = Array.Empty<uint>(), currentExecutionMethodTokens = new[] { frozenToken },
         excludedBaseTypeTokens = Array.Empty<uint>(), genericContextMethodTokens = new[] { frozenToken }, sourceKind = "frozen-base-aot" });
-    provider.Bytes[assets + "frozen.dll"] = frozenDll; provider.Bytes[baseRoot + "frozen.mv"] = frozenMv;
+    provider.Bytes[prefix + ".dll.bytes"] = frozenDll; provider.Bytes[prefix + ".mv.bytes"] = frozenMv;
     foreach (var record in new[] { manifest["supportedBases"][0], validation["bases"][0], plan["baseSelections"][0] })
         record["frozenAotSources"] = new JsonArray(Clone(row));
     foreach (var record in new[] { manifest["supportedBases"][0], validation["bases"][0] })
@@ -196,6 +197,17 @@ void AddFrozen(JsonNode manifest, JsonNode validation, JsonNode plan, Provider p
 RunCase("frozen-conditional-selection-forwarded", 0, AddFrozen, true);
 cases["frozen-source-kind-and-conditions-forwarded"] = RuntimeApi.LastSourceKinds?.First() == 1 &&
     RuntimeApi.LastConditional?[0].SequenceEqual(new[] { frozenToken }) == true;
+foreach (string kind in new[] { "immutable-root", "other-base", "path-traversal" })
+    RunCase("frozen-mv-rejects-" + kind, 0, (m, v, p, provider) =>
+    {
+        AddFrozen(m, v, p, provider);
+        string path = kind == "immutable-root" ? baseRoot + "frozen.mv" :
+            kind == "other-base" ? assets + "payload/frozen-aot/" + identities[1].BaseId.ToLowerInvariant() + "/" + frozenName + ".mv.bytes" :
+            assets + "payload/frozen-aot/../" + frozenName + ".mv.bytes";
+        provider.Bytes[path] = frozenMv;
+        foreach (var record in new[] { m["supportedBases"][0], v["bases"][0], p["baseSelections"][0] })
+            record["frozenAotSources"][0]["baseMetaVersion"] = path;
+    }, false);
 RunCase("frozen-condition-plan-mismatch", 0, (m, v, p, provider) =>
 { AddFrozen(m, v, p, provider); p["baseSelections"][0]["frozenAotSources"][0]["genericContextMethodTokens"] = new JsonArray(); }, false);
 RunCase("frozen-source-validation-mismatch", 0, (m, v, p, provider) =>

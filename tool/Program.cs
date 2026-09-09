@@ -1333,22 +1333,10 @@ internal static partial class Program
                 aotMetadataSetId, runtimeAssetRoot, baseMetaVersionAssetRoot,
                 expectedEngineWorkflow);
             unsupported.AddRange(identityErrors);
-            string[] missingRuntimeCapabilities = requiredRuntimeCapabilities
-                .Except(baseNativeRuntimeCapabilities, StringComparer.Ordinal)
-                .OrderBy(value => value, StringComparer.Ordinal).ToArray();
-            if (!ResourceUpdateCompatibility.CanExecuteUpdate(baseRuntimeProtocol,
-                    baseNativeRuntimeContract,
-                    baseNativeRuntimeCapabilities, requiredRuntimeCapabilities) &&
-                missingRuntimeCapabilities.Length == 0)
-                unsupported.Add("base-runtime-protocol-cannot-execute-update:" +
-                    baseRuntimeProtocol);
-            unsupported.AddRange(missingRuntimeCapabilities.Select(capability =>
-                "base-missing-runtime-capability:" + capability));
             var nativeManifestSha256 = Sha256File(nativeManifestPath);
             var baseIdentityKey = baseId;
             if (!candidateBaseIdentityKeys.Add(baseIdentityKey))
                 unsupported.Add("duplicate-base-identity:" + baseId);
-            bool baseCompatible = uncovered.Count == 0 && unsupported.Count == 0;
             var assemblyModes = new List<ResourceAssemblyMode>();
             foreach (string name in names.OrderBy(value => value,
                          StringComparer.OrdinalIgnoreCase))
@@ -1362,12 +1350,11 @@ internal static partial class Program
             if (frozenAotPlanPaths.Length != 0)
             {
                 JsonElement frozenPlan = ReadJson<JsonElement>(frozenAotPlanPaths[baseIndex]);
-                if (GetString(frozenPlan, "baseId") != baseId ||
-                    GetString(frozenPlan, "aotAnalysisSnapshotSha256") != (aotAnalysis?.Sha256 ?? string.Empty) ||
-                    !frozenPlan.TryGetProperty("sources", out JsonElement sourceRows) ||
-                    sourceRows.ValueKind != JsonValueKind.Array)
-                    throw new DheException("Frozen AOT plan is not bound to Base snapshot: " + baseId);
-                foreach (JsonElement source in sourceRows.EnumerateArray())
+                if (aotAnalysis == null) throw new DheException("Frozen AOT planning requires an authenticated Base snapshot: " + baseId);
+                JsonElement[] sourceRows = FrozenAotSourcePlan.Validate(frozenPlan, baseId, aotAnalysis,
+                    baselineRecords.Select(record => record.path),
+                    names.Select(name => Path.Combine(currentVariant.Root, name + ".dll")), currentVariant.CurrentSetHash);
+                foreach (JsonElement source in sourceRows)
                 {
                     string sourceName = NormalizeName(GetString(source, "assemblyName") ?? string.Empty);
                     string sourceFile = GetString(source, "sourceFile") ?? string.Empty;
@@ -1403,7 +1390,7 @@ internal static partial class Program
                         assemblyName = sourceName,
                         source = runtimeAssetRoot + sourceRelative,
                         sourceSha256 = sourceHash,
-                        baseMetaVersion = baseMetaVersionAssetRoot + mvRelative,
+                        baseMetaVersion = runtimeAssetRoot + mvRelative,
                         baseMetaVersionSha256 = mvHash,
                         currentStorageTypeTokens = sourceTypes,
                         currentExecutionMethodTokens = sourceMethods,
@@ -1415,6 +1402,17 @@ internal static partial class Program
                 if (frozenAotSources.Count != 0)
                     requiredRuntimeCapabilities.Add("frozen-aot-source-v1");
             }
+            string[] missingRuntimeCapabilities = requiredRuntimeCapabilities
+                .Except(baseNativeRuntimeCapabilities, StringComparer.Ordinal)
+                .OrderBy(value => value, StringComparer.Ordinal).ToArray();
+            if (!ResourceUpdateCompatibility.CanExecuteUpdate(baseRuntimeProtocol,
+                    baseNativeRuntimeContract,
+                    baseNativeRuntimeCapabilities, requiredRuntimeCapabilities) &&
+                missingRuntimeCapabilities.Length == 0)
+                unsupported.Add("base-runtime-protocol-cannot-execute-update:" + baseRuntimeProtocol);
+            unsupported.AddRange(missingRuntimeCapabilities.Select(capability =>
+                "base-missing-runtime-capability:" + capability));
+            bool baseCompatible = uncovered.Count == 0 && unsupported.Count == 0;
             var baseRecord = new
             {
                 baseId,
