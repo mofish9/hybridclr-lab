@@ -43,6 +43,23 @@ using (var session = Open(original, project, local))
     session.RecordGeneration(generated);
     session.RequireGeneration(generated);
     Check("generated-source-provenance", true);
+    if (OperatingSystem.IsWindows())
+    {
+        string recordPath = Path.Combine(cache, "generation.json");
+        using (var held = new FileStream(recordPath, FileMode.Open, FileAccess.Read, FileShare.Read))
+        {
+            var release = Task.Run(async () => { await Task.Delay(200); held.Dispose(); });
+            session.RecordGeneration(generated);
+            release.GetAwaiter().GetResult();
+        }
+        session.RequireGeneration(generated);
+        Check("transient-generation-read-lock-retried", true);
+        byte[] originalRecord = File.ReadAllBytes(recordPath);
+        using (var held = new FileStream(recordPath, FileMode.Open, FileAccess.Read, FileShare.Read))
+            Reject("persistent-generation-read-lock-rejected", () => session.RecordGeneration(generated));
+        Check("failed-atomic-replace-preserves-old-record", File.ReadAllBytes(recordPath).SequenceEqual(originalRecord) &&
+            Directory.GetFiles(cache, "generation.json.dhe-*.tmp").Length == 0);
+    }
     File.AppendAllText(cpp, "void changed() {}\n");
     Reject("stale-generated-source-rejected", () => session.RequireGeneration(generated));
     File.WriteAllText(cpp, "void fixture() {}\n");
