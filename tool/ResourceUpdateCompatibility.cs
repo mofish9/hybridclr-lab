@@ -15,6 +15,8 @@ internal sealed class ResourceUpdateCompatibility
 		"resource-update-aot-metadata-set-selection-v1",
 		"atomic-multi-assembly-registration-v1",
         "current-storage-execution-plan-array-v1",
+        "current-parameter-default-metadata-v1",
+        "shared-type-initialization-v1",
 		"supplemental-existing-type-instance-fields-v1",
         "supplemental-existing-type-static-fields-v1",
         "supplemental-existing-generic-type-fields-v1",
@@ -132,13 +134,21 @@ internal sealed class ResourceUpdateCompatibility
         MetaVersionMethod[] added = current.Methods.Where(method =>
             !baselineMethods.ContainsKey(method.StableId)).ToArray();
 
+        bool parameterDefaultsChanged = false;
         foreach (MetaVersionMethod method in changed)
         {
             MetaVersionMethod currentMethod = currentMethods[method.StableId];
             if (!string.Equals(method.NonCustomMetadataVersion,
                     currentMethod.NonCustomMetadataVersion,
                     StringComparison.OrdinalIgnoreCase))
-                unsupported.Add("existing-method-metadata-change:" + method.Identity);
+            {
+                if (method.ParameterDefaultIndependentMetadataVersion.Length != 0 &&
+                    string.Equals(method.ParameterDefaultIndependentMetadataVersion,
+                        currentMethod.ParameterDefaultIndependentMetadataVersion, StringComparison.OrdinalIgnoreCase))
+                    parameterDefaultsChanged = true;
+                else
+                    unsupported.Add("existing-method-metadata-change:" + method.Identity);
+            }
         }
 		// A removed Base method keeps its native symbol for binary compatibility,
 		// but its universal guard resolves to a MissingMethodException tombstone.
@@ -243,6 +253,13 @@ internal sealed class ResourceUpdateCompatibility
             "single-current-multibase-v1",
             "atomic-multi-assembly-registration-v1",
         };
+        if (parameterDefaultsChanged || added.Any(method => method.HasParameterDefaults))
+            requiredCapabilities.Add("current-parameter-default-metadata-v1");
+        if (changed.Concat(removed).Any(method => method.Name == ".cctor") ||
+            added.Any(method => method.Name == ".cctor" && baselineTypes.ContainsKey(method.DeclaringTypeStableId)) ||
+            current.Fields.Any(field => field.IsStatic && baselineTypes.ContainsKey(field.DeclaringTypeStableId) &&
+                !baselineFields.ContainsKey(field.StableId)))
+            requiredCapabilities.Add("shared-type-initialization-v1");
         if (requiresInterfaceSlots)
             requiredCapabilities.Add("existing-interface-method-slots-v1");
         if (physicalTypes.Count != 0 || executionTokens.Count != 0)

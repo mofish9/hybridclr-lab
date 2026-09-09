@@ -60,3 +60,19 @@ The repair has no throughput claim. Primary acceptance remains zero differential
 for defaults, repeated/reflection access, recursion, exceptions and concurrent
 first touch across both Bases. Runtime mapping and Unity VM hooks are separate
 candidate commits and can be rolled back together without changing old evidence.
+
+The expanded fixture exposed a resource compiler gate before Current loading:
+existing-method-metadata-change rejects even an optional constant change. Add a
+separate comparison hash that ignores only positive-sequence parameter constants
+and Optional/HasDefault flags. Keep method attributes, implementation flags,
+parameter names, In/Out flags, marshalling, custom attributes, constraints and
+security in the rejection comparison. The binary MV and its existing hashes do
+not change. Test both permitted defaults and rejected neighboring metadata.
+
+Require current-parameter-default-metadata-v1 for those changes and added methods
+with defaults. Require shared-type-initialization-v1 for changed/removed cctors,
+new cctors on Base types, and added static fields on Base types. Advertise these
+in the candidate package's baked identity and runtime validation. Old immutable
+Bases without these capabilities must reject the resource; do not edit their
+identity files to claim support. Build new verification Bases with the new
+package and preserve the earlier gate failure.

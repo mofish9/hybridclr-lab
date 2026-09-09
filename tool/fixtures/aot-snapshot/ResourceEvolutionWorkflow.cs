@@ -104,6 +104,7 @@ internal static class ResourceEvolutionWorkflow
         {
             string run = Path.Combine(output, "base-" + version), build = Path.Combine(run, "base"), stage = Path.Combine(output, "stage-" + version);
             checks["base-reference-" + version] = Matches(Read(Path.Combine(run, "player-result.json")), Read(Path.Combine(output, "reference-" + version + ".json")));
+            checks["base-noop-reference-" + version] = Matches(Read(Path.Combine(run, "resource-player-result.json")), Read(Path.Combine(output, "reference-" + version + ".json")));
             string embedded = Path.Combine(build, "player/Snapshot_Data/StreamingAssets/SnapshotDHE");
             foreach (string file in Directory.GetFiles(embedded, "*", SearchOption.AllDirectories))
             {

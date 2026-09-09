@@ -336,7 +336,12 @@ internal sealed class MetaVersionSnapshot
                 StableMethodMetadataWithoutOwnAttributes(method)),
             Hash("dhe-method-custom-attributes\n" + Attributes(method.CustomAttributes)),
             method.CustomAttributes.Count != 0 || method.ParamDefs.Any(parameter => parameter.CustomAttributes.Count != 0),
-            method.IsVirtual, method.IsConstructor, method.DeclaringType?.IsInterface == true);
+            method.IsVirtual, method.IsConstructor, method.DeclaringType?.IsInterface == true)
+        {
+            ParameterDefaultIndependentMetadataVersion = Hash("dhe-method-parameter-default-independent\n" +
+                StableMethodMetadataWithoutOwnAttributes(method, true)),
+            HasParameterDefaults = method.ParamDefs.Any(parameter => parameter.Sequence > 0 && parameter.HasConstant),
+        };
     }
 
 	private static MetaVersionField CreateField(FieldDef field, string declaringTypeStableId,
@@ -600,11 +605,13 @@ internal sealed class MetaVersionSnapshot
                 StringComparer.Ordinal)), DeclSecurities(method.DeclSecurities));
     }
 
-    private static string StableMethodMetadataWithoutOwnAttributes(MethodDef method)
+    private static string StableMethodMetadataWithoutOwnAttributes(MethodDef method, bool ignoreParameterDefaults = false)
     {
         var parameters = method.ParamDefs.OrderBy(parameter => parameter.Sequence).Select(parameter => string.Join("/",
-            parameter.Sequence, parameter.Name.String, parameter.Attributes,
-            ConstantShape(parameter.HasConstant ? parameter.Constant : null),
+            parameter.Sequence, parameter.Name.String,
+            ignoreParameterDefaults && parameter.Sequence > 0
+                ? parameter.Attributes & ~(ParamAttributes.HasDefault | ParamAttributes.Optional) : parameter.Attributes,
+            ignoreParameterDefaults && parameter.Sequence > 0 ? "" : ConstantShape(parameter.HasConstant ? parameter.Constant : null),
             parameter.MarshalType?.ToString() ?? "", Attributes(parameter.CustomAttributes)));
         return string.Join("|", MethodIdentity(method), method.MethodSig,
             ((uint)method.Attributes).ToString("x8"), ((uint)method.ImplAttributes).ToString("x8"),
@@ -779,7 +786,11 @@ internal sealed record MetaVersionMethod(string Identity, string StableId, strin
 	[property: JsonIgnore] bool HasCustomAttributes,
     [property: JsonIgnore] bool IsVirtual,
     [property: JsonIgnore] bool IsConstructor,
-    [property: JsonIgnore] bool DeclaringTypeIsInterface);
+    [property: JsonIgnore] bool DeclaringTypeIsInterface)
+{
+    [JsonIgnore] public string ParameterDefaultIndependentMetadataVersion { get; init; } = "";
+    [JsonIgnore] public bool HasParameterDefaults { get; init; }
+}
 
 internal sealed record MetaVersionField(string Identity, string StableId, string Version,
     string DeclaringTypeStableId, uint Token, uint Flags, string Name, string FieldType,

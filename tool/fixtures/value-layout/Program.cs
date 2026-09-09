@@ -5,6 +5,8 @@ using System.Text.Json;
 using System.Text.Json.Nodes;
 using HybridCLR.DheTool;
 
+if (args.Length > 0 && args[0] == "parameter-default-policy") return ParameterDefaultPolicy.Run(args.Skip(1).ToArray());
+
 string[] assemblies = { "HybridCLR.ValueLayoutModel", "HybridCLR.ValueLayoutOther", "HybridCLR.ValueLayoutConsumer" };
 const string nativeAssembly = "HybridCLR.ValueLayoutNative";
 var json = new JsonSerializerOptions { WriteIndented = true };
