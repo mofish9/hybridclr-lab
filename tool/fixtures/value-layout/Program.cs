@@ -31,6 +31,91 @@ string Run(string executable, string root, params string[] arguments)
     if (process.ExitCode != 0) throw new InvalidOperationException(result);
     return result;
 }
+if (args.Length == 2 && args[0] == "probe-audit")
+{
+    string root = Path.GetFullPath(args[1]);
+    string reportPath = Path.Combine(root, "audit.json"); NewOutput(reportPath);
+    JsonElement Read(string path) => JsonSerializer.Deserialize<JsonElement>(File.ReadAllText(Path.Combine(root, path)));
+    var auditChecks = new Dictionary<string, bool>();
+    var runtime = Read("runtime-fixed/DHE-Unity2022/runtime-manifest.json");
+    string runtimeHash = Hash(Path.Combine(root, "runtime-fixed/DHE-Unity2022/runtime-manifest.json"));
+    var native = Read("native-fixed/DHE-Unity2022/native-gate.json");
+    auditChecks["real-headers-native"] = native.GetProperty("passed").GetBoolean() && native.GetProperty("mergeReady").GetBoolean() &&
+        !native.GetProperty("surrogateExternalHeadersUsed").GetBoolean() && native.GetProperty("nativeExitCode").GetInt32() == 0 &&
+        native.GetProperty("runtimeManifestSha256").GetString()!.Equals(runtimeHash, StringComparison.OrdinalIgnoreCase);
+    var runCases = new[] {
+        (Base: "base-old-fixed", Payload: "payload-method-old", Report: "method-old-fixed-result.json", Revision: 73),
+        (Base: "base-old-fixed", Payload: "payload-noop-old", Report: "noop-old-result.json", Revision: 41),
+        (Base: "base-old-fixed", Payload: "payload-latest-old", Report: "latest-old-result.json", Revision: 73),
+        (Base: "base-new", Payload: "payload-latest-new", Report: "latest-new-result.json", Revision: 73),
+        (Base: "base-new", Payload: "payload-noop-new", Report: "noop-new-result.json", Revision: 41),
+    };
+    foreach (string built in runCases.Select(item => item.Base).Distinct())
+    {
+        var binding = Read(built + "/build-binding.json");
+        var guards = Read(built + "/native-manifest.json");
+        auditChecks[built + "-native-binding"] = binding.GetProperty("runtimeManifestSha256").GetString() == runtimeHash &&
+            Hash(Path.Combine(root, built, "runtime-manifest.json")) == runtimeHash &&
+            Hash(Path.Combine(root, built, "player-executable", "GameAssembly.dll")) == binding.GetProperty("gameAssemblySha256").GetString() &&
+            Hash(Path.Combine(root, built, "player-executable", "CurrentStorage.exe")) == binding.GetProperty("playerSha256").GetString() &&
+            Hash(Path.Combine(root, built, "native-manifest.json")) == binding.GetProperty("nativeManifestSha256").GetString() &&
+            guards.GetProperty("guardMode").GetString() == "universal" &&
+            guards.GetProperty("unsupportedGuardedMethodCount").GetInt32() == 0 &&
+            guards.GetProperty("supportedGuardedMethodCount").GetInt32() > 0;
+    }
+    foreach (var item in runCases)
+    {
+        var result = Read(item.Report);
+        string[] records = result.GetProperty("records").EnumerateArray().Select(record => record.GetString()!).ToArray();
+        var reference = Read(item.Payload == "payload-method-old" ? "reference-method.json" :
+            item.Payload == "payload-noop-old" ? "reference-base.json" : "reference-layout.json");
+        string[] expectedRecords = reference.GetProperty("records").EnumerateArray().Select(record => record.GetString()!).ToArray();
+        auditChecks[item.Report + "-correctness"] = result.GetProperty("passed").GetBoolean() && result.GetProperty("loadCode").GetInt32() == 0 &&
+            result.GetProperty("consumerPassed").GetBoolean() && result.GetProperty("reflectionPassed").GetBoolean() &&
+            reference.GetProperty("passed").GetBoolean() && records.Length == 14 && records.SequenceEqual(expectedRecords);
+        auditChecks[item.Report + "-dispatch"] = result.GetProperty("directRevision").GetInt32() == item.Revision &&
+            result.GetProperty("reflectedRevision").GetInt32() == item.Revision && result.GetProperty("revisionPassed").GetBoolean() &&
+            result.GetProperty("revisionInterpreterEntries").GetInt32() == (item.Revision == 73 ? 1 : 0) &&
+            result.GetProperty("unchangedAotEntries").GetInt32() == 1;
+        var plan = Read(item.Payload + "/plan.json");
+        auditChecks[item.Report + "-base-mv"] = plan.GetProperty("assemblies").EnumerateArray().All(selection =>
+        {
+            string name = selection.GetProperty("name").GetString()!;
+            var snapshot = MetaVersionSnapshot.Create(Path.Combine(root, item.Base, "baseline", name + ".dll"));
+            return snapshot.AssemblySha256.Equals(selection.GetProperty("baseSha256").GetString(), StringComparison.OrdinalIgnoreCase) &&
+                snapshot.ToBinary().SequenceEqual(File.ReadAllBytes(Path.Combine(root, item.Payload, "base", name + ".mv")));
+        });
+    }
+    auditChecks["different-base-layouts"] = MetaVersionSnapshot.Create(Path.Combine(root, "base-old-fixed/baseline/HybridCLR.ValueLayoutModel.dll"))
+        .Types.Single(type => type.Identity == "HybridCLR.Lab.ValueLayout.Payload").Version !=
+        MetaVersionSnapshot.Create(Path.Combine(root, "base-new/baseline/HybridCLR.ValueLayoutModel.dll"))
+        .Types.Single(type => type.Identity == "HybridCLR.Lab.ValueLayout.Payload").Version;
+    auditChecks["same-current-dll-and-mv"] = assemblies.All(name => new[] { ".dll", ".mv" }.All(extension =>
+        Hash(Path.Combine(root, "payload-latest-old/current", name + extension)) == Hash(Path.Combine(root, "payload-latest-new/current", name + extension))));
+    string rejected = Path.Combine(root, "wrong-base-result.json"); NewOutput(rejected);
+    bool wrongBaseRejected = false;
+    try { Run("dotnet", root, typeof(MetaVersionSnapshot).Assembly.Location, "probe-run",
+        Path.Combine(root, "base-new/player-executable"), Path.Combine(root, "payload-latest-old"), rejected, "73"); }
+    catch (InvalidOperationException error) { wrongBaseRejected = error.Message.Contains("Payload Base does not match the built Player"); }
+    auditChecks["wrong-base-rejected-before-player"] = wrongBaseRejected && !File.Exists(rejected);
+    bool wrongExpectedRejected = false;
+    string wrongExpected = Path.Combine(root, "wrong-expected-result.json"); NewOutput(wrongExpected);
+    try { Run("dotnet", root, typeof(MetaVersionSnapshot).Assembly.Location, "probe-run", Path.Combine(root, "base-new/player-executable"),
+        Path.Combine(root, "payload-latest-new"), wrongExpected, "41"); }
+    catch (InvalidOperationException) { wrongExpectedRejected = true; }
+    auditChecks["updated-behaviour-required"] = wrongExpectedRejected && File.Exists(wrongExpected) &&
+        !Read("wrong-expected-result.json").GetProperty("passed").GetBoolean() &&
+        Read("wrong-expected-result.json").GetProperty("directRevision").GetInt32() == 73;
+    File.WriteAllText(reportPath, JsonSerializer.Serialize(new {
+        passed = auditChecks.Values.All(value => value), scope = "Guarded Windows storage probe, not public resource workflow qualification",
+        auditChecks, runtimeSource = runtime.GetProperty("source"), runtimeManifestSha256 = runtimeHash,
+        nativeGateSha256 = Hash(Path.Combine(root, "native-fixed/DHE-Unity2022/native-gate.json")),
+        toolSha256 = Hash(typeof(MetaVersionSnapshot).Assembly.Location),
+        results = runCases.Select(item => new { path = item.Report, sha256 = Hash(Path.Combine(root, item.Report)) }).ToArray(),
+    }, json));
+    foreach (var check in auditChecks) Console.WriteLine(check.Key + ": " + check.Value);
+    return auditChecks.Values.All(value => value) ? 0 : 1;
+}
 if (args.Length == 6 && args[0] == "probe-build")
 {
     string lab = Path.GetFullPath(args[1]), editor = Path.GetFullPath(args[2]),
