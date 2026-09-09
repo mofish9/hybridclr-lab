@@ -2,6 +2,8 @@ using System.Diagnostics;
 using System.Security.Cryptography;
 using System.Text.Json;
 using HybridCLR.DheTool;
+using dnlib.DotNet;
+using dnlib.DotNet.Writer;
 
 internal static class UnityWorkflow
 {
@@ -9,7 +11,8 @@ internal static class UnityWorkflow
     {
         if (args.Length < 6 || args.Length > 8) throw new ArgumentException("unity-workflow <lab> <package> <editor> <runtime manifest> <fixture DLL root> <new output> [expected revision] [latest Current DLL root]");
         string expectedRevision = args.Length >= 7 ? int.Parse(args[6]).ToString() : "41";
-        string latestCurrentRoot = args.Length == 8 ? Path.GetFullPath(args[7]) : null;
+        string latestCurrentRoot = args.Length == 8 && args[7] != ":evolve:" ? Path.GetFullPath(args[7]) : null;
+        bool synthesizeEvolution = args.Length == 8 && args[7] == ":evolve:";
         string lab = Path.GetFullPath(args[0]), package = Path.GetFullPath(args[1]), editor = Path.GetFullPath(args[2]),
             runtimeManifest = Path.GetFullPath(args[3]), fixtures = Path.GetFullPath(args[4]), output = Path.GetFullPath(args[5]);
         if (Directory.Exists(output)) throw new IOException("Output must be new.");
@@ -110,6 +113,24 @@ internal static class UnityWorkflow
             result.RootElement.GetProperty("baseId").GetString() == identity.RootElement.GetProperty("baseId").GetString() &&
             result.RootElement.GetProperty("aotAnalysisSnapshotSha256").GetString() == snapshot.Sha256;
         string resource = Path.Combine(output, "resource-noop"), staging = Path.Combine(output, "stage-noop");
+        if (synthesizeEvolution)
+        {
+            latestCurrentRoot = Path.Combine(output, "evolved-current");
+            Directory.CreateDirectory(latestCurrentRoot);
+            foreach (string source in Directory.GetFiles(Path.Combine(build, "current"), "*.dll"))
+            {
+                string target = Path.Combine(latestCurrentRoot, Path.GetFileName(source));
+                File.Copy(source, target);
+                if (!Path.GetFileNameWithoutExtension(source).Equals("HybridCLR.ValueLayoutModel", StringComparison.Ordinal)) continue;
+                using var module = ModuleDefMD.Load(target);
+                TypeDef payload = module.Find("HybridCLR.Lab.ValueLayout.Payload", false) ?? throw new InvalidDataException("Payload type missing.");
+                payload.Fields.Add(new FieldDefUser("Extra", new FieldSig(module.CorLibTypes.Int64), FieldAttributes.Public));
+                payload.Fields.Add(new FieldDefUser("Reference", new FieldSig(module.CorLibTypes.Object), FieldAttributes.Public));
+                var writerOptions = new ModuleWriterOptions(module);
+                writerOptions.PEHeadersOptions.TimeDateStamp = 123456789;
+                module.Write(target, writerOptions);
+            }
+        }
         string resourceCurrentRoot = latestCurrentRoot ?? Path.Combine(build, "current");
         string frozen = Path.Combine(output, "frozen-aot");
         FrozenAotMaterialize.Run(new[] { identityPath, resourceCurrentRoot, frozen,

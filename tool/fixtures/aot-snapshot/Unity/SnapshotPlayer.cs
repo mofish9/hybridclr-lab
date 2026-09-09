@@ -68,8 +68,10 @@ namespace HybridCLR.Lab.Snapshot
                     var native = System.Reflection.Assembly.Load("HybridCLR.ValueLayoutNative").GetType("HybridCLR.Lab.ValueLayoutNative.NativeBoundary");
                     result.ordinaryAotReferenceResult = (long)native.GetMethod("ResourceResult").Invoke(null, null);
                     result.ordinaryAotStaticNeighbor = (int)native.GetMethod("StaticNeighbor").Invoke(null, null);
+                    object echoInput = ValueLayout.Factory.Create();
+                    echoInput.GetType().GetField("Extra")?.SetValue(echoInput, 90000000001L);
                     object echoed = native.GetMethod("Echo").Invoke(null,
-                        new object[] { ValueLayout.Factory.Create() });
+                        new object[] { echoInput });
                     result.ordinaryAotEchoExtra = (long)echoed.GetType().GetField("Extra").GetValue(echoed);
                 }
                 int expectedIndex = Array.IndexOf(args, "-expectedRevision");
