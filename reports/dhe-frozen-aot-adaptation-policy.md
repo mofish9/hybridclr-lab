@@ -22,6 +22,8 @@
 
 后续接口候选已增加：HybridCLR `e22aed2a049c0f85d56a89a9b1bad272a57653e8` 提供带 source role 的 native 原子加载；package `0125a8ddc80fea16a1095d1b06b2a094ffce4851` 提供 `DheRuntime.LoadFrozenAotImages` 和计划记录校验。重新组装的 `runtime-v3` 在 Unity 2022 真实 headers 下 CTest 仍为 1/1 通过。
 
+`materialize-frozen-aot` 已用真实 Base 快照和人工扩大的 `Payload` Current 生成 source assets/plan：2 个普通源被选中（`HybridCLR.ValueLayoutNative`、`mscorlib`），其中包含普通 Echo、内联 owner、泛型调用等 token。`mscorlib` 被选中说明完整程序集扫描会触及框架泛型代码，必须经过单独 Player 验证；该命令本身不等于可加载证明。
+
 策略结果包括：完整快照读取、重复框架引用身份保留、普通 AOT 原始 Echo 与内联 owner 选中、StaticNeighbor 保持 AOT、静态值字段选择、generic-context 和 native-only 义务、错误 Base/Current/manifest/source 拒绝，以及引用重定向拒绝。
 
 ## 仍未通过的发布门禁
