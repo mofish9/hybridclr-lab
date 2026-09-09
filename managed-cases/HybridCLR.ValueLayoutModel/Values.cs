@@ -56,6 +56,18 @@ namespace HybridCLR.Lab.ValueLayout
     public static class Factory
     {
         [MethodImpl(MethodImplOptions.NoInlining)]
+        public static int GetRevision()
+        {
+#if DHE_METHOD_UPDATE
+            return 73;
+#else
+            return 41;
+#endif
+        }
+        [MethodImpl(MethodImplOptions.NoInlining)]
+        public static int UnchangedRevision() => 5;
+
+        [MethodImpl(MethodImplOptions.NoInlining)]
         public static Payload Create()
         {
             var value = new Payload { Count = 17 };

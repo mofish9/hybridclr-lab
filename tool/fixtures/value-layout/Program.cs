@@ -16,14 +16,89 @@ void NewOutput(string path)
 string Run(string executable, string root, params string[] arguments)
 {
     var start = new ProcessStartInfo(executable) { WorkingDirectory = root, UseShellExecute = false,
-        RedirectStandardOutput = true, RedirectStandardError = true };
+        RedirectStandardOutput = true, RedirectStandardError = true, CreateNoWindow = true,
+        WindowStyle = ProcessWindowStyle.Hidden };
     foreach (string argument in arguments) start.ArgumentList.Add(argument);
     using var process = Process.Start(start) ?? throw new IOException(executable);
     Task<string> stdout = process.StandardOutput.ReadToEndAsync(), stderr = process.StandardError.ReadToEndAsync();
-    process.WaitForExit();
+    Console.WriteLine("Process " + process.Id + ": " + Path.GetFileName(executable));
+    if (!process.WaitForExit(20 * 60 * 1000))
+    {
+        process.Kill(entireProcessTree: true);
+        throw new TimeoutException(executable);
+    }
     string result = stdout.GetAwaiter().GetResult() + stderr.GetAwaiter().GetResult();
     if (process.ExitCode != 0) throw new InvalidOperationException(result);
     return result;
+}
+if (args.Length == 6 && args[0] == "probe-build")
+{
+    string lab = Path.GetFullPath(args[1]), editor = Path.GetFullPath(args[2]),
+        project = Path.GetFullPath(args[3]), runtime = Path.GetFullPath(args[4]), output = Path.GetFullPath(args[5]);
+    NewOutput(output);
+    Directory.CreateDirectory(output);
+    string manifest = Path.Combine(Path.GetDirectoryName(runtime)!, "runtime-manifest.json");
+    File.Copy(manifest, Path.Combine(output, "runtime-manifest.json"));
+    string runtimeHash = Hash(manifest);
+    Console.WriteLine(Run(editor, lab, "-batchmode", "-quit", "-nographics", "-projectPath", project,
+        "-executeMethod", "HybridCLR.Lab.Editor.CurrentStorageProbeBuild.Prepare", "-probeRuntime", runtime,
+        "-probeOutput", output, "-logFile", Path.Combine(output, "prepare.log")));
+    var camel = new JsonSerializerOptions(json) { PropertyNamingPolicy = JsonNamingPolicy.CamelCase };
+    var entries = assemblies.Select(name =>
+    {
+        string dll = Path.Combine(output, "baseline", name + ".dll");
+        var snapshot = MetaVersionSnapshot.Create(dll);
+        string mvJson = Path.Combine(output, name + ".mv.json");
+        File.WriteAllText(mvJson, JsonSerializer.Serialize(snapshot.ToJson(dll), camel));
+        return new { assemblyName = name, baseMetaVersionJson = mvJson, baselineSha256 = Hash(dll) };
+    }).ToArray();
+    string guards = Path.Combine(output, "guard-plan.json");
+    File.WriteAllText(guards, JsonSerializer.Serialize(new { schemaVersion = 1, complete = true, assemblies = entries }, json));
+    Console.WriteLine(Run(editor, lab, "-batchmode", "-quit", "-nographics", "-projectPath", project,
+        "-executeMethod", "HybridCLR.Lab.Editor.CurrentStorageProbeBuild.Build", "-probeOutput", output,
+        "-probePlayerRoot", Path.Combine(output, "player-executable"), "-probeGuardsPlan", guards,
+        "-logFile", Path.Combine(output, "build.log")));
+    foreach (var entry in entries)
+        if (Hash(Path.Combine(output, "baseline", entry.assemblyName + ".dll")) != entry.baselineSha256)
+            throw new InvalidDataException("Final Base differs from guarded metadata: " + entry.assemblyName);
+    if (Hash(manifest) != runtimeHash) throw new InvalidDataException("Runtime manifest changed during build.");
+    File.WriteAllText(Path.Combine(output, "build-binding.json"), JsonSerializer.Serialize(new
+    {
+        labHead = Run("git", lab, "rev-parse", "HEAD").Trim(), runtimeManifestSha256 = runtimeHash,
+        playerSha256 = Hash(Path.Combine(output, "player-executable", "CurrentStorage.exe")),
+        gameAssemblySha256 = Hash(Path.Combine(output, "player-executable", "GameAssembly.dll")),
+        nativeManifestSha256 = Hash(Path.Combine(output, "native-manifest.json")), assemblies = entries,
+    }, json));
+    Console.WriteLine(output); return 0;
+}
+if (args.Length == 5 && args[0] == "probe-run")
+{
+    string playerRoot = Path.GetFullPath(args[1]), payload = Path.GetFullPath(args[2]), result = Path.GetFullPath(args[3]);
+    NewOutput(result);
+    string output = Path.GetDirectoryName(playerRoot)!;
+    using var binding = JsonDocument.Parse(File.ReadAllText(Path.Combine(output, "build-binding.json")));
+    foreach (var item in new[] { (File: "CurrentStorage.exe", Key: "playerSha256"), (File: "GameAssembly.dll", Key: "gameAssemblySha256") })
+        if (Hash(Path.Combine(playerRoot, item.File)) != binding.RootElement.GetProperty(item.Key).GetString())
+            throw new InvalidDataException("Player identity mismatch: " + item.File);
+    using var plan = JsonDocument.Parse(File.ReadAllText(Path.Combine(payload, "plan.json")));
+    foreach (var selection in plan.RootElement.GetProperty("assemblies").EnumerateArray())
+    {
+        string name = selection.GetProperty("name").GetString()!;
+        var embedded = binding.RootElement.GetProperty("assemblies").EnumerateArray().Single(item =>
+            item.GetProperty("assemblyName").GetString() == name);
+        if (!string.Equals(embedded.GetProperty("baselineSha256").GetString(),
+                selection.GetProperty("baseSha256").GetString(), StringComparison.OrdinalIgnoreCase))
+            throw new InvalidDataException("Payload Base does not match the built Player: " + name);
+        byte[] expected = MetaVersionSnapshot.Create(Path.Combine(output, "baseline", name + ".dll")).ToBinary();
+        if (!expected.SequenceEqual(File.ReadAllBytes(Path.Combine(payload, "base", name + ".mv"))))
+            throw new InvalidDataException("Base MV mismatch: " + name);
+    }
+    Console.WriteLine(Run(Path.Combine(playerRoot, "CurrentStorage.exe"), playerRoot,
+        "-batchmode", "-nographics", "-logFile", result + ".log", "-currentStoragePayload", payload,
+        "-currentStorageResult", result, "-expectedRevision", args[4], "-requireGuards", "true"));
+    using var report = JsonDocument.Parse(File.ReadAllText(result));
+    if (!report.RootElement.GetProperty("passed").GetBoolean()) throw new InvalidDataException("Player failed: " + result);
+    Console.WriteLine(File.ReadAllText(result)); return 0;
 }
 if (args.Length == 3 && args[0] == "probe-refresh")
 {

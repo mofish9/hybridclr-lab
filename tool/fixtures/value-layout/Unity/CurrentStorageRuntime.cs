@@ -23,6 +23,8 @@ namespace HybridCLR.Lab
             public bool passed; public string stage; public string error;
             public int loadCode = -1; public string[] records; public bool consumerPassed;
             public int interpreterEntries; public string scope = "Current storage research probe";
+            public bool reflectionPassed, revisionPassed;
+            public int directRevision, reflectedRevision, revisionInterpreterEntries, unchangedAotEntries;
         }
 
         private static string Argument(string name)
@@ -53,13 +55,40 @@ namespace HybridCLR.Lab
                 result.stage = "load-images"; save();
                 result.loadCode = Load(dlls, before, after, plan.assemblies.Select(item => item.types).ToArray(), plan.assemblies.Select(item => item.methods).ToArray());
                 if (result.loadCode != 0) throw new InvalidOperationException("DHE load failed: " + result.loadCode);
+                result.stage = "revision"; save();
+                int expectedRevision = int.Parse(Argument("-expectedRevision") ?? "41");
+                bool requireGuards = Argument("-requireGuards") == "true";
+                HybridCLR.RuntimeApi.ResetDifferentialDispatchCounters();
+                result.directRevision = ValueLayout.Factory.GetRevision();
+                result.revisionInterpreterEntries = HybridCLR.RuntimeApi.GetDifferentialInterpreterEntryCount();
+                HybridCLR.RuntimeApi.ResetDifferentialDispatchCounters();
+                int sentinel = ValueLayout.Factory.UnchangedRevision();
+                result.unchangedAotEntries = HybridCLR.RuntimeApi.GetDifferentialAotEntryCount();
+                MethodInfo revision = typeof(ValueLayout.Factory).GetMethod("GetRevision");
+                result.reflectedRevision = (int)Resolve(revision).Invoke(null, null);
+                result.revisionPassed = result.directRevision == expectedRevision &&
+                    result.reflectedRevision == expectedRevision && sentinel == 5 &&
+                    !HybridCLR.RuntimeApi.IsDifferentialMethodChanged(typeof(ValueLayout.Factory).GetMethod("UnchangedRevision")) &&
+                    (!requireGuards || (result.unchangedAotEntries > 0 &&
+                    (expectedRevision == 41 ? result.revisionInterpreterEntries == 0 : result.revisionInterpreterEntries > 0)));
+                result.stage = "reflection"; save();
+                object box = Resolve(typeof(ValueLayout.Factory).GetMethod("Create")).Invoke(null, null);
+                FieldInfo count = box.GetType().GetField("Count");
+                count.SetValue(box, 29);
+                object foreign = Activator.CreateInstance(Assembly.Load("HybridCLR.ValueLayoutOther")
+                    .GetType("HybridCLR.Lab.ValueLayout.Payload", true));
+                bool foreignRejected = false;
+                try { count.GetValue(foreign); }
+                catch (ArgumentException) { foreignRejected = true; }
+                result.reflectionPassed = count.DeclaringType.IsInstanceOfType(box) &&
+                    (int)count.GetValue(box) == 29 && foreignRejected;
                 result.stage = "model"; save();
                 MethodInfo model = Assembly.Load("HybridCLR.ValueLayoutModel").GetType("HybridCLR.Lab.ValueLayout.ValueLayoutProbe", true).GetMethod("Run");
                 result.records = (string[])Resolve(model).Invoke(null, null);
                 result.stage = "consumer-and-native-boundary"; save();
                 MethodInfo consumer = Assembly.Load("HybridCLR.ValueLayoutConsumer").GetType("HybridCLR.Lab.ValueLayoutConsumer.Calls", true).GetMethod("Run");
                 result.consumerPassed = (bool)Resolve(consumer).Invoke(null, null);
-                result.passed = result.records.Length == 14 && result.records.All(record => record.EndsWith("\tpassed", StringComparison.Ordinal)) && result.consumerPassed;
+                result.passed = result.records.Length == 14 && result.records.All(record => record.EndsWith("\tpassed", StringComparison.Ordinal)) && result.consumerPassed && result.reflectionPassed && result.revisionPassed;
                 result.interpreterEntries = HybridCLR.RuntimeApi.GetDifferentialInterpreterEntryCount();
                 result.stage = "complete";
             }

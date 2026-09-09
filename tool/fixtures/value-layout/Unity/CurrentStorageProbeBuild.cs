@@ -63,9 +63,13 @@ namespace HybridCLR.Lab.Editor
             {
                 Target = BuildTarget.StandaloneWindows64, BaselineAotRoot = Path.Combine(output, "baseline"),
                 OutputPath = player, Scenes = new[] { "Assets/Scenes/CurrentStorage.unity" }, CleanBuild = true,
-                // Deliberately isolates image/layout behavior. The static lab
-                // entry chooses Current metadata; native guards/caller coverage
-                // must still be tested with the full DHE workflow afterwards.
+                NativeFinalizeOptions = Array.IndexOf(Environment.GetCommandLineArgs(), "-probeGuardsPlan") < 0 ? null : new DheNativeFinalizeOptions
+                {
+                    ProjectRoot = Path.GetFullPath("."), ProjectPlanPath = Argument("-probeGuardsPlan"),
+                    GuardAllMethods = true, RequireCompleteCoverage = true,
+                    OutputManifestPath = Path.Combine(output, "native-manifest.json"),
+                    BeeLogPath = Path.Combine(output, "native-rebuild.log"),
+                },
             });
             if (report.summary.result != BuildResult.Succeeded) throw new BuildFailedException(report.summary.result.ToString());
             string gameAssembly = Path.Combine(Path.GetDirectoryName(player), "GameAssembly.dll");
