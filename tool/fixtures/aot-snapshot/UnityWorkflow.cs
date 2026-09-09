@@ -108,10 +108,14 @@ internal static class UnityWorkflow
             result.RootElement.GetProperty("baseId").GetString() == identity.RootElement.GetProperty("baseId").GetString() &&
             result.RootElement.GetProperty("aotAnalysisSnapshotSha256").GetString() == snapshot.Sha256;
         string resource = Path.Combine(output, "resource-noop"), staging = Path.Combine(output, "stage-noop");
+        string frozen = Path.Combine(output, "frozen-aot");
+        FrozenAotMaterialize.Run(new[] { identityPath, Path.Combine(build, "current"), frozen,
+            "Assets/StreamingAssets/SnapshotDHE", "Assets/StreamingAssets/SnapshotDHE/BaseMetaVersion" });
         Execute("dotnet", tool, "resource-update", "-CurrentRoot", Path.Combine(build, "current"), "-SettingsFile",
             Path.Combine(project, "ProjectSettings/HybridCLRSettings.asset"), "-BaselineRoot", Path.Combine(build, "baseline"),
             "-BaseNativeManifest", nativeManifest, "-BaseBuildIdentity", identityPath,
             "-AotMetadataRoot", Path.Combine(Path.GetDirectoryName(snapshot.ManifestPath), "assemblies"),
+            "-FrozenAotPlans", Path.Combine(frozen, "frozen-aot-source-plan.json"),
             "-Mode", "Exploratory", "-OutputRoot", resource);
         string embeddedAssets = Path.Combine(build, "player/Snapshot_Data/StreamingAssets/SnapshotDHE");
         foreach (string source in Directory.GetFiles(embeddedAssets, "*", SearchOption.AllDirectories))
