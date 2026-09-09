@@ -792,6 +792,7 @@ internal static partial class Program
         var outputInputs = currentVariantRoots.Values.Append(settingsPath)
             .Concat(new[] { baseRegistryPath, previousBaseRegistryPath,
                 previousReleaseLedgerPath, channelSnapshotPath }.OfType<string>())
+            .Concat(ReadPathList(cli, "frozenaotplans", "frozenaotplan"))
             .ToArray();
         var outputRoot = SafeOutputRoot(cli.Require("outputroot"), outputInputs);
         foreach (string input in outputInputs)
@@ -801,6 +802,7 @@ internal static partial class Program
         string[] baselineRoots;
         string[] nativeManifestPaths;
         string[] buildIdentityPaths;
+        string[] frozenAotPlanPaths = Array.Empty<string>();
         string?[] registryAotMetadataRoots = Array.Empty<string?>();
         if (!string.IsNullOrWhiteSpace(baseRegistryPath))
         {
@@ -818,6 +820,7 @@ internal static partial class Program
             baselineRoots = baseRegistry.Entries.Select(entry => entry.BaselineRoot).ToArray();
             nativeManifestPaths = baseRegistry.Entries.Select(entry => entry.NativeManifest).ToArray();
             buildIdentityPaths = baseRegistry.Entries.Select(entry => entry.BuildIdentity).ToArray();
+            frozenAotPlanPaths = ReadPathList(cli, "frozenaotplans", "frozenaotplan");
             if (baseRegistry.Entries.Any(entry => entry.AotMetadataRoot != null))
                 registryAotMetadataRoots = baseRegistry.Entries.Select(entry =>
                     entry.AotMetadataRoot).ToArray();
@@ -853,6 +856,7 @@ internal static partial class Program
                 .Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries)
                 .Select(path => RequireFile(path, "Base Player build identity"))
                 .ToArray();
+            frozenAotPlanPaths = ReadPathList(cli, "frozenaotplans", "frozenaotplan");
         }
         ResourceReleaseContext resourceRelease = PrepareResourceReleaseContext(cli,
             baseRegistry, previousBaseRegistry);
@@ -868,6 +872,8 @@ internal static partial class Program
             throw new DheException("BaseRoots and BaseNativeManifests must have the same number of entries.");
         if (buildIdentityPaths.Length != baselineRoots.Length)
             throw new DheException("BaseRoots and BaseBuildIdentities must have the same number of entries.");
+        if (frozenAotPlanPaths.Length != 0 && frozenAotPlanPaths.Length != baselineRoots.Length)
+            throw new DheException("FrozenAotPlans must contain one plan per BaseRoot.");
         var baseIdentities = buildIdentityPaths.Select(path => ReadJson<JsonElement>(path)).ToArray();
         if (baseIdentities.Any(identity => GetInt(identity, "identityVersion") != 1))
             throw new DheException(
@@ -1349,6 +1355,44 @@ internal static partial class Program
                     assemblyModes.Add(new ResourceAssemblyMode(name, executionMode,
                         execution.Plans.TryGetValue(name, out var selectedExecution) ? selectedExecution : null));
             }
+            var frozenAotSources = new List<object>();
+            if (frozenAotPlanPaths.Length != 0)
+            {
+                JsonElement frozenPlan = ReadJson<JsonElement>(frozenAotPlanPaths[baseIndex]);
+                if (GetString(frozenPlan, "baseId") != baseId ||
+                    GetString(frozenPlan, "aotAnalysisSnapshotSha256") != (aotAnalysis?.Sha256 ?? string.Empty) ||
+                    !frozenPlan.TryGetProperty("sources", out JsonElement sourceRows) ||
+                    sourceRows.ValueKind != JsonValueKind.Array)
+                    throw new DheException("Frozen AOT plan is not bound to Base snapshot: " + baseId);
+                foreach (JsonElement source in sourceRows.EnumerateArray())
+                {
+                    string sourceName = NormalizeName(GetString(source, "assemblyName") ?? string.Empty);
+                    string sourcePath = GetString(source, "source") ?? string.Empty;
+                    string sourceHash = GetString(source, "sourceSha256") ?? string.Empty;
+                    string mvPath = GetString(source, "baseMetaVersion") ?? string.Empty;
+                    string mvHash = GetString(source, "baseMetaVersionSha256") ?? string.Empty;
+                    if (sourceName.Length == 0 || !IsHex(sourceHash, 64, 64) ||
+                        !IsHex(mvHash, 64, 64) || !sourcePath.StartsWith(runtimeAssetRoot, StringComparison.OrdinalIgnoreCase) ||
+                        !mvPath.StartsWith(baseMetaVersionAssetRoot, StringComparison.OrdinalIgnoreCase) ||
+                        !source.TryGetProperty("currentStorageTypeTokens", out JsonElement sourceTypes) ||
+                        !source.TryGetProperty("currentExecutionMethodTokens", out JsonElement sourceMethods) ||
+                        !source.TryGetProperty("excludedBaseTypeTokens", out JsonElement excluded))
+                        throw new DheException("Frozen AOT source record is invalid: " + baseId + "/" + sourceName);
+                    frozenAotSources.Add(new
+                    {
+                        assemblyName = sourceName,
+                        source = sourcePath,
+                        sourceSha256 = sourceHash,
+                        baseMetaVersion = mvPath,
+                        baseMetaVersionSha256 = mvHash,
+                        currentStorageTypeTokens = sourceTypes,
+                        currentExecutionMethodTokens = sourceMethods,
+                        excludedBaseTypeTokens = excluded,
+                    });
+                }
+                if (frozenAotSources.Count != 0)
+                    requiredRuntimeCapabilities.Add("frozen-aot-source-v1");
+            }
             var baseRecord = new
             {
                 baseId,
@@ -1382,12 +1426,13 @@ internal static partial class Program
                 unsupportedChanges = unsupported.OrderBy(value => value, StringComparer.Ordinal).ToArray(),
                 assemblies = assemblyCompatibility.ToArray(),
                 assemblyModes = assemblyModes.ToArray(),
+                frozenAotSources = frozenAotSources.ToArray(),
                 currentStorageImpact = execution.Impact,
             };
             candidateBases.Add(baseRecord);
             resourceBaseSelections.Add(new ResourceAotMetadataBaseSelection(baseId,
                 aotMetadataSetId, payloadVariantId, currentVariant.CurrentSetHash,
-                assemblyModes.ToArray()));
+                assemblyModes.ToArray(), frozenAotSources.ToArray()));
             if (!baseCompatible)
             {
                 releaseErrors.Add("Base " + baseId + " is incompatible: " +
@@ -4312,7 +4357,8 @@ internal static partial class Program
         "-ForceOutput.",
         "Resource release plan accepts one config-relative JSON document with -Config, " +
         "joins the immutable Base runner catalog to every active Base, and generates the " +
-        "exact resource-release-qualify config without starting a Player.",
+        "exact resource-release-qualify config without starting a Player. " +
+        "Resource-update accepts -FrozenAotPlans (one Base-bound frozen source plan per Base).",
         "Resource release qualify accepts one config-relative JSON document with -Config, " +
         "stages and directly starts every process runner, accepts authenticated distributed " +
         "prequalified reports, and emits one exact-coverage aggregate gate.",
@@ -4606,7 +4652,8 @@ internal static partial class Program
         ResourceAotMetadataPayload[] Assemblies);
     private sealed record ResourceAotMetadataBaseSelection(string BaseId,
         string AotMetadataSetId, string PayloadVariantId,
-        string CurrentAssemblySetSha256, ResourceAssemblyMode[] AssemblyModes);
+        string CurrentAssemblySetSha256, ResourceAssemblyMode[] AssemblyModes,
+        object[]? FrozenAotSources = null);
     private sealed record ResourceAssemblyMode(string AssemblyName, string ExecutionMode,
         [property: System.Text.Json.Serialization.JsonIgnore] ResourceExecutionPlan? ExecutionPlan = null)
     {

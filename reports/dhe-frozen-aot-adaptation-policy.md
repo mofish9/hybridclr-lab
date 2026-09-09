@@ -26,6 +26,8 @@
 
 `merge-frozen-aot` 已将 source records 写入匹配的 `baseSelections[baseId].frozenAotSources`，避免多个 Base 共用错误的普通 AOT 源。示例合并输出验证了 2 条 source records 被绑定到 `9e7cc69b...` Base。
 
+资源生成器现在接受 `-FrozenAotPlans`，要求每个 Base 传入一个已绑定自身 `baseId`、AOT 快照 SHA、源 DLL/MV SHA 和 token 选择的计划，并将记录写入资源 validation/runtime plan 的对应 Base selection。旧 Base 若没有重新构建 native manifest 的 `frozen-aot-source-v1` 能力会明确失败，不会静默发布。
+
 策略结果包括：完整快照读取、重复框架引用身份保留、普通 AOT 原始 Echo 与内联 owner 选中、StaticNeighbor 保持 AOT、静态值字段选择、generic-context 和 native-only 义务、错误 Base/Current/manifest/source 拒绝，以及引用重定向拒绝。
 
 ## 仍未通过的发布门禁
