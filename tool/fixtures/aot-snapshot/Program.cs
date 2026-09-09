@@ -1,5 +1,4 @@
 using System.Security.Cryptography;
-using System.Reflection;
 using System.Text.Json;
 using dnlib.DotNet;
 using dnlib.DotNet.Emit;
@@ -182,7 +181,8 @@ string GitHead(string root)
     return value.Trim();
 }
 var host = System.Reflection.Assembly.GetExecutingAssembly();
-string packageRoot = host.GetCustomAttributes<System.Reflection.AssemblyMetadataAttribute>().Single(value => value.Key == "DhePackageRoot").Value;
+string packageRoot = host.GetCustomAttributes(typeof(System.Reflection.AssemblyMetadataAttribute), false)
+    .Cast<System.Reflection.AssemblyMetadataAttribute>().Single(value => value.Key == "DhePackageRoot").Value;
 File.WriteAllText(Path.Combine(output, "result.json"), JsonSerializer.Serialize(new { passed = checks.Values.All(value => value), checks, errors,
     labHead = GitHead(Path.GetFullPath("../../../../../..", AppContext.BaseDirectory)), packageHead = GitHead(packageRoot),
     hostSha256 = Hash(File.ReadAllBytes(host.Location)), toolSha256 = Hash(File.ReadAllBytes(args[2])),
