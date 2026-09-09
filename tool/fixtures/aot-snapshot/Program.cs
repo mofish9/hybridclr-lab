@@ -1,4 +1,5 @@
 using System.Security.Cryptography;
+using System.Reflection;
 using System.Text.Json;
 using dnlib.DotNet;
 using dnlib.DotNet.Emit;
@@ -172,7 +173,19 @@ toolProgram.GetMethod("RewriteArchiveJsonDocuments", System.Reflection.BindingFl
 checks["actual-archive-rewriter-preserves-manifest-bytes"] = File.ReadAllBytes(archiveManifest).SequenceEqual(File.ReadAllBytes(capture.ManifestPath));
 checks["archive-reader-portable-after-relocation"] = AotAnalysisSnapshot.Read(Path.Combine(archive, "build-identity.json"),
     boundIdentity, aotNames, dhe).OrdinaryAssemblyPaths.All(path => path.StartsWith(archive));
+string GitHead(string root)
+{
+    var start = new System.Diagnostics.ProcessStartInfo("git") { RedirectStandardOutput = true, UseShellExecute = false, CreateNoWindow = true };
+    foreach (string argument in new[] { "-C", root, "rev-parse", "HEAD" }) start.ArgumentList.Add(argument);
+    using var process = System.Diagnostics.Process.Start(start); string value = process.StandardOutput.ReadToEnd(); process.WaitForExit();
+    if (process.ExitCode != 0) throw new IOException("Cannot bind fixture source.");
+    return value.Trim();
+}
+var host = System.Reflection.Assembly.GetExecutingAssembly();
+string packageRoot = host.GetCustomAttributes<System.Reflection.AssemblyMetadataAttribute>().Single(value => value.Key == "DhePackageRoot").Value;
 File.WriteAllText(Path.Combine(output, "result.json"), JsonSerializer.Serialize(new { passed = checks.Values.All(value => value), checks, errors,
+    labHead = GitHead(Path.GetFullPath("../../../../../..", AppContext.BaseDirectory)), packageHead = GitHead(packageRoot),
+    hostSha256 = Hash(File.ReadAllBytes(host.Location)), toolSha256 = Hash(File.ReadAllBytes(args[2])),
     scope = "AOT snapshot normalization and validation using real stripped DLLs; not final Player qualification", input, capture.ManifestPath, capture.ManifestSha256 }, json));
 foreach (var check in checks) Console.WriteLine(check.Key + ": " + check.Value + (check.Value || !errors.ContainsKey(check.Key) ? "" : " " + errors[check.Key]));
 return checks.Values.All(value => value) ? 0 : 1;
