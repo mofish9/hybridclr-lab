@@ -2,8 +2,6 @@ using System.Diagnostics;
 using System.Security.Cryptography;
 using System.Text.Json;
 using HybridCLR.DheTool;
-using dnlib.DotNet;
-using dnlib.DotNet.Writer;
 
 internal static class UnityWorkflow
 {
@@ -11,7 +9,8 @@ internal static class UnityWorkflow
     {
         if (args.Length < 6 || args.Length > 8) throw new ArgumentException("unity-workflow <lab> <package> <editor> <runtime manifest> <fixture DLL root> <new output> [expected revision] [latest Current DLL root]");
         string expectedRevision = args.Length >= 7 ? int.Parse(args[6]).ToString() : "41";
-        string latestCurrentRoot = args.Length == 8 && args[7] != ":evolve:" ? Path.GetFullPath(args[7]) : null;
+        bool frozenEntryProbe = args.Length == 8 && args[7] == ":frozen-entry:";
+        string latestCurrentRoot = args.Length == 8 && args[7] != ":evolve:" && !frozenEntryProbe ? Path.GetFullPath(args[7]) : null;
         bool synthesizeEvolution = args.Length == 8 && args[7] == ":evolve:";
         string lab = Path.GetFullPath(args[0]), package = Path.GetFullPath(args[1]), editor = Path.GetFullPath(args[2]),
             runtimeManifest = Path.GetFullPath(args[3]), fixtures = Path.GetFullPath(args[4]), output = Path.GetFullPath(args[5]);
@@ -20,27 +19,6 @@ internal static class UnityWorkflow
         string project = Path.Combine(output, "project"), build = Path.Combine(output, "base");
         string ordinaryGuardRoot = Path.Combine(output, "ordinary-guard-mv");
         Directory.CreateDirectory(ordinaryGuardRoot);
-        // Generate guard-only MV JSON from the immutable ordinary AOT input
-        // before Unity builds its Base. These records never become hotfix
-        // assemblies; they only make direct native entries universally guarded.
-        foreach (string name in new[] { "HybridCLR.ValueLayoutNative" })
-        {
-            var guardSnapshot = MetaVersionSnapshot.Create(Path.Combine(fixtures, name + ".dll"));
-            var methods = guardSnapshot.Methods.Select(method => new
-            {
-                identity = method.Identity, stableId = method.StableId, name = method.Name,
-                token = method.Token, flags = method.Flags, declaringType = method.DeclaringType,
-                returnType = method.ReturnType, parameterTypes = method.ParameterTypes,
-                isStatic = method.IsStatic, hasThis = method.HasThis,
-                isAbstract = method.IsAbstract, isPInvoke = method.IsPInvoke,
-                declaringTypeIsValueType = method.DeclaringTypeIsValueType,
-                genericParameterCount = method.GenericParameterCount,
-                declaringTypeGenericParameterCount = method.DeclaringTypeGenericParameterCount,
-            }).ToArray();
-            File.WriteAllText(Path.Combine(ordinaryGuardRoot, name + ".mv.json"),
-                JsonSerializer.Serialize(new { assemblyName = guardSnapshot.AssemblyName, methods },
-                    new JsonSerializerOptions { PropertyNamingPolicy = JsonNamingPolicy.CamelCase, WriteIndented = true }));
-        }
         string tool = Path.Combine(lab, "tool/bin/Release/net6.0/HybridCLR.DheTool.dll");
         string probe = Path.Combine(lab, "tool/fixtures/value-layout/bin/Release/net6.0/ValueLayoutTests.dll");
         string Execute(string exe, params string[] arguments)
@@ -68,6 +46,8 @@ internal static class UnityWorkflow
         File.Delete(Path.Combine(project, "Assets/CurrentStorageRuntime.cs"));
         foreach (var pair in new[] { ("SnapshotPlayer.cs", "Assets"), ("SnapshotWorkflowBuild.cs", "Assets/Editor") })
             File.Copy(Path.Combine(lab, "tool/fixtures/aot-snapshot/Unity", pair.Item1), Path.Combine(project, pair.Item2, pair.Item1));
+        if (frozenEntryProbe)
+            File.Copy(Path.Combine(lab, "tool/fixtures/aot-snapshot/Unity/FrozenEntryPlayer.cs"), Path.Combine(project, "Assets/FrozenEntryPlayer.cs"));
         File.WriteAllText(Path.Combine(project, "Assets/SnapshotIdentity.cs"),
             File.ReadAllText(Path.Combine(lab, "templates/DheBuildIdentity.cs")).Replace("__DHE_IDENTITY_NAMESPACE__", "HybridCLR.Lab.Snapshot"));
         using var runtime = JsonDocument.Parse(File.ReadAllBytes(runtimeManifest));
@@ -88,6 +68,17 @@ internal static class UnityWorkflow
                 "-logFile", Path.Combine(output, phase + ".log"));
         }
         Phase("Prepare");
+        var prepared = JsonSerializer.Deserialize<JsonElement>(File.ReadAllText(Path.Combine(build, "adapter/prepare.json")));
+        string stripped = prepared.GetProperty("currentSourceRoot").GetString();
+        FrozenEntryWorkflow.WriteGuardJson(Path.Combine(stripped, "HybridCLR.ValueLayoutNative.dll"),
+            Path.Combine(ordinaryGuardRoot, "HybridCLR.ValueLayoutNative.mv.json"));
+        if (frozenEntryProbe)
+        {
+            // Diagnostic coverage for the Nullable<Payload> operations in this
+            // fixture. This is not universal ordinary-AOT release coverage.
+            FrozenEntryWorkflow.WriteGuardJson(Path.Combine(stripped, "mscorlib.dll"),
+                Path.Combine(ordinaryGuardRoot, "mscorlib.mv.json"), method => method.DeclaringType == "System.Nullable`1");
+        }
         Execute("dotnet", tool, "preflight", "-SettingsFile", Path.Combine(project, "ProjectSettings/HybridCLRSettings.asset"),
             "-BaselineRoot", Path.Combine(build, "baseline"), "-CurrentRoot", Path.Combine(build, "current"),
             "-OutputRoot", Path.Combine(build, "project-preflight"), "-ProjectRoot", project, "-RequireDheEqualsHotUpdate", "-RequireCompleteCoverage");
@@ -106,30 +97,18 @@ internal static class UnityWorkflow
         Execute("dotnet", tool, "schema-validate", "-Schema", Path.Combine(lab, "schemas/dhe-build-identity.schema.json"),
             "-Document", identityPath, "-Output", Path.Combine(output, "identity-schema.json"));
         string player = Path.Combine(build, "player/Snapshot.exe"), playerReport = Path.Combine(output, "player-result.json");
-        string baseExpectedRevision = latestCurrentRoot == null ? expectedRevision : "41";
+        string baseExpectedRevision = latestCurrentRoot == null && !synthesizeEvolution ? expectedRevision : "41";
         Execute(player, "-batchmode", "-nographics", "-snapshotResult", playerReport, "-expectedRevision", baseExpectedRevision, "-logFile", Path.Combine(output, "player.log"));
         using var result = JsonDocument.Parse(File.ReadAllBytes(playerReport));
         bool passed = result.RootElement.GetProperty("passed").GetBoolean() &&
             result.RootElement.GetProperty("baseId").GetString() == identity.RootElement.GetProperty("baseId").GetString() &&
             result.RootElement.GetProperty("aotAnalysisSnapshotSha256").GetString() == snapshot.Sha256;
+        if (frozenEntryProbe) return passed ? FrozenEntryWorkflow.Verify(build, output) : 1;
         string resource = Path.Combine(output, "resource-noop"), staging = Path.Combine(output, "stage-noop");
         if (synthesizeEvolution)
         {
             latestCurrentRoot = Path.Combine(output, "evolved-current");
-            Directory.CreateDirectory(latestCurrentRoot);
-            foreach (string source in Directory.GetFiles(Path.Combine(build, "current"), "*.dll"))
-            {
-                string target = Path.Combine(latestCurrentRoot, Path.GetFileName(source));
-                File.Copy(source, target);
-                if (!Path.GetFileNameWithoutExtension(source).Equals("HybridCLR.ValueLayoutModel", StringComparison.Ordinal)) continue;
-                using var module = ModuleDefMD.Load(File.ReadAllBytes(target));
-                TypeDef payload = module.Find("HybridCLR.Lab.ValueLayout.Payload", false) ?? throw new InvalidDataException("Payload type missing.");
-                payload.Fields.Add(new FieldDefUser("Extra", new FieldSig(module.CorLibTypes.Int64), FieldAttributes.Public));
-                payload.Fields.Add(new FieldDefUser("Reference", new FieldSig(module.CorLibTypes.Object), FieldAttributes.Public));
-                var writerOptions = new ModuleWriterOptions(module);
-                writerOptions.PEHeadersOptions.TimeDateStamp = 123456789;
-                module.Write(target, writerOptions);
-            }
+            EvolutionCurrent.Run(new[] { Path.Combine(build, "current"), latestCurrentRoot });
         }
         string resourceCurrentRoot = latestCurrentRoot ?? Path.Combine(build, "current");
         string frozen = Path.Combine(output, "frozen-aot");

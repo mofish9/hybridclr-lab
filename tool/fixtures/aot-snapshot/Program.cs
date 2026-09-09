@@ -14,6 +14,7 @@ if (args.Length > 0 && args[0] == "frozen-aot-policy") return FrozenAotPolicy.Ru
 if (args.Length > 0 && args[0] == "materialize-frozen-aot") return FrozenAotMaterialize.Run(args.Skip(1).ToArray());
 if (args.Length > 0 && args[0] == "merge-frozen-aot") return FrozenAotMaterialize.Merge(args.Skip(1).ToArray());
 if (args.Length > 0 && args[0] == "synthesize-evolution") return EvolutionCurrent.Run(args.Skip(1).ToArray());
+if (args.Length > 0 && args[0] == "frozen-entry-workflow") return FrozenEntryWorkflow.Run(args.Skip(1).ToArray());
 if (args.Length == 4 && args[0] == "compare")
 {
     if (Directory.Exists(args[3])) throw new IOException("Comparison output must be new.");

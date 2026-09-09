@@ -36,6 +36,7 @@ namespace HybridCLR.Lab.Snapshot
         {
             if (Application.isEditor) return;
             string[] args = Environment.GetCommandLineArgs();
+            if (Array.IndexOf(args, "-frozenEntryPlan") >= 0) return;
             int index = Array.IndexOf(args, "-snapshotResult");
             if (index < 0 || index + 1 >= args.Length) throw new ArgumentException("-snapshotResult");
             var result = new Result();
@@ -68,18 +69,12 @@ namespace HybridCLR.Lab.Snapshot
                     var native = System.Reflection.Assembly.Load("HybridCLR.ValueLayoutNative").GetType("HybridCLR.Lab.ValueLayoutNative.NativeBoundary");
                     result.ordinaryAotReferenceResult = (long)native.GetMethod("ResourceResult").Invoke(null, null);
                     result.ordinaryAotStaticNeighbor = (int)native.GetMethod("StaticNeighbor").Invoke(null, null);
-                    object echoInput = ValueLayout.Factory.Create();
-                    echoInput.GetType().GetField("Extra")?.SetValue(echoInput, 90000000001L);
-                    object echoed = native.GetMethod("Echo").Invoke(null,
-                        new object[] { echoInput });
-                    result.ordinaryAotEchoExtra = (long)echoed.GetType().GetField("Extra").GetValue(echoed);
                 }
                 int expectedIndex = Array.IndexOf(args, "-expectedRevision");
                 int expectedRevision = expectedIndex < 0 ? 41 : int.Parse(args[expectedIndex + 1]);
                 result.passed = result.loadedAssemblies == 3 && result.revision == expectedRevision &&
-                    result.sentinel == 5 && (!result.resourceUpdate ||
-                    (!RuntimeApi.IsDifferentialMethodChanged(typeof(ValueLayout.Factory).GetMethod("UnchangedRevision")) &&
-                     result.ordinaryAotEchoExtra == 90000000001L));
+                    result.sentinel == 5 &&
+                    !RuntimeApi.IsDifferentialMethodChanged(typeof(ValueLayout.Factory).GetMethod("UnchangedRevision"));
             }
             catch (Exception exception) { result.error = exception.ToString(); }
             File.WriteAllText(args[index + 1], JsonUtility.ToJson(result, true));

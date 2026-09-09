@@ -1197,37 +1197,14 @@ internal static partial class Program
                 baselineRecords.Select(record => (record.name, record.path)));
             var aotAnalysis = AotAnalysisSnapshot.Read(buildIdentityPath, buildIdentity,
                 baseAotAssemblyNames, identityAssemblyNames);
-            var frozenSourceAssemblyNames = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
-            if (frozenAotPlanPaths.Length != 0)
-            {
-                JsonElement frozenPlanForCompatibility = ReadJson<JsonElement>(frozenAotPlanPaths[baseIndex]);
-                if (frozenPlanForCompatibility.TryGetProperty("sources", out JsonElement sourceRowsForCompatibility) &&
-                    sourceRowsForCompatibility.ValueKind == JsonValueKind.Array)
-                {
-                    foreach (JsonElement source in sourceRowsForCompatibility.EnumerateArray())
-                    {
-                        string sourceName = NormalizeName(GetString(source, "assemblyName") ?? string.Empty);
-                        if (sourceName.Length != 0) frozenSourceAssemblyNames.Add(sourceName);
-                    }
-                }
-            }
             var execution = ResourceExecutionPlanner.Compile(
                 baselineRecords.Where(record => currentVariant.Snapshots.ContainsKey(record.name)).Select(record => record.path),
                 names.Select(name => Path.Combine(currentVariant.Root, name + ".dll")),
                 aotAnalysis?.OrdinaryAssemblyPaths ?? Array.Empty<string>());
-            foreach (string reason in execution.UnsupportedChanges)
-            {
-                // Ordinary AOT layout/ABI obligations are admissible only
-                // when the matching immutable source-bound plan is present.
-                // All other unsupported changes retain the fail-closed gate.
-                string? assembly = reason.StartsWith("current-storage-ordinary-aot-", StringComparison.Ordinal)
-                    ? reason[("current-storage-ordinary-aot-".Length)..].Split(':', 2)[0]
-                    : reason.StartsWith("current-storage-native-abi:", StringComparison.Ordinal)
-                        ? reason["current-storage-native-abi:".Length..].Split(':', 2)[0]
-                        : null;
-                if (assembly == null || !frozenSourceAssemblyNames.Contains(assembly))
-                    unsupported.Add(reason);
-            }
+            // A source name alone proves neither its immutable identity nor
+            // native caller/ABI coverage. Frozen admission remains gated until
+            // the complete source-bound execution proof is implemented.
+            unsupported.AddRange(execution.UnsupportedChanges);
             if (execution.Impact.ChangedValueTypes.Length != 0)
             {
                 if (aotAnalysis == null)
