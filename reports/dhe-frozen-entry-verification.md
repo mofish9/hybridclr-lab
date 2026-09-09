@@ -158,3 +158,11 @@ signature decode, causing `ParallelLoopResult::_lowestBreakIteration` to be
 reported as an unsupported supplemental field before MV rejection. Runtime
 execution sites still remap selected physical owners; this change only removes
 the premature remap from signature matching.
+
+`dhe-frozen-entry-proof-07` with runtime `d6aab95` reached the expected MV
+registration rejection. Its combined post-rejection assertion then failed.
+Review found `RuntimeType.GetFields_native` selected Current fields from a cached
+homologous image without checking successful dispatch publication. IL2CPP
+candidate `8a13baf` adds the acquire-state gate. The Player now records AOT and
+interpreter counters and checks dispatch, field visibility and retained Count
+separately before retrying the correct MV, so these outcomes cannot be conflated.

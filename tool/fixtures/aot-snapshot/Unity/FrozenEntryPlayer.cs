@@ -14,7 +14,7 @@ namespace HybridCLR.Lab.Snapshot
         [Serializable] private class Record { public string name, dll, before, after, dllSha256, beforeSha256, afterSha256, invalidBefore, invalidBeforeSha256; public int sourceKind; public uint[] types, methods, excluded; }
         [Serializable] private class Plan { public string format, baseId; public bool releaseReady; public Record[] records; }
         [Serializable] private class Check { public string name; public bool passed; }
-        [Serializable] private class Result { public bool passed; public string stage, error; public int loadCode = -1; public Check[] checks; }
+        [Serializable] private class Result { public bool passed; public string stage, error; public int loadCode = -1, failedBatchAotCount, failedBatchInterpreterCount; public bool failedBatchExtraVisible; public Check[] checks; }
         private static string Argument(string name)
         {
             var args = Environment.GetCommandLineArgs(); int index = Array.IndexOf(args, name);
@@ -72,8 +72,12 @@ namespace HybridCLR.Lab.Snapshot
                     Check("invalid-base-rejected-after-metadata-preparation", failure == LoadImageErrorCode.DHE_MV_REGISTRATION_FAILED);
                     RuntimeApi.ResetDifferentialDispatchCounters();
                     object retained = NativeBoundary.FrozenCopyBox(original);
-                    Check("failed-batch-keeps-base-execution", RuntimeApi.GetDifferentialAotEntryCount() > 0 &&
-                        RuntimeApi.GetDifferentialInterpreterEntryCount() == 0 && retained.GetType().GetField("Extra") == null);
+                    result.failedBatchAotCount = RuntimeApi.GetDifferentialAotEntryCount();
+                    result.failedBatchInterpreterCount = RuntimeApi.GetDifferentialInterpreterEntryCount();
+                    result.failedBatchExtraVisible = retained.GetType().GetField("Extra") != null;
+                    Check("failed-batch-keeps-base-dispatch", result.failedBatchAotCount > 0 && result.failedBatchInterpreterCount == 0);
+                    Check("failed-batch-keeps-base-field-view", !result.failedBatchExtraVisible);
+                    Check("failed-batch-keeps-base-value", (int)retained.GetType().GetField("Count").GetValue(retained) == 17);
                 }
                 Save("load-frozen-and-mutable");
                 result.loadCode = (int)RuntimeApi.LoadDifferentialHybridAssembliesWithMetaVersionAndExecutionPlanAndSources(dlls, before, after, types, methods, kinds, excluded);
