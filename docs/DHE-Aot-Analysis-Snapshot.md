@@ -46,3 +46,10 @@ Rollback boundaries: package snapshot/capture and identity changes, lab archive
 and resource reader, and dedicated regressions. Keep the layout publication
 gate until the snapshot is bound and the public Windows resource workflow is
 verified. Do not update formal branches/tags or CAT while this is a candidate.
+
+The bound snapshot and no-op Windows resource loop are now verified; see
+`../reports/dhe-aot-analysis-workflow.md` for exact identities and remaining gates.
+Execution plans use zero-or-one `executionPlans` arrays because Unity JsonUtility
+materializes null inline objects. Explicit token counts guard selection decoding;
+the capability `current-storage-execution-plan-array-v1` prevents old loaders
+from accepting the new representation. This changes the resource envelope, not MV.
