@@ -29,6 +29,14 @@ identity-shape changes. Tests must also reject missing/extra/tampered snapshot
 files. Final Player validation must happen before recording successful native
 evidence. A failure must preserve the previous snapshot for diagnosis.
 
+UnityLinker can change the stripped facade inventory between scripts-only and
+final builds (observed: a UnityEngine.TextAsset exported type disappears). Keep
+this difference visible to normalization. If final inputs or native guards
+change, validate the original capture first, capture the actual final inputs,
+then rebuild with their identity once. The last build must match both the staged
+native identity and full AOT snapshot. Never allow an unbounded retry or accept
+the first mismatching Player as the completed Base.
+
 Primary metrics: complete identity/inventory coverage and zero differences
 outside the documented normalization. No throughput, memory, ARM64 or release
 claim is implied. The snapshot alone does not implement native ABI bridges or
