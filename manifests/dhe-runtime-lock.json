@@ -8,7 +8,7 @@
       "repository": "hybridclr",
       "sourceMode": "integrated",
       "baseCommit": "9e4fc7219724a3c63ff845e0b2acaa7d10c2430b",
-      "integratedCommit": "741e91402b508e360bc3e976012ca5fd37aa30f6",
+      "integratedCommit": "7a8939253d6ef775979c74118f76b1689382d305",
       "expectedTreeSha256": "BCA38D8D4A31B05E914E0022D442129F05FA078702FFF15866DB9C821B1E50F3",
       "path": "patches/dhe-lite/hybridclr.patch",
       "sha256": "3E16BF9C18B6F31287D73EFAEB015C7DA213B87FB7E69F7AD06FDFCBC482A24B",
