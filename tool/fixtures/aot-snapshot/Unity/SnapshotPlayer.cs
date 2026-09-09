@@ -15,6 +15,8 @@ namespace HybridCLR.Lab.Snapshot
             public bool resourceUpdate;
             public string baseId, aotAnalysisSnapshotSha256, error;
             public int loadedAssemblies, revision, sentinel;
+            public string[] records;
+            public long ordinaryAotReferenceResult;
         }
         private sealed class Provider : IDheRuntimeAssetProvider
         {
@@ -57,7 +59,16 @@ namespace HybridCLR.Lab.Snapshot
                 result.loadedAssemblies = plan.assemblies.Length;
                 result.revision = ValueLayout.Factory.GetRevision();
                 result.sentinel = ValueLayout.Factory.UnchangedRevision();
-                result.passed = result.loadedAssemblies == 3 && result.revision == 41 && result.sentinel == 5 &&
+                var probe = typeof(ValueLayout.Factory).Assembly.GetType("HybridCLR.Lab.ValueLayout.ResourceEvolutionProbe");
+                if (probe != null)
+                {
+                    result.records = (string[])probe.GetMethod("Run").Invoke(null, null);
+                    var native = System.Reflection.Assembly.Load("HybridCLR.ValueLayoutNative").GetType("HybridCLR.Lab.ValueLayoutNative.NativeBoundary");
+                    result.ordinaryAotReferenceResult = (long)native.GetMethod("ResourceResult").Invoke(null, null);
+                }
+                int expectedIndex = Array.IndexOf(args, "-expectedRevision");
+                int expectedRevision = expectedIndex < 0 ? 41 : int.Parse(args[expectedIndex + 1]);
+                result.passed = result.loadedAssemblies == 3 && result.revision == expectedRevision && result.sentinel == 5 &&
                     !RuntimeApi.IsDifferentialMethodChanged(typeof(ValueLayout.Factory).GetMethod("UnchangedRevision"));
             }
             catch (Exception exception) { result.error = exception.ToString(); }

@@ -7,7 +7,8 @@ internal static class UnityWorkflow
 {
     public static int Run(string[] args)
     {
-        if (args.Length != 6) throw new ArgumentException("unity-workflow <lab> <package> <editor> <runtime manifest> <fixture DLL root> <new output>");
+        if (args.Length != 6 && args.Length != 7) throw new ArgumentException("unity-workflow <lab> <package> <editor> <runtime manifest> <fixture DLL root> <new output> [expected revision]");
+        string expectedRevision = args.Length == 7 ? int.Parse(args[6]).ToString() : "41";
         string lab = Path.GetFullPath(args[0]), package = Path.GetFullPath(args[1]), editor = Path.GetFullPath(args[2]),
             runtimeManifest = Path.GetFullPath(args[3]), fixtures = Path.GetFullPath(args[4]), output = Path.GetFullPath(args[5]);
         if (Directory.Exists(output)) throw new IOException("Output must be new.");
@@ -77,7 +78,7 @@ internal static class UnityWorkflow
         Execute("dotnet", tool, "schema-validate", "-Schema", Path.Combine(lab, "schemas/dhe-build-identity.schema.json"),
             "-Document", identityPath, "-Output", Path.Combine(output, "identity-schema.json"));
         string player = Path.Combine(build, "player/Snapshot.exe"), playerReport = Path.Combine(output, "player-result.json");
-        Execute(player, "-batchmode", "-nographics", "-snapshotResult", playerReport, "-logFile", Path.Combine(output, "player.log"));
+        Execute(player, "-batchmode", "-nographics", "-snapshotResult", playerReport, "-expectedRevision", expectedRevision, "-logFile", Path.Combine(output, "player.log"));
         using var result = JsonDocument.Parse(File.ReadAllBytes(playerReport));
         bool passed = result.RootElement.GetProperty("passed").GetBoolean() &&
             result.RootElement.GetProperty("baseId").GetString() == identity.RootElement.GetProperty("baseId").GetString() &&
@@ -99,7 +100,7 @@ internal static class UnityWorkflow
             "-Output", Path.Combine(output, "stage-noop.json"));
         string resourceResult = Path.Combine(output, "resource-player-result.json");
         Execute(player, "-batchmode", "-nographics", "-snapshotResult", resourceResult, "-snapshotResourceRoot", staging,
-            "-logFile", Path.Combine(output, "resource-player.log"));
+            "-expectedRevision", expectedRevision, "-logFile", Path.Combine(output, "resource-player.log"));
         using var loadedResource = JsonDocument.Parse(File.ReadAllBytes(resourceResult));
         passed &= loadedResource.RootElement.GetProperty("passed").GetBoolean() &&
             loadedResource.RootElement.GetProperty("resourceUpdate").GetBoolean() &&

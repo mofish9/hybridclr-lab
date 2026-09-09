@@ -58,8 +58,10 @@ namespace HybridCLR.Lab.ValueLayout
         [MethodImpl(MethodImplOptions.NoInlining)]
         public static int GetRevision()
         {
-#if DHE_METHOD_UPDATE
+#if DHE_METHOD_UPDATE || DHE_RESOURCE_CURRENT
             return 73;
+#elif DHE_RESOURCE_BASE_NEW
+            return 51;
 #else
             return 41;
 #endif

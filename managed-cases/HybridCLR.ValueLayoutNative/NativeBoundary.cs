@@ -9,5 +9,7 @@ namespace HybridCLR.Lab.ValueLayoutNative
     {
         [MethodImpl(MethodImplOptions.NoInlining)]
         public static Payload Echo(Payload value) => value;
+        [MethodImpl(MethodImplOptions.NoInlining)]
+        public static long ResourceResult() => new ResourceChild().Compute();
     }
 }
