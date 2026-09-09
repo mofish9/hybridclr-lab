@@ -16,7 +16,7 @@ internal static class EvolutionCurrent
             string target = Path.Combine(outputRoot, Path.GetFileName(source));
             File.Copy(source, target);
             if (!Path.GetFileNameWithoutExtension(source).Equals("HybridCLR.ValueLayoutModel", StringComparison.Ordinal)) continue;
-            using var module = ModuleDefMD.Load(target);
+            using var module = ModuleDefMD.Load(File.ReadAllBytes(target));
             TypeDef payload = module.Find("HybridCLR.Lab.ValueLayout.Payload", false) ?? throw new InvalidDataException("Payload type missing.");
             if (payload.Fields.All(field => field.Name != "Extra"))
                 payload.Fields.Add(new FieldDefUser("Extra", new FieldSig(module.CorLibTypes.Int64), FieldAttributes.Public));
