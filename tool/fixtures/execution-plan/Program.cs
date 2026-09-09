@@ -8,7 +8,7 @@ using HybridCLR.DheTool;
 using dnlib.DotNet;
 using dnlib.DotNet.Emit;
 
-if (args.Length != 2) throw new ArgumentException("<public-reflection artifact root> <new report.json>");
+if (args.Length != 3) throw new ArgumentException("<public-reflection artifact root> <new report.json> <DheTool.dll>");
 string root = Path.GetFullPath(args[0]), output = Path.GetFullPath(args[1]);
 if (File.Exists(output)) throw new IOException("Report must be new.");
 var json = new JsonSerializerOptions { IncludeFields = true, WriteIndented = true };
@@ -103,9 +103,9 @@ JsonNode manifestDocument = Node(new { schemaVersion = 1, format = "hybridclr.dh
     runtimeProtocol = "dhe-runtime-protocol-v1", compatibilityValidated = true, playerUpdateRequired = false, guardCoverageValidated = true,
     currentAssemblySetSha256 = currentSetHash, runtimeAssetRoot = assets, baseMetaVersionAssetRoot = baseRoot,
     runtimePlan = "dhe-runtime-plan.json", validation = "validation.json", supportedBases = supportedBases.ToArray() });
-void RunCase(string name, int baseIndex, Action<JsonNode, JsonNode, JsonNode, Provider> mutate, bool expected)
+void RunCase(string name, int baseIndex, Action<JsonNode, JsonNode, JsonNode, Provider> mutate, bool expected, bool reset = true)
 {
-    DheRuntime.Reset(); RuntimeApi.Calls = 0; RuntimeApi.LastTypes = RuntimeApi.LastMethods = null;
+    if (reset) { DheRuntime.Reset(); RuntimeApi.Calls = 0; RuntimeApi.LastTypes = RuntimeApi.LastMethods = null; }
     var provider = providers[baseIndex].Copy();
     var manifest = Clone(manifestDocument); var validation = Clone(validationDocument); var plan = Clone(planDocument);
     mutate?.Invoke(manifest, validation, plan, provider);
@@ -155,7 +155,27 @@ RunCase("wrong-base-provider", 0, (_, _, _, provider) =>
     foreach (var item in providers[1].Bytes.Where(item => item.Key.StartsWith(baseRoot))) provider.Bytes[item.Key] = item.Value;
 }, false);
 RunCase("duplicate-base-selection", 0, (_, _, p, _) => p["baseSelections"].AsArray().Add(Clone(p["baseSelections"][0])), false);
-RunCase("valid-retry-after-rejections", 0, null, true);
+RunCase("valid-retry-without-reset-after-rejection", 0, null, true, reset: false);
+var toolAssembly = Assembly.LoadFrom(Path.GetFullPath(args[2]));
+var stagingCanonical = toolAssembly.GetType("HybridCLR.DheTool.Program", throwOnError: true)
+    .GetMethod("CanonicalResourceAssemblyModes", BindingFlags.Static | BindingFlags.NonPublic);
+string[] StageBinding(JsonNode record)
+{
+    using var source = JsonDocument.Parse(record.ToJsonString());
+    using var payload = JsonDocument.Parse(Node(new { assemblies = assemblyRecords.ToArray() }).ToJsonString());
+    return (string[])stagingCanonical.Invoke(null, new object[] { source.RootElement, payload.RootElement, "fixture" });
+}
+var boundBase = Clone(supportedBases[0]);
+string[] stageBefore = StageBinding(boundBase);
+cases["staging-binds-execution-plan"] = stageBefore.All(value => value.Contains("|")) &&
+    stageBefore.Any(value => value.Contains(boundBase["assemblyModes"][0]["executionPlan"]["baseMetaVersionSha256"].GetValue<string>()));
+boundBase["assemblyModes"][0]["executionPlan"]["currentStorageTypeTokens"].AsArray().RemoveAt(0);
+cases["staging-detects-selection-tamper"] = !stageBefore.SequenceEqual(StageBinding(boundBase));
+boundBase["assemblyModes"][0]["executionPlan"]["currentExecutionMethodTokens"] = new JsonArray(JsonValue.Create(0x06000001u), JsonValue.Create(0x06000001u));
+bool duplicateRejected = false;
+try { StageBinding(boundBase); }
+catch (TargetInvocationException error) when (error.InnerException is InvalidDataException) { duplicateRejected = true; }
+cases["staging-rejects-duplicate-selection"] = duplicateRejected;
 string[] assemblyNames = identities[0].AssemblyNames;
 string[] BaseFiles(string version) => assemblyNames.Select(name => Path.Combine(root,
     version == "old" ? "base-old-reflection" : "base-new", "baseline", name + ".dll")).ToArray();
