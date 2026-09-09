@@ -287,6 +287,14 @@ foreach (var sourceSet in new[] { BaseFiles("old"), currentFiles })
         if (!source.EndsWith("HybridCLR.ValueLayoutModel.dll")) { File.Copy(source, target); continue; }
         using var module = ModuleDefMD.Load(source);
         TypeDef owner = module.Find("HybridCLR.Lab.ValueLayout.Factory", false);
+        var payloadType = module.Find("HybridCLR.Lab.ValueLayout.Payload", false);
+        payloadType.Methods.Add(new MethodDefUser("NativeStub", MethodSig.CreateStatic(module.CorLibTypes.Int32),
+            dnlib.DotNet.MethodImplAttributes.Runtime | dnlib.DotNet.MethodImplAttributes.InternalCall,
+            dnlib.DotNet.MethodAttributes.Public | dnlib.DotNet.MethodAttributes.Static));
+        owner.Fields.Add(new FieldDefUser("StaticPayload", new FieldSig(payloadType.ToTypeSig()),
+            dnlib.DotNet.FieldAttributes.Public | dnlib.DotNet.FieldAttributes.Static));
+        owner.Fields.Add(new FieldDefUser("StaticReference", new FieldSig(module.Find("HybridCLR.Lab.ValueLayout.InlineOwner", false).ToTypeSig()),
+            dnlib.DotNet.FieldAttributes.Public | dnlib.DotNet.FieldAttributes.Static));
         if (mutated.Count != 0)
         {
             var method = new MethodDefUser("NewHelper", MethodSig.CreateStatic(module.CorLibTypes.Int32),
@@ -300,7 +308,12 @@ foreach (var sourceSet in new[] { BaseFiles("old"), currentFiles })
     mutated.Add(assemblyNames.Select(name => Path.Combine(destination, name + ".dll")).ToArray());
 }
 var staticCompilation = ResourceExecutionPlanner.Compile(mutated[0], mutated[1], Array.Empty<string>());
-cases["mutation-plan-remains-valid"] = staticCompilation.UnsupportedChanges.Length == 0;
+cases["existing-static-value-storage-detected-and-supported"] = staticCompilation.Impact.StaticValueFields.Any(field =>
+    !field.OrdinaryAot && field.Identity.Contains("::StaticPayload|")) &&
+    !staticCompilation.UnsupportedChanges.Any(reason => reason.Contains("::StaticPayload|"));
+cases["static-reference-does-not-grow-storage"] = !staticCompilation.Impact.StaticValueFields.Any(field => field.Identity.Contains("::StaticReference|"));
+cases["non-il-storage-member-requires-bridge"] = staticCompilation.UnsupportedChanges.Any(reason =>
+    reason.StartsWith("current-storage-native-member:") && reason.Contains("::NativeStub|"));
 var addedSnapshot = MetaVersionSnapshot.Create(mutated[1].Single(path => path.EndsWith("HybridCLR.ValueLayoutModel.dll")));
 cases["new-method-is-not-a-base-entry"] = !staticCompilation.Plans[addedSnapshot.AssemblyName].CurrentExecutionMethodTokens.Contains(
     addedSnapshot.Methods.Single(method => method.Name == "NewHelper").Token);

@@ -30,3 +30,21 @@ failure reports must be retained. A passed probe will still require resource
 schema/guard authentication, old-object migration, multi-Base, generic/native ABI
 and platform qualification before formal opt4 release. No native code or project
 generation output is manually patched by this fixture.
+
+## Generic Signature Initialization Regression
+
+The `dhe-frozen-entry-proof-02` Windows Player passed Base construction and
+pre-load AOT checks, then exited with 0xC0000005 in the source batch. Its native
+stack connects `InitTypeDefs_1`, `Image::ReadGenericClass`, `GenericClass::CreateClass`
+and `InterpreterImage::GetTypeInfoFromTypeDefinitionRawIndex`. Signature decoding
+was materializing a hidden Current class before `InitClass` initialized its table.
+This is a failed native integration regression, not a completed execution proof.
+
+Candidate runtime `377aea6960bcf7bbba9288045c03f1de5c9f858d` keeps generic and
+array remapping at the metadata-description level, preserves signature flags,
+and never materializes a Current generic definition from `ReadGenericClass`.
+The same five-source frozen-entry workload must pass unchanged on a freshly built
+Player. Native compile/CTest is a separate check; its stubs do not execute image
+initialization and cannot replace this Player regression. No latency or memory
+claim is made. Unity 2022 Windows is the current target; Tuanjie follows after
+correctness is stable, and Unity 2021 is outside the user's current scope.
