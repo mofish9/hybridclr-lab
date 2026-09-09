@@ -19,7 +19,7 @@
 | `artifacts/dhe-frozen-aot-20260909/policy-final3/result.json` | 21/21 policy checks，通过真实完整 AOT 快照 |
 | HybridCLR 候选 | `e22aed2a049c0f85d56a89a9b1bad272a57653e8`，冻结来源运行时校验 |
 | package 候选 | `2d4c3845d8716087c49ec9d50176abd4e1253548`，统一原子加载入口与普通 AOT guard 输入 |
-| lab 候选 | `8824a38`，策略编译器、资源 staging 和 fixture |
+| lab 候选 | `6f09b8b46f669d26b747c66d7fecd7a4795e2a35`，策略编译器、资源 staging 和 fixture |
 
 HybridCLR `e22aed2a049c0f85d56a89a9b1bad272a57653e8` 提供带 source role 的 native 原子加载；package `e965c34e1c247de6fc5f323c4de4874d0d525e9d` 已将 frozen source 与 mutable hotfix 合并到唯一的 `LoadAssemblyImages` 事务，移除可绕过原子发布的旧 frozen loader。重新组装的 `runtime-v5` 在 Unity 2022 真实 headers 下 CTest 1/1、FGS 通过。
 
