@@ -327,6 +327,20 @@ namespace vm
 		return nullptr;
     }
 
+    const Il2CppGenericInst* MetadataCache::GetGenericInst(const Il2CppType* const* types,
+        uint32_t count)
+    {
+        // The standalone native gate does not boot metadata and never
+        // executes generic inflation.  Keep the resolver linkable while
+        // preserving the shape expected by the runtime implementation.
+        Il2CppGenericInst* inst = static_cast<Il2CppGenericInst*>(std::malloc(sizeof(Il2CppGenericInst)));
+        inst->type_argc = count;
+        inst->type_argv = static_cast<const Il2CppType**>(std::malloc(sizeof(Il2CppType*) * count));
+        for (uint32_t i = 0; i < count; ++i)
+            inst->type_argv[i] = types[i];
+        return inst;
+    }
+
     void Image::GetTypes(const Il2CppImage* image, bool, TypeVector* target)
     {
         if (target)
@@ -350,6 +364,11 @@ namespace vm
 
     void Class::SetupMethods(Il2CppClass*)
     {
+    }
+
+    Il2CppClass* Class::FromIl2CppType(const Il2CppType*, bool)
+    {
+        return nullptr;
     }
 
     const MethodInfo* Class::GetMethodFromName(Il2CppClass*, const char*, int)
