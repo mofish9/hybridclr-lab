@@ -44,3 +44,7 @@ CorLibTypeSig storage is intrinsic and must terminate layout/signature traversal
 Extend policy tests with the actual complete stripped AOT inventory. Reuse frozen
 Bases for tool-only fixes through the workflow's optional existing-matrix path;
 verify package/runtime/Player hashes before reuse and preserve failed outputs.
+Full core-library analysis also exposed duplicate AssemblyRef rows when the
+planner unnecessarily created hotfix MVs for ordinary AOT modules. Ordinary AOT
+is frozen input: use its retained method/field definitions directly as the
+reference inventory and reserve MV generation for actual hotfix assemblies.

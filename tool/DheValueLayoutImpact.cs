@@ -97,13 +97,16 @@ public static class DheValueLayoutImpact
             foreach (var entry in modules.OrderBy(entry => entry.Key, StringComparer.Ordinal))
             {
                 bool ordinary = !hotfixAssemblies.Contains(entry.Key);
-                if (!baseline.TryGetValue(entry.Key, out var before))
-                {
-                    if (!ordinary) continue;
-                    before = MetaVersionSnapshot.Create(entry.Value.Location);
-                }
-                var oldMethods = before.Methods.Select(method => method.Identity).ToHashSet(StringComparer.Ordinal);
-                var oldFields = before.Fields.Select(field => field.Identity).ToHashSet(StringComparer.Ordinal);
+                if (!baseline.TryGetValue(entry.Key, out var before) && !ordinary) continue;
+                // Ordinary AOT input is the frozen Base code, never a hotfix MV.
+                // Its own retained definitions are the reference inventory.
+                var oldMethods = (ordinary
+                    ? entry.Value.GetTypes().SelectMany(type => type.Methods).Select(MetaVersionSnapshot.MethodIdentity)
+                    : before!.Methods.Select(method => method.Identity)).ToHashSet(StringComparer.Ordinal);
+                var oldFields = (ordinary
+                    ? entry.Value.GetTypes().SelectMany(type => type.Fields).Select(field =>
+                        field.DeclaringType.FullName + "::" + field.Name + "|" + field.FieldType.FullName)
+                    : before!.Fields.Select(field => field.Identity)).ToHashSet(StringComparer.Ordinal);
                 foreach (TypeDef type in entry.Value.GetTypes().Where(type => type.Name != "<Module>"))
                 {
                     bool generic = false;
