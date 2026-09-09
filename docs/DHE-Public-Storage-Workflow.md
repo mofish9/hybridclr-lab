@@ -40,3 +40,20 @@ byref, nullable, generic and foreign-assembly argument coverage.
 Rollback boundaries: separate candidate runtime API, package API/loader,
 compiler/planner and fixture commits. Do not update runtime tags, Installer
 defaults or formal branches until the complete public workflow is qualified.
+
+The resource transport stores an optional executionPlan under each per-Base
+assemblyModes entry, never in the shared Current payload. It binds the exact
+Base MV and Current MV SHA-256 and sorted Current TypeDef/MethodDef token sets.
+Manifest, validation and runtime plan must carry identical selections. The
+package validates the selected plan against its embedded Base MV before native
+loading, and preserves the plan for both initial load and transaction retry.
+An interpreter-only assembly has no Base plan. The runtime capability is
+current-storage-execution-plan-v1; this candidate accepts it on Unity2022Fgs.
+
+Host regression fixture: tool/fixtures/execution-plan. Compile with an explicit
+DhePackageRoot. It includes the actual package validator/loader source and
+records native arguments, testing two Bases, identical Current resources,
+reordered load inputs, invalid bindings/tokens and inconsistent manifest tables.
+Synthetic identity construction and the host JSON adapter make this a package
+logic test only; a complete native Player through the resource builder/stager is
+still required before declaring the public resource workflow qualified.
