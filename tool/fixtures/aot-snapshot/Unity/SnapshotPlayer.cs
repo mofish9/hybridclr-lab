@@ -12,13 +12,17 @@ namespace HybridCLR.Lab.Snapshot
         [Serializable] private sealed class Result
         {
             public bool passed;
+            public bool resourceUpdate;
             public string baseId, aotAnalysisSnapshotSha256, error;
             public int loadedAssemblies, revision, sentinel;
         }
         private sealed class Provider : IDheRuntimeAssetProvider
         {
-            private string PathFor(string path) => Path.Combine(Application.streamingAssetsPath,
-                path.Substring("Assets/StreamingAssets/".Length));
+            public string ResourceRoot;
+            private string PathFor(string path) => ResourceRoot != null &&
+                !path.Contains("/BaseMetaVersion/")
+                ? Path.Combine(ResourceRoot, path.Substring("Assets/StreamingAssets/SnapshotDHE/".Length))
+                : Path.Combine(Application.streamingAssetsPath, path.Substring("Assets/StreamingAssets/".Length));
             public bool Exists(string path) => File.Exists(PathFor(path));
             public byte[] LoadBytes(string path) => File.ReadAllBytes(PathFor(path));
             public string LoadText(string path) => File.ReadAllText(PathFor(path));
@@ -35,10 +39,16 @@ namespace HybridCLR.Lab.Snapshot
             {
                 var identity = DheBuildIdentity.Create();
                 result.baseId = identity.BaseId; result.aotAnalysisSnapshotSha256 = identity.AotAnalysisSnapshotSha256;
-                var provider = new Provider();
+                int resourceIndex = Array.IndexOf(args, "-snapshotResourceRoot");
+                var provider = new Provider { ResourceRoot = resourceIndex < 0 ? null : args[resourceIndex + 1] };
+                result.resourceUpdate = provider.ResourceRoot != null;
                 const string root = "Assets/StreamingAssets/SnapshotDHE/";
-                const string planPath = root + "DheRuntimePlan.json";
-                if (!DheRuntime.Initialize(provider, identity, out string error, planPath, root))
+                string planPath = root + (result.resourceUpdate ? "dhe-runtime-plan.json" : "DheRuntimePlan.json");
+                string error;
+                bool initialized = result.resourceUpdate
+                    ? DheRuntime.InitializeFromResourceUpdate(provider, identity, root + "dhe-resource-update.json", out error, root)
+                    : DheRuntime.Initialize(provider, identity, out error, planPath, root);
+                if (!initialized)
                     throw new InvalidDataException(error);
                 var plan = JsonUtility.FromJson<Plan>(provider.LoadText(planPath));
                 if (!DheRuntime.LoadAssemblyImages(plan.assemblies.Select(row => row.assemblyName).ToArray(),

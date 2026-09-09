@@ -68,18 +68,50 @@ internal static class UnityWorkflow
         string[] Names(string property, string child = null) => identity.RootElement.GetProperty(property).EnumerateArray()
             .Select(row => child == null ? row.GetString() : row.GetProperty(child).GetString()).ToArray();
         var snapshot = AotAnalysisSnapshot.Read(identityPath, identity.RootElement, Names("aotAssemblyNames"), Names("assemblies", "assemblyName"));
+        string nativeManifest = Path.Combine(build, "native/dhe-native-manifest.json");
+        var toolAssembly = System.Reflection.Assembly.LoadFrom(tool);
+        toolAssembly.GetType("HybridCLR.DheTool.Program", true)
+            .GetMethod("ValidateNativeFinalizeEvidence", System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.Static)
+            .Invoke(null, new object[] { Path.Combine(build, "adapter/native-finalize.json"),
+                Path.Combine(build, "adapter/build-final-player.json"), "StandaloneWindows64", project, nativeManifest });
+        Execute("dotnet", tool, "schema-validate", "-Schema", Path.Combine(lab, "schemas/dhe-build-identity.schema.json"),
+            "-Document", identityPath, "-Output", Path.Combine(output, "identity-schema.json"));
         string player = Path.Combine(build, "player/Snapshot.exe"), playerReport = Path.Combine(output, "player-result.json");
         Execute(player, "-batchmode", "-nographics", "-snapshotResult", playerReport, "-logFile", Path.Combine(output, "player.log"));
         using var result = JsonDocument.Parse(File.ReadAllBytes(playerReport));
         bool passed = result.RootElement.GetProperty("passed").GetBoolean() &&
             result.RootElement.GetProperty("baseId").GetString() == identity.RootElement.GetProperty("baseId").GetString() &&
             result.RootElement.GetProperty("aotAnalysisSnapshotSha256").GetString() == snapshot.Sha256;
+        string resource = Path.Combine(output, "resource-noop"), staging = Path.Combine(output, "stage-noop");
+        Execute("dotnet", tool, "resource-update", "-CurrentRoot", Path.Combine(build, "current"), "-SettingsFile",
+            Path.Combine(project, "ProjectSettings/HybridCLRSettings.asset"), "-BaselineRoot", Path.Combine(build, "baseline"),
+            "-BaseNativeManifest", nativeManifest, "-BaseBuildIdentity", identityPath,
+            "-AotMetadataRoot", Path.Combine(Path.GetDirectoryName(snapshot.ManifestPath), "assemblies"),
+            "-Mode", "Exploratory", "-OutputRoot", resource);
+        string embeddedAssets = Path.Combine(build, "player/Snapshot_Data/StreamingAssets/SnapshotDHE");
+        foreach (string source in Directory.GetFiles(embeddedAssets, "*", SearchOption.AllDirectories))
+        {
+            string destination = Path.Combine(staging, Path.GetRelativePath(embeddedAssets, source));
+            Directory.CreateDirectory(Path.GetDirectoryName(destination)); File.Copy(source, destination);
+        }
+        Execute("dotnet", tool, "stage-resource-update", "-UpdateRoot", resource, "-AssetRoot", staging,
+            "-BaseBuildIdentity", identityPath, "-ImmutableFiles", player + "," + Path.Combine(build, "player/GameAssembly.dll"),
+            "-Output", Path.Combine(output, "stage-noop.json"));
+        string resourceResult = Path.Combine(output, "resource-player-result.json");
+        Execute(player, "-batchmode", "-nographics", "-snapshotResult", resourceResult, "-snapshotResourceRoot", staging,
+            "-logFile", Path.Combine(output, "resource-player.log"));
+        using var loadedResource = JsonDocument.Parse(File.ReadAllBytes(resourceResult));
+        passed &= loadedResource.RootElement.GetProperty("passed").GetBoolean() &&
+            loadedResource.RootElement.GetProperty("resourceUpdate").GetBoolean() &&
+            loadedResource.RootElement.GetProperty("baseId").GetString() == identity.RootElement.GetProperty("baseId").GetString();
         File.WriteAllText(Path.Combine(output, "result.json"), JsonSerializer.Serialize(new
         {
-            passed, scope = "Unity2022 package Base phases, final snapshot verification and no-op package Player load; not layout resource release qualification",
+            passed, scope = "Unity2022 package Base phases, final snapshot/native validation and generated no-op resource loaded by the same immutable Player; not layout resource release qualification",
             labHead, packageHead, toolSha256 = Hash(tool), hostSha256 = Hash(typeof(UnityWorkflow).Assembly.Location),
             runtimeManifest, runtimeManifestSha256 = Hash(runtimeManifest), identitySha256 = Hash(identityPath),
             snapshotManifestSha256 = snapshot.Sha256, ordinaryAotCount = snapshot.OrdinaryAssemblyPaths.Length,
+            resourceManifestSha256 = Hash(Path.Combine(resource, "dhe-resource-update.json")),
+            resourcePlayerResultSha256 = Hash(resourceResult), stageSha256 = Hash(Path.Combine(output, "stage-noop.json")),
             playerSha256 = Hash(player), gameAssemblySha256 = Hash(Path.Combine(build, "player/GameAssembly.dll")),
         }, new JsonSerializerOptions { WriteIndented = true }));
         return passed ? 0 : 1;
