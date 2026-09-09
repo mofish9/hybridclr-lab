@@ -4,6 +4,9 @@ using System.Text;
 using System.Text.Json;
 using System.Text.Json.Nodes;
 using HybridCLR;
+using HybridCLR.DheTool;
+using dnlib.DotNet;
+using dnlib.DotNet.Emit;
 
 if (args.Length != 2) throw new ArgumentException("<public-reflection artifact root> <new report.json>");
 string root = Path.GetFullPath(args[0]), output = Path.GetFullPath(args[1]);
@@ -153,6 +156,72 @@ RunCase("wrong-base-provider", 0, (_, _, _, provider) =>
 }, false);
 RunCase("duplicate-base-selection", 0, (_, _, p, _) => p["baseSelections"].AsArray().Add(Clone(p["baseSelections"][0])), false);
 RunCase("valid-retry-after-rejections", 0, null, true);
+string[] assemblyNames = identities[0].AssemblyNames;
+string[] BaseFiles(string version) => assemblyNames.Select(name => Path.Combine(root,
+    version == "old" ? "base-old-reflection" : "base-new", "baseline", name + ".dll")).ToArray();
+string[] currentFiles = assemblyNames.Select(name => Path.Combine(root, "payload-latest-old/current", name + ".dll")).ToArray();
+var compiled = ResourceExecutionPlanner.Compile(BaseFiles("old"), currentFiles, Array.Empty<string>());
+cases["compiler-finds-layouts"] = compiled.Impact.ChangedValueTypes.Length == 5;
+cases["compiler-binds-same-current-per-base"] = ResourceExecutionPlanner.Compile(BaseFiles("new"), currentFiles,
+    Array.Empty<string>()).Plans.Count == 0; // Only method bodies differ on this Base; MV dispatch already handles them.
+foreach (string name in assemblyNames)
+{
+    var plan = compiled.Plans[name];
+    var packagePlan = UnityEngine.JsonUtility.FromJson<DheExecutionPlan>(JsonSerializer.Serialize(plan,
+        new JsonSerializerOptions { PropertyNamingPolicy = JsonNamingPolicy.CamelCase }));
+    packagePlan.Validate(name, providers[0].Bytes[baseRoot + name + ".mv.bytes"], providers[0].Bytes[assets + name + ".mv.bytes"]);
+    cases["compiler-package-binding-" + name] = packagePlan.CanonicalBinding() == plan.CanonicalBinding();
+    var before = MetaVersionSnapshot.Create(BaseFiles("old").Single(path => Path.GetFileNameWithoutExtension(path) == name));
+    var current = MetaVersionSnapshot.Create(currentFiles.Single(path => Path.GetFileNameWithoutExtension(path) == name));
+    var compatibility = ResourceUpdateCompatibility.Analyze(before, current,
+        currentStorageTypes: current.Types.Where(type => plan.CurrentStorageTypeTokens.Contains(type.Token)).Select(type => type.StableId),
+        currentExecutionMethodTokens: plan.CurrentExecutionMethodTokens);
+    cases["compiler-layout-compatibility-" + name] = compatibility.Compatible;
+    errors["compiler-layout-compatibility-" + name] = string.Join(";", compatibility.UnsupportedChanges);
+}
+var consumer = MetaVersionSnapshot.Create(currentFiles.Single(path => path.EndsWith("HybridCLR.ValueLayoutConsumer.dll")));
+var consumerTokens = compiled.Plans[consumer.AssemblyName].CurrentExecutionMethodTokens;
+cases["unchanged-layout-dependent-caller-selected"] = consumerTokens.Contains(consumer.Methods.Single(method => method.Name == "DirectCopy").Token);
+cases["unaffected-caller-retains-aot"] = !consumerTokens.Contains(consumer.Methods.Single(method => method.Name == "Unrelated").Token);
+var withNative = ResourceExecutionPlanner.Compile(BaseFiles("old"), currentFiles,
+    new[] { Path.Combine(root, "base-old-reflection/baseline/HybridCLR.ValueLayoutNative.dll") });
+cases["ordinary-aot-abi-obligations-explicit"] = withNative.UnsupportedChanges.Any(value => value.StartsWith("current-storage-native-abi:")) &&
+    withNative.UnsupportedChanges.Any(value => value.StartsWith("current-storage-ordinary-aot-layout:"));
+string mutations = output + ".inputs";
+if (Directory.Exists(mutations)) throw new IOException("Mutation fixture directory must be new.");
+var mutated = new List<string[]>();
+foreach (var sourceSet in new[] { BaseFiles("old"), currentFiles })
+{
+    string destination = Path.Combine(mutations, mutated.Count == 0 ? "base" : "current");
+    Directory.CreateDirectory(destination);
+    foreach (string source in sourceSet)
+    {
+        string target = Path.Combine(destination, Path.GetFileName(source));
+        if (!source.EndsWith("HybridCLR.ValueLayoutModel.dll")) { File.Copy(source, target); continue; }
+        using var module = ModuleDefMD.Load(source);
+        TypeDef owner = module.Find("HybridCLR.Lab.ValueLayout.Factory", false);
+        owner.Fields.Add(new FieldDefUser("StaticPayload", new FieldSig(module.Find("HybridCLR.Lab.ValueLayout.Payload", false).ToTypeSig()),
+            dnlib.DotNet.FieldAttributes.Public | dnlib.DotNet.FieldAttributes.Static));
+        owner.Fields.Add(new FieldDefUser("StaticReference", new FieldSig(module.Find("HybridCLR.Lab.ValueLayout.InlineOwner", false).ToTypeSig()),
+            dnlib.DotNet.FieldAttributes.Public | dnlib.DotNet.FieldAttributes.Static));
+        if (mutated.Count != 0)
+        {
+            var method = new MethodDefUser("NewHelper", MethodSig.CreateStatic(module.CorLibTypes.Int32),
+                dnlib.DotNet.MethodImplAttributes.IL | dnlib.DotNet.MethodImplAttributes.Managed,
+                dnlib.DotNet.MethodAttributes.Public | dnlib.DotNet.MethodAttributes.Static) { Body = new CilBody() };
+            method.Body.Instructions.Add(Instruction.Create(OpCodes.Ldc_I4_1)); method.Body.Instructions.Add(Instruction.Create(OpCodes.Ret));
+            owner.Methods.Add(method);
+        }
+        module.Write(target);
+    }
+    mutated.Add(assemblyNames.Select(name => Path.Combine(destination, name + ".dll")).ToArray());
+}
+var staticCompilation = ResourceExecutionPlanner.Compile(mutated[0], mutated[1], Array.Empty<string>());
+cases["static-value-storage-obligation-explicit"] = staticCompilation.UnsupportedChanges.Any(value => value.Contains("StaticPayload"));
+cases["static-reference-does-not-grow-storage"] = !staticCompilation.UnsupportedChanges.Any(value => value.Contains("StaticReference"));
+var addedSnapshot = MetaVersionSnapshot.Create(mutated[1].Single(path => path.EndsWith("HybridCLR.ValueLayoutModel.dll")));
+cases["new-method-is-not-a-base-entry"] = !staticCompilation.Plans[addedSnapshot.AssemblyName].CurrentExecutionMethodTokens.Contains(
+    addedSnapshot.Methods.Single(method => method.Name == "NewHelper").Token);
 Directory.CreateDirectory(Path.GetDirectoryName(output));
 File.WriteAllText(output, JsonSerializer.Serialize(new { passed = cases.Values.All(value => value),
     scope = "Package resource validation and native argument selection on .NET host; native calls are recorded, not executed",

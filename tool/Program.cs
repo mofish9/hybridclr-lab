@@ -1187,6 +1187,21 @@ internal static partial class Program
             }).ToArray();
             var managedAssemblySetSha256 = NamedAssemblySetHash(
                 baselineRecords.Select(record => (record.name, record.path)));
+            var execution = ResourceExecutionPlanner.Compile(
+                baselineRecords.Where(record => currentVariant.Snapshots.ContainsKey(record.name)).Select(record => record.path),
+                names.Select(name => Path.Combine(currentVariant.Root, name + ".dll")), Array.Empty<string>());
+            unsupported.AddRange(execution.UnsupportedChanges);
+            if (execution.Impact.ChangedValueTypes.Length != 0)
+            {
+                // The current Base archive binds only the DHE DLL set and an
+                // ordinary-AOT name inventory. It does not bind the ordinary
+                // DLL bodies needed to certify layout-dependent native calls.
+                // Emit inspectable per-Base plans, but do not publish them as a
+                // qualified resource update until that archive proof is added.
+                unsupported.Add("current-storage-aot-boundary-inventory-not-bound");
+                if (baseEngineWorkflow != "Unity2022Fgs")
+                    unsupported.Add("current-storage-engine-not-qualified:" + baseEngineWorkflow);
+            }
             var baseId = GetString(buildIdentity, "baseId") ?? string.Empty;
             var baseMvSet = new List<(string name, byte[] bytes)>();
             var assemblyCompatibility = new List<object>();
@@ -1220,7 +1235,11 @@ internal static partial class Program
                 var compatibility = ResourceUpdateCompatibility.Analyze(baselineSnapshot,
                     currentSnapshot, currentVariant.AddressTakenFields,
                     usesUnresolvedCallStubs: baseEngineWorkflow != "Unity2021Standard",
-                    currentAssemblySet: currentVariant.Snapshots.Values);
+                    currentAssemblySet: currentVariant.Snapshots.Values,
+                    currentStorageTypes: execution.Plans.TryGetValue(baselineRecord.name, out var executionPlan)
+                        ? currentSnapshot.Types.Where(type => executionPlan.CurrentStorageTypeTokens.Contains(type.Token)).Select(type => type.StableId)
+                        : Array.Empty<string>(),
+                    currentExecutionMethodTokens: executionPlan?.CurrentExecutionMethodTokens);
                 requiredRuntimeCapabilities.UnionWith(
                     compatibility.RequiredRuntimeCapabilities);
                 var missingGuards = compatibility.GuardRequiredMethods.Where(method =>
@@ -1321,7 +1340,8 @@ internal static partial class Program
             {
                 if (TryClassifyAssemblyExecutionMode(name, baselineNameSet, baseAotNameSet,
                         out string executionMode, out _))
-                    assemblyModes.Add(new ResourceAssemblyMode(name, executionMode));
+                    assemblyModes.Add(new ResourceAssemblyMode(name, executionMode,
+                        execution.Plans.TryGetValue(name, out var selectedExecution) ? selectedExecution : null));
             }
             var baseRecord = new
             {
@@ -1355,6 +1375,7 @@ internal static partial class Program
                 unsupportedChanges = unsupported.OrderBy(value => value, StringComparer.Ordinal).ToArray(),
                 assemblies = assemblyCompatibility.ToArray(),
                 assemblyModes = assemblyModes.ToArray(),
+                currentStorageImpact = execution.Impact,
             };
             candidateBases.Add(baseRecord);
             resourceBaseSelections.Add(new ResourceAotMetadataBaseSelection(baseId,
@@ -4577,7 +4598,8 @@ internal static partial class Program
     private sealed record ResourceAotMetadataBaseSelection(string BaseId,
         string AotMetadataSetId, string PayloadVariantId,
         string CurrentAssemblySetSha256, ResourceAssemblyMode[] AssemblyModes);
-    private sealed record ResourceAssemblyMode(string AssemblyName, string ExecutionMode);
+    private sealed record ResourceAssemblyMode(string AssemblyName, string ExecutionMode,
+        ResourceExecutionPlan? ExecutionPlan = null);
     private sealed record MultiBaseResourceReleaseProof(
         string ResourceUpdateManifestSha256,
         string ReleaseLedgerSha256,

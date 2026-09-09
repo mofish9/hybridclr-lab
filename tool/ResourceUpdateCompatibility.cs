@@ -14,6 +14,7 @@ internal sealed class ResourceUpdateCompatibility
 		"resource-update-aot-metadata-path-v1",
 		"resource-update-aot-metadata-set-selection-v1",
 		"atomic-multi-assembly-registration-v1",
+        "current-storage-execution-plan-v1",
 		"supplemental-existing-type-instance-fields-v1",
         "supplemental-existing-type-static-fields-v1",
         "supplemental-existing-generic-type-fields-v1",
@@ -82,7 +83,8 @@ internal sealed class ResourceUpdateCompatibility
 
     public static ResourceUpdateCompatibility Analyze(MetaVersionSnapshot baseline,
         MetaVersionSnapshot current, IEnumerable<string>? addressTakenFields = null,
-        bool usesUnresolvedCallStubs = true, IEnumerable<MetaVersionSnapshot>? currentAssemblySet = null)
+        bool usesUnresolvedCallStubs = true, IEnumerable<MetaVersionSnapshot>? currentAssemblySet = null,
+        IEnumerable<string>? currentStorageTypes = null, IEnumerable<uint>? currentExecutionMethodTokens = null)
     {
         var baselineMethods = baseline.Methods.ToDictionary(method => method.StableId,
             StringComparer.OrdinalIgnoreCase);
@@ -97,6 +99,8 @@ internal sealed class ResourceUpdateCompatibility
         var currentFields = current.Fields.ToDictionary(field => field.StableId,
             StringComparer.OrdinalIgnoreCase);
         var unsupported = new List<string>();
+        var physicalTypes = new HashSet<string>(currentStorageTypes ?? Array.Empty<string>(), StringComparer.Ordinal);
+        var executionTokens = new HashSet<uint>(currentExecutionMethodTokens ?? Array.Empty<uint>());
         if (!string.Equals(baseline.AssemblyName, current.AssemblyName,
                 StringComparison.Ordinal))
             unsupported.Add("assembly-name-change:" + baseline.AssemblyName + "->" +
@@ -121,7 +125,8 @@ internal sealed class ResourceUpdateCompatibility
 
         MetaVersionMethod[] changed = baseline.Methods.Where(method =>
             currentMethods.TryGetValue(method.StableId, out MetaVersionMethod? currentMethod) &&
-            !string.Equals(method.Version, currentMethod.Version, StringComparison.OrdinalIgnoreCase)).ToArray();
+            (!string.Equals(method.Version, currentMethod.Version, StringComparison.OrdinalIgnoreCase) ||
+             executionTokens.Contains(currentMethod.Token))).ToArray();
         MetaVersionMethod[] removed = baseline.Methods.Where(method =>
             !currentMethods.ContainsKey(method.StableId)).ToArray();
         MetaVersionMethod[] added = current.Methods.Where(method =>
@@ -149,12 +154,13 @@ internal sealed class ResourceUpdateCompatibility
 				continue;
             if (!currentFields.TryGetValue(field.StableId, out MetaVersionField? currentField))
 			{
-				if (!field.IsStatic && field.DeclaringTypeIsValueType)
+				if (!field.IsStatic && field.DeclaringTypeIsValueType && !physicalTypes.Contains(field.DeclaringTypeStableId))
 					unsupported.Add("removed-instance-field-on-existing-value-type:" + field.Identity);
 			}
 			else if (!string.Equals(field.NonCustomMetadataVersion,
 					 currentField.NonCustomMetadataVersion,
-                         StringComparison.OrdinalIgnoreCase))
+                         StringComparison.OrdinalIgnoreCase) &&
+                     (field.IsStatic || !physicalTypes.Contains(field.DeclaringTypeStableId)))
                 unsupported.Add("existing-field-metadata-change:" + field.Identity);
         }
         var allAddressTakenFields = new HashSet<string>(addressTakenFields ??
@@ -165,7 +171,7 @@ internal sealed class ResourceUpdateCompatibility
         {
 			if (baselineTypes[field.DeclaringTypeStableId].IsPrivateImplementationDetails)
                 continue;
-			if (!field.IsStatic && !IsSupportedInstanceFieldAddition(field))
+			if (!field.IsStatic && !IsSupportedInstanceFieldAddition(field) && !physicalTypes.Contains(field.DeclaringTypeStableId))
 				unsupported.Add(UnsupportedInstanceFieldReason(field) + ":" + field.Identity);
             else if (field.IsStatic && (field.IsThreadStatic || field.HasRva))
                 unsupported.Add("added-threadstatic-or-rva-field-on-existing-type:" +
@@ -207,7 +213,7 @@ internal sealed class ResourceUpdateCompatibility
 					StringComparison.OrdinalIgnoreCase) &&
 				(!string.Equals(type.NonFieldLayoutVersion, currentType.NonFieldLayoutVersion,
 					 StringComparison.OrdinalIgnoreCase) ||
-				 !HasOnlySupportedInstanceFieldEvolution(type, baselineFields, currentFields)))
+				 (!physicalTypes.Contains(type.StableId) && !HasOnlySupportedInstanceFieldEvolution(type, baselineFields, currentFields))))
                 unsupported.Add("existing-type-layout-or-vtable-change:" + type.Identity);
 			if (!string.Equals(type.NonCustomUnsupportedDeclarativeVersion,
 					currentType.NonCustomUnsupportedDeclarativeVersion,
@@ -239,6 +245,8 @@ internal sealed class ResourceUpdateCompatibility
         };
         if (requiresInterfaceSlots)
             requiredCapabilities.Add("existing-interface-method-slots-v1");
+        if (physicalTypes.Count != 0 || executionTokens.Count != 0)
+            requiredCapabilities.Add("current-storage-execution-plan-v1");
         if (requiresClassVirtualMethods)
             requiredCapabilities.Add("existing-class-virtual-methods-v1");
         if (current.Fields.Any(field => !field.IsStatic && field.DeclaringTypeIsGeneric &&

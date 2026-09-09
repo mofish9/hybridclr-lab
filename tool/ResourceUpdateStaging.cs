@@ -1488,6 +1488,23 @@ internal static partial class Program
                 runtimeAssetRoot, payloads, paths);
             string mode = selectedModes.TryGetValue(name, out string? selectedMode)
                 ? selectedMode : GetString(plan, "executionMode") ?? "dhe-differential";
+            if (selectedBase.TryGetProperty("assemblyModes", out JsonElement modeTable))
+            {
+                JsonElement modeRow = modeTable.EnumerateArray().Single(row =>
+                    NormalizeName(GetString(row, "assemblyName") ?? "") == name);
+                if (modeRow.TryGetProperty("executionPlan", out JsonElement executionValue) && executionValue.ValueKind != JsonValueKind.Null)
+                {
+                    var execution = executionValue.Deserialize<ResourceExecutionPlan>(Json)
+                        ?? throw new DheException("Invalid resource execution plan: " + name);
+                    execution.CanonicalBinding();
+                    JsonElement baseAssembly = selectedBase.GetProperty("assemblies").EnumerateArray().Single(row =>
+                        NormalizeName(GetString(row, "assemblyName") ?? "") == name);
+                    if (execution.AssemblyName != name || mode != "dhe-differential" ||
+                        !string.Equals(execution.BaseMetaVersionSha256, GetString(baseAssembly, "baseMetaVersionSha256"), StringComparison.OrdinalIgnoreCase) ||
+                        !string.Equals(execution.CurrentMetaVersionSha256, GetString(assembly, "currentMetaVersionSha256"), StringComparison.OrdinalIgnoreCase))
+                        throw new DheException("Resource execution plan MV binding mismatch: " + name);
+                }
+            }
             if (!IsDheExecutionMode(mode))
                 throw new DheException("Runtime plan execution mode is invalid for " + name + ".");
             var expectedBasePath = baseMetaVersionAssetRoot + name + ".mv.bytes";
@@ -1822,7 +1839,16 @@ internal static partial class Program
             if (string.IsNullOrWhiteSpace(name) || !names.Add(name) ||
                 !IsDheExecutionMode(executionMode))
                 throw new DheException(description + " contains an invalid assembly mode.");
-            values.Add(name + "=" + executionMode);
+            string executionBinding = "";
+            if (mode.TryGetProperty("executionPlan", out JsonElement executionValue) && executionValue.ValueKind != JsonValueKind.Null)
+            {
+                var execution = executionValue.Deserialize<ResourceExecutionPlan>(Json)
+                    ?? throw new DheException(description + " has an invalid execution plan.");
+                if (executionMode != "dhe-differential" || execution.AssemblyName != name)
+                    throw new DheException(description + " execution plan has no matching Base assembly.");
+                executionBinding = execution.CanonicalBinding();
+            }
+            values.Add(name + "=" + executionMode + "|" + executionBinding);
         }
         if (!names.OrderBy(value => value, StringComparer.OrdinalIgnoreCase)
                 .SequenceEqual(expectedNames, StringComparer.OrdinalIgnoreCase))

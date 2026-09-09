@@ -57,3 +57,20 @@ reordered load inputs, invalid bindings/tokens and inconsistent manifest tables.
 Synthetic identity construction and the host JSON adapter make this a package
 logic test only; a complete native Player through the resource builder/stager is
 still required before declaring the public resource workflow qualified.
+
+The compiler now emits per-Base plans in resource compatibility evidence and
+staging compares their canonical bindings. It selects unchanged methods whose
+IL/signature depends on changed layouts, plus members of selected physical
+types; it excludes added methods from Base-entry selections. Field-layout
+compatibility is evaluated only with the explicit physical type selection.
+Static value fields and ordinary native ABI dependencies remain explicit
+obligations, not implicit interpreter fallbacks for ordinary AOT assemblies.
+
+Archive gap found during integration: existing Base identity evidence binds
+the DHE DLL set and the ordinary-AOT assembly name inventory, but lacks a bound
+ordinary-AOT DLL/ABI snapshot for layout impact analysis. resource-update emits
+the proposed selections in validation.json and rejects layout publication with
+current-storage-aot-boundary-inventory-not-bound until this proof is added.
+Finish capture/archive/identity validation of that snapshot, then run the whole
+public workflow. This is an outstanding requirement, not a narrowed goal or a
+claim that method-body-only updates satisfy the task.

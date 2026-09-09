@@ -17,7 +17,10 @@ public sealed record DheValueLayoutTypeImpact(string TypeIdentity, bool Requires
     public uint CurrentTypeToken { get; init; }
 }
 public sealed record DheValueLayoutImpactResult(string[] ChangedValueTypes,
-    DheValueLayoutTypeImpact[] Layouts, DheValueLayoutMethodImpact[] Methods);
+    DheValueLayoutTypeImpact[] Layouts, DheValueLayoutMethodImpact[] Methods)
+{
+    public string[] ChangedStaticValueFields { get; init; } = Array.Empty<string>();
+}
 
 public static class DheValueLayoutImpact
 {
@@ -85,6 +88,7 @@ public static class DheValueLayoutImpact
                     Array.Empty<DheValueLayoutMethodImpact>());
 
             var methods = new List<DheValueLayoutMethodImpact>();
+            var staticFields = new SortedSet<string>(StringComparer.Ordinal);
             foreach (var entry in modules.OrderBy(entry => entry.Key, StringComparer.Ordinal))
             {
                 bool ordinary = !hotfixAssemblies.Contains(entry.Key);
@@ -94,10 +98,20 @@ public static class DheValueLayoutImpact
                     before = MetaVersionSnapshot.Create(entry.Value.Location);
                 }
                 var oldMethods = before.Methods.Select(method => method.Identity).ToHashSet(StringComparer.Ordinal);
+                var oldFields = before.Fields.Select(field => field.Identity).ToHashSet(StringComparer.Ordinal);
                 foreach (TypeDef type in entry.Value.GetTypes().Where(type => type.Name != "<Module>"))
                 {
                     bool generic = false;
                     Layout(new Use(type, Context.Empty, TypeKey(type)), ref generic);
+                    foreach (FieldDef field in type.Fields.Where(field => field.IsStatic))
+                    {
+                        var dependencies = new HashSet<string>(StringComparer.Ordinal);
+                        bool open = false;
+                        Inline(field.FieldType, Context.Empty, dependencies, ref open);
+                        string identity = field.DeclaringType.FullName + "::" + field.Name + "|" + field.FieldType.FullName;
+                        if (dependencies.Count != 0 && oldFields.Contains(identity))
+                            staticFields.Add(entry.Key + ":" + identity);
+                    }
                     foreach (MethodDef method in type.Methods)
                     {
                         string identity = MetaVersionSnapshot.MethodIdentity(method);
@@ -160,7 +174,8 @@ public static class DheValueLayoutImpact
                         CurrentTypeToken = layoutDefinitions[entry.Key].MDToken.Raw,
                     }).ToArray(),
                 methods.OrderBy(method => method.AssemblyName, StringComparer.Ordinal)
-                    .ThenBy(method => method.MethodIdentity, StringComparer.Ordinal).ToArray());
+                    .ThenBy(method => method.MethodIdentity, StringComparer.Ordinal).ToArray())
+            { ChangedStaticValueFields = staticFields.ToArray() };
         }
 
         private void MethodSignature(MethodSig? signature, Context context,
