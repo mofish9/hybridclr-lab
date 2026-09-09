@@ -84,6 +84,12 @@ context remap、泛型实例 Current layout 以及 changed generic execution bri
 `current-storage-p11-noop-u22-current-rerun.json`）。这些 payload 的 Base 身份
 不同于 p48，作为历史流程证据保留。
 
+最新 runtime（HybridCLR `741e914`）重新链接的 p50 Base 已通过真正的同哈希 no-op
+payload 和 p38 完整 Current 更新，两个结果均为 `loadCode=0`、14/14、
+`consumerPassed=true`。另建 p51 Base 验证了仅修改 `Factory.Create` 方法体的资源，
+当前仍出现 Base/Current 反射 FieldInfo 不匹配；该 method-only 路径尚未通过，不能
+把早期 p11 的历史结果外推到当前 runtime。
+
 多 Base 复测：同一份 `current-storage-raw-p38` Current 资源分别加载到 p11 和 p48
 Windows Base Player，两个结果均为 `loadCode=0`、14/14、`consumerPassed=true`。
 这证明当前资源身份可以被两种不同 Base 消费；连续多次更新和更多历史 Base 仍待
