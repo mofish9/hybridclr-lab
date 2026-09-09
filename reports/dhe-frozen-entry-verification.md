@@ -3,6 +3,45 @@
 This candidate tests Unity 2022 Windows only. It is not release admission,
 Android/iOS qualification, or a performance result.
 
+## Current Verified State
+
+Runtime `d6aab95d8aa12f467abcfdc9105cd87a29309580`, Unity 2022 IL2CPP
+`8a13baf1ec45068fbb9535beea03425b717f501b`, package
+`2d4c3845d8716087c49ec9d50176abd4e1253548`, fixture lab
+`60d2765c2815990163943fea8aa55f4a100f48d8` passed the native gate and the
+34-check Windows frozen-entry probe. Native evidence is
+`artifacts/dhe-batch-initialization-20260909/native-04/DHE-Unity2022/native-gate.json`
+with real Unity 2022 headers and no surrogates. This flag is not release admission.
+
+`artifacts/dhe-frozen-entry-proof-08` (PID 4896) rejects an invalid Base MV
+after metadata preparation, keeps Base dispatch (AOT count 1, interpreter count
+0), hides the added field and retains the original Count. Corrected MV retry
+then passes direct and inline-owner added-field preservation, reflected value
+return, exception virtual behavior and unchanged AOT sentinels.
+
+The same immutable Player, DLL and MV bytes pass all 34 checks in each replay:
+
+| Directory suffix after `dhe-frozen-entry-proof-08-` | Order | PID |
+| --- | --- | --- |
+| order-original | Native, mscorlib, Consumer, Model, Other | 41556 |
+| order-swap | Model, mscorlib, Consumer, Native, Other | 56868 |
+| order-reverse | Other, Model, Consumer, mscorlib, Native | 53856 |
+
+All runs retain GameAssembly SHA-256
+`F8C3B92F3C62D6DD50EDCCC98CE67AE90CEA640273E9725CC89FDAE28CDD6BA3`.
+This resolves the previously reproduced order differential for this graph; it
+does not establish arbitrary cyclic graphs or concurrent publication correctness.
+
+The next fixture adds independently selectable nullable, generic, array/byref
+and pre-existing boxed-value probes. They reuse one Player through
+`replay-frozen-entry` with an optional capability argument and retain every core
+assertion. The runner checks the reported capability, so an older Player cannot
+silently pass a capability it does not implement. These additions are not yet
+verified. Universal guard admission, managed resource authentication/staging,
+multi-Base qualification and performance remain open.
+
+## Workload and Historical Findings
+
 The workload keeps the configured hotfix set unchanged. Ordinary AOT DLL bytes
 remain frozen. It builds guards from actual Unity-stripped method tokens, then
 loads selected frozen sources together with evolved hotfix images through the
@@ -120,7 +159,7 @@ to the metadata-locked preparation; failures must retain referenced allocations
 without publishing a partial graph or allowing an incompatible retry. Both
 orders above must pass unchanged, followed by cyclic cross-assembly references,
 failed registration/retry and concurrent access tests. This phased initialization
-has not yet been implemented. Universal guard admission, frozen managed-loader
+was not yet implemented at that evidence point. Universal guard admission, frozen managed-loader
 authentication/staging, old-object/static state and multi-Base qualification remain
 separate open gates. Overall status: research candidate, not opt4 release-ready.
 
