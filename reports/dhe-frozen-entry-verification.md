@@ -36,9 +36,34 @@ The next fixture adds independently selectable nullable, generic, array/byref
 and pre-existing boxed-value probes. They reuse one Player through
 `replay-frozen-entry` with an optional capability argument and retain every core
 assertion. The runner checks the reported capability, so an older Player cannot
-silently pass a capability it does not implement. These additions are not yet
-verified. Universal guard admission, managed resource authentication/staging,
-multi-Base qualification and performance remain open.
+silently pass a capability it does not implement. The missing-capability negative
+check correctly rejected proof-08 (PID 58220) despite its process returning zero.
+
+`dhe-frozen-entry-proof-09`, fixture lab `8e7f235`, uses the same runtime/package
+commits as proof-08 and passes the 34 core checks. GameAssembly SHA-256 is
+`F322C80FC0933841F6DFB2D44EA5D9E3BBB55092A1BC67E514F08F90E28BC477`.
+Its immutable replays produce these results:
+
+| Suffix after `dhe-frozen-entry-proof-09-` | PID | Outcome |
+| --- | --- | --- |
+| generics | 54160 | 36 checks pass, including generic value container and open generic method copies |
+| arrays-byref | 16344 | 37 checks pass, including clone, array element and reflected byref copies |
+| nullable | 49020 | managed reflection rejects Payload as an argument to Nullable<Payload> |
+| old-values | 55968 | old boxed Payload cannot be unboxed as its Current representation |
+
+The next planner candidate distinguishes an affected generic instantiation from
+an affected generic definition. A frozen `Nullable<T>` definition is unchanged;
+its Current argument can produce the required new closed layout while retaining
+the core-library identity required by IL2CPP nullable handling. All affected
+owner methods still require frozen IL and native guards. Owners with concrete
+affected fields retain physical definition selection. This is a candidate fix,
+not a passing result. `recompile-frozen-entry` reauthenticates an existing Player,
+native manifest and prior proof, then regenerates only the diagnostic resources
+and records the source evidence hash. No Base rebuild or binary mutation occurs.
+
+Old boxed-value adaptation remains a separate failing gate. Universal guard
+admission, managed resource authentication/staging, multi-Base qualification and
+performance also remain open.
 
 ## Workload and Historical Findings
 

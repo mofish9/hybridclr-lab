@@ -42,7 +42,13 @@ internal static class FrozenAotAdaptation
             using var module = ModuleDefMD.Load(source.ReadVerifiedBytes());
             var types = module.GetTypes().ToDictionary(type => type.MDToken.Raw);
             var methods = module.GetTypes().SelectMany(type => type.Methods).ToDictionary(method => method.MDToken.Raw);
-            var physical = impact.Layouts.Where(type => type.RequiresOrdinaryAotBridge && type.AssemblyName == source.AssemblyName)
+            var ownerLayouts = impact.Layouts.Where(type => type.RequiresOrdinaryAotBridge && type.AssemblyName == source.AssemblyName).ToArray();
+            // A changed generic argument requires a new closed instantiation,
+            // not a replacement for the frozen generic definition. Keeping that
+            // definition also preserves runtime identities such as Nullable<T>.
+            // An owner with a concrete affected field has an open-definition
+            // impact of its own and still needs physical Current storage.
+            var physical = ownerLayouts.Where(type => type.TypeIdentity == type.DefinitionIdentity)
                 .Select(type => type.CurrentTypeToken).ToHashSet();
             var statics = impact.StaticValueFields.Where(field => field.OrdinaryAot && field.AssemblyName == source.AssemblyName).ToArray();
             var affected = impact.Methods.Where(method => method.AssemblyName == source.AssemblyName).ToArray();
@@ -72,7 +78,7 @@ internal static class FrozenAotAdaptation
                 else if (!Excluded(methods[method.CurrentMethodToken].DeclaringType.MDToken.Raw))
                     Obligation("generic-context-analysis", method.CurrentMethodToken, method.MethodIdentity);
             }
-            foreach (uint token in physical.ToArray())
+            foreach (uint token in ownerLayouts.Select(type => type.CurrentTypeToken).Distinct())
             {
                 if (Excluded(token))
                 {
@@ -80,7 +86,8 @@ internal static class FrozenAotAdaptation
                     physical.Remove(token);
                     continue;
                 }
-                foreach (MethodDef method in types[token].Methods) Select(method, "physical-owner");
+                foreach (MethodDef method in types[token].Methods)
+                    Select(method, physical.Contains(token) ? "physical-owner" : "generic-argument-storage");
             }
             foreach (var field in statics)
             {

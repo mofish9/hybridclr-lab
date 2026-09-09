@@ -57,7 +57,7 @@ internal static class FrozenEntryWorkflow
             mv.AssemblySha256 }, Json));
     }
 
-    internal static int Verify(string build, string output)
+    internal static int Verify(string build, string output, string sourceEvidenceSha256 = null)
     {
         string identityPath = Path.Combine(build, "build-identity.json");
         var identity = JsonSerializer.Deserialize<JsonElement>(File.ReadAllText(identityPath));
@@ -113,7 +113,32 @@ internal static class FrozenEntryWorkflow
         string planPath = Path.Combine(output, "frozen-entry-plan.json");
         File.WriteAllText(planPath, JsonSerializer.Serialize(new { format = "hybridclr.frozen-entry-probe", releaseReady = false,
             baseId = identity.GetProperty("baseId").GetString(), records }, Json));
-        return RunPlayer(build, output, planPath, snapshot.Sha256);
+        return RunPlayer(build, output, planPath, snapshot.Sha256, sourceEvidenceSha256);
+    }
+
+    public static int Recompile(string[] args)
+    {
+        if (args.Length != 2) throw new ArgumentException("recompile-frozen-entry <existing proof root> <new output>");
+        string proof = Path.GetFullPath(args[0]), output = Path.GetFullPath(args[1]);
+        if (Directory.Exists(output)) throw new IOException("Recompile output must be new.");
+        var input = AuthenticateProof(proof);
+        Directory.CreateDirectory(output);
+        return Verify(input.Build, output, input.EvidenceHash);
+    }
+
+    private static (string Build, JsonElement Evidence, string EvidenceHash) AuthenticateProof(string proof)
+    {
+        string evidencePath = Path.Combine(proof, "frozen-entry-evidence.json");
+        var evidence = JsonSerializer.Deserialize<JsonElement>(File.ReadAllText(evidencePath));
+        string build = evidence.TryGetProperty("buildRoot", out var storedBuild) ? storedBuild.GetString()! : Path.Combine(proof, "base");
+        string Hash(string path) => Convert.ToHexString(SHA256.HashData(File.ReadAllBytes(path)));
+        foreach (var binding in new[] { (Path.Combine(proof, "frozen-entry-plan.json"), "planSha256"),
+            (Path.Combine(build, "player/Snapshot.exe"), "playerHash"), (Path.Combine(build, "player/GameAssembly.dll"), "gameHash"),
+            (Path.Combine(build, "native/dhe-native-manifest.json"), "nativeManifestSha256") })
+            if (!Hash(binding.Item1).Equals(evidence.GetProperty(binding.Item2).GetString(), StringComparison.OrdinalIgnoreCase))
+                throw new InvalidDataException("Proof input changed: " + binding.Item1);
+        if (!evidence.GetProperty("unchanged").GetBoolean()) throw new InvalidDataException("Prior Player identity was not stable.");
+        return (build, evidence, Hash(evidencePath));
     }
 
     public static int Replay(string[] args)
@@ -122,20 +147,10 @@ internal static class FrozenEntryWorkflow
         string capability = args.Length == 4 ? args[3] : "core";
         if (!new[] { "core", "nullable", "generics", "arrays-byref", "old-values" }.Contains(capability))
             throw new ArgumentException("Unknown frozen entry capability: " + capability);
-        string proof = Path.GetFullPath(args[0]), output = Path.GetFullPath(args[1]), build = Path.Combine(proof, "base");
+        string proof = Path.GetFullPath(args[0]), output = Path.GetFullPath(args[1]);
         if (Directory.Exists(output)) throw new IOException("Replay output must be new.");
-        string sourcePlan = Path.Combine(proof, "frozen-entry-plan.json"), sourceEvidence = Path.Combine(proof, "frozen-entry-evidence.json");
-        var evidence = JsonSerializer.Deserialize<JsonElement>(File.ReadAllText(sourceEvidence));
-        string Hash(string path) => Convert.ToHexString(SHA256.HashData(File.ReadAllBytes(path)));
-        void Bind(string path, string property)
-        {
-            if (!Hash(path).Equals(evidence.GetProperty(property).GetString(), StringComparison.OrdinalIgnoreCase))
-                throw new InvalidDataException("Replay input changed: " + path);
-        }
-        Bind(sourcePlan, "planSha256");
-        Bind(Path.Combine(build, "player/Snapshot.exe"), "playerHash");
-        Bind(Path.Combine(build, "player/GameAssembly.dll"), "gameHash");
-        if (!evidence.GetProperty("unchanged").GetBoolean()) throw new InvalidDataException("Prior Player identity was not stable.");
+        string sourcePlan = Path.Combine(proof, "frozen-entry-plan.json");
+        var input = AuthenticateProof(proof);
         var plan = JsonNode.Parse(File.ReadAllText(sourcePlan))!;
         if (plan["format"]!.GetValue<string>() != "hybridclr.frozen-entry-probe" || plan["releaseReady"]!.GetValue<bool>())
             throw new InvalidDataException("Replay requires a research probe plan.");
@@ -147,7 +162,7 @@ internal static class FrozenEntryWorkflow
         Directory.CreateDirectory(output);
         string planPath = Path.Combine(output, "frozen-entry-plan.json");
         File.WriteAllText(planPath, plan.ToJsonString(Json));
-        return RunPlayer(build, output, planPath, evidence.GetProperty("snapshotSha256").GetString()!, Hash(sourceEvidence), capability);
+        return RunPlayer(input.Build, output, planPath, input.Evidence.GetProperty("snapshotSha256").GetString()!, input.EvidenceHash, capability);
     }
 
     private static int RunPlayer(string build, string output, string planPath, string snapshotSha256, string sourceEvidenceSha256 = null, string capability = "core")
@@ -165,7 +180,7 @@ internal static class FrozenEntryWorkflow
         bool passed = unchanged && process.ExitCode == 0 && playerResult.ValueKind == JsonValueKind.Object && playerResult.GetProperty("passed").GetBoolean() &&
             (capability == "core" || (playerResult.TryGetProperty("capability", out var actualCapability) && actualCapability.GetString() == capability));
         File.WriteAllText(Path.Combine(output, "frozen-entry-evidence.json"), JsonSerializer.Serialize(new { passed, unchanged,
-            pid = process.Id, exitCode = process.ExitCode, capability, playerHash, gameHash, planSha256 = Hash(planPath),
+            pid = process.Id, exitCode = process.ExitCode, capability, buildRoot = Path.GetFullPath(build), playerHash, gameHash, planSha256 = Hash(planPath),
             resultSha256 = File.Exists(result) ? Hash(result) : null, nativeManifestSha256 = Hash(nativeManifestPath),
             snapshotSha256, sourceEvidenceSha256, hostSha256 = Hash(typeof(FrozenEntryWorkflow).Assembly.Location),
             scope = "Research public native source transaction and direct ordinary AOT entries; not resource release admission or performance qualification" }, Json));
