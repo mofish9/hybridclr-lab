@@ -67,3 +67,59 @@ before the original inline-owner error can be reliably reported. The next
 candidate distinguishes mutable assemblies in virtual/interface eligibility,
 retains ordinary frozen native overrides, and adds an exception virtual-call
 regression. Inline-owner and reflected value-copy assertions remain mandatory.
+
+### Source Order Differential (Current Candidate)
+
+Runtime `c065ce6a7be923703584a29e1fabb01faae32c6f`, IL2CPP
+`bda33548e37ec79f11996b2e26cd2f2ed044fead`, package
+`2d4c3845d8716087c49ec9d50176abd4e1253548`; Player fixture lab `458a8d7`,
+replay host lab `59c4570ad0d422d5193fd1d8caa982004346b96e`.
+No formal branch, tag, Installer default or consuming project was changed.
+
+The native compile/CTest gate is
+`artifacts/dhe-generic-signature-20260909/native-03/DHE-Unity2022/native-gate.json`:
+passed, `mergeReady=true`, `surrogateExternalHeadersUsed=false`. These flags
+apply to this native gate only. The restored managed execution-plan suite passed
+50 checks in `artifacts/dhe-frozen-entry-static-check-02.json`; it records native
+arguments on the .NET host and is not native Player coverage.
+
+`artifacts/dhe-frozen-entry-proof-04` built and validated its Base successfully.
+The five-source transaction and exception virtual-call regression passed. The
+remaining inline-owner failure is now reported normally as an assertion failure,
+not a native crash. Original order is Native, mscorlib, Consumer, Model, Other.
+
+`replay-frozen-entry` reuses that exact Player and all original DLL/MV bytes. It
+authenticates the prior plan/evidence and binary hashes, accepts only a complete
+permutation, writes a new plan, and records new process/result evidence.
+
+| Evidence directory under artifacts | Order | Result |
+| --- | --- | --- |
+| dhe-frozen-entry-order-original | Native, mscorlib, Consumer, Model, Other | PID 47148: inline added-field preservation fails |
+| dhe-frozen-entry-order-swap-owner | Model, mscorlib, Consumer, Native, Other | PID 53540: all 29 checks pass |
+
+Both replays use host SHA-256
+`F41A35FEF106D3FBDE325C8AB0922FE69C3D4D311A6681C9C25DBBDFD068DA20`
+and GameAssembly SHA-256
+`14E917C987AA5FBD842FAF38247A3FD5AAAA6F8E1B6F139DE083128BF91B7E3E`.
+Player/GameAssembly are unchanged before and after each run. The passing order
+proves direct frozen copy, inline owner, reflected value return, ordinary AOT
+sentinel and unchanged hotfix predicate for this workload. It does not prove
+order independence, arbitrary updates, multiple Bases, or the managed resource
+release workflow.
+
+The confirmed blocker is order-dependent cross-assembly storage binding. The
+current loader fully initializes each image before the next: `InitMethods` and
+`InitFields` can materialize an ordinary owner's physical layout while its
+selected hotfix value definition is still unavailable. Swapping only Model and
+Native changes the result. Manual source ordering is a diagnostic, not a fix.
+
+Next implementation boundary: prepare every batch image and its type/generic
+definitions, bind Current references across the entire batch, then initialize
+layouts/method metadata and publish dispatch. Pending lookup must stay private
+to the metadata-locked preparation; failures must retain referenced allocations
+without publishing a partial graph or allowing an incompatible retry. Both
+orders above must pass unchanged, followed by cyclic cross-assembly references,
+failed registration/retry and concurrent access tests. This phased initialization
+has not yet been implemented. Universal guard admission, frozen managed-loader
+authentication/staging, old-object/static state and multi-Base qualification remain
+separate open gates. Overall status: research candidate, not opt4 release-ready.
