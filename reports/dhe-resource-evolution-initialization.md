@@ -95,6 +95,9 @@ dotnet ValueLayoutTests.dll parameter-default-policy <Base Model DLL> <全新输
 
 ## 后续与回滚
 
+后续静态值存储及真实资源验证已推进，见
+[dhe-static-value-storage.md](dhe-static-value-storage.md)。下述内容保留本报告原始身份。
+
 下一步先验证静态值存储的 Current 地址、未变化字段的一致性，以及包含演化值类型
 的泛型初始化状态；再解决普通 AOT 值布局/ABI 边界。出包门禁只有在实现与 Player
 对照都通过后才可放开。Unity 2022 完整验收后再移植团结，由用户补 Android 真机。
