@@ -90,8 +90,19 @@ internal static class FrozenEntryWorkflow
             File.Copy(source, dll);
             MetaVersionSnapshot.Create(kind == 1 ? source : Path.Combine(build, "baseline", name + ".dll")).WriteBinary(before);
             MetaVersionSnapshot.Create(source).WriteBinary(next);
+            string invalidBefore = null, invalidBeforeSha256 = null;
+            if (kind == 0 && name == "HybridCLR.ValueLayoutModel")
+            {
+                var invalid = MetaVersionSnapshot.Create(Path.Combine(build, "baseline", name + ".dll"));
+                int index = Array.FindIndex(invalid.Methods, method => method.Name == "UnchangedRevision");
+                if (index < 0 || methods.Contains(invalid.Methods[index].Token))
+                    throw new InvalidDataException("Retry probe requires an unselected Base method.");
+                invalid.Methods[index] = invalid.Methods[index] with { StableId = new string('F', 64), Token = 0x0600ffffu };
+                invalidBefore = Path.Combine(payloadRoot, name + ".invalid-base.mv");
+                invalid.WriteBinary(invalidBefore); invalidBeforeSha256 = Hash(invalidBefore);
+            }
             records.Add(new { name, dll, before, after = next, sourceKind = kind, types, methods, excluded,
-                dllSha256 = Hash(dll), beforeSha256 = Hash(before), afterSha256 = Hash(next) });
+                dllSha256 = Hash(dll), beforeSha256 = Hash(before), afterSha256 = Hash(next), invalidBefore, invalidBeforeSha256 });
         }
         foreach (var plan in frozen.Assemblies)
             Add(plan.AssemblyName, snapshot.Assemblies.Single(source => source.AssemblyName == plan.AssemblyName).Path, 1,

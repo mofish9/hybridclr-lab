@@ -123,3 +123,21 @@ failed registration/retry and concurrent access tests. This phased initializatio
 has not yet been implemented. Universal guard admission, frozen managed-loader
 authentication/staging, old-object/static state and multi-Base qualification remain
 separate open gates. Overall status: research candidate, not opt4 release-ready.
+
+### Batch Initialization Candidate
+
+The next runtime splits interpreter metadata into definitions, details and
+finalization. All batch type/generic definitions exist before any peer signature
+is decoded; all details exist before classes/layouts are materialized. A thread
+local preparation scope supplies type definitions under g_MetadataLock without
+exposing incomplete images to other threads. It is removed on exception. Images
+are registered only after the complete graph initializes. Finalizer inheritance
+is resolved across peer images after their method/parent information is ready.
+
+Pending images retain the full batch membership and exact source/selection
+identity. MV registration failure can reuse that graph with corrected MV data.
+Metadata-initialization failure retains allocations and fails later attempts for
+that graph; restarting the Player is required because cached references cannot
+be safely freed or rebound. No partial dispatch is intentionally published.
+Validation must exercise original and permuted orders, MV failure/retry and
+cross-assembly cycles; no passing result is implied by this design note.

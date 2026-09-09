@@ -11,7 +11,7 @@ namespace HybridCLR.Lab.Snapshot
 {
     public static class FrozenEntryPlayer
     {
-        [Serializable] private class Record { public string name, dll, before, after, dllSha256, beforeSha256, afterSha256; public int sourceKind; public uint[] types, methods, excluded; }
+        [Serializable] private class Record { public string name, dll, before, after, dllSha256, beforeSha256, afterSha256, invalidBefore, invalidBeforeSha256; public int sourceKind; public uint[] types, methods, excluded; }
         [Serializable] private class Plan { public string format, baseId; public bool releaseReady; public Record[] records; }
         [Serializable] private class Check { public string name; public bool passed; }
         [Serializable] private class Result { public bool passed; public string stage, error; public int loadCode = -1; public Check[] checks; }
@@ -61,6 +61,20 @@ namespace HybridCLR.Lab.Snapshot
                 var kinds = plan.records.Select(row => row.sourceKind).ToArray();
                 var excluded = plan.records.Select(row => row.excluded).ToArray();
                 Check("frozen-and-mutable-batch", kinds.Contains(1) && kinds.Contains(0));
+                int retryIndex = Array.FindIndex(plan.records, row => !string.IsNullOrEmpty(row.invalidBefore));
+                if (retryIndex >= 0)
+                {
+                    Save("invalid-base-registration");
+                    var invalid = (byte[][])before.Clone();
+                    invalid[retryIndex] = Read(plan.records[retryIndex].invalidBefore, plan.records[retryIndex].invalidBeforeSha256);
+                    var failure = RuntimeApi.LoadDifferentialHybridAssembliesWithMetaVersionAndExecutionPlanAndSources(
+                        dlls, invalid, after, types, methods, kinds, excluded);
+                    Check("invalid-base-rejected-after-metadata-preparation", failure == LoadImageErrorCode.DHE_MV_REGISTRATION_FAILED);
+                    RuntimeApi.ResetDifferentialDispatchCounters();
+                    object retained = NativeBoundary.FrozenCopyBox(original);
+                    Check("failed-batch-keeps-base-execution", RuntimeApi.GetDifferentialAotEntryCount() > 0 &&
+                        RuntimeApi.GetDifferentialInterpreterEntryCount() == 0 && retained.GetType().GetField("Extra") == null);
+                }
                 Save("load-frozen-and-mutable");
                 result.loadCode = (int)RuntimeApi.LoadDifferentialHybridAssembliesWithMetaVersionAndExecutionPlanAndSources(dlls, before, after, types, methods, kinds, excluded);
                 Check("native-source-transaction", result.loadCode == 0);
