@@ -94,7 +94,9 @@ namespace HybridCLR.Lab
                 MethodInfo copyMethod = callsType.GetMethod("DirectCopy"), refMethod = callsType.GetMethod("RefRoundTrip");
                 result.reflectionSignaturePassed = typeof(ValueLayout.Factory).GetMethod("Create").ReturnType == payloadType &&
                     copyMethod.ReturnType == payloadType && copyMethod.GetParameters()[0].ParameterType == payloadType &&
-                    refMethod.GetParameters()[0].ParameterType.GetElementType() == payloadType;
+                    refMethod.GetParameters()[0].ParameterType.GetElementType() == payloadType &&
+                    copyMethod.GetParameters()[0].Member == copyMethod &&
+                    copyMethod.GetParameters()[0].Member.DeclaringType == callsType;
                 object copied = copyMethod.Invoke(null, new[] { box });
                 object genericCopy = typeof(ValueLayout.Factory).GetMethod("Identity").MakeGenericMethod(payloadType).Invoke(null, new[] { box });
                 object[] refArgs = { box }; refMethod.Invoke(null, refArgs);
