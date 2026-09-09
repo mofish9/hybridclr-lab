@@ -22,9 +22,9 @@ if (args.Length == 4 && args[0] == "compare")
         var summary = new
         {
             file, module.Name, module.Mvid, module.RuntimeVersion, module.Cor20HeaderFlags, length = bytes.Length,
-            moduleAttributes = module.CustomAttributes.Select(attribute => new { attribute.TypeFullName, blob = Convert.ToHexString(attribute.GetBlob()) }),
+            moduleAttributes = module.CustomAttributes.Select(attribute => new { attribute.TypeFullName, arguments = attribute.ConstructorArguments.Select(value => value.ToString()) }),
             assembly = module.Assembly.FullName,
-            assemblyAttributes = module.Assembly.CustomAttributes.Select(attribute => new { attribute.TypeFullName, blob = Convert.ToHexString(attribute.GetBlob()) }),
+            assemblyAttributes = module.Assembly.CustomAttributes.Select(attribute => new { attribute.TypeFullName, arguments = attribute.ConstructorArguments.Select(value => value.ToString()) }),
             types = module.GetTypes().Select(type => type.FullName), exports = module.ExportedTypes.Select(type => type.FullName),
             references = module.GetAssemblyRefs().Select(reference => reference.FullName),
             sections = pe.PEHeaders.SectionHeaders.Select(section => new { section.Name, section.PointerToRawData, section.SizeOfRawData }),
