@@ -215,6 +215,21 @@ RunCase("frozen-capability-cannot-be-omitted", 0, (m, v, p, provider) =>
 var toolAssembly = Assembly.LoadFrom(Path.GetFullPath(args[2]));
 var stagingCanonical = toolAssembly.GetType("HybridCLR.DheTool.Program", throwOnError: true)
     .GetMethod("CanonicalResourceAssemblyModes", BindingFlags.Static | BindingFlags.NonPublic);
+var frozenCanonical = toolAssembly.GetType("HybridCLR.DheTool.Program", throwOnError: true)
+    .GetMethod("CanonicalResourceFrozenSources", BindingFlags.Static | BindingFlags.NonPublic);
+string[] FrozenStageBinding(JsonNode record)
+{
+    using var document = JsonDocument.Parse(record.ToJsonString());
+    return (string[])frozenCanonical.Invoke(null, new object[] { document.RootElement });
+}
+var stagedFrozenManifest = Clone(manifestDocument);
+AddFrozen(stagedFrozenManifest, Clone(validationDocument), Clone(planDocument), providers[0].Copy());
+var stagedFrozenBase = stagedFrozenManifest["supportedBases"][0];
+string[] frozenBefore = FrozenStageBinding(stagedFrozenBase);
+cases["staging-binds-frozen-source"] = frozenBefore.Length == 1;
+stagedFrozenBase["frozenAotSources"][0]["genericContextMethodTokens"] = new JsonArray();
+cases["staging-detects-frozen-condition-tamper"] = !frozenBefore.SequenceEqual(FrozenStageBinding(stagedFrozenBase));
+cases["staging-detects-added-frozen-source"] = !frozenBefore.SequenceEqual(FrozenStageBinding(supportedBases[0]));
 string[] StageBinding(JsonNode record)
 {
     using var source = JsonDocument.Parse(record.ToJsonString());

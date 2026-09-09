@@ -1649,6 +1649,8 @@ internal static partial class Program
                 !supportedModes.SequenceEqual(CanonicalResourceAssemblyModes(selection,
                     variant, "Runtime plan Base selection " + baseId),
                     StringComparer.OrdinalIgnoreCase) ||
+                !CanonicalResourceFrozenSources(supportedBase).SequenceEqual(
+                    CanonicalResourceFrozenSources(selection), StringComparer.Ordinal) ||
                 !string.Equals(GetString(selection, "aotMetadataSetId"), setId,
                     StringComparison.OrdinalIgnoreCase) ||
                 !string.Equals(GetString(selection, "payloadVariantId") ?? "default",
@@ -1838,6 +1840,8 @@ internal static partial class Program
                 !supportedModes.SequenceEqual(CanonicalResourceAssemblyModes(validatedBase,
                     variant, "DHE resource validated Base " + baseId),
                     StringComparer.OrdinalIgnoreCase) ||
+                !CanonicalResourceFrozenSources(supportedBase).SequenceEqual(
+                    CanonicalResourceFrozenSources(validatedBase), StringComparer.Ordinal) ||
                 !GetBool(validatedBase, "compatible") ||
                 !GetBool(validatedBase, "guardCoverageValidated") ||
                 GetInt(validatedBase, "unsupportedChangeCount") != 0 ||
@@ -1863,6 +1867,45 @@ internal static partial class Program
                 throw new DheException("DHE resource update contains an unvalidated Base: " + baseId);
         }
         return validationPath;
+    }
+
+    private static string[] CanonicalResourceFrozenSources(JsonElement record)
+    {
+        if (!record.TryGetProperty("frozenAotSources", out JsonElement sources) || sources.ValueKind == JsonValueKind.Null)
+            return Array.Empty<string>();
+        if (sources.ValueKind != JsonValueKind.Array) throw new DheException("Frozen sources must be an array.");
+        var names = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+        uint[] Tokens(JsonElement source, string property, uint table, uint minimum)
+        {
+            if (!source.TryGetProperty(property, out JsonElement array) || array.ValueKind != JsonValueKind.Array)
+                throw new DheException("Frozen source is missing " + property + ".");
+            uint[] tokens = array.EnumerateArray().Select(value => value.GetUInt32()).ToArray();
+            if (!tokens.SequenceEqual(tokens.Distinct().OrderBy(token => token)) ||
+                tokens.Any(token => (token >> 24) != table || (token & 0xffffffu) <= minimum))
+                throw new DheException("Invalid frozen source selection: " + property);
+            return tokens;
+        }
+        return sources.EnumerateArray().Select(source =>
+        {
+            string name = NormalizeName(GetString(source, "assemblyName") ?? string.Empty);
+            string hash = GetString(source, "sourceSha256") ?? string.Empty;
+            string mvHash = GetString(source, "baseMetaVersionSha256") ?? string.Empty;
+            string path = GetString(source, "source") ?? string.Empty;
+            string mvPath = GetString(source, "baseMetaVersion") ?? string.Empty;
+            if (name.Length == 0 || !names.Add(name) || !IsHex(hash, 64, 64) || !IsHex(mvHash, 64, 64) ||
+                string.IsNullOrWhiteSpace(path) || string.IsNullOrWhiteSpace(mvPath) || GetString(source, "sourceKind") != "frozen-base-aot")
+                throw new DheException("Invalid frozen source identity: " + name);
+            uint[] types = Tokens(source, "currentStorageTypeTokens", 2, 1);
+            uint[] methods = Tokens(source, "currentExecutionMethodTokens", 6, 0);
+            uint[] excluded = Tokens(source, "excludedBaseTypeTokens", 2, 1);
+            uint[] conditional = Tokens(source, "genericContextMethodTokens", 6, 0);
+            if (conditional.Any(token => !methods.Contains(token)))
+                throw new DheException("Conditional frozen method is not selected: " + name);
+            // JSON string encoding makes the binding unambiguous even when a
+            // path contains separators used by the method-plan canonical form.
+            return JsonSerializer.Serialize(new { name, hash = hash.ToUpperInvariant(), mvHash = mvHash.ToUpperInvariant(),
+                path = path.Replace('\\', '/'), mvPath = mvPath.Replace('\\', '/'), types, methods, excluded, conditional });
+        }).OrderBy(value => value, StringComparer.Ordinal).ToArray();
     }
 
     private static string[] CanonicalResourceAssemblyModes(JsonElement record,
