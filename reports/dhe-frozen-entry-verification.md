@@ -40,7 +40,7 @@ and `InterpreterImage::GetTypeInfoFromTypeDefinitionRawIndex`. Signature decodin
 was materializing a hidden Current class before `InitClass` initialized its table.
 This is a failed native integration regression, not a completed execution proof.
 
-Candidate runtime `377aea6960bcf7bbba9288045c03f1de5c9f858d` keeps generic and
+Candidate runtime `684672a5d5078d1233143eb8d5da7aa57f73ac38` keeps generic and
 array remapping at the metadata-description level, preserves signature flags,
 and never materializes a Current generic definition from `ReadGenericClass`.
 The same five-source frozen-entry workload must pass unchanged on a freshly built
