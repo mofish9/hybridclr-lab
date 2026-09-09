@@ -1844,13 +1844,18 @@ internal static partial class Program
                 !IsDheExecutionMode(executionMode))
                 throw new DheException(description + " contains an invalid assembly mode.");
             string executionBinding = "";
-            if (mode.TryGetProperty("executionPlan", out JsonElement executionValue) && executionValue.ValueKind != JsonValueKind.Null)
+            if (mode.TryGetProperty("executionPlans", out JsonElement executions) && executions.ValueKind != JsonValueKind.Null)
             {
-                var execution = executionValue.Deserialize<ResourceExecutionPlan>(Json)
-                    ?? throw new DheException(description + " has an invalid execution plan.");
-                if (executionMode != "dhe-differential" || execution.AssemblyName != name)
-                    throw new DheException(description + " execution plan has no matching Base assembly.");
-                executionBinding = execution.CanonicalBinding();
+                if (executions.ValueKind != JsonValueKind.Array || executions.GetArrayLength() > 1)
+                    throw new DheException(description + " must contain zero or one execution plan.");
+                if (executions.GetArrayLength() == 1)
+                {
+                    var execution = executions[0].Deserialize<ResourceExecutionPlan>(Json)
+                        ?? throw new DheException(description + " has an invalid execution plan.");
+                    if (executionMode != "dhe-differential" || execution.AssemblyName != name)
+                        throw new DheException(description + " execution plan has no matching Base assembly.");
+                    executionBinding = execution.CanonicalBinding();
+                }
             }
             values.Add(name + "=" + executionMode + "|" + executionBinding);
         }

@@ -64,11 +64,13 @@ foreach (string version in new[] { "old", "new" })
             currentStorageTypeTokens = record.GetProperty("types").EnumerateArray().Select(value => value.GetUInt32()).ToArray(),
             currentExecutionMethodTokens = record.GetProperty("methods").EnumerateArray().Select(value => value.GetUInt32()).ToArray(),
         };
+        plan.currentStorageTypeTokenCount = plan.currentStorageTypeTokens.Length;
+        plan.currentExecutionMethodTokenCount = plan.currentExecutionMethodTokens.Length;
         plan.Validate(name, beforeBytes[name], currentMv);
         provider.Bytes[baseRoot + name + ".mv.bytes"] = beforeBytes[name];
         provider.Bytes[assets + name + ".dll.bytes"] = currentBytes[name];
         provider.Bytes[assets + name + ".mv.bytes"] = currentMv;
-        modes.Add(Node(new { assemblyName = name, executionMode = "dhe-differential", executionPlan = plan }));
+        modes.Add(Node(new { assemblyName = name, executionMode = "dhe-differential", executionPlans = new[] { plan } }));
         if (version == "old") assemblyRecords.Add(Node(new { assemblyName = name, executionMode = "dhe-differential",
             current = assets + name + ".dll.bytes", currentSha256 = Hash(currentBytes[name]),
             currentMetaVersion = assets + name + ".mv.bytes", currentMetaVersionSha256 = Hash(currentMv),
@@ -129,8 +131,8 @@ void RunCase(string name, int baseIndex, Action<JsonNode, JsonNode, JsonNode, Pr
                 RuntimeApi.Calls == 1 && RuntimeApi.LastTypes != null && names.Select((item, index) =>
             {
                 var mode = expectedModes.Single(value => value["assemblyName"].GetValue<string>() == item);
-                return RuntimeApi.LastTypes[index].SequenceEqual(mode["executionPlan"]["currentStorageTypeTokens"].AsArray().Select(token => token.GetValue<uint>())) &&
-                    RuntimeApi.LastMethods[index].SequenceEqual(mode["executionPlan"]["currentExecutionMethodTokens"].AsArray().Select(token => token.GetValue<uint>()));
+                return RuntimeApi.LastTypes[index].SequenceEqual(mode["executionPlans"][0]["currentStorageTypeTokens"].AsArray().Select(token => token.GetValue<uint>())) &&
+                    RuntimeApi.LastMethods[index].SequenceEqual(mode["executionPlans"][0]["currentExecutionMethodTokens"].AsArray().Select(token => token.GetValue<uint>()));
             }).All(value => value);
         }
     }
@@ -147,17 +149,17 @@ RunCase("wrong-analysis-snapshot-binding", 0, (m, v, p, _) =>
 RunCase("method-only-base-keeps-mv-dispatch-without-plan", 1, (m, v, p, _) =>
 {
     foreach (var table in new[] { m["supportedBases"][1]["assemblyModes"], v["bases"][1]["assemblyModes"], p["baseSelections"][1]["assemblyModes"] })
-        foreach (var mode in table.AsArray()) mode.AsObject().Remove("executionPlan");
+        foreach (var mode in table.AsArray()) mode.AsObject().Remove("executionPlans");
 }, true, expectPlans: false);
 RunCase("plan-manifest-selection-mismatch", 0, (_, _, plan, _) =>
-    plan["baseSelections"][0]["assemblyModes"][0]["executionPlan"]["currentStorageTypeTokens"] = new JsonArray(), false);
+    plan["baseSelections"][0]["assemblyModes"][0]["executionPlans"][0]["currentStorageTypeTokens"] = new JsonArray(), false);
 RunCase("manifest-validation-selection-mismatch", 0, (_, validation, _, _) =>
-    validation["bases"][0]["assemblyModes"][0]["executionPlan"]["baseMetaVersionSha256"] = emptyHash, false);
+    validation["bases"][0]["assemblyModes"][0]["executionPlans"][0]["baseMetaVersionSha256"] = emptyHash, false);
 void MutateBoundPlan(JsonNode manifest, JsonNode validation, JsonNode plan, Action<JsonNode> change)
 {
-    change(manifest["supportedBases"][0]["assemblyModes"][0]["executionPlan"]);
-    change(validation["bases"][0]["assemblyModes"][0]["executionPlan"]);
-    change(plan["baseSelections"][0]["assemblyModes"][0]["executionPlan"]);
+    change(manifest["supportedBases"][0]["assemblyModes"][0]["executionPlans"][0]);
+    change(validation["bases"][0]["assemblyModes"][0]["executionPlans"][0]);
+    change(plan["baseSelections"][0]["assemblyModes"][0]["executionPlans"][0]);
 }
 RunCase("wrong-base-mv-binding", 0, (m, v, p, _) => MutateBoundPlan(m, v, p, row => row["baseMetaVersionSha256"] = emptyHash), false);
 RunCase("wrong-current-mv-binding", 0, (m, v, p, _) => MutateBoundPlan(m, v, p, row => row["currentMetaVersionSha256"] = emptyHash), false);
@@ -182,10 +184,12 @@ string[] StageBinding(JsonNode record)
 var boundBase = Clone(supportedBases[0]);
 string[] stageBefore = StageBinding(boundBase);
 cases["staging-binds-execution-plan"] = stageBefore.All(value => value.Contains("|")) &&
-    stageBefore.Any(value => value.Contains(boundBase["assemblyModes"][0]["executionPlan"]["baseMetaVersionSha256"].GetValue<string>()));
-boundBase["assemblyModes"][0]["executionPlan"]["currentStorageTypeTokens"].AsArray().RemoveAt(0);
+    stageBefore.Any(value => value.Contains(boundBase["assemblyModes"][0]["executionPlans"][0]["baseMetaVersionSha256"].GetValue<string>()));
+boundBase["assemblyModes"][0]["executionPlans"][0]["currentStorageTypeTokens"].AsArray().RemoveAt(0);
+boundBase["assemblyModes"][0]["executionPlans"][0]["currentStorageTypeTokenCount"] = boundBase["assemblyModes"][0]["executionPlans"][0]["currentStorageTypeTokens"].AsArray().Count;
 cases["staging-detects-selection-tamper"] = !stageBefore.SequenceEqual(StageBinding(boundBase));
-boundBase["assemblyModes"][0]["executionPlan"]["currentExecutionMethodTokens"] = new JsonArray(JsonValue.Create(0x06000001u), JsonValue.Create(0x06000001u));
+boundBase["assemblyModes"][0]["executionPlans"][0]["currentExecutionMethodTokens"] = new JsonArray(JsonValue.Create(0x06000001u), JsonValue.Create(0x06000001u));
+boundBase["assemblyModes"][0]["executionPlans"][0]["currentExecutionMethodTokenCount"] = 2;
 bool duplicateRejected = false;
 try { StageBinding(boundBase); }
 catch (TargetInvocationException error) when (error.InnerException is InvalidDataException) { duplicateRejected = true; }
@@ -210,9 +214,9 @@ foreach (string file in new[] { "dhe-resource-update.schema.json", "dhe-resource
         validateSchema.Invoke(null, new object[] { schema.RootElement.GetProperty("$defs").GetProperty("executionPlan"), instance.RootElement, schema.RootElement, "$", failures });
         return failures.Count == 0;
     }
-    cases["schema-valid-plan-" + file] = SchemaAccepts(supportedBases[0]["assemblyModes"][0]["executionPlan"]);
+    cases["schema-valid-plan-" + file] = SchemaAccepts(supportedBases[0]["assemblyModes"][0]["executionPlans"][0]);
     cases["schema-no-plan-" + file] = SchemaAccepts(null);
-    cases["schema-duplicate-rejected-" + file] = !SchemaAccepts(boundBase["assemblyModes"][0]["executionPlan"]);
+    cases["schema-duplicate-rejected-" + file] = !SchemaAccepts(boundBase["assemblyModes"][0]["executionPlans"][0]);
     if (file == "dhe-runtime-plan.schema.json")
     {
         bool CompletePlanAccepted(JsonNode value)

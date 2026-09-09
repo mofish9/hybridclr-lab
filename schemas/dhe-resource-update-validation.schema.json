@@ -16,7 +16,9 @@
         "baseMetaVersionSha256",
         "currentMetaVersionSha256",
         "currentStorageTypeTokens",
-        "currentExecutionMethodTokens"
+        "currentExecutionMethodTokens",
+        "currentStorageTypeTokenCount",
+        "currentExecutionMethodTokenCount"
       ],
       "additionalProperties": false,
       "properties": {
@@ -36,6 +38,8 @@
           "type": "string",
           "pattern": "^[0-9a-fA-F]{64}$"
         },
+        "currentStorageTypeTokenCount": { "type": "integer", "minimum": 0 },
+        "currentExecutionMethodTokenCount": { "type": "integer", "minimum": 0 },
         "currentStorageTypeTokens": {
           "type": "array",
           "uniqueItems": true,
@@ -132,7 +136,7 @@
               "properties": {
                 "assemblyName": { "type": "string", "minLength": 1 },
                 "executionMode": { "enum": ["dhe-differential", "interpreter-only"] },
-                "executionPlan": { "$ref": "#/$defs/executionPlan" }
+                "executionPlans": { "type": "array", "maxItems": 1, "items": { "allOf": [{ "$ref": "#/$defs/executionPlan" }, { "type": "object" }] } }
               }
             }
           },

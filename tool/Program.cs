@@ -4603,7 +4603,11 @@ internal static partial class Program
         string AotMetadataSetId, string PayloadVariantId,
         string CurrentAssemblySetSha256, ResourceAssemblyMode[] AssemblyModes);
     private sealed record ResourceAssemblyMode(string AssemblyName, string ExecutionMode,
-        ResourceExecutionPlan? ExecutionPlan = null);
+        [property: System.Text.Json.Serialization.JsonIgnore] ResourceExecutionPlan? ExecutionPlan = null)
+    {
+        public ResourceExecutionPlan[] ExecutionPlans => ExecutionPlan == null
+            ? Array.Empty<ResourceExecutionPlan>() : new[] { ExecutionPlan };
+    }
     private sealed record MultiBaseResourceReleaseProof(
         string ResourceUpdateManifestSha256,
         string ReleaseLedgerSha256,

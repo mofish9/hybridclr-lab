@@ -4,9 +4,10 @@ namespace HybridCLR.DheTool;
 
 internal sealed record ResourceExecutionPlan(int SchemaVersion, string AssemblyName,
     string BaseMetaVersionSha256, string CurrentMetaVersionSha256,
-    uint[] CurrentStorageTypeTokens, uint[] CurrentExecutionMethodTokens)
+    uint[] CurrentStorageTypeTokens, uint[] CurrentExecutionMethodTokens,
+    int CurrentStorageTypeTokenCount, int CurrentExecutionMethodTokenCount)
 {
-    public const string Capability = "current-storage-execution-plan-v1";
+    public const string Capability = "current-storage-execution-plan-array-v1";
 
     public string CanonicalBinding()
     {
@@ -27,6 +28,9 @@ internal sealed record ResourceExecutionPlan(int SchemaVersion, string AssemblyN
             !Hash(BaseMetaVersionSha256) || !Hash(CurrentMetaVersionSha256))
             throw new InvalidDataException("Execution plan identity is invalid.");
         Tokens(CurrentStorageTypeTokens, 2, 1); Tokens(CurrentExecutionMethodTokens, 6, 0);
+        if (CurrentStorageTypeTokenCount != CurrentStorageTypeTokens.Length ||
+            CurrentExecutionMethodTokenCount != CurrentExecutionMethodTokens.Length)
+            throw new InvalidDataException("Execution plan token counts do not match its selections.");
         return AssemblyName + "|" + BaseMetaVersionSha256.ToUpperInvariant() + "|" + CurrentMetaVersionSha256.ToUpperInvariant() +
             "|" + string.Join(",", CurrentStorageTypeTokens.Select(token => token.ToString("X8"))) +
             "|" + string.Join(",", CurrentExecutionMethodTokens.Select(token => token.ToString("X8")));
@@ -81,8 +85,9 @@ internal static class ResourceExecutionPlanner
             // Added methods have no Base guard. Abstract members have no call frame.
             uint[] executable = selectedMethods.Where(method => CanExecute(method.Flags) && CanExecute(baseMethods[method.StableId].Flags))
                 .Select(method => method.Token).Distinct().OrderBy(token => token).ToArray();
+            uint[] physicalTokens = selectedTypes.Select(type => type.Token).Distinct().OrderBy(token => token).ToArray();
             var plan = new ResourceExecutionPlan(1, entry.Key, Hash(baseline.ToBinary()), Hash(current.ToBinary()),
-                selectedTypes.Select(type => type.Token).Distinct().OrderBy(token => token).ToArray(), executable);
+                physicalTokens, executable, physicalTokens.Length, executable.Length);
             plan.CanonicalBinding(); plans.Add(entry.Key, plan);
         }
         return new(impact, plans, errors.ToArray());

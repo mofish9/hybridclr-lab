@@ -20,6 +20,41 @@ namespace HybridCLR.Lab.Editor
                 Debug.Log("SNAPSHOT_JSON " + source + " planIsNull=" + (mode.executionPlan == null) + " parsed=" + JsonUtility.ToJson(mode));
             }
         }
+        [Serializable] private sealed class JsonCase { public string name; public bool passed; public string error; }
+        [Serializable] private sealed class JsonReport { public bool passed; public JsonCase[] checks; }
+        public static void CheckPlanJson()
+        {
+            var type = typeof(DheRuntime).GetNestedType("DheAssemblyMode", System.Reflection.BindingFlags.NonPublic);
+            var canonical = typeof(DheRuntime).GetMethod("CanonicalAssemblyModes", System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.Static);
+            string hash = new string('a', 64);
+            string valid = JsonUtility.ToJson(new DheExecutionPlan { schemaVersion = 1, assemblyName = "Example",
+                baseMetaVersionSha256 = hash, currentMetaVersionSha256 = hash,
+                currentStorageTypeTokens = new uint[] { 0x02000002 }, currentExecutionMethodTokens = new uint[] { 0x06000001 },
+                currentStorageTypeTokenCount = 1, currentExecutionMethodTokenCount = 1 });
+            var cases = new System.Collections.Generic.List<JsonCase>();
+            void Check(string name, string suffix, bool expected)
+            {
+                var modes = Array.CreateInstance(type, 1);
+                modes.SetValue(JsonUtility.FromJson("{\"assemblyName\":\"Example\",\"executionMode\":\"dhe-differential\"" + suffix + "}", type), 0);
+                bool accepted = true; string error = null;
+                try { canonical.Invoke(null, new object[] { modes }); }
+                catch (System.Reflection.TargetInvocationException exception) { accepted = false; error = exception.InnerException.Message; }
+                cases.Add(new JsonCase { name = name, passed = accepted == expected, error = error });
+            }
+            Check("absent-plan", "", true);
+            Check("null-plan-array", ",\"executionPlans\":null", true);
+            Check("empty-plan-array", ",\"executionPlans\":[]", true);
+            Check("valid-plan", ",\"executionPlans\":[" + valid + "]", true);
+            Check("empty-plan-object-rejected", ",\"executionPlans\":[{}]", false);
+            Check("null-array-element-rejected", ",\"executionPlans\":[null]", false);
+            Check("multiple-plans-rejected", ",\"executionPlans\":[" + valid + "," + valid + "]", false);
+            Check("missing-selection-rejected", ",\"executionPlans\":[" + valid.Replace("\"currentStorageTypeTokens\":[33554434],", "") + "]", false);
+            Check("wrong-count-rejected", ",\"executionPlans\":[" + valid.Replace("\"currentStorageTypeTokenCount\":1", "\"currentStorageTypeTokenCount\":2") + "]", false);
+            var report = new JsonReport { passed = cases.All(row => row.passed), checks = cases.ToArray() };
+            string[] args = Environment.GetCommandLineArgs(); int index = Array.IndexOf(args, "-snapshotJsonResult");
+            File.WriteAllText(args[index + 1], JsonUtility.ToJson(report, true));
+            if (!report.passed) throw new InvalidOperationException("Unity execution-plan JSON checks failed.");
+        }
         public static void Prepare() => DheProjectWorkflowRunner.Prepare(Adapter());
         public static void StageRuntimePlan() => DheProjectWorkflowRunner.StageRuntimePlan(Adapter());
         public static void BuildScriptsOnly() => DheProjectWorkflowRunner.BuildScriptsOnly(Adapter());

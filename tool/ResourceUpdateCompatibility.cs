@@ -14,7 +14,7 @@ internal sealed class ResourceUpdateCompatibility
 		"resource-update-aot-metadata-path-v1",
 		"resource-update-aot-metadata-set-selection-v1",
 		"atomic-multi-assembly-registration-v1",
-        "current-storage-execution-plan-v1",
+        "current-storage-execution-plan-array-v1",
 		"supplemental-existing-type-instance-fields-v1",
         "supplemental-existing-type-static-fields-v1",
         "supplemental-existing-generic-type-fields-v1",
@@ -246,7 +246,7 @@ internal sealed class ResourceUpdateCompatibility
         if (requiresInterfaceSlots)
             requiredCapabilities.Add("existing-interface-method-slots-v1");
         if (physicalTypes.Count != 0 || executionTokens.Count != 0)
-            requiredCapabilities.Add("current-storage-execution-plan-v1");
+            requiredCapabilities.Add("current-storage-execution-plan-array-v1");
         if (requiresClassVirtualMethods)
             requiredCapabilities.Add("existing-class-virtual-methods-v1");
         if (current.Fields.Any(field => !field.IsStatic && field.DeclaringTypeIsGeneric &&
