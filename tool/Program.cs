@@ -1367,27 +1367,38 @@ internal static partial class Program
                 foreach (JsonElement source in sourceRows.EnumerateArray())
                 {
                     string sourceName = NormalizeName(GetString(source, "assemblyName") ?? string.Empty);
-                    string sourcePath = GetString(source, "source") ?? string.Empty;
+                    string sourceFile = GetString(source, "sourceFile") ?? string.Empty;
+                    string baseMetaFile = GetString(source, "baseMetaVersionFile") ?? string.Empty;
                     string sourceHash = GetString(source, "sourceSha256") ?? string.Empty;
-                    string mvPath = GetString(source, "baseMetaVersion") ?? string.Empty;
                     string mvHash = GetString(source, "baseMetaVersionSha256") ?? string.Empty;
-                    if (sourceName.Length == 0 || !IsHex(sourceHash, 64, 64) ||
-                        !IsHex(mvHash, 64, 64) || !sourcePath.StartsWith(runtimeAssetRoot, StringComparison.OrdinalIgnoreCase) ||
-                        !mvPath.StartsWith(baseMetaVersionAssetRoot, StringComparison.OrdinalIgnoreCase) ||
+                    if (sourceName.Length == 0 || !File.Exists(sourceFile) || !File.Exists(baseMetaFile) ||
+                        !IsHex(sourceHash, 64, 64) ||
+                        !IsHex(mvHash, 64, 64) ||
                         !source.TryGetProperty("currentStorageTypeTokens", out JsonElement sourceTypes) ||
                         !source.TryGetProperty("currentExecutionMethodTokens", out JsonElement sourceMethods) ||
                         !source.TryGetProperty("excludedBaseTypeTokens", out JsonElement excluded))
                         throw new DheException("Frozen AOT source record is invalid: " + baseId + "/" + sourceName);
+                    string sourceRelative = "payload/frozen-aot/" + baseId.ToLowerInvariant() + "/" + sourceName + ".dll.bytes";
+                    string mvRelative = "payload/frozen-aot/" + baseId.ToLowerInvariant() + "/" + sourceName + ".mv.bytes";
+                    string sourceTarget = ResolveContainedPath(outputRoot, sourceRelative, "frozen AOT source");
+                    string mvTarget = ResolveContainedPath(outputRoot, mvRelative, "frozen AOT source MV");
+                    Directory.CreateDirectory(Path.GetDirectoryName(sourceTarget)!);
+                    File.Copy(sourceFile, sourceTarget, true);
+                    File.Copy(baseMetaFile, mvTarget, true);
+                    if (!string.Equals(Sha256File(sourceTarget), sourceHash, StringComparison.OrdinalIgnoreCase) ||
+                        !string.Equals(Sha256File(mvTarget), mvHash, StringComparison.OrdinalIgnoreCase))
+                        throw new DheException("Frozen AOT source copied hash mismatch: " + baseId + "/" + sourceName);
                     frozenAotSources.Add(new
                     {
                         assemblyName = sourceName,
-                        source = sourcePath,
+                        source = runtimeAssetRoot + sourceRelative,
                         sourceSha256 = sourceHash,
-                        baseMetaVersion = mvPath,
+                        baseMetaVersion = baseMetaVersionAssetRoot + mvRelative,
                         baseMetaVersionSha256 = mvHash,
                         currentStorageTypeTokens = sourceTypes,
                         currentExecutionMethodTokens = sourceMethods,
                         excludedBaseTypeTokens = excluded,
+                        sourceKind = "frozen-base-aot",
                     });
                 }
                 if (frozenAotSources.Count != 0)

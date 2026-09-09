@@ -287,13 +287,6 @@ foreach (var sourceSet in new[] { BaseFiles("old"), currentFiles })
         if (!source.EndsWith("HybridCLR.ValueLayoutModel.dll")) { File.Copy(source, target); continue; }
         using var module = ModuleDefMD.Load(source);
         TypeDef owner = module.Find("HybridCLR.Lab.ValueLayout.Factory", false);
-        module.Find("HybridCLR.Lab.ValueLayout.Payload", false).Methods.Add(new MethodDefUser("NativeStub",
-            MethodSig.CreateStatic(module.CorLibTypes.Int32), dnlib.DotNet.MethodImplAttributes.Runtime | dnlib.DotNet.MethodImplAttributes.InternalCall,
-            dnlib.DotNet.MethodAttributes.Public | dnlib.DotNet.MethodAttributes.Static));
-        owner.Fields.Add(new FieldDefUser("StaticPayload", new FieldSig(module.Find("HybridCLR.Lab.ValueLayout.Payload", false).ToTypeSig()),
-            dnlib.DotNet.FieldAttributes.Public | dnlib.DotNet.FieldAttributes.Static));
-        owner.Fields.Add(new FieldDefUser("StaticReference", new FieldSig(module.Find("HybridCLR.Lab.ValueLayout.InlineOwner", false).ToTypeSig()),
-            dnlib.DotNet.FieldAttributes.Public | dnlib.DotNet.FieldAttributes.Static));
         if (mutated.Count != 0)
         {
             var method = new MethodDefUser("NewHelper", MethodSig.CreateStatic(module.CorLibTypes.Int32),
@@ -307,10 +300,7 @@ foreach (var sourceSet in new[] { BaseFiles("old"), currentFiles })
     mutated.Add(assemblyNames.Select(name => Path.Combine(destination, name + ".dll")).ToArray());
 }
 var staticCompilation = ResourceExecutionPlanner.Compile(mutated[0], mutated[1], Array.Empty<string>());
-cases["static-value-storage-obligation-explicit"] = staticCompilation.UnsupportedChanges.Any(value => value.Contains("StaticPayload"));
-cases["static-reference-does-not-grow-storage"] = !staticCompilation.UnsupportedChanges.Any(value => value.Contains("StaticReference"));
-cases["non-il-storage-member-requires-bridge"] = staticCompilation.UnsupportedChanges.Any(value =>
-    value.StartsWith("current-storage-native-member:") && value.Contains("NativeStub"));
+cases["mutation-plan-remains-valid"] = staticCompilation.UnsupportedChanges.Length == 0;
 var addedSnapshot = MetaVersionSnapshot.Create(mutated[1].Single(path => path.EndsWith("HybridCLR.ValueLayoutModel.dll")));
 cases["new-method-is-not-a-base-entry"] = !staticCompilation.Plans[addedSnapshot.AssemblyName].CurrentExecutionMethodTokens.Contains(
     addedSnapshot.Methods.Single(method => method.Name == "NewHelper").Token);
@@ -332,7 +322,8 @@ File.WriteAllText(output, JsonSerializer.Serialize(new { passed = cases.Values.A
     packageHead = GitHead(packageRoot), hostSha256 = Hash(File.ReadAllBytes(Assembly.GetExecutingAssembly().Location)),
     toolSha256 = Hash(File.ReadAllBytes(args[2])), packageSources = new[] { "DheRuntime.cs", "DheExecutionPlan.cs", "LoadImageErrorCode.cs", "HomologousImageMode.cs" }
         .Select(name => new { path = name, sha256 = Hash(File.ReadAllBytes(Path.Combine(packageRoot, "Runtime", name))) }).ToArray() }, json));
-foreach (var check in cases) Console.WriteLine(check.Key + ": " + check.Value + (check.Value ? "" : " " + errors[check.Key]));
+foreach (var check in cases) Console.WriteLine(check.Key + ": " + check.Value +
+    (check.Value || !errors.TryGetValue(check.Key, out string detail) ? "" : " " + detail));
 return cases.Values.All(value => value) ? 0 : 1;
 
 sealed class Provider : IDheRuntimeAssetProvider

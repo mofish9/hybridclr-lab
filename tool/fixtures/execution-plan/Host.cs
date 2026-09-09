@@ -48,5 +48,9 @@ namespace HybridCLR
         public static LoadImageErrorCode LoadDifferentialHybridAssembliesWithMetaVersionAndExecutionPlan(
             byte[][] dlls, byte[][] before, byte[][] after, uint[][] types, uint[][] methods)
         { Calls++; LastTypes = types; LastMethods = methods; return LoadImageErrorCode.OK; }
+        public static LoadImageErrorCode LoadDifferentialHybridAssembliesWithMetaVersionAndExecutionPlanAndSources(
+            byte[][] dlls, byte[][] before, byte[][] after, uint[][] types, uint[][] methods,
+            int[] sourceKinds, uint[][] excluded)
+        { Calls++; LastTypes = types; LastMethods = methods; return LoadImageErrorCode.OK; }
     }
 }

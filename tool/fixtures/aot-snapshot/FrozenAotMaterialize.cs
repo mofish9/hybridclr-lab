@@ -48,6 +48,8 @@ internal static class FrozenAotMaterialize
             records.Add(new
             {
                 assemblyName = plan.AssemblyName,
+                sourceFile = source.Path,
+                baseMetaVersionFile = mvPath,
                 source = runtimeAssetRoot + sourceRelative,
                 sourceSha256 = Hash(File.ReadAllBytes(sourcePath)),
                 baseMetaVersion = baseMetaAssetRoot + mvRelative,

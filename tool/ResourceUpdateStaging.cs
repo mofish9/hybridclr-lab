@@ -120,14 +120,14 @@ internal static partial class Program
         var stagedFiles = new List<object>();
         foreach (var payload in payloads)
         {
-            var target = ResolveContainedPath(assetRoot, payload.RelativePath,
+            var target = ResolveContainedPath(payload.AssetRoot, payload.RelativePath,
                 "DHE staged payload");
             Directory.CreateDirectory(Path.GetDirectoryName(target)!);
             File.Copy(payload.SourcePath, target, true);
             var targetHash = Sha256File(target);
             if (!targetHash.Equals(payload.Sha256, StringComparison.OrdinalIgnoreCase))
                 throw new DheException("Staged DHE payload hash mismatch: " + payload.RelativePath);
-            stagedFiles.Add(new { path = payload.RelativePath, sha256 = targetHash });
+            stagedFiles.Add(new { path = payload.AssetRoot + payload.RelativePath, sha256 = targetHash });
         }
 
         var planFileName = Path.GetFileName(runtimePlanRelative);
@@ -1521,6 +1521,38 @@ internal static partial class Program
                 throw new DheException("Interpreter-only Base MetaVersion path is invalid for " + name + ".");
         }
 
+        if (selectedBase.TryGetProperty("frozenAotSources", out JsonElement frozenSources) &&
+            frozenSources.ValueKind == JsonValueKind.Array && frozenSources.GetArrayLength() != 0)
+        {
+            JsonElement runtimeBase = runtimePlan.GetProperty("baseSelections").EnumerateArray().Single(row =>
+                string.Equals(GetString(row, "baseId"), GetString(selectedBase, "baseId"), StringComparison.OrdinalIgnoreCase));
+            JsonElement runtimeSources = runtimeBase.GetProperty("frozenAotSources");
+            if (runtimeSources.GetArrayLength() != frozenSources.GetArrayLength())
+                throw new DheException("Resource and runtime frozen AOT source records differ.");
+            foreach (JsonElement source in frozenSources.EnumerateArray())
+            {
+                string name = NormalizeName(GetString(source, "assemblyName") ?? string.Empty);
+                string sourceAsset = GetString(source, "source") ?? string.Empty;
+                string sourceHash = GetString(source, "sourceSha256") ?? string.Empty;
+                string mvAsset = GetString(source, "baseMetaVersion") ?? string.Empty;
+                string mvHash = GetString(source, "baseMetaVersionSha256") ?? string.Empty;
+                JsonElement runtimeSource = runtimeSources.EnumerateArray().SingleOrDefault(row =>
+                    string.Equals(GetString(row, "assemblyName"), name, StringComparison.OrdinalIgnoreCase));
+                if (runtimeSource.ValueKind != JsonValueKind.Object ||
+                    GetString(runtimeSource, "source") != sourceAsset ||
+                    GetString(runtimeSource, "sourceSha256") != sourceHash ||
+                    GetString(runtimeSource, "baseMetaVersion") != mvAsset ||
+                    GetString(runtimeSource, "baseMetaVersionSha256") != mvHash ||
+                    !sourceAsset.StartsWith(runtimeAssetRoot, StringComparison.OrdinalIgnoreCase) ||
+                    !mvAsset.StartsWith(baseMetaVersionAssetRoot, StringComparison.OrdinalIgnoreCase))
+                    throw new DheException("Resource/runtime frozen AOT binding mismatch: " + name);
+                AddResourcePayload(updateRoot, sourceAsset[runtimeAssetRoot.Length..], sourceHash,
+                    sourceAsset, runtimeAssetRoot, payloads, paths);
+                AddBaseMetaPayload(updateRoot, mvAsset[baseMetaVersionAssetRoot.Length..], mvHash,
+                    mvAsset, baseMetaVersionAssetRoot, payloads, paths);
+            }
+        }
+
         if (!runtimePlan.TryGetProperty("aotMetadata", out JsonElement legacyMetadata) ||
             legacyMetadata.ValueKind != JsonValueKind.Array || legacyMetadata.GetArrayLength() != 0 ||
             !manifest.TryGetProperty("aotMetadataSets", out JsonElement manifestSets) ||
@@ -2221,7 +2253,31 @@ internal static partial class Program
         if (!Sha256File(source).Equals(expectedHash, StringComparison.OrdinalIgnoreCase))
             throw new DheException("DHE resource payload hash mismatch: " + relative);
         paths.Add(relative, expectedHash!);
-        payloads.Add(new ResourcePayload(relative, source, expectedHash!.ToLowerInvariant()));
+        payloads.Add(new ResourcePayload(relative, source, expectedHash!.ToLowerInvariant(), runtimeAssetRoot));
+    }
+
+    private static void AddBaseMetaPayload(string updateRoot, string? relativePath, string? expectedHash,
+        string? planAssetPath, string baseMetaVersionAssetRoot, List<ResourcePayload> payloads,
+        Dictionary<string, string> paths)
+    {
+        var relative = relativePath ?? string.Empty;
+        if (!relative.StartsWith("payload/", StringComparison.OrdinalIgnoreCase) ||
+            !IsHex(expectedHash, 64, 64) ||
+            !string.Equals(planAssetPath, baseMetaVersionAssetRoot + relative, StringComparison.OrdinalIgnoreCase))
+            throw new DheException("Frozen Base MetaVersion path/hash binding is invalid: " + relative);
+        string key = "base-meta:" + relative;
+        if (paths.TryGetValue(key, out string? priorHash))
+        {
+            if (!string.Equals(priorHash, expectedHash, StringComparison.OrdinalIgnoreCase))
+                throw new DheException("Frozen Base MetaVersion path has conflicting hashes: " + relative);
+            return;
+        }
+        var source = RequireFile(ResolveContainedPath(updateRoot, relative, "DHE frozen Base MetaVersion"),
+            "DHE frozen Base MetaVersion");
+        if (!Sha256File(source).Equals(expectedHash, StringComparison.OrdinalIgnoreCase))
+            throw new DheException("Frozen Base MetaVersion hash mismatch: " + relative);
+        paths.Add(key, expectedHash!);
+        payloads.Add(new ResourcePayload(relative, source, expectedHash!.ToLowerInvariant(), baseMetaVersionAssetRoot));
     }
 
     private static string RequirePortableAssetRoot(string? value, string description)
@@ -2233,5 +2289,5 @@ internal static partial class Program
         return normalized;
     }
 
-    private sealed record ResourcePayload(string RelativePath, string SourcePath, string Sha256);
+    private sealed record ResourcePayload(string RelativePath, string SourcePath, string Sha256, string AssetRoot);
 }
