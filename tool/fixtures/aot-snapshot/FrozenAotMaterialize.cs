@@ -1,5 +1,6 @@
 using System.Security.Cryptography;
 using System.Text.Json;
+using System.Text.Json.Nodes;
 using HybridCLR.DheTool;
 
 internal static class FrozenAotMaterialize
@@ -73,6 +74,27 @@ internal static class FrozenAotMaterialize
         string planPath = Path.Combine(outputRoot, "frozen-aot-source-plan.json");
         File.WriteAllText(planPath, JsonSerializer.Serialize(document, Json));
         Console.WriteLine("Materialized frozen AOT sources: " + records.Count + "; plan=" + planPath);
+        return 0;
+    }
+
+    public static int Merge(string[] args)
+    {
+        if (args.Length != 3)
+            throw new ArgumentException("merge-frozen-aot <runtime plan json> <frozen source plan json> <new output json>");
+        string runtimePath = Path.GetFullPath(args[0]), sourcePath = Path.GetFullPath(args[1]), outputPath = Path.GetFullPath(args[2]);
+        if (File.Exists(outputPath)) throw new IOException("Merged runtime plan output must be new: " + outputPath);
+        JsonNode runtime = JsonNode.Parse(File.ReadAllText(runtimePath)) ?? throw new InvalidDataException("Runtime plan is empty.");
+        JsonNode source = JsonNode.Parse(File.ReadAllText(sourcePath)) ?? throw new InvalidDataException("Frozen source plan is empty.");
+        string baseId = source["baseId"]?.GetValue<string>() ?? throw new InvalidDataException("Frozen source plan has no Base ID.");
+        JsonArray selections = runtime["baseSelections"] as JsonArray ?? throw new InvalidDataException("Runtime plan has no Base selections.");
+        JsonObject? match = selections.OfType<JsonObject>().SingleOrDefault(item =>
+            string.Equals(item["baseId"]?.GetValue<string>(), baseId, StringComparison.OrdinalIgnoreCase));
+        if (match == null) throw new InvalidDataException("Runtime plan has no matching Base selection: " + baseId);
+        JsonArray sources = source["sources"] as JsonArray ?? throw new InvalidDataException("Frozen source plan has no sources.");
+        match["frozenAotSources"] = JsonNode.Parse(sources.ToJsonString())!;
+        Directory.CreateDirectory(Path.GetDirectoryName(outputPath)!);
+        File.WriteAllText(outputPath, runtime.ToJsonString(Json));
+        Console.WriteLine("Merged frozen AOT source records into Base selection: " + baseId);
         return 0;
     }
 

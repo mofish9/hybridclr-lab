@@ -12,6 +12,7 @@ if (args.Length > 0 && args[0] == "evolution-workflow") return ResourceEvolution
 if (args.Length > 0 && args[0] == "evolution-reference") return ResourceEvolutionWorkflow.Reference(args.Skip(1).ToArray());
 if (args.Length > 0 && args[0] == "frozen-aot-policy") return FrozenAotPolicy.Run(args.Skip(1).ToArray());
 if (args.Length > 0 && args[0] == "materialize-frozen-aot") return FrozenAotMaterialize.Run(args.Skip(1).ToArray());
+if (args.Length > 0 && args[0] == "merge-frozen-aot") return FrozenAotMaterialize.Merge(args.Skip(1).ToArray());
 if (args.Length == 4 && args[0] == "compare")
 {
     if (Directory.Exists(args[3])) throw new IOException("Comparison output must be new.");
