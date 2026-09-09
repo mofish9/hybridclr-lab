@@ -143,6 +143,7 @@
             "items": { "type": "string", "pattern": "^[^/\\\\]+$", "minLength": 1 }
           },
           "aotSnapshotSha256": { "type": "string", "pattern": "^[0-9a-fA-F]{64}$" },
+          "aotAnalysisSnapshotSha256": { "type": ["string", "null"], "pattern": "^[0-9a-fA-F]{64}$" },
           "baseMetaVersionSetSha256": { "type": "string", "pattern": "^[0-9a-fA-F]{64}$" },
           "aotMetadataSetId": { "type": "string", "pattern": "^[0-9a-fA-F]{64}$" },
           "nativeGuardSourceSha256": { "type": "string", "pattern": "^[0-9a-fA-F]{64}$" },

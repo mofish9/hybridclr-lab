@@ -711,9 +711,11 @@ internal static partial class Program
             GetString(identity, "runtimeProtocol") ?? string.Empty,
             GetString(identity, "runtimeContract") ?? string.Empty, runtimeCapabilities,
             GetString(identity, "runtimeAssetRoot") ?? string.Empty,
-            GetString(identity, "baseMetaVersionAssetRoot") ?? string.Empty);
+            GetString(identity, "baseMetaVersionAssetRoot") ?? string.Empty,
+            GetString(identity, "aotAnalysisSnapshotSha256"));
         if (!string.Equals(baseId, computedBaseId, StringComparison.OrdinalIgnoreCase))
             throw new DheException("Base build identity composite baseId is invalid: " + identityPath);
+        AotAnalysisSnapshot.Read(identityPath, identity, aotAssemblyNames, assemblyNames);
         return baseId;
     }
 
@@ -1187,18 +1189,17 @@ internal static partial class Program
             }).ToArray();
             var managedAssemblySetSha256 = NamedAssemblySetHash(
                 baselineRecords.Select(record => (record.name, record.path)));
+            var aotAnalysis = AotAnalysisSnapshot.Read(buildIdentityPath, buildIdentity,
+                baseAotAssemblyNames, identityAssemblyNames);
             var execution = ResourceExecutionPlanner.Compile(
                 baselineRecords.Where(record => currentVariant.Snapshots.ContainsKey(record.name)).Select(record => record.path),
-                names.Select(name => Path.Combine(currentVariant.Root, name + ".dll")), Array.Empty<string>());
+                names.Select(name => Path.Combine(currentVariant.Root, name + ".dll")),
+                aotAnalysis?.OrdinaryAssemblyPaths ?? Array.Empty<string>());
             unsupported.AddRange(execution.UnsupportedChanges);
             if (execution.Impact.ChangedValueTypes.Length != 0)
             {
-                // The current Base archive binds only the DHE DLL set and an
-                // ordinary-AOT name inventory. It does not bind the ordinary
-                // DLL bodies needed to certify layout-dependent native calls.
-                // Emit inspectable per-Base plans, but do not publish them as a
-                // qualified resource update until that archive proof is added.
-                unsupported.Add("current-storage-aot-boundary-inventory-not-bound");
+                if (aotAnalysis == null)
+                    unsupported.Add("current-storage-aot-boundary-inventory-not-bound");
                 if (baseEngineWorkflow != "Unity2022Fgs")
                     unsupported.Add("current-storage-engine-not-qualified:" + baseEngineWorkflow);
             }
@@ -1355,6 +1356,7 @@ internal static partial class Program
                 aotAssemblySetSha256 = GetString(buildIdentity, "aotAssemblySetSha256"),
                 aotAssemblyNames = baseAotAssemblyNames,
                 aotSnapshotSha256 = baseAotSnapshotSha256,
+                aotAnalysisSnapshotSha256 = aotAnalysis?.Sha256,
                 baseMetaVersionSetSha256 = baseMvSetHash,
                 aotMetadataSetId,
                 nativeGuardSourceSha256 = baseNativeGuardSourceSha256,
@@ -1614,7 +1616,7 @@ internal static partial class Program
             GetString(identity, "nativeGuardSourceSha256") ?? string.Empty,
             GetString(identity, "nativeManifestSha256") ?? string.Empty,
             runtimeProtocol, runtimeContract, runtimeCapabilities, runtimeAssetRoot,
-            baseMetaVersionAssetRoot);
+            baseMetaVersionAssetRoot, GetString(identity, "aotAnalysisSnapshotSha256"));
         if (!string.Equals(GetString(identity, "baseId"), computedBaseId,
                 StringComparison.OrdinalIgnoreCase))
             errors.Add("base-build-identity-composite-id:" + identityPath);
@@ -1747,7 +1749,7 @@ internal static partial class Program
         string aotMetadataSetId,
         string nativeGuardSourceSha256, string nativeManifestSha256,
         string runtimeProtocol, string runtimeContract, IEnumerable<string> runtimeCapabilities,
-        string runtimeAssetRoot, string baseMetaVersionAssetRoot)
+        string runtimeAssetRoot, string baseMetaVersionAssetRoot, string? aotAnalysisSnapshotSha256 = null)
     {
         string[] capabilities = runtimeCapabilities.Where(value => !string.IsNullOrWhiteSpace(value))
             .Distinct(StringComparer.Ordinal).OrderBy(value => value, StringComparer.Ordinal).ToArray();
@@ -1767,6 +1769,8 @@ internal static partial class Program
             "runtimeCapabilities=" + string.Join(",", capabilities) + "\n" +
             "runtimeAssetRoot=" + NormalizeRuntimeAssetRoot(runtimeAssetRoot) + "\n" +
             "baseMetaVersionAssetRoot=" + NormalizeRuntimeAssetRoot(baseMetaVersionAssetRoot) + "\n";
+        if (!string.IsNullOrWhiteSpace(aotAnalysisSnapshotSha256))
+            canonical += "aotAnalysisSnapshotSha256=" + aotAnalysisSnapshotSha256.ToLowerInvariant() + "\n";
         return Sha256Text(canonical);
     }
 

@@ -4,8 +4,10 @@ using dnlib.DotNet;
 using dnlib.DotNet.Emit;
 using dnlib.DotNet.Writer;
 using HybridCLR.Editor.Commands;
+using HybridCLR.DheTool;
+using System.Text.Json.Nodes;
 
-if (args.Length != 2) throw new ArgumentException("<real Unity stripped AOT root> <new output root>");
+if (args.Length != 3) throw new ArgumentException("<real Unity stripped AOT root> <new output root> <tool DLL>");
 string input = Path.GetFullPath(args[0]), output = Path.GetFullPath(args[1]);
 if (Directory.Exists(output)) throw new IOException("Output must be new.");
 Directory.CreateDirectory(output);
@@ -118,6 +120,57 @@ Directory.CreateDirectory(Path.Combine(tampered, "assemblies"));
 foreach (string file in Directory.GetFiles(captured, "*.dll")) File.Copy(file, Path.Combine(tampered, "assemblies", Path.GetFileName(file)));
 File.WriteAllBytes(Path.Combine(tampered, "assemblies", ownerName + ".dll"), new byte[] { 0 });
 Reject("captured-dll-tamper-rejected", () => DheAotAnalysisSnapshot.Validate(Path.Combine(tampered, "manifest.json"), capture.ManifestSha256, final, dhe, Deserialize));
+JsonElement Identity(string hash, string relative) => JsonSerializer.SerializeToElement(new
+    { aotAnalysisSnapshotSha256 = hash, aotAnalysisSnapshot = relative });
+string relativeManifest = Path.GetRelativePath(output, capture.ManifestPath).Replace('\\', '/');
+string identityPath = Path.Combine(output, "build-identity.json");
+string[] aotNames = manifest.assemblies.Select(row => row.assemblyName).ToArray();
+var boundIdentity = Identity(capture.ManifestSha256, relativeManifest);
+var read = AotAnalysisSnapshot.Read(identityPath, boundIdentity, aotNames, dhe);
+checks["resource-reader-complete-ordinary-subset"] = read.OrdinaryAssemblyPaths.Length == aotNames.Length - dhe.Length &&
+    !read.OrdinaryAssemblyPaths.Select(Path.GetFileNameWithoutExtension).Intersect(dhe).Any();
+checks["historical-no-snapshot-explicitly-absent"] = AotAnalysisSnapshot.Read(identityPath,
+    JsonSerializer.SerializeToElement(new { }), aotNames, dhe) == null;
+Reject("reader-partial-binding-rejected", () => AotAnalysisSnapshot.Read(identityPath,
+    JsonSerializer.SerializeToElement(new { aotAnalysisSnapshotSha256 = capture.ManifestSha256 }), aotNames, dhe));
+Reject("reader-path-traversal-rejected", () => AotAnalysisSnapshot.Read(identityPath,
+    Identity(capture.ManifestSha256, "../manifest.json"), aotNames, dhe));
+Reject("reader-wrong-aot-inventory-rejected", () => AotAnalysisSnapshot.Read(identityPath, boundIdentity, aotNames.Skip(1), dhe));
+Reject("reader-wrong-dhe-classification-rejected", () => AotAnalysisSnapshot.Read(identityPath, boundIdentity, aotNames, dhe.Skip(1)));
+void BadCapture(string name, Action<JsonNode> mutateManifest, Action<string> mutateFiles)
+{
+    string changed = Path.Combine(output, name); Directory.CreateDirectory(changed);
+    JsonNode document = JsonNode.Parse(File.ReadAllText(capture.ManifestPath)); mutateManifest?.Invoke(document);
+    byte[] bytes = System.Text.Encoding.UTF8.GetBytes(document.ToJsonString(json));
+    string hash = Hash(bytes).ToLowerInvariant(), relative = "aot-analysis/" + hash + "/manifest.json";
+    string newManifest = Path.Combine(changed, relative.Replace('/', Path.DirectorySeparatorChar));
+    string dllRoot = Path.Combine(Path.GetDirectoryName(newManifest), "assemblies"); Directory.CreateDirectory(dllRoot);
+    foreach (string file in Directory.GetFiles(captured, "*.dll")) File.Copy(file, Path.Combine(dllRoot, Path.GetFileName(file)));
+    File.WriteAllBytes(newManifest, bytes); mutateFiles?.Invoke(dllRoot);
+    Reject(name, () => AotAnalysisSnapshot.Read(Path.Combine(changed, "build-identity.json"), Identity(hash, relative), aotNames, dhe));
+}
+BadCapture("reader-tampered-dll-rejected", null, path => File.WriteAllBytes(Path.Combine(path, ownerName + ".dll"), new byte[] { 0 }));
+BadCapture("reader-missing-dll-rejected", null, path => File.Delete(Path.Combine(path, ownerName + ".dll")));
+BadCapture("reader-extra-dll-rejected", null, path => File.Copy(Path.Combine(path, ownerName + ".dll"), Path.Combine(path, "Extra.dll")));
+BadCapture("reader-unsafe-dll-path-rejected", node => node["assemblies"][0]["file"] = "../escape.dll", null);
+BadCapture("reader-wrong-owner-rejected", node => node["identityAssembly"] = "mscorlib", null);
+BadCapture("reader-wrong-dll-name-rejected", node => node["assemblies"][0]["assemblyName"] = "Wrong", null);
+string archive = Path.Combine(output, "archive");
+string archiveManifest = Path.Combine(archive, relativeManifest.Replace('/', Path.DirectorySeparatorChar));
+Directory.CreateDirectory(Path.GetDirectoryName(archiveManifest));
+File.Copy(capture.ManifestPath, archiveManifest);
+Directory.CreateDirectory(Path.Combine(Path.GetDirectoryName(archiveManifest), "assemblies"));
+foreach (string file in Directory.GetFiles(captured, "*.dll"))
+    File.Copy(file, Path.Combine(Path.GetDirectoryName(archiveManifest), "assemblies", Path.GetFileName(file)));
+File.WriteAllText(Path.Combine(archive, "build-identity.json"), JsonSerializer.Serialize(boundIdentity));
+var tool = System.Reflection.Assembly.LoadFrom(Path.GetFullPath(args[2]));
+var toolProgram = tool.GetType("HybridCLR.DheTool.Program", true);
+var mapping = toolProgram.GetNestedType("ArchivePathMapping", System.Reflection.BindingFlags.NonPublic);
+toolProgram.GetMethod("RewriteArchiveJsonDocuments", System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.Static)
+    .Invoke(null, new object[] { archive, output, Array.CreateInstance(mapping, 0) });
+checks["actual-archive-rewriter-preserves-manifest-bytes"] = File.ReadAllBytes(archiveManifest).SequenceEqual(File.ReadAllBytes(capture.ManifestPath));
+checks["archive-reader-portable-after-relocation"] = AotAnalysisSnapshot.Read(Path.Combine(archive, "build-identity.json"),
+    boundIdentity, aotNames, dhe).OrdinaryAssemblyPaths.All(path => path.StartsWith(archive));
 File.WriteAllText(Path.Combine(output, "result.json"), JsonSerializer.Serialize(new { passed = checks.Values.All(value => value), checks, errors,
     scope = "AOT snapshot normalization and validation using real stripped DLLs; not final Player qualification", input, capture.ManifestPath, capture.ManifestSha256 }, json));
 foreach (var check in checks) Console.WriteLine(check.Key + ": " + check.Value + (check.Value || !errors.ContainsKey(check.Key) ? "" : " " + errors[check.Key]));

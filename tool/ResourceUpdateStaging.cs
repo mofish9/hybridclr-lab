@@ -1233,6 +1233,7 @@ internal static partial class Program
         string[] aotAssemblyNames = ReadAotAssemblyNames(identity,
             "Base Player build identity");
         string snapshot = GetString(identity, "aotSnapshotSha256") ?? string.Empty;
+        string? analysisSnapshot = GetString(identity, "aotAnalysisSnapshotSha256");
         string baseMetaVersionSet = GetString(identity, "baseMetaVersionSetSha256") ?? string.Empty;
         string aotMetadataSetId = GetString(identity, "aotMetadataSetId") ?? string.Empty;
         string guard = GetString(identity, "nativeGuardSourceSha256") ?? string.Empty;
@@ -1253,6 +1254,7 @@ internal static partial class Program
             !IsHex(baseId, 64, 64) || !IsHex(managedSet, 64, 64) ||
             !IsHex(aotAssemblySet, 64, 64) ||
             !IsHex(snapshot, 64, 64) || !IsHex(baseMetaVersionSet, 64, 64) ||
+            (analysisSnapshot != null && !IsHex(analysisSnapshot, 64, 64)) ||
             !IsHex(aotMetadataSetId, 64, 64) ||
             !IsHex(guard, 64, 64) || !IsHex(nativeManifest, 64, 64) ||
             !string.Equals(runtimeProtocol, ResourceUpdateCompatibility.RuntimeProtocol,
@@ -1263,7 +1265,7 @@ internal static partial class Program
         string computedBaseId = ComputeBaseId(target, engineWorkflow,
             il2cppCodeGeneration, managedSet, aotAssemblySet, snapshot,
             baseMetaVersionSet, aotMetadataSetId, guard, nativeManifest, runtimeProtocol, runtimeContract,
-            runtimeCapabilities, runtimeAssetRoot, baseMetaVersionAssetRoot);
+            runtimeCapabilities, runtimeAssetRoot, baseMetaVersionAssetRoot, analysisSnapshot);
         if (!string.Equals(baseId, computedBaseId, StringComparison.OrdinalIgnoreCase))
             throw new DheException("Base Player build identity composite baseId is invalid.");
 
@@ -1297,6 +1299,8 @@ internal static partial class Program
                     "Selected resource update Base"), StringComparer.OrdinalIgnoreCase)
                 .SetEquals(aotAssemblyNames) ||
             !string.Equals(GetString(selected, "aotSnapshotSha256"), snapshot,
+                StringComparison.OrdinalIgnoreCase) ||
+            !string.Equals(GetString(selected, "aotAnalysisSnapshotSha256"), analysisSnapshot,
                 StringComparison.OrdinalIgnoreCase) ||
             !string.Equals(GetString(selected, "baseMetaVersionSetSha256"),
                 baseMetaVersionSet, StringComparison.OrdinalIgnoreCase) ||
@@ -2174,6 +2178,7 @@ internal static partial class Program
         var managed = GetString(value, "managedAssemblySetSha256") ?? string.Empty;
         var aotAssemblySet = GetString(value, "aotAssemblySetSha256") ?? string.Empty;
         var snapshot = GetString(value, "aotSnapshotSha256") ?? string.Empty;
+        var analysisSnapshot = GetString(value, "aotAnalysisSnapshotSha256");
         var baseMetaVersion = GetString(value, "baseMetaVersionSetSha256") ?? string.Empty;
         var aotMetadataSetId = GetString(value, "aotMetadataSetId") ?? string.Empty;
         var guard = GetString(value, "nativeGuardSourceSha256") ?? string.Empty;
@@ -2181,11 +2186,12 @@ internal static partial class Program
         if (target.Length == 0 || !IsHex(baseId, 64, 64) || !IsHex(managed, 64, 64) ||
             !IsHex(aotAssemblySet, 64, 64) ||
             !IsHex(snapshot, 64, 64) ||
+            (analysisSnapshot != null && !IsHex(analysisSnapshot, 64, 64)) ||
             !IsHex(baseMetaVersion, 64, 64) || !IsHex(aotMetadataSetId, 64, 64) ||
             !IsHex(guard, 64, 64) ||
             !IsHex(nativeManifest, 64, 64))
             throw new DheException("DHE resource update contains an incomplete Player Base identity.");
-        return string.Join("|", target, baseId, managed, aotAssemblySet, snapshot, baseMetaVersion,
+        return string.Join("|", target, baseId, managed, aotAssemblySet, snapshot, analysisSnapshot, baseMetaVersion,
             aotMetadataSetId, guard,
             nativeManifest);
     }

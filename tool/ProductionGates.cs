@@ -6118,10 +6118,13 @@ internal static partial class Program
                 GetString(identity, "runtimeProtocol") ?? string.Empty,
                 GetString(identity, "runtimeContract") ?? string.Empty, identityCapabilities,
                 GetString(identity, "runtimeAssetRoot") ?? string.Empty,
-                GetString(identity, "baseMetaVersionAssetRoot") ?? string.Empty);
+                GetString(identity, "baseMetaVersionAssetRoot") ?? string.Empty,
+                GetString(identity, "aotAnalysisSnapshotSha256"));
             if (!computedBaseId.Equals(GetString(identity, "baseId"),
                     StringComparison.OrdinalIgnoreCase))
                 errors.Add("Build identity composite Base ID is invalid.");
+            AotAnalysisSnapshot.Read(identityPath, identity,
+                ReadIdentityAotAssemblyNames(identity, identityPath), names);
         }
         catch (Exception exception)
         {

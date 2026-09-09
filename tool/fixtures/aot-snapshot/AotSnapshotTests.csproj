@@ -10,6 +10,7 @@
   </Target>
   <ItemGroup>
     <Compile Include="$(DhePackageRoot)/Editor/Commands/DheAotAnalysisSnapshot.cs" Link="Package/DheAotAnalysisSnapshot.cs" />
+    <Compile Include="../../AotAnalysisSnapshot.cs" Link="Tool/AotAnalysisSnapshot.cs" />
     <Reference Include="dnlib"><HintPath>../../dnlib.dll</HintPath></Reference>
   </ItemGroup>
 </Project>

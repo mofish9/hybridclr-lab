@@ -45,6 +45,7 @@ foreach (string version in new[] { "old", "new" })
         AotSnapshotKind = "managed-assembly-plus-generated-cpp-v1", ManagedAssemblySetSha256 = HashText("managed" + version),
         AotAssemblyNames = names, AotAssemblySetSha256 = HashText(string.Concat(names.OrderBy(name => name, StringComparer.Ordinal).Select(name => name + "\n"))),
         AotSnapshotSha256 = HashText("snapshot" + version), BaseMetaVersionSetSha256 = SetHash(beforeBytes),
+        AotAnalysisSnapshotSha256 = HashText("analysis-snapshot" + version),
         NativeGuardSourceSha256 = HashText("guard" + version), NativeManifestSha256 = HashText("native" + version),
         AotMetadataSetId = emptyHash, RuntimeProtocol = "dhe-runtime-protocol-v1", RuntimeContract = "dhe-runtime-v27",
         RuntimeCapabilities = (string[])typeof(DheRuntime).GetField("NativeRuntimeCapabilities", BindingFlags.Static | BindingFlags.NonPublic).GetValue(null),
@@ -81,6 +82,7 @@ foreach (string version in new[] { "old", "new" })
         baseId = identity.BaseId, target = identity.Target, engineWorkflow = identity.EngineWorkflow, il2cppCodeGeneration = identity.Il2CppCodeGeneration,
         managedAssemblySetSha256 = identity.ManagedAssemblySetSha256, aotAssemblySetSha256 = identity.AotAssemblySetSha256,
         aotAssemblyNames = names, aotSnapshotSha256 = identity.AotSnapshotSha256, baseMetaVersionSetSha256 = identity.BaseMetaVersionSetSha256,
+        aotAnalysisSnapshotSha256 = identity.AotAnalysisSnapshotSha256,
         nativeGuardSourceSha256 = identity.NativeGuardSourceSha256, nativeManifestSha256 = identity.NativeManifestSha256,
         runtimeProtocol = identity.RuntimeProtocol, nativeRuntimeContract = identity.RuntimeContract, runtimeCapabilities = identity.RuntimeCapabilities,
         requiredRuntimeCapabilities = new[] { DheExecutionPlan.Capability, "atomic-multi-assembly-registration-v1" },
@@ -137,6 +139,11 @@ void RunCase(string name, int baseIndex, Action<JsonNode, JsonNode, JsonNode, Pr
 }
 RunCase("old-base-public-loader", 0, null, true);
 RunCase("new-base-same-current-public-loader", 1, null, true);
+RunCase("wrong-analysis-snapshot-binding", 0, (m, v, p, _) =>
+{
+    m["supportedBases"][0]["aotAnalysisSnapshotSha256"] = emptyHash;
+    v["bases"][0]["aotAnalysisSnapshotSha256"] = emptyHash;
+}, false);
 RunCase("method-only-base-keeps-mv-dispatch-without-plan", 1, (m, v, p, _) =>
 {
     foreach (var table in new[] { m["supportedBases"][1]["assemblyModes"], v["bases"][1]["assemblyModes"], p["baseSelections"][1]["assemblyModes"] })

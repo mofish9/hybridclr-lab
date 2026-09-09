@@ -12,6 +12,7 @@ namespace __DHE_IDENTITY_NAMESPACE__
         public const string ManagedAssemblySetSha256 = "0000000000000000000000000000000000000000000000000000000000000000";
         public const string AotAssemblySetSha256 = "0000000000000000000000000000000000000000000000000000000000000000";
         public const string AotSnapshotSha256 = "0000000000000000000000000000000000000000000000000000000000000000";
+        public const string AotAnalysisSnapshotSha256 = "0000000000000000000000000000000000000000000000000000000000000000";
         public const string NativeGuardSourceSha256 = "0000000000000000000000000000000000000000000000000000000000000000";
         public const string NativeManifestSha256 = "0000000000000000000000000000000000000000000000000000000000000000";
         public const string BaseMetaVersionSetSha256 = "0000000000000000000000000000000000000000000000000000000000000000";
@@ -38,6 +39,7 @@ namespace __DHE_IDENTITY_NAMESPACE__
                 ManagedAssemblySetSha256 = ManagedAssemblySetSha256,
                 AotAssemblySetSha256 = AotAssemblySetSha256,
                 AotSnapshotSha256 = AotSnapshotSha256,
+                AotAnalysisSnapshotSha256 = AotAnalysisSnapshotSha256,
                 NativeGuardSourceSha256 = NativeGuardSourceSha256,
                 NativeManifestSha256 = NativeManifestSha256,
                 BaseMetaVersionSetSha256 = BaseMetaVersionSetSha256,

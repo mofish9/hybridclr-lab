@@ -83,7 +83,13 @@ internal static partial class Program
         mappings.AddRange(externalMappings);
         mappings = mappings.OrderByDescending(mapping => mapping.Source.Length).ToList();
         foreach (var path in Directory.GetFiles(archive, "*.json", SearchOption.AllDirectories))
+        {
+            // Already portable, content-addressed bytes are part of the embedded
+            // Base identity. Even JSON whitespace must remain unchanged.
+            if (GetString(ReadJson<JsonElement>(path), "format") ==
+                "hybridclr.dhe-aot-analysis-snapshot.json") continue;
             RewriteArchiveJson(path, mappings);
+        }
         var violations = Directory.GetFiles(archive, "*.json", SearchOption.AllDirectories)
             .SelectMany(path => FindAbsoluteJsonStrings(path).Select(value => Path.GetRelativePath(archive, path) + ": " + value))
             .Take(20).ToArray();
