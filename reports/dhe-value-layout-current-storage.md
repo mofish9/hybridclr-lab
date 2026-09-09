@@ -1,8 +1,9 @@
 # Current storage and execution metadata: Unity 2022 research checkpoint
 
 本轮仍是研究候选，尚未形成可交付的结构体热更能力。当前只推进 Unity 2022，
-其真实 headers compile/CTest 已通过；新布局 Base 的 p11 Player 通过，但历史旧布局
-Base 消费同一 Current 资源的 p27 Player 仍失败（Array.Copy/Clone 与反射字段 owner）。
+其真实 headers compile/CTest 已通过；最新 p48 Player 已通过旧布局 Base 消费同一
+Current 资源的 14/14 value-layout、Consumer、泛型复制/泛型装箱、数组、反射和 GC。
+此前 p27 失败结果属于旧 runtime checkpoint，不能继续代表当前候选。
 没有性能、内存或 ARM64 结论。团结 2022 尚未按本轮逻辑重新组装或验证。
 公共资源加载流程仍未传入 Current storage plan。
 
@@ -10,9 +11,9 @@ Base 消费同一 Current 资源的 p27 Player 仍失败（Array.Copy/Clone 与�
 
 | 组件 | commit |
 |---|---|
-| HybridCLR | 3c3510a7f89c8dca3a503dd903e4cbbeda6a3237 |
-| lab（p27 lock） | 76d33fd |
-| Unity 2022 IL2CPP | e6e602849529e8f4eb0790b0d8a3e4f5cc32ad6f |
+| HybridCLR | 38c5f097d6b38e3e0f48c9178b74b15e7c3ac5fc |
+| lab（当前 lock） | 3a284e6 |
+| Unity 2022 IL2CPP | 325791073cd75ca480c73f024fd5304c7cd9c7dc |
 | 团结 2022 IL2CPP（尚未移植） | df8d0123d9f5a9fce79283fe5261dba21e802aa0 |
 | package | bc319e5e376d97ed89fdd0f127d4256fa466f1ef |
 
@@ -70,6 +71,13 @@ p8/p9/p10 的失败结果仍保留作修复链证据；它们不能替代 p11 �
 `array-copy-and-clone` 仍为 InvalidCastException，反射字段现在可解析但
 RuntimeFieldInfo.GetValue/SetValue 报“field ... is not a field on the target object”，
 Consumer FullCopyMatches 同样失败。因此多 Base 证据仍为条件失败，不能宣称完整能力。
+
+最新复测：`current-storage-p48-result.json` 使用当前 runtime 重新链接的 Unity 2022
+Windows Player，以旧布局 Base 和 `current-storage-raw-p38` Current 资源运行，结果为
+`passed=true`、`loadCode=0`、14/14、`consumerPassed=true`。本次修复链增加了泛型
+context remap、泛型实例 Current layout 以及 changed generic execution bridge；对应
+源码提交为 HybridCLR `38c5f09`。尚未重新完成 no-op、method-only、多 Base 连续更新
+和性能/内存门禁，因此仍是有条件通过。
 
 以下路径相对 C:/hybridclr_optimize/artifacts/dhe-evolution-20260908。
 
