@@ -56,14 +56,50 @@ an affected generic definition. A frozen `Nullable<T>` definition is unchanged;
 its Current argument can produce the required new closed layout while retaining
 the core-library identity required by IL2CPP nullable handling. All affected
 owner methods still require frozen IL and native guards. Owners with concrete
-affected fields retain physical definition selection. This is a candidate fix,
-not a passing result. `recompile-frozen-entry` reauthenticates an existing Player,
+affected fields retain physical definition selection. `recompile-frozen-entry` reauthenticates an existing Player,
 native manifest and prior proof, then regenerates only the diagnostic resources
 and records the source evidence hash. No Base rebuild or binary mutation occurs.
+
+### Resource-Only Generic Definition Result
+
+Planner lab commit `565e5e5` produced
+`artifacts/dhe-frozen-entry-generic-definition-01` against the immutable proof-09
+Player. Every DLL, Base MV, Current MV and method selection matches proof-09.
+The only selection difference is removal of corlib type token `0x02000161`
+(`Nullable<T>`) from physical definition selection. The ordinary inline owner
+and mutable storage selections are unchanged.
+
+| Suffix after `dhe-frozen-entry-generic-definition-01` | PID | Outcome |
+| --- | --- | --- |
+| (none) | 40056 | all 34 core checks pass |
+| -generics | 7320 | all 36 checks pass |
+| -arrays-byref | 51100 | all 37 checks pass |
+| -order-swap | 53000 | core and generic checks pass in swapped order |
+| -order-reverse | 42308 | core and array/byref checks pass in reversed order |
+| -nullable | 56328 | affected nullable copy and null pass; unaffected Nullable<long> fails the native ABI guard |
+
+This is a partial correction. Frozen methods are still selected at definition
+granularity, so the selected Nullable constructor also marks Nullable<long> as
+requiring interpretation. The open-definition ABI guard rejects its native
+entry even though this closed instance is unaffected. Do not weaken the ABI
+guard or claim Nullable support from the first two checks alone.
+
+The next implementation needs an authenticated distinction between unconditional
+method dependencies and methods selected only because their generic arguments
+change. The runtime must retain AOT for unaffected closed instances and remap
+affected instances before creating their Current call frames. Native selections,
+retry identity, resource-plan bindings and managed loading must carry the same
+distinction. The negative guard for genuinely changed value frames remains
+mandatory; matching names or sizes is not sufficient to enter an old native ABI.
 
 Old boxed-value adaptation remains a separate failing gate. Universal guard
 admission, managed resource authentication/staging, multi-Base qualification and
 performance also remain open.
+
+This iteration changes the lab candidate only. Runtime/package candidate commits
+remain those listed above. No formal maintenance branch, tag, remote, Installer
+default or CAT checkout was changed. C: retains about 73 GiB free after the two
+new Player builds, so no cleanup was needed.
 
 ## Workload and Historical Findings
 
