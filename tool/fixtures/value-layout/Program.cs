@@ -236,7 +236,7 @@ if (args.Length == 6 && args[0] == "probe-project")
         string.Join("", assemblies.Append(nativeAssembly).Append("Assembly-CSharp").Select(name => "<assembly fullname=\"" + name + "\" preserve=\"all\"/>")) + "</linker>");
     File.WriteAllText(Path.Combine(destination, "probe-source.json"), JsonSerializer.Serialize(new
     {
-        scope = "Current storage research probe; no DHE native guards or production workflow qualification",
+        scope = "Current storage API fixture; build output binds native guards separately; resource workflow not qualified",
         labHead = Run("git", lab, "rev-parse", "HEAD").Trim(), labChanges = Run("git", lab, "status", "--porcelain").Trim(),
         packageHead = Run("git", package, "rev-parse", "HEAD").Trim(), engineVersion,
         inputAssemblies = assemblies.Append(nativeAssembly).Select(name => new { name, sha256 = Hash(Path.Combine(fixture, name + ".dll")) }).ToArray(),

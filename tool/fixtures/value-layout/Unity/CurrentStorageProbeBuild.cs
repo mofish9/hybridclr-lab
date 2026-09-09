@@ -98,7 +98,7 @@ namespace HybridCLR.Lab.Editor
         {
             public bool passed; public string unityVersion; public string bytes;
             public string playerSha256; public string gameAssemblySha256;
-            public string scope = "Current storage probe; no native entry guard qualification";
+            public string scope = "Current storage API fixture; guard coverage is recorded in native-manifest.json";
         }
     }
 }
