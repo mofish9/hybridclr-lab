@@ -15,12 +15,15 @@
 
 | 证据 | 结果 |
 |---|---|
-| `artifacts/dhe-frozen-aot-20260909/native/DHE-Unity2022/native-gate.json` | 真实 Unity 2022 headers，CTest 1/1，`mergeReady=true`，无 surrogate headers |
+| `artifacts/dhe-frozen-aot-20260909/native-v5/DHE-Unity2022/native-gate.json` | 真实 Unity 2022 headers，CTest 1/1，FGS，通过，`mergeReady=true`，无 surrogate headers |
 | `artifacts/dhe-frozen-aot-20260909/policy-final3/result.json` | 21/21 policy checks，通过真实完整 AOT 快照 |
-| HybridCLR 候选 | `ecd519d3bceee5fd3cd6636b191202461411d434`，冻结来源运行时校验 |
-| lab 候选 | `6b3da8c`，策略编译器、快照来源记录和 fixture |
+| HybridCLR 候选 | `e22aed2a049c0f85d56a89a9b1bad272a57653e8`，冻结来源运行时校验 |
+| package 候选 | `e965c34e1c247de6fc5f323c4de4874d0d525e9d`，统一原子加载入口 |
+| lab 候选 | `e33e0ca`，策略编译器、资源 staging 和 fixture |
 
-后续接口候选已增加：HybridCLR `e22aed2a049c0f85d56a89a9b1bad272a57653e8` 提供带 source role 的 native 原子加载；package `f1dd1226dc5e926d804a2ddf6850c2981dbbe488` 提供 `DheRuntime.LoadFrozenAotImages`、按 Base 选择 source records 和计划记录校验。重新组装的 `runtime-v3` 在 Unity 2022 真实 headers 下 CTest 仍为 1/1 通过。
+HybridCLR `e22aed2a049c0f85d56a89a9b1bad272a57653e8` 提供带 source role 的 native 原子加载；package `e965c34e1c247de6fc5f323c4de4874d0d525e9d` 已将 frozen source 与 mutable hotfix 合并到唯一的 `LoadAssemblyImages` 事务，移除可绕过原子发布的旧 frozen loader。重新组装的 `runtime-v5` 在 Unity 2022 真实 headers 下 CTest 1/1、FGS 通过。
+
+提交后的 managed execution-plan 门禁也已重跑，所有检查通过；该门禁覆盖统一 API 参数记录、双 Base 选择、schema、hash/MV 绑定和失败重试语义。
 
 `materialize-frozen-aot` 已用真实 Base 快照和人工扩大的 `Payload` Current 生成 source assets/plan：2 个普通源被选中（`HybridCLR.ValueLayoutNative`、`mscorlib`），其中包含普通 Echo、内联 owner、泛型调用等 token。`mscorlib` 被选中说明完整程序集扫描会触及框架泛型代码，必须经过单独 Player 验证；该命令本身不等于可加载证明。
 
