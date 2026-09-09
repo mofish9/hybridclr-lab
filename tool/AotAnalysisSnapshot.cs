@@ -1,3 +1,4 @@
+#nullable enable
 using System.Security.Cryptography;
 using System.Text.Json;
 using dnlib.DotNet;
@@ -68,7 +69,7 @@ internal sealed record AotAnalysisSnapshot(string ManifestPath, string Sha256, s
         string[] actualFiles = Directory.GetFiles(Path.Combine(root, "assemblies"), "*", SearchOption.AllDirectories);
         if (identityOwners != 1 || names.Count == 0 || !names.SetEquals(expectedAotNames) ||
             !dhe.SetEquals(expectedDheNames) || actualFiles.Length != names.Count ||
-            !names.SetEquals(actualFiles.Select(Path.GetFileNameWithoutExtension)))
+            !names.SetEquals(actualFiles.Select(path => Path.GetFileNameWithoutExtension(path))))
             throw new InvalidDataException("Base AOT analysis inventory/classification mismatch.");
         return new(manifestPath, hash!.ToLowerInvariant(), ordinary.OrderBy(path => path, StringComparer.Ordinal).ToArray());
     }
