@@ -11,8 +11,8 @@ Current 资源的 14/14 value-layout、Consumer、泛型复制/泛型装箱、�
 
 | 组件 | commit |
 |---|---|
-| HybridCLR | 38c5f097d6b38e3e0f48c9178b74b15e7c3ac5fc |
-| lab（当前 lock） | 3a284e6 |
+| HybridCLR | 741e91402b508e360bc3e976012ca5fd37aa30f6 |
+| lab（当前 lock） | 6f2643a |
 | Unity 2022 IL2CPP | 325791073cd75ca480c73f024fd5304c7cd9c7dc |
 | 团结 2022 IL2CPP（尚未移植） | df8d0123d9f5a9fce79283fe5261dba21e802aa0 |
 | package | bc319e5e376d97ed89fdd0f127d4256fa466f1ef |
