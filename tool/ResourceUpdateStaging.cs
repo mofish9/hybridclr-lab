@@ -120,7 +120,15 @@ internal static partial class Program
         var stagedFiles = new List<object>();
         foreach (var payload in payloads)
         {
-            var target = ResolveContainedPath(payload.AssetRoot, payload.RelativePath,
+            if (!payload.AssetRoot.StartsWith(runtimeAssetRoot,
+                    StringComparison.OrdinalIgnoreCase))
+                throw new DheException("DHE payload asset root is outside runtime asset root: " +
+                    payload.AssetRoot);
+            string assetPrefix = payload.AssetRoot[runtimeAssetRoot.Length..].Trim('/');
+            string stagedRelative = string.IsNullOrEmpty(assetPrefix)
+                ? payload.RelativePath
+                : assetPrefix + "/" + payload.RelativePath;
+            var target = ResolveContainedPath(assetRoot, stagedRelative,
                 "DHE staged payload");
             Directory.CreateDirectory(Path.GetDirectoryName(target)!);
             File.Copy(payload.SourcePath, target, true);
