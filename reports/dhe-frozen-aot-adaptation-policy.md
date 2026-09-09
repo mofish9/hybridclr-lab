@@ -25,6 +25,8 @@ HybridCLR `e22aed2a049c0f85d56a89a9b1bad272a57653e8` 提供带 source role 的 n
 
 提交后的 managed execution-plan 门禁也已重跑，所有检查通过；该门禁覆盖统一 API 参数记录、双 Base 选择、schema、hash/MV 绑定和失败重试语义。
 
+随后在 Unity 2022.3.62f3 Windows Player 上完成了同一 Base 的 resource-only no-op staging：修正 staging 物理目标路径后，`Snapshot.exe` 返回 `passed=true`、`resourceUpdate=true`，并验证 staged `payload/*.dll.bytes` 与 `payload/*.mv.bytes` 可被 Player 读取。该结果只证明现有 hotfix 路径，尚未证明普通 AOT frozen source 的 direct-entry 适配。
+
 `materialize-frozen-aot` 已用真实 Base 快照和人工扩大的 `Payload` Current 生成 source assets/plan：2 个普通源被选中（`HybridCLR.ValueLayoutNative`、`mscorlib`），其中包含普通 Echo、内联 owner、泛型调用等 token。`mscorlib` 被选中说明完整程序集扫描会触及框架泛型代码，必须经过单独 Player 验证；该命令本身不等于可加载证明。
 
 `merge-frozen-aot` 已将 source records 写入匹配的 `baseSelections[baseId].frozenAotSources`，避免多个 Base 共用错误的普通 AOT 源。示例合并输出验证了 2 条 source records 被绑定到 `9e7cc69b...` Base。
