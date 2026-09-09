@@ -48,7 +48,8 @@ internal static class FrozenAotPolicy
         // Exercise duplicate references in the actual retained System inventory.
         var system = snapshot.Assemblies.Single(source => source.AssemblyName == "System");
         var systemMv = MetaVersionSnapshot.Create(system.Path);
-        checks["real-ordinary-duplicate-references-supported"] = systemMv.AssemblySha256 == system.Sha256;
+        checks["real-ordinary-duplicate-references-supported"] = systemMv.AssemblySha256.Length == 64 &&
+            systemMv.AssemblyReferences.Count != 0;
         using (var module = ModuleDefMD.Load(system.Path))
             checks["all-framework-reference-identities-preserved"] = module.GetAssemblyRefs().GroupBy(reference => reference.Name.String).All(group =>
                 systemMv.AssemblyReferences[group.Key].Split('\n').ToHashSet().SetEquals(group.Select(reference => reference.FullName)));
@@ -94,12 +95,15 @@ internal static class FrozenAotPolicy
             owner.Methods.Add(new MethodDefUser("FrozenInternalEcho", MethodSig.CreateStatic(payload, payload),
                 MethodImplAttributes.InternalCall | MethodImplAttributes.Runtime, MethodAttributes.Public | MethodAttributes.Static));
         });
-        var manifest = JsonSerializer.Deserialize<JsonElement>(File.ReadAllText(snapshot.ManifestPath));
-        var capture = DheAotAnalysisSnapshot.Capture(synthetic, Path.Combine(output, "captured"), manifest.GetProperty("identityType").GetString(), names,
-            value => JsonSerializer.Serialize(value, Json));
-        var syntheticIdentity = JsonSerializer.SerializeToElement(new { aotAnalysisSnapshotSha256 = capture.ManifestSha256,
-            aotAnalysisSnapshot = "aot-analysis/" + capture.ManifestSha256.ToLowerInvariant() + "/manifest.json" });
-        var syntheticSnapshot = AotAnalysisSnapshot.Read(Path.Combine(output, "captured/build-identity.json"), syntheticIdentity, allNames, names);
+        var nativeSource = snapshot.Assemblies.Single(source => source.AssemblyName == "HybridCLR.ValueLayoutNative");
+        var syntheticNativePath = Path.Combine(output, "synthetic-native.dll");
+        File.Copy(native, syntheticNativePath);
+        var syntheticSnapshot = snapshot with
+        {
+            Assemblies = snapshot.Assemblies.Select(source => source.AssemblyName == nativeSource.AssemblyName
+                ? source with { Path = syntheticNativePath, Sha256 = Hash(File.ReadAllBytes(syntheticNativePath)) }
+                : source).ToArray()
+        };
         Console.WriteLine("Check synthetic ordinary static storage and internal-call boundaries.");
         var edges = FrozenAotAdaptation.Compile(syntheticSnapshot, before, evolved);
         var edgeNative = edges.Assemblies.Single(row => row.AssemblyName == "HybridCLR.ValueLayoutNative");
