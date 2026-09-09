@@ -69,8 +69,7 @@ internal sealed class MetaVersionSnapshot
                 StableAssemblyShape(module)),
             AssemblyNonReferenceMetadataVersion = Hash("dhe-assembly-nonreference-metadata\n" +
                 StableAssemblyShape(module, false)),
-            AssemblyReferences = module.GetAssemblyRefs().ToDictionary(reference => reference.Name.String,
-                reference => reference.FullName, StringComparer.OrdinalIgnoreCase),
+            AssemblyReferences = ReadAssemblyReferences(module),
             TypeReferenceScopes = module.GetTypeRefs().GroupBy(type => type.FullName, StringComparer.Ordinal)
                 .ToDictionary(group => group.Key, group => string.Join("\n", group.Select(type =>
                     type.DefinitionAssembly?.FullName ?? "").Distinct(StringComparer.Ordinal)
@@ -89,6 +88,17 @@ internal sealed class MetaVersionSnapshot
                         ? generic.GenericType.FullName : type.BaseType.FullName),
                 StringComparer.Ordinal),
         };
+    }
+
+    private static IReadOnlyDictionary<string, string> ReadAssemblyReferences(ModuleDefMD module)
+    {
+        // Unity retains duplicate rows and even several framework versions for
+        // one simple name. Preserve the complete identity set for comparison;
+        // never arbitrarily choose a version. This does not resolve references,
+        // rewrite the DLL, or change the existing binary MV hash input.
+        return module.GetAssemblyRefs().GroupBy(reference => reference.Name.String, StringComparer.OrdinalIgnoreCase)
+            .ToDictionary(group => group.Key, group => string.Join("\n", group.Select(reference => reference.FullName)
+                .Distinct(StringComparer.Ordinal).OrderBy(value => value, StringComparer.Ordinal)), StringComparer.OrdinalIgnoreCase);
     }
 
     private static MetaVersionAttributeUse[] ReadAttributeUses(ModuleDefMD module)

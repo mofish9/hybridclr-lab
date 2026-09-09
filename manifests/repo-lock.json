@@ -18,8 +18,8 @@
     "hybridclr": {
       "upstream": "https://github.com/focus-creative-games/hybridclr.git",
       "fork": "https://github.com/mofish9/hybridclr.git",
-      "tag": "65f8777c76590dc89653ec662619e98645d152da",
-      "commit": "65f8777c76590dc89653ec662619e98645d152da",
+      "tag": "ecd519d3bceee5fd3cd6636b191202461411d434",
+      "commit": "ecd519d3bceee5fd3cd6636b191202461411d434",
       "localBranch": "optimize/v8.13.0"
     },
     "il2cpp_plus": {

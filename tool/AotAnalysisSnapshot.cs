@@ -8,8 +8,21 @@ namespace HybridCLR.DheTool;
 // Reads the immutable package capture. Final-build semantic normalization is
 // verified by the package before a Base is archived; never infer that proof
 // from a directory supplied separately by a resource build caller.
-internal sealed record AotAnalysisSnapshot(string ManifestPath, string Sha256, string[] OrdinaryAssemblyPaths)
+internal sealed record AotAnalysisAssembly(string AssemblyName, string Path, string Sha256,
+    bool Dhe, uint[] ExcludedTypeTokens)
 {
+    public byte[] ReadVerifiedBytes()
+    {
+        byte[] bytes = File.ReadAllBytes(Path);
+        if (!Convert.ToHexString(SHA256.HashData(bytes)).Equals(Sha256, StringComparison.OrdinalIgnoreCase))
+            throw new InvalidDataException("Frozen AOT source changed after snapshot validation: " + AssemblyName);
+        return bytes;
+    }
+}
+
+internal sealed record AotAnalysisSnapshot(string ManifestPath, string Sha256, AotAnalysisAssembly[] Assemblies)
+{
+    public string[] OrdinaryAssemblyPaths => Assemblies.Where(source => !source.Dhe).Select(source => source.Path).ToArray();
     public static AotAnalysisSnapshot? Read(string identityPath, JsonElement identity,
         IEnumerable<string> expectedAotNames, IEnumerable<string> expectedDheNames)
     {
@@ -41,7 +54,7 @@ internal sealed record AotAnalysisSnapshot(string ManifestPath, string Sha256, s
         string root = Path.GetDirectoryName(manifestPath)!;
         var names = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
         var dhe = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
-        var ordinary = new List<string>();
+        var sources = new List<AotAnalysisAssembly>();
         int identityOwners = 0;
         foreach (JsonElement row in rows.EnumerateArray())
         {
@@ -64,13 +77,18 @@ internal sealed record AotAnalysisSnapshot(string ManifestPath, string Sha256, s
             if (owner != (name == Text(manifest, "identityAssembly")) || owner && isDhe.GetBoolean())
                 throw new InvalidDataException("Base AOT analysis generated identity owner is invalid.");
             if (owner) identityOwners++;
-            if (isDhe.GetBoolean()) dhe.Add(name); else ordinary.Add(path);
+            if (isDhe.GetBoolean()) dhe.Add(name);
+            string identityType = Text(manifest, "identityType")!;
+            uint[] excluded = owner ? module.GetTypes().Where(type => type.FullName == identityType ||
+                type.FullName.StartsWith(identityType + "/", StringComparison.Ordinal))
+                .Select(type => type.MDToken.Raw).OrderBy(token => token).ToArray() : Array.Empty<uint>();
+            sources.Add(new(name, path, Text(row, "sha256")!.ToUpperInvariant(), isDhe.GetBoolean(), excluded));
         }
         string[] actualFiles = Directory.GetFiles(Path.Combine(root, "assemblies"), "*", SearchOption.AllDirectories);
         if (identityOwners != 1 || names.Count == 0 || !names.SetEquals(expectedAotNames) ||
             !dhe.SetEquals(expectedDheNames) || actualFiles.Length != names.Count ||
             !names.SetEquals(actualFiles.Select(path => Path.GetFileNameWithoutExtension(path))))
             throw new InvalidDataException("Base AOT analysis inventory/classification mismatch.");
-        return new(manifestPath, hash!.ToLowerInvariant(), ordinary.OrderBy(path => path, StringComparer.Ordinal).ToArray());
+        return new(manifestPath, hash!.ToLowerInvariant(), sources.OrderBy(source => source.AssemblyName, StringComparer.Ordinal).ToArray());
     }
 }

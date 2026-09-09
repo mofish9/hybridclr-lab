@@ -24,7 +24,11 @@ public sealed record DheValueLayoutImpactResult(string[] ChangedValueTypes,
 }
 
 public sealed record DheStaticValueFieldImpact(string Identity, string AssemblyName,
-    bool OrdinaryAot, bool ThreadStatic, bool HasRva);
+    bool OrdinaryAot, bool ThreadStatic, bool HasRva)
+{
+    public uint FieldToken { get; init; }
+    public uint DeclaringTypeToken { get; init; }
+}
 
 public static class DheValueLayoutImpact
 {
@@ -121,7 +125,8 @@ public static class DheValueLayoutImpact
                         {
                             staticFields.Add(entry.Key + ":" + identity);
                             staticDetails.Add(new(entry.Key + ":" + identity, entry.Key, ordinary,
-                                field.CustomAttributes.Any(attribute => attribute.TypeFullName == "System.ThreadStaticAttribute"), field.HasFieldRVA));
+                                field.CustomAttributes.Any(attribute => attribute.TypeFullName == "System.ThreadStaticAttribute"), field.HasFieldRVA)
+                            { FieldToken = field.MDToken.Raw, DeclaringTypeToken = type.MDToken.Raw });
                         }
                     }
                     foreach (MethodDef method in type.Methods)

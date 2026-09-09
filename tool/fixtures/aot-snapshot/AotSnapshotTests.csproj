@@ -3,7 +3,7 @@
     <OutputType>Exe</OutputType>
     <TargetFramework>net6.0</TargetFramework>
     <ImplicitUsings>enable</ImplicitUsings>
-    <Nullable>disable</Nullable>
+    <Nullable>annotations</Nullable>
   </PropertyGroup>
   <Target Name="RequirePackage" BeforeTargets="PrepareForBuild">
     <Error Condition="'$(DhePackageRoot)' == ''" Text="Pass the package source as DhePackageRoot." />
@@ -16,6 +16,11 @@
     <Compile Remove="Unity/**/*.cs" />
     <Compile Include="$(DhePackageRoot)/Editor/Commands/DheAotAnalysisSnapshot.cs" Link="Package/DheAotAnalysisSnapshot.cs" />
     <Compile Include="../../AotAnalysisSnapshot.cs" Link="Tool/AotAnalysisSnapshot.cs" />
+    <Compile Include="../../MetaVersion.cs" Link="Tool/MetaVersion.cs" />
+    <Compile Include="../../ResourceUpdateCompatibility.cs" Link="Tool/ResourceUpdateCompatibility.cs" />
+    <Compile Include="../../ResourceExecutionPlan.cs" Link="Tool/ResourceExecutionPlan.cs" />
+    <Compile Include="../../DheValueLayoutImpact.cs" Link="Tool/DheValueLayoutImpact.cs" />
+    <Compile Include="../../FrozenAotAdaptation.cs" Link="Tool/FrozenAotAdaptation.cs" />
     <Reference Include="dnlib"><HintPath>../../dnlib.dll</HintPath></Reference>
   </ItemGroup>
 </Project>

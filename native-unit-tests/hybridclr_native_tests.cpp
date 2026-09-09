@@ -554,6 +554,52 @@ namespace
         rejects(base, invalid, {}, { caller.token });
         invalid = base; invalid.methods[0].declaringTypeStableId.fill(99);
         rejects(invalid, current, { value.token }, {});
+
+#if defined(HYBRIDCLR_DHE_HAS_FROZEN_AOT_SOURCE)
+        CurrentImageSource frozen;
+        frozen.kind = CurrentImageSourceKind::FrozenBaseAot;
+        frozen.baseSourceHash = base.assemblyHash;
+        CHECK(BuildCurrentImagePlan(base, base, { base.types[0].token }, {}, plan, frozen));
+        CHECK(plan.source == frozen && plan.methods.size() == 1);
+        samePlan = plan; samePlan.source = CurrentImageSource{};
+        CHECK(!(samePlan == plan)); // A pending image cannot change source role.
+        auto rejectsFrozen = [&](const MetaVersionData& execution, const CurrentImageSource& source,
+            std::vector<uint32_t> types, std::vector<uint32_t> methods) {
+            CurrentImagePlan sentinel = plan;
+            CHECK(!BuildCurrentImagePlan(base, execution, types, methods, sentinel, source));
+            CHECK(sentinel == plan);
+        };
+        rejectsFrozen(current, frozen, {}, {}); // Newer ordinary DLL is forbidden.
+        invalid = base; invalid.methods[0].version.fill(98);
+        rejectsFrozen(invalid, frozen, {}, {}); // Equal DLL claims do not hide changed MV.
+        invalid = base; invalid.types[0].version.fill(97);
+        rejectsFrozen(invalid, frozen, {}, {});
+        invalid = base; invalid.methods[0].token = 0x06000018;
+        rejectsFrozen(invalid, frozen, {}, {});
+        invalid = base; invalid.methods.pop_back();
+        rejectsFrozen(invalid, frozen, {}, {});
+        invalid = base; invalid.flags ^= kMetaVersionStrictCompatibilityFlag;
+        rejectsFrozen(invalid, frozen, {}, {});
+        CurrentImageSource badSource = frozen;
+        badSource.baseSourceHash.fill(99);
+        rejectsFrozen(base, badSource, {}, {});
+        badSource.baseSourceHash.fill(0);
+        rejectsFrozen(base, badSource, {}, {});
+        badSource = frozen; badSource.kind = static_cast<CurrentImageSourceKind>(99);
+        rejectsFrozen(base, badSource, {}, {});
+        badSource = frozen; badSource.kind = CurrentImageSourceKind::MutableHotfix;
+        rejectsFrozen(base, badSource, {}, {}); // No hidden frozen constraints on mutable sources.
+        frozen.excludedBaseTypeTokens = { base.types[0].token };
+        CHECK(BuildCurrentImagePlan(base, base, {}, { base.methods[1].token }, samePlan, frozen));
+        rejectsFrozen(base, frozen, { base.types[0].token }, {});
+        rejectsFrozen(base, frozen, {}, { base.methods[0].token });
+        badSource = frozen; badSource.excludedBaseTypeTokens.push_back(base.types[0].token);
+        rejectsFrozen(base, badSource, {}, {});
+        badSource = frozen; badSource.excludedBaseTypeTokens = { 0x02000099 };
+        rejectsFrozen(base, badSource, {}, {});
+        badSource = frozen; badSource.excludedBaseTypeTokens = { base.types[1].token, base.types[0].token };
+        rejectsFrozen(base, badSource, {}, {});
+#endif
 #endif
     }
 
@@ -991,6 +1037,46 @@ namespace
         CHECK(changed.methodPointerCallByInterp == originalChanged.methodPointerCallByInterp);
         hybridclr::dhe::ResetForTests();
         physicalCurrent.isInterpterImpl = false;
+
+#if defined(HYBRIDCLR_DHE_HAS_FROZEN_AOT_SOURCE)
+        auto frozenBase = executionBase;
+        frozenBase.assemblyHash.fill(71);
+        auto frozenCurrent = frozenBase;
+        auto frozenRegistration = executionRegistration;
+        frozenRegistration.baseMetaVersion = &frozenBase;
+        frozenRegistration.currentMetaVersion = &frozenCurrent;
+        frozenRegistration.source.kind = hybridclr::dhe::CurrentImageSourceKind::FrozenBaseAot;
+        frozenRegistration.source.baseSourceHash = frozenBase.assemblyHash;
+        physicalCurrent.token = changed.token;
+        CHECK(hybridclr::dhe::PrepareAndRegisterMetaVersions({ frozenRegistration }));
+        CHECK(hybridclr::dhe::IsFrozenAotExecutionSource(&assembly));
+        CHECK(hybridclr::dhe::ResolveCurrentExecutionMethod(&changed) == &physicalCurrent);
+        CHECK(!hybridclr::dhe::IsChangedMethod(&unchanged));
+        hybridclr::dhe::ResetForTests();
+        physicalCurrent.isInterpterImpl = false;
+        frozenCurrent.methods[0].version.fill(99);
+        CHECK(!hybridclr::dhe::PrepareAndRegisterMetaVersions({ frozenRegistration }));
+        CHECK(!hybridclr::dhe::IsDheAssembly(&assembly) && !physicalCurrent.isInterpterImpl);
+        frozenCurrent = frozenBase;
+        frozenRegistration.source.excludedBaseTypeTokens = { frozenBase.types[0].token };
+        CHECK(!hybridclr::dhe::PrepareAndRegisterMetaVersions({ frozenRegistration }));
+        CHECK(!hybridclr::dhe::IsFrozenAotExecutionSource(&assembly));
+        CHECK(!physicalCurrent.isInterpterImpl && !changed.isInterpterImpl);
+        // Invalid later source must not publish or prepare an earlier valid one.
+        auto otherFrozenBase = frozenBase;
+        auto otherFrozenCurrent = frozenBase;
+        Il2CppAssembly otherFrozenAssembly{};
+        otherFrozenAssembly.aname.name = "Invalid.Frozen";
+        otherFrozenBase.assemblyName = otherFrozenCurrent.assemblyName = "Invalid.Frozen";
+        otherFrozenCurrent.assemblyHash.fill(72);
+        hybridclr::dhe::MetaVersionRegistration otherFrozen(&otherFrozenAssembly, &otherFrozenBase, &otherFrozenCurrent);
+        otherFrozen.source = frozenRegistration.source;
+        frozenRegistration.source.excludedBaseTypeTokens.clear();
+        CHECK(!hybridclr::dhe::PrepareAndRegisterMetaVersions({ frozenRegistration, otherFrozen }));
+        CHECK(!hybridclr::dhe::IsDheAssembly(&assembly) && !hybridclr::dhe::IsDheAssembly(&otherFrozenAssembly));
+        CHECK(!physicalCurrent.isInterpterImpl && !changed.isInterpterImpl);
+        physicalCurrent.token = executionCurrent.methods[0].token;
+#endif
 
         auto invalidExecution = executionRegistration;
         invalidExecution.currentExecutions.push_back(invalidExecution.currentExecutions[0]);
