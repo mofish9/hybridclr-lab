@@ -14,6 +14,29 @@ internal static class UnityWorkflow
         if (Directory.Exists(output)) throw new IOException("Output must be new.");
         Directory.CreateDirectory(output);
         string project = Path.Combine(output, "project"), build = Path.Combine(output, "base");
+        string ordinaryGuardRoot = Path.Combine(output, "ordinary-guard-mv");
+        Directory.CreateDirectory(ordinaryGuardRoot);
+        // Generate guard-only MV JSON from the immutable ordinary AOT input
+        // before Unity builds its Base. These records never become hotfix
+        // assemblies; they only make direct native entries universally guarded.
+        foreach (string name in new[] { "HybridCLR.ValueLayoutNative" })
+        {
+            var guardSnapshot = MetaVersionSnapshot.Create(Path.Combine(fixtures, name + ".dll"));
+            var methods = guardSnapshot.Methods.Select(method => new
+            {
+                identity = method.Identity, stableId = method.StableId, name = method.Name,
+                token = method.Token, flags = method.Flags, declaringType = method.DeclaringType,
+                returnType = method.ReturnType, parameterTypes = method.ParameterTypes,
+                isStatic = method.IsStatic, hasThis = method.HasThis,
+                isAbstract = method.IsAbstract, isPInvoke = method.IsPInvoke,
+                declaringTypeIsValueType = method.DeclaringTypeIsValueType,
+                genericParameterCount = method.GenericParameterCount,
+                declaringTypeGenericParameterCount = method.DeclaringTypeGenericParameterCount,
+            }).ToArray();
+            File.WriteAllText(Path.Combine(ordinaryGuardRoot, name + ".mv.json"),
+                JsonSerializer.Serialize(new { assemblyName = guardSnapshot.AssemblyName, methods },
+                    new JsonSerializerOptions { PropertyNamingPolicy = JsonNamingPolicy.CamelCase, WriteIndented = true }));
+        }
         string tool = Path.Combine(lab, "tool/bin/Release/net6.0/HybridCLR.DheTool.dll");
         string probe = Path.Combine(lab, "tool/fixtures/value-layout/bin/Release/net6.0/ValueLayoutTests.dll");
         string Execute(string exe, params string[] arguments)
@@ -57,6 +80,7 @@ internal static class UnityWorkflow
                 "-dheTarget", "StandaloneWindows64", "-dheOutputRoot", build, "-dheBaselineRoot", Path.Combine(build, "baseline"),
                 "-dheCurrentRoot", Path.Combine(build, "current"), "-dheMode", "Exploratory", "-dheBootstrap", "true",
                 "-dheProjectPlan", plan, "-dheEngineWorkflow", "Unity2022Fgs", "-dheIl2CppCodeGeneration", "OptimizeSize",
+                "-dheOrdinaryGuardMvRoot", ordinaryGuardRoot,
                 "-logFile", Path.Combine(output, phase + ".log"));
         }
         Phase("Prepare");

@@ -17,6 +17,7 @@ namespace HybridCLR.Lab.Snapshot
             public int loadedAssemblies, revision, sentinel;
             public string[] records;
             public long ordinaryAotReferenceResult;
+            public long ordinaryAotEchoExtra;
             public int ordinaryAotStaticNeighbor;
         }
         private sealed class Provider : IDheRuntimeAssetProvider
@@ -67,11 +68,14 @@ namespace HybridCLR.Lab.Snapshot
                     var native = System.Reflection.Assembly.Load("HybridCLR.ValueLayoutNative").GetType("HybridCLR.Lab.ValueLayoutNative.NativeBoundary");
                     result.ordinaryAotReferenceResult = (long)native.GetMethod("ResourceResult").Invoke(null, null);
                     result.ordinaryAotStaticNeighbor = (int)native.GetMethod("StaticNeighbor").Invoke(null, null);
+                    object echoed = native.GetMethod("Echo").Invoke(null, new[] { ValueLayout.Factory.Create() });
+                    result.ordinaryAotEchoExtra = (long)echoed.GetType().GetField("Extra").GetValue(echoed);
                 }
                 int expectedIndex = Array.IndexOf(args, "-expectedRevision");
                 int expectedRevision = expectedIndex < 0 ? 41 : int.Parse(args[expectedIndex + 1]);
                 result.passed = result.loadedAssemblies == 3 && result.revision == expectedRevision && result.sentinel == 5 &&
-                    !RuntimeApi.IsDifferentialMethodChanged(typeof(ValueLayout.Factory).GetMethod("UnchangedRevision"));
+                    !RuntimeApi.IsDifferentialMethodChanged(typeof(ValueLayout.Factory).GetMethod("UnchangedRevision")) &&
+                    result.ordinaryAotEchoExtra == 90000000001L;
             }
             catch (Exception exception) { result.error = exception.ToString(); }
             File.WriteAllText(args[index + 1], JsonUtility.ToJson(result, true));
