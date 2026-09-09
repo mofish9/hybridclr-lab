@@ -19,6 +19,7 @@ namespace HybridCLR.Lab
             public int interpreterEntries; public string scope = "Public RuntimeApi storage transaction and ordinary reflection; resource workflow not qualified";
             public int rejectedInvalidPlans;
             public bool reflectionPassed, revisionPassed;
+            public bool reflectionSignaturePassed, reflectionValueCallsPassed;
             public int directRevision, reflectedRevision, revisionInterpreterEntries, unchangedAotEntries;
         }
 
@@ -88,6 +89,21 @@ namespace HybridCLR.Lab
                     (expectedRevision == 41 ? result.revisionInterpreterEntries == 0 : result.revisionInterpreterEntries > 0)));
                 result.stage = "reflection"; save();
                 object box = typeof(ValueLayout.Factory).GetMethod("Create").Invoke(null, null);
+                Type payloadType = box.GetType();
+                Type callsType = Assembly.Load("HybridCLR.ValueLayoutConsumer").GetType("HybridCLR.Lab.ValueLayoutConsumer.Calls", true);
+                MethodInfo copyMethod = callsType.GetMethod("DirectCopy"), refMethod = callsType.GetMethod("RefRoundTrip");
+                result.reflectionSignaturePassed = typeof(ValueLayout.Factory).GetMethod("Create").ReturnType == payloadType &&
+                    copyMethod.ReturnType == payloadType && copyMethod.GetParameters()[0].ParameterType == payloadType &&
+                    refMethod.GetParameters()[0].ParameterType.GetElementType() == payloadType;
+                object copied = copyMethod.Invoke(null, new[] { box });
+                object genericCopy = typeof(ValueLayout.Factory).GetMethod("Identity").MakeGenericMethod(payloadType).Invoke(null, new[] { box });
+                object[] refArgs = { box }; refMethod.Invoke(null, refArgs);
+                MethodInfo hasCurrent = typeof(ValueLayout.Factory).GetMethod("HasCurrentFields");
+                MethodInfo nullableCopy = callsType.GetMethod("NullableCopy");
+                object nullableValue = nullableCopy.Invoke(null, new[] { box });
+                result.reflectionValueCallsPassed = new[] { copied, genericCopy, refArgs[0], nullableValue }
+                    .All(value => value != null && value.GetType() == payloadType && (bool)hasCurrent.Invoke(null, new[] { value })) &&
+                    nullableCopy.Invoke(null, new object[] { null }) == null;
                 FieldInfo count = box.GetType().GetField("Count");
                 count.SetValue(box, 29);
                 object foreign = Activator.CreateInstance(Assembly.Load("HybridCLR.ValueLayoutOther")
@@ -95,8 +111,12 @@ namespace HybridCLR.Lab
                 bool foreignRejected = false;
                 try { count.GetValue(foreign); }
                 catch (ArgumentException) { foreignRejected = true; }
+                bool foreignArgumentRejected = false;
+                try { copyMethod.Invoke(null, new[] { foreign }); }
+                catch (ArgumentException) { foreignArgumentRejected = true; }
                 result.reflectionPassed = count.DeclaringType.IsInstanceOfType(box) &&
-                    (int)count.GetValue(box) == 29 && foreignRejected;
+                    (int)count.GetValue(box) == 29 && foreignRejected && foreignArgumentRejected &&
+                    result.reflectionSignaturePassed && result.reflectionValueCallsPassed;
                 result.stage = "model"; save();
                 MethodInfo model = Assembly.Load("HybridCLR.ValueLayoutModel").GetType("HybridCLR.Lab.ValueLayout.ValueLayoutProbe", true).GetMethod("Run");
                 result.records = (string[])model.Invoke(null, null);

@@ -28,6 +28,15 @@ mutation. No throughput, P99, memory or mobile claim is made. FGS and real Unity
 API adapter: it reuses the serialized, prepared multi-image registration.
 Later public resource identity validation must finish before entering it.
 
+The first public-API Player exposed a real failure: Factory.Create invoked via
+ordinary reflection still used the Base struct return ABI and raised the
+Current-frame guard. The five invalid-plan checks and revision dispatch passed.
+Correct reflection at its managed invocation boundary, before receiver and
+argument conversion. ParameterInfo and ReturnType must expose that same
+physical signature while preserving the logical declaring/reflected owner.
+Keep raw native Invoke calls under their existing ABI contract. Add boxed value,
+byref, nullable, generic and foreign-assembly argument coverage.
+
 Rollback boundaries: separate candidate runtime API, package API/loader,
 compiler/planner and fixture commits. Do not update runtime tags, Installer
 defaults or formal branches until the complete public workflow is qualified.
