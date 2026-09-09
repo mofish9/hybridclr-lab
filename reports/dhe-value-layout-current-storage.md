@@ -1,5 +1,8 @@
 # DHE Current storage：Unity 2022 Windows 验证状态
 
+本报告保留研究入口阶段的精确身份和证据。后续公共 RuntimeApi 与普通反射验证见
+[dhe-public-storage-api.md](dhe-public-storage-api.md)，不要将后续结果换绑到本报告提交。
+
 当前研究候选已通过带原生入口 guard 的 method-only、no-op 和两种 Base 布局验证。
 正式 package 的资源加载入口尚未接通 Current storage plan；不能将本报告称为完整
 DHE 工作流已交付，也不能用于 Android、iOS、团结或性能结论。
