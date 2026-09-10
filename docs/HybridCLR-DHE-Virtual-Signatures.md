@@ -84,3 +84,18 @@ Require all 25 named checks, six unchanged virtual implementations, positive AOT
 entries and zero DHE interpreter entries; verify the original Player and staged
 resource hashes. This guards against gaining update correctness by interpreting
 the entire unchanged virtual workload.
+
+Base-84 at HybridCLR `9208965` / IL2CPP `816778a` passes native03,
+startup/no-op, all 25 unchanged checks (4,136 AOT entries, zero DHE interpreter
+entries), the 46 Current business cases and a 67-file independent audit. Its
+updated signature probe passes 24/25. All four ThreadStart callbacks fail at the
+entry guard before entering their try blocks; this is not evidence of a dispatch
+cache race. Preserve `probe-base84-01` as the remaining failure.
+
+The worker closure retains its Base object storage and has a void/no-argument
+signature, but needs an interpreter body because its locals use grown types.
+The guard classifier currently admits only static scalar frames. Extend it to
+non-generic reference instance scalar frames only when the declaring class and
+every physical parent retain Base storage. Value/byref/custom-type arguments and
+changed receiver storage remain guarded. Re-run the unchanged and full update
+suites, including old-receiver rejection controls, before qualifying this rule.
