@@ -12,7 +12,7 @@ internal static class FrozenResourceWorkflow
     private static readonly JsonSerializerOptions Json = new() { WriteIndented = true };
     private const string ModelName = "HybridCLR.ValueLayoutModel";
     private const string NativeName = "HybridCLR.ValueLayoutNative";
-    private const string ProbeName = "HybridCLR.Lab.ValueLayout.ResourceEvolutionProbe";
+    private const string ProbeName = "HybridCLR.Lab.ValueLayout.FrozenResourceProbe";
     private static string Hash(string path) => Convert.ToHexString(SHA256.HashData(File.ReadAllBytes(path)));
     private static JsonElement Read(string path) => JsonSerializer.Deserialize<JsonElement>(File.ReadAllText(path));
 
@@ -50,19 +50,21 @@ internal static class FrozenResourceWorkflow
                 ? AssemblyLoadContext.Default.LoadFromAssemblyPath(Path.Combine(current, name.Name + ".dll")) : null;
         var model = AssemblyLoadContext.Default.LoadFromAssemblyPath(Path.Combine(current, ModelName + ".dll"));
         var records = (string[])model.GetType(ProbeName, true)!.GetMethod("Run")!.Invoke(null, null)!;
-        File.WriteAllText(args[2], JsonSerializer.Serialize(new { passed = records.Length == 4, records }, Json));
-        return records.Length == 4 ? 0 : 1;
+        int revision = (int)model.GetType("HybridCLR.Lab.ValueLayout.Factory", true)!.GetMethod("GetRevision")!.Invoke(null, null)!;
+        File.WriteAllText(args[2], JsonSerializer.Serialize(new { passed = records.Length == 4 && revision == 73, records, revision }, Json));
+        return records.Length == 4 && revision == 73 ? 0 : 1;
     }
 
-    // Add actual Current-only business code. The Base Player already invokes a
-    // probe by reflection, so this strengthens verification without rebuilding it.
+    // The real business entry returns a new revision only after all value-copy
+    // assertions succeed. This works with immutable Bases without fixture-specific
+    // optional reflection hooks or any change to ordinary AOT source bytes.
     private static void AddProbe(string current)
     {
         string path = Path.Combine(current, ModelName + ".dll");
         using var module = ModuleDefMD.Load(File.ReadAllBytes(path));
         if (module.Find(ProbeName, false) != null) throw new InvalidDataException("Probe already exists.");
         var payload = module.Find("HybridCLR.Lab.ValueLayout.Payload", false)!;
-        var type = new TypeDefUser("HybridCLR.Lab.ValueLayout", "ResourceEvolutionProbe", module.CorLibTypes.Object.TypeDefOrRef)
+        var type = new TypeDefUser("HybridCLR.Lab.ValueLayout", "FrozenResourceProbe", module.CorLibTypes.Object.TypeDefOrRef)
             { Attributes = dnlib.DotNet.TypeAttributes.Public | dnlib.DotNet.TypeAttributes.Abstract | dnlib.DotNet.TypeAttributes.Sealed };
         module.Types.Add(type);
         var run = new MethodDefUser("Run", MethodSig.CreateStatic(new SZArraySig(module.CorLibTypes.String)),
@@ -115,7 +117,11 @@ internal static class FrozenResourceWorkflow
             il.Add(Instruction.Create(OpCodes.Dup)); il.Add(Instruction.Create(OpCodes.Ldc_I4, index));
             il.Add(Instruction.Create(OpCodes.Ldstr, records[index])); il.Add(Instruction.Create(OpCodes.Stelem_Ref));
         }
-        il.Add(Instruction.Create(OpCodes.Ret)); module.Write(path);
+        il.Add(Instruction.Create(OpCodes.Ret));
+        var entry = module.Find("HybridCLR.Lab.ValueLayout.Factory", false)!.Methods.Single(method => method.Name == "GetRevision");
+        entry.Body = new CilBody(); entry.Body.Instructions.Add(Instruction.Create(OpCodes.Call, run));
+        entry.Body.Instructions.Add(Instruction.Create(OpCodes.Pop)); entry.Body.Instructions.Add(Instruction.Create(OpCodes.Ldc_I4, 73));
+        entry.Body.Instructions.Add(Instruction.Create(OpCodes.Ret)); module.Write(path);
     }
 
     public static int Run(string[] args)
@@ -173,10 +179,11 @@ internal static class FrozenResourceWorkflow
             Execute("dotnet", tool, "stage-resource-update", "-UpdateRoot", resource, "-AssetRoot", stage,
                 "-BaseBuildIdentity", Path.Combine(build, "build-identity.json"), "-ImmutableFiles", player + "," + game, "-Output", Path.Combine(output, "stage-" + index + ".json"));
             Execute(player, "-batchmode", "-nographics", "-snapshotResult", report, "-snapshotResourceRoot", stage,
-                "-expectedRevision", "41", "-logFile", report + ".log");
+                "-expectedRevision", "73", "-logFile", report + ".log");
             var result = Read(report);
             checks["standard-resource-player-" + index] = result.GetProperty("passed").GetBoolean() && result.GetProperty("resourceUpdate").GetBoolean() &&
-                result.GetProperty("records").EnumerateArray().Select(row => row.GetString()!).SequenceEqual(expected);
+                result.GetProperty("revision").GetInt32() == Read(referenceFile).GetProperty("revision").GetInt32() &&
+                result.GetProperty("sentinel").GetInt32() == 5 && expected.Length == 4;
             checks["immutable-player-" + index] = Hash(player) == playerHash && Hash(game) == gameHash;
             players.Add(new { proof = proofs[index], playerSha256 = playerHash, gameAssemblySha256 = gameHash, resultSha256 = Hash(report) });
         }
