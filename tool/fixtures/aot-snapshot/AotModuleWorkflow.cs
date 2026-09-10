@@ -85,4 +85,27 @@ internal static class AotModuleWorkflow
         }
         Console.WriteLine(current); return 0;
     }
+
+    internal static int InlineCurrent(string[] args)
+    {
+        if (args.Length != 6 || (args[4] != "base" && args[4] != "current"))
+            throw new ArgumentException("inline-current <lab> <Base proof> <original DLL root> <editor> <base|current> <new output>");
+        string output = Path.GetFullPath(args[5]), current = Path.Combine(output, "current");
+        if (Directory.Exists(output)) throw new IOException("Inline output must be new.");
+        Directory.CreateDirectory(current); var snapshot = Snapshot(args[1]);
+        foreach (string path in Directory.GetFiles(args[2], "*.dll")) File.Copy(path, Path.Combine(current, Path.GetFileName(path)));
+        var names = Directory.GetFiles(current, "*.dll").Select(Path.GetFileNameWithoutExtension).ToHashSet();
+        string model = Path.Combine(current, "HybridCLR.ValueLayoutModel.dll");
+        FrozenStaticWorkflow.CompileAndMerge(Path.GetFullPath(args[0]), args[3], "InlineHotfixCases", model,
+            snapshot.Assemblies.Where(row => !row.Dhe && !names.Contains(row.AssemblyName)).Select(row => row.Path).Concat(Directory.GetFiles(current, "*.dll")),
+            Path.Combine(output, "compiled"), false, args[4] == "current" ? "INLINE_CURRENT" : null);
+        using (var module = ModuleDefMD.Load(File.ReadAllBytes(model)))
+        {
+            module.Find("HybridCLR.Lab.ValueLayout.Factory", false)!.Methods.Single(method => method.Name == "GetRevision")
+                .Body.Instructions.Insert(0, Instruction.Create(OpCodes.Call,
+                    module.Find("HybridCLR.Lab.ModuleEvolution.InlineHotfixCases", false)!.Methods.Single(method => method.Name == "Verify")));
+            module.Write(model);
+        }
+        Console.WriteLine(current); return 0;
+    }
 }

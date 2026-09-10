@@ -20,6 +20,7 @@ if (args.Length > 0 && args[0] == "aot-module-next-base") return AotModuleWorkfl
 if (args.Length > 0 && args[0] == "literal-current") return AotModuleWorkflow.LiteralCurrent(args.Skip(1).ToArray());
 if (args.Length > 0 && args[0] == "ordinary-module-guards") return OrdinaryModuleGuardTests.Run(args.Skip(1).ToArray());
 if (args.Length > 0 && args[0] == "inline-guard-policy") return InlineGuardTests.Run(args.Skip(1).ToArray());
+if (args.Length > 0 && args[0] == "inline-current") return AotModuleWorkflow.InlineCurrent(args.Skip(1).ToArray());
 if (args.Length > 0 && args[0] == "baseline-linker-identity") return BaselineLinkerIdentity.Run(args.Skip(1).ToArray());
 if (args.Length > 0 && args[0] == "pe-header-identity") return PeHeaderIdentity.Run(args.Skip(1).ToArray());
 if (args.Length > 0 && args[0] == "frozen-static-new-base") return FrozenStaticWorkflow.NewBase(args.Skip(1).ToArray());
