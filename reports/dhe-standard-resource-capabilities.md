@@ -21,3 +21,23 @@ storage is distinct from evolving an ordinary AOT static field that already
 exists in a Base; the latter admission gate remains a separate implementation
 task. Tuanjie follows Windows qualification. Candidate changes remain in the
 research worktrees, with no CAT, formal branch, tag, remote or Installer changes.
+
+## Reproduced direct Nullable failure
+
+Lab `d7c8ee6` compiles all 23 cases with the real Unity compiler; the merged
+Current DLL passes the CLR reference. In `resource-03` under
+`artifacts/dhe-standard-resource-capabilities-20260910`, proof-16 (PID 10300)
+loads the resource and passes ordinary Echo/box/inline/sentinel checks, then
+fails the direct Nullable value case. Its corrupted diagnostic argument also
+indicates a stack-layout disagreement; this is not passing Player evidence.
+
+The transform recognizes Nullable intrinsics by namespace/name. Frozen method
+execution can use an interpreter fallback copy of the generic definition, whose
+Il2CppClass lacks the engine's canonical nullable flag and whose castClass is
+itself. The intrinsic pushes that class as the underlying value and uses it for
+copying. Reflection executes the IL body and did not expose this fast-path error.
+Require the actual engine Nullable identity and a distinct underlying castClass
+before any Nullable intrinsic. Other definitions execute their IL normally.
+Test canonical/alias/invalid class eligibility with real engine headers and
+rerun the unchanged resource suite on a newly built immutable Player. Keep the
+old failure and Players; no patching of generated code or existing binaries.

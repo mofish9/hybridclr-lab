@@ -36,6 +36,11 @@ static_assert(std::is_constructible<hybridclr::dhe::MetaVersionRegistration,
 #include "hybridclr/interpreter/MemoryUtil.h"
 #include "native_test_hooks.h"
 
+#if __has_include("hybridclr/transform/NullableIntrinsic.h")
+#include "hybridclr/transform/NullableIntrinsic.h"
+#define HYBRIDCLR_LAB_HAS_NULLABLE_INTRINSIC_POLICY 1
+#endif
+
 #if __has_include("hybridclr/metadata/DheGenericFieldMetadata.h")
 #include "hybridclr/metadata/DheGenericFieldMetadata.h"
 #define HYBRIDCLR_LAB_HAS_GENERIC_FIELD_METADATA 1
@@ -2319,6 +2324,29 @@ static void TestDheInterfaceSlots()
 
 int main()
 {
+#if HYBRIDCLR_LAB_HAS_NULLABLE_INTRINSIC_POLICY
+    {
+        using hybridclr::transform::CanUseNullableIntrinsic;
+        Il2CppClass underlying{}, canonical{}, fallback{};
+        Il2CppGenericClass instance{};
+        canonical.generic_class = &instance;
+        canonical.nullabletype = true;
+        canonical.castClass = &underlying;
+        CHECK(CanUseNullableIntrinsic(&canonical));
+        CHECK(!CanUseNullableIntrinsic(nullptr));
+        // A same-named frozen interpreter definition is not the engine's
+        // special Nullable class, even though its IL body is executable.
+        fallback.namespaze = "System"; fallback.name = "Nullable`1";
+        fallback.generic_class = &instance; fallback.castClass = &fallback;
+        CHECK(!CanUseNullableIntrinsic(&fallback));
+        fallback.castClass = &underlying;
+        CHECK(!CanUseNullableIntrinsic(&fallback));
+        canonical.castClass = &canonical;
+        CHECK(!CanUseNullableIntrinsic(&canonical));
+        canonical.castClass = nullptr;
+        CHECK(!CanUseNullableIntrinsic(&canonical));
+    }
+#endif
 #if HYBRIDCLR_LAB_HAS_CLASS_VIRTUAL_SLOTS
     {
         using hybridclr::metadata::FindDheVirtualSlotDeclaration;
