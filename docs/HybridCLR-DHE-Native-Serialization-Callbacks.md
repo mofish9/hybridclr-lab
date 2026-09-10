@@ -31,3 +31,29 @@ Add a separately labelled callbacks-control variant that creates a new interpret
 MonoBehaviour implementing the interface. Keep identical native JSON/clone assertions
 to verify the test's engine expectations without changing an existing type's
 interfaces. That control cannot qualify the rejected existing-type evolution.
+
+## Selected-storage interface-addition candidate
+
+Admit an interface-list addition only for an existing non-generic reference class
+selected for physical Current storage. Require identical parent identity (including
+assembly), attributes, packing, class size and generic declaration. Every original
+interface identity must remain, additions must be non-generic direct declarations,
+and duplicate entries are rejected. Existing field checks and execution-plan
+dependency propagation still apply. Interface removals/replacements, changed
+inheritance and generic interface evolution remain separate required work.
+
+The analysis facts must not change the MV binary format or existing hashes.
+Require a new physical-current-interface-additions-v1 capability on every target
+Base; do not rewrite immutable older Base manifests to add it. Candidate package
+capability declaration is experimental until the same shared Current succeeds
+on two newly built Windows Bases, cold and cached, including direct interface,
+native JSON/clone callbacks, receiver safety and the original business suite.
+No formal package/Installer defaults or remote references are changed.
+
+First add source-bound policy tests using the compiler-produced callback DLL:
+selected addition, missing selection/capability, removal/replacement, duplicate,
+parent/layout/attribute changes and generic declarations. Retain emitted mutation
+DLLs and report identities. Then test the actual native path. If Unity still uses
+a cached Base descriptor for interface discovery, locate and correct the exported
+query boundary while keeping physical object checks strict. A new-type control
+must never satisfy this existing-type qualification.
