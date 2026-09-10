@@ -357,7 +357,8 @@ namespace vm
             target->clear();
 			for (const DheResolverRecord& resolver : s_dheResolvers)
 			{
-				if (image == resolver.image && resolver.klass)
+                if (image == resolver.image && resolver.klass &&
+                    (!resolver.klass->name || std::strcmp(resolver.klass->name, "<Module>") != 0))
 				{
 					target->push_back(resolver.klass);
 					break;
@@ -368,6 +369,21 @@ namespace vm
 
     Il2CppClass* Image::ClassFromName(const Il2CppImage*, const char*, const char*)
     {
+        return nullptr;
+    }
+
+    uint32_t Image::GetNumTypes(const Il2CppImage* image)
+    {
+        s_dheResolverEnumerations.fetch_add(1, std::memory_order_relaxed);
+        for (const auto& resolver : s_dheResolvers)
+            if (image == resolver.image && resolver.klass) return 1;
+        return 0;
+    }
+
+    const Il2CppClass* Image::GetType(const Il2CppImage* image, AssemblyTypeIndex index)
+    {
+        for (const auto& resolver : s_dheResolvers)
+            if (image == resolver.image && resolver.klass && index == 0) return resolver.klass;
         return nullptr;
     }
 

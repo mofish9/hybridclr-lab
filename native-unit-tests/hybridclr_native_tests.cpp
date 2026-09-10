@@ -827,6 +827,25 @@ namespace
 		currentMethod.version.fill(5);
         baseMetaVersion.methods.push_back(baseMethod);
         currentMetaVersion.methods.push_back(currentMethod);
+        // Real Image::GetTypes hides <Module>. Native token lookup must still
+        // find its cctor for changed-body preparation and removed tombstones.
+        klass->name = "<Module>";
+        klass->token = 0x02000001;
+        CHECK(hybridclr::dhe::ResolveMethodByToken(assembly.aname.name, changed.token) == &changed);
+        for (bool removedModuleCctor : { false, true })
+        {
+            auto moduleBase = baseMetaVersion, moduleCurrent = currentMetaVersion;
+            moduleBase.types[0].token = klass->token;
+            moduleCurrent.types[0].token = klass->token;
+            if (removedModuleCctor) { moduleCurrent.methods.clear(); moduleCurrent.types.clear(); }
+            CHECK(hybridclr::dhe::PrepareAndRegisterMetaVersion(&assembly, moduleBase, moduleCurrent));
+            CHECK(hybridclr::dhe::IsChangedMethod(&changed));
+            CHECK(hybridclr::dhe::ResolveAotGuardMethodByToken(assembly.aname.name, changed.token) == &changed);
+            hybridclr::dhe::ResetForTests();
+            changed.isInterpterImpl = false;
+        }
+        klass->name = "DheNativeType";
+        klass->token = 0x02000002;
         CHECK(hybridclr::dhe::RegisterLogicalMethodMapping(&assembly,
             &reorderedCurrentChanged, &changed));
         CHECK(hybridclr::dhe::RegisterLogicalMethodMapping(&assembly,
