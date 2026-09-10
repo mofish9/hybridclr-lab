@@ -18,14 +18,16 @@ Their immutable inputs are recorded in `manifests/repo-lock.json`.
 ## Current phase
 
 The active checkpoint is physical reference owners; see
-`reports/dhe-reference-owner-windows.md`. Immutable Base-70 passes the exact
+`reports/dhe-reference-owner-windows.md`. Immutable Base-70/71 pass the exact
 previously failing Current DLLs, all 46 business cases, generic reflection,
 cached receivers, native interface callbacks, serialization, complete lifecycle
 and public preparation/recovery. An allocation correction and typed reference
 dependency closure repair the generic-owner and coroutine failures. The final
-planner passes 29 focused checks, 17 generic regressions and 113 managed checks.
-Another Base at the same runtime identity is being built for the shared-resource
-rerun. Broader evolution and performance gates remain; this is not a release.
+planner passes 38 focused checks, 17 generic regressions and 113 managed checks.
+Three shared resources pass independent audits across both Bases at the same
+runtime identity, including changed generic bodies and retained generic AOT.
+All twelve adjacent Unity replays and two-Base preparation/recovery pass.
+Broader evolution and performance gates remain; this is not a release.
 
 ## Earlier research checkpoints
 

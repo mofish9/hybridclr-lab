@@ -11,8 +11,12 @@ guards remain unchanged. All 46 business cases, 18 generic reference checks,
 11 cached receiver checks, 14 reference checks, 9 interface callbacks,
 11 serialization checks, 17 lifecycle checks and public failure/recovery pass.
 
-This is an incomplete research candidate. A second Base with the original layout
-is being built at the same runtime identity for the full shared-resource rerun.
+The full shared-resource rerun at 0636641 also passes on original-layout Base-71
+and evolved-layout Base-70, both using the same native runtime. Three independent
+shared resources cover the preserved callback payload, a changed generic body,
+and unchanged generic AOT dispatch. Detailed identities are below.
+
+This is an incomplete research candidate.
 Broader interface removal/inheritance, old-object migration, scene/Prefab
 evolution, byref/native boundaries, performance and memory remain required work.
 Unity 2022 Windows is the qualification target; Tuanjie follows Windows stability.
@@ -30,7 +34,8 @@ Artifact paths below are relative to `D:/hybridclr_artifacts`.
 | Lab, lifecycle oracle and native03 | 9c71e01 |
 | Lab, Base-70 build and pre-closure resource | f9b2e45326d5866a851f71b41dcc741740f25b15 |
 | Lab, first owner closure | cc68c3a |
-| Lab, final owner closure, hosts/tools and resource02 | b0dbf75c67230fd93a621416e8329167752aee9e |
+| Lab, initial complete owner closure, hosts/tools and resource02 | b0dbf75c67230fd93a621416e8329167752aee9e |
+| Lab, parent/cross-assembly closure and final shared resources | 0636641d49da4f981d90895c44c57dd9c696f6e0 |
 
 HybridCLR canonical source tree:
 `D25C6843DA04EF6F65F7AF983A3ABD8CDD443BCF2B20A99F01A3B5DEC5D3D724`.
@@ -124,10 +129,68 @@ sequence, and valid Current recovery in a fresh process. No failed-process
 business entry is allowed. These are one-Base results until the shared-resource
 rerun is recorded separately.
 
+## Final two-Base rerun
+
+Base-71 (`dhe-reference-owner-base-71`) was built at lab b0dbf75 with owner
+host/tool02. It uses the exact runtime03 manifest and runtime/package commits
+listed above. Base ID:
+`db3bd6f8bbbd7403319ed78921b031b89c7b4a10b08cd6890d911dd44bc7fabc`.
+GameAssembly SHA:
+`44B6EBB31B2A22E29002B2DFE2CABFA5E18B57C773287ED37B466DCCF035EB0E`.
+Both Base-71 and Base-70 retain their original build/startup/no-op proofs.
+
+Review found another dependency edge: an instance field can refer to a derived
+class whose parent moved to Current, or a class can inherit a closed generic
+with an affected argument. Parent-before01 preserves three missing-selection
+failures. Parent-after01 passes all 38 checks, including unchanged cross-assembly
+owners and order-independent closure. This verifies propagation through an
+existing hierarchy, not arbitrary edits to inheritance declarations. Generic
+plan03 passes 17 checks and managed03 passes 113 checks at 0636641.
+
+The final binaries at that lab commit are:
+
+| Tool/host artifact | SHA-256 |
+| --- | --- |
+| dhe-reference-owner-tool-03/HybridCLR.DheTool.dll | B7FA12AAC0CF0188129DDAB6F6F03E8F0E7C30390F2E71C573A94311838DF790 |
+| dhe-reference-owner-host-03/AotSnapshotTests.dll | D5725F2956DD37B714E599DB7A605C8D321ED5417218CD0FB9D186C4FB4797AC |
+| dhe-reference-owner-plan-host-06/ExecutionPlanTests.dll | E2968DD9DB3D9D01EBC5E23FF22FF6C91FBB46426BE604CC3DA39583ED948545 |
+
+All three workflows below pass 16 checks and the complete 46-case reference
+sequence on both immutable Bases. The Current DLL sets are identical across
+the two Bases for each resource; Base-specific plans remain separate.
+
+| Resource output | Current-set SHA-256 | Manifest SHA-256 |
+| --- | --- | --- |
+| dhe-reference-owner-shared-resource-03 | e62ce11e326987b906e16505b2a5d391585c021677173b4019993172efb3be24 | A873ED517B691A0E4DA597719C654D6EF68E83C6FA59A6F57D32B2256ABD58D6 |
+| dhe-reference-owner-body-resource-03 | 1e58232fb8f0e723071e8b2cb959935148c7e416712f706c85ea80bd90047cb0 | C73B53D7D162FB122B559BA4B145A04D4EFBDF426B17C9A6F26BE153AD650B26 |
+| dhe-reference-owner-dispatch-resource-03 | 339bec559c47d90bd2293f44169d07ed32a0bb65098feb84378aef869a24e17c | 014E9FB88706F3D04A60B778DBE79AAA3370D64161052A896F214E5FB9233295 |
+
+The matching `*-resource-audit-03.json` reports independently rehash 126 files,
+verify two Bases, 46 cases and four successful/restored runs each.
+
+All twelve `dhe-reference-owner-base-<71|70>-<mode>-03` replays pass. Each Base
+passes the six modes and exact counts from the table above: cold/cached native
+interface callbacks, cached reference and generic identity, and cold/cached full
+serialization/lifecycle. Current lifecycle selection is True,True for both;
+the selection derives from their bound plans rather than their numerical Delta.
+
+`dhe-reference-owner-public-probes-03` passes all 15 checks, binds 93 files and
+verifies both original Base controls, full preparation failures without business
+effects, and complete fresh-process Current recovery. The changed-body resource
+requires exactly four Current generic calls on each Base, including direct,
+reflection and delegate invocation. `dhe-reference-owner-dispatch-replay-03`
+passes 13 checks on Base-70: its existing unchanged Payload/Envelope instances
+report selected=False and interpreter=0, with AOT totals 30/37. Those totals
+include reflection wrappers and are not a performance measurement. Base-71
+introduces that helper as new Current code and is not counted as retained-AOT
+evidence for it.
+
 ## Isolation and remaining work
 
 All implementation work is on candidate worktrees. No formal branch, runtime tag,
 remote, Installer default or CAT source changed. No cleanup or deletion occurred;
 new large artifacts are on D. Preserve original failures and each immutable Base.
 Rollback source, locks and resources as matched candidate sets; existing formal
-defaults remain the deployment fallback.
+defaults remain the deployment fallback. Native source changes require a new
+Player; a resource-only rollback cannot replace the native runtime in an already
+built Base. The preceding failed resources remain diagnostic history.
