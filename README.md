@@ -26,10 +26,12 @@ implementation and validation status is in
 qualification target; Tuanjie follows it, and Unity 2021 is outside new work.
 The preceding candidate passes all 23 standard-resource value/generic/reflection/
 initialization cases on two distinct immutable Bases using identical Current
-DLLs. The active mixed-assembly candidate extends that exact approach to 31
-cases and changing Base assembly inventories. Native compile/CTest passes;
-the real Player found a parser ownership crash, now fixed in committed sources
-and awaiting a new immutable Player replay. Remaining storage/assembly
+DLLs. The active mixed-assembly candidate passes all 31 cases on three immutable
+Bases with one identical Current payload, including Added as interpreter-only
+on two Bases and differential on the Base which already compiled it as AOT.
+All 23 shared-resource checks, native compile/CTest, core rollback and 22 focused
+linker-identity checks pass. The parser ownership crash and two host compatibility
+failures are preserved with their fixes and exact evidence. Remaining storage/assembly
 capabilities and Release qualification are still pending. Historical 0.1.35
 release evidence below does not qualify this research snapshot.
 

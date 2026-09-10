@@ -3,14 +3,21 @@
 ## Active checkpoint: new assemblies and mixed metadata batches
 
 The active Unity 2022 candidate is HybridCLR `9e7b601`, IL2CPP `8a13baf`, package
-`b51473f`. The retained 31-case Current adds an interpreter-only assembly with
-parent/interface/field dependencies back into evolved DHE types. Runtime
-`04a0502` passes Base startup and 35 core checks but crashes while pre-parsing
-the new DLL. The fix gives the owning RawImage parser a native copy instead of
-a managed byte-array interior. Real-header native compile/CTest passes on the
-fix; the new immutable Player replay is pending. A second Base is also being
-built with Added already in its AOT inventory. See
-`../reports/dhe-new-assembly-resources.md` for exact failing evidence and gates.
+`b51473f`, lab `b136328`. All 31 cases pass on three immutable Windows Bases with
+the same exact Current bytes and 23 shared-resource workflow checks. Added is
+interpreter-only on proof-25/Base-26 and differential on Base-24, which already
+compiled it as AOT. Old/new value layouts and cyclic parent/interface/field
+dependencies are covered. Missing/corrupt resources and snapshot substitution
+are rejected, then restored resources pass. Native compile/CTest uses real
+headers; proof-25 passes 35 core rollback/dispatch checks. Two conservative
+linker-identity corrections pass 22 focused checks. Base-24 retains runtime
+`04a0502` and uses the all-differential path; the other two use `9e7b601`, which
+fixes the mixed parser's buffer ownership crash. See
+`../reports/dhe-new-assembly-resources.md` for exact passing/failing identities,
+148-file independent audit, rollback and remaining gates. Existing ordinary
+static-value storage, additional mixed transaction/module-initializer behavior,
+native-only ABI boundaries and performance/release qualification remain open.
+Tuanjie follows Unity 2022; no new Unity 2021 work is in scope.
 The following 23-case milestone remains historical evidence on its own identity.
 
 ## Preceding checkpoint: standard resources with evolved value layouts
