@@ -8,8 +8,8 @@
       "repository": "hybridclr",
       "sourceMode": "integrated",
       "baseCommit": "9e4fc7219724a3c63ff845e0b2acaa7d10c2430b",
-      "integratedCommit": "ca152685eacd57a5bb54ee66781833ef8f6d8eae",
-      "expectedTreeSha256": "29FB06C6798C4C206B171D85903731C12037533322AAFF26350B3CA069F61DEF",
+      "integratedCommit": "e4037758ad8476e87e005b6857f6b4db9bbeca48",
+      "expectedTreeSha256": "BCB8FB0D4DE86824085B7E28AC456E3D837DF2CA5DDC0EF681635E88DADE0275",
       "path": "patches/dhe-lite/hybridclr.patch",
       "sha256": "3E16BF9C18B6F31287D73EFAEB015C7DA213B87FB7E69F7AD06FDFCBC482A24B",
       "applyRoot": "libil2cpp",
@@ -35,8 +35,8 @@
       "repository": "il2cpp_plus",
       "sourceMode": "integrated",
       "baseCommit": "bf15337e189ae7da5876aa51c9b896a36c52a155",
-      "integratedCommit": "b0cf8e3db876948309e7ad946a89a1c6eb58e346",
-      "expectedTreeSha256": "25F4D0FE2DB493E9EA55601D7EDC062EB5E7090E3BEC0AB42912E8FD58A01BCF",
+      "integratedCommit": "6d0f642bc99367ff07e9e0f2f248ee136d037114",
+      "expectedTreeSha256": "257F6B90EC3C07F4549CE8BFDB5F1541D717FA7BDCB450ED000F7A1CFD622C11",
       "engineWorkflows": [
         "Unity2022Fgs"
       ],
