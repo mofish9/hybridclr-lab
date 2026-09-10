@@ -5,6 +5,21 @@ using HybridCLR.DheTool;
 
 internal static class UnityBehaviourWorkflow
 {
+    internal static int Attributes(string[] args)
+    {
+        if (args.Length != 2) throw new ArgumentException("unity-behaviour-attributes <merged Model DLL> <new report>");
+        if (File.Exists(args[1])) throw new IOException("Attribute report must be new.");
+        using var module = ModuleDefMD.Load(args[0]);
+        var records = module.GetTypes().SelectMany(type => type.Methods).SelectMany(method => method.CustomAttributes
+            .Where(attribute => attribute.TypeFullName == "System.Runtime.CompilerServices.IteratorStateMachineAttribute")
+            .Select(attribute => new { method = method.FullName, owner = (attribute.ConstructorArguments[0].Value as TypeSig)?.DefinitionAssembly?.Name.String,
+                stateMachine = (attribute.ConstructorArguments[0].Value as TypeSig)?.ReflectionFullName })).ToArray();
+        bool passed = records.Length != 0 && records.All(row => row.owner == module.Assembly.Name &&
+            module.GetTypes().Any(type => type.ReflectionFullName == row.stateMachine));
+        File.WriteAllText(args[1], JsonSerializer.Serialize(new { passed, records }, new JsonSerializerOptions { WriteIndented = true }));
+        Console.WriteLine("Iterator attribute ownership: " + passed); return passed ? 0 : 1;
+    }
+
     internal static int Compile(string[] args)
     {
         if (args.Length != 6 || (args[4] != "base" && args[4] != "current"))

@@ -44,6 +44,7 @@ internal static class FrozenStaticWorkflow
         using (var target = ModuleDefMD.Load(File.ReadAllBytes(targetPath)))
         using (var compiled = ModuleDefMD.Load(File.ReadAllBytes(library)))
         {
+            RebindAttributeTypes(compiled, target);
             foreach (TypeRef reference in compiled.GetTypeRefs())
                 if (reference.ResolutionScope == compiled || reference.DefinitionAssembly?.Name == compiled.Assembly.Name)
                     reference.ResolutionScope = target;
@@ -81,6 +82,66 @@ internal static class FrozenStaticWorkflow
             librarySha256 = Hash(library), targetPath, targetSha256 = Hash(targetPath),
             scope = "Real Unity compiler fixture; Base ordinary types are merged only before Base construction"
         }, new JsonSerializerOptions { WriteIndented = true }));
+    }
+
+    private static void RebindAttributeTypes(ModuleDef source, ModuleDef target)
+    {
+        // typeof(StateMachine) in compiler attributes is stored inside the
+        // attribute blob, not necessarily in the module's TypeRef table.
+        // Decode and rebind it before moving the declaring types.
+        void Reference(ITypeDefOrRef value)
+        {
+            if (value is TypeSpec spec) Signature(spec.TypeSig);
+            if (value is TypeRef reference)
+            {
+                if (reference.ResolutionScope is TypeRef parent) Reference(parent);
+                else if (reference.ResolutionScope == source || reference.DefinitionAssembly?.Name == source.Assembly.Name)
+                    reference.ResolutionScope = target;
+            }
+        }
+        void Signature(TypeSig value)
+        {
+            if (value == null) return;
+            if (value is TypeDefOrRefSig named) Reference(named.TypeDefOrRef);
+            if (value is GenericInstSig generic)
+            {
+                Signature(generic.GenericType);
+                foreach (var argument in generic.GenericArguments) Signature(argument);
+            }
+            Signature(value.Next);
+        }
+        CAArgument Argument(CAArgument value)
+        {
+            Signature(value.Type);
+            if (value.Value is TypeSig type) Signature(type);
+            else if (value.Value is ITypeDefOrRef reference) Reference(reference);
+            else if (value.Value is IList<CAArgument> array)
+                for (int index = 0; index < array.Count; ++index) array[index] = Argument(array[index]);
+            return value;
+        }
+        void Attributes(IHasCustomAttribute owner)
+        {
+            foreach (var attribute in owner.CustomAttributes)
+            {
+                for (int index = 0; index < attribute.ConstructorArguments.Count; ++index)
+                    attribute.ConstructorArguments[index] = Argument(attribute.ConstructorArguments[index]);
+                foreach (var named in attribute.NamedArguments) named.Argument = Argument(named.Argument);
+            }
+        }
+        foreach (var type in source.GetTypes())
+        {
+            Attributes(type);
+            foreach (var field in type.Fields) Attributes(field);
+            foreach (var property in type.Properties) Attributes(property);
+            foreach (var item in type.Events) Attributes(item);
+            foreach (var parameter in type.GenericParameters) Attributes(parameter);
+            foreach (var method in type.Methods)
+            {
+                Attributes(method);
+                foreach (var parameter in method.ParamDefs) Attributes(parameter);
+                foreach (var parameter in method.GenericParameters) Attributes(parameter);
+            }
+        }
     }
 
     internal static int NewBase(string[] args)
