@@ -1,6 +1,7 @@
 using System.Security.Cryptography;
 using System.Text.Json;
 using dnlib.DotNet;
+using dnlib.DotNet.Emit;
 using HybridCLR.DheTool;
 
 internal static class ReferenceInterfacePolicyTests
@@ -8,6 +9,7 @@ internal static class ReferenceInterfacePolicyTests
     private const string Owner = "HybridCLR.Lab.UnityCases.EvolvingBehaviour";
     private const string Contract = "UnityEngine.ISerializationCallbackReceiver";
     private const string Capability = "physical-current-interface-additions-v1";
+    private const string EvolutionCapability = "physical-current-interface-evolution-v1";
 
     internal static int Run(string[] args)
     {
@@ -47,17 +49,38 @@ internal static class ReferenceInterfacePolicyTests
             var result = Analyze(baseline, current, selection); analyses[name] = result;
             checks[name + ":layout-rejected"] = result.UnsupportedChanges.Contains("existing-type-layout-or-vtable-change:" + Owner);
         }
+        void Evolved(string name, MetaVersionSnapshot baseline, MetaVersionSnapshot current)
+        {
+            var result = Analyze(baseline, current, id); analyses[name] = result;
+            checks[name + ":compatible"] = result.Compatible;
+            checks[name + ":evolution-capability"] = result.RequiredRuntimeCapabilities.Contains(EvolutionCapability);
+            checks[name + ":older-Base-rejected"] = !ResourceUpdateCompatibility.CanExecuteUpdate(
+                ResourceUpdateCompatibility.RuntimeProtocol, ResourceUpdateCompatibility.CurrentNativeRuntimeContract,
+                ResourceUpdateCompatibility.KnownRuntimeCapabilities.Where(value => value != EvolutionCapability),
+                result.RequiredRuntimeCapabilities);
+        }
         Accepted("selected-addition", before, after, true);
         Accepted("no-op", after, after, false);
         Rejected("missing-selection", before, after);
         Rejected("wrong-selection", before, after, new string('0', 64));
-        Rejected("interface-removal", after, before, id);
+        Evolved("interface-removal", after, before);
+        var removed = Edit("removed-interface-and-methods", (_, type) =>
+        {
+            type.Interfaces.Clear();
+            foreach (var method in type.Methods.Where(method => method.Name == "OnBeforeSerialize" || method.Name == "OnAfterDeserialize").ToArray())
+                type.Methods.Remove(method);
+        });
+        Evolved("interface-and-method-removal", after, removed);
+        Rejected("removal-missing-selection", after, before);
         var replacement = Edit("replacement", (module, type) =>
         {
             type.Interfaces.Clear();
             type.Interfaces.Add(new InterfaceImplUser(new TypeRefUser(module, "System", "IDisposable", module.CorLibTypes.AssemblyRef)));
+            var dispose = new MethodDefUser("Dispose", MethodSig.CreateInstance(module.CorLibTypes.Void), MethodImplAttributes.IL,
+                MethodAttributes.Public | MethodAttributes.Virtual | MethodAttributes.Final | MethodAttributes.NewSlot) { Body = new CilBody() };
+            dispose.Body.Instructions.Add(Instruction.Create(OpCodes.Ret)); type.Methods.Add(dispose);
         });
-        Rejected("interface-replacement", after, replacement, id);
+        Evolved("interface-replacement", after, replacement);
         foreach (string mutation in new[] { "duplicate", "parent", "parent-scope", "sealed", "packing", "class-size", "generic-owner", "generic-interface" })
         {
             var invalid = Edit(mutation, (module, type) =>
@@ -98,7 +121,7 @@ internal static class ReferenceInterfacePolicyTests
             mutations = Directory.GetFiles(output, "*.dll").ToDictionary(Path.GetFileName, Hash),
             analyses = analyses.ToDictionary(pair => pair.Key, pair => new { pair.Value.Compatible,
                 pair.Value.UnsupportedChanges, pair.Value.RequiredRuntimeCapabilities }),
-            scope = "Compiler-produced existing-type interface addition; admission and negative policy checks only, no native qualification"
+            scope = "Existing reference interface addition/removal/replacement admission and retained shape gates; no native qualification"
         }, new JsonSerializerOptions { WriteIndented = true }));
         Console.WriteLine("Reference interface policy: " + passed);
         foreach (var check in checks.Where(pair => !pair.Value)) Console.WriteLine("FAILED: " + check.Key);
