@@ -59,6 +59,18 @@ internal static class FrozenAotAdmission
             bool Selected(MethodDef method) => method.IsAbstract || method.HasBody && method.IsIL && !method.IsUnmanaged &&
                 !method.IsPinvokeImpl && !method.IsInternalCall && !source.ExcludedTypeTokens.Contains(method.DeclaringType.MDToken.Raw) &&
                 plan.ExecutionPlan.CurrentExecutionMethodTokens.Contains(method.MDToken.Raw) && Covered(method);
+            // Current storage needs both its original initializer and every
+            // concrete affected native accessor. Keeping only a field record
+            // would still let old AOT code read/write the smaller Base slot.
+            bool allAffectedMethodsSelected = execution.Impact.Methods.Where(method => method.AssemblyName == source.AssemblyName &&
+                method.ChangedValueTypes.Length != 0).All(impact => methods.TryGetValue(impact.CurrentMethodToken, out var method) &&
+                    MetaVersionSnapshot.MethodIdentity(method) == impact.MethodIdentity && Selected(method));
+            foreach (var field in execution.Impact.StaticValueFields.Where(field => field.OrdinaryAot && field.AssemblyName == source.AssemblyName))
+                if (!field.ThreadStatic && !field.HasRva && allAffectedMethodsSelected &&
+                    types.TryGetValue(field.DeclaringTypeToken, out var owner) && !source.ExcludedTypeTokens.Contains(field.DeclaringTypeToken) &&
+                    owner.Fields.Any(definition => definition.MDToken.Raw == field.FieldToken && definition.IsStatic && !definition.IsLiteral && !definition.HasFieldRVA) &&
+                    plan.StaticValueFieldTokens.Contains(field.FieldToken) && owner.Methods.Where(method => method.IsStaticConstructor).All(Selected))
+                    discharged.Add("current-storage-ordinary-aot-static-field:" + field.Identity);
             foreach (var impact in execution.Impact.Methods.Where(method => method.AssemblyName == source.AssemblyName &&
                 method.Decision == "native-abi-bridge" && method.ChangedValueTypes.Length != 0))
                 if (methods.TryGetValue(impact.CurrentMethodToken, out var method) && !method.IsAbstract &&

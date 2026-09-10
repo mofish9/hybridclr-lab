@@ -37,3 +37,31 @@ Rollback boundary: new fixture/admission changes remain independent of the
 previous `f494726` lab checkpoint. Any runtime correction gets its own commit,
 real-header native gate and new immutable Player. Historical evidence and the
 same failing Current are retained rather than overwritten.
+
+## Initial evidence and admission candidate
+
+Lab `bf3ddfe` builds Base-27 with runtime `9e7b601`, package `b51473f` and IL2CPP
+`8a13baf`. Base startup (PID 15888) and no-op resource (20256) pass. Base ID is
+`d9b3be71ef860ea44a273de0b7d65e718e9ba1c2222e8674a73ddeb2129285b2`; snapshot
+`df9a450ed2480aafdf8b30417ea0ef3e2f613b093c4670b6fdbd5852582db4a9`; GameAssembly
+`90FF4BB7BE64D8FC6C5B01BDF01E8EDAC43CF501D2DD15A268DC05F456A3712C`.
+The new Current Model hash is
+`BBD7C413F923926E131B2639AD3F01BE5A6278A1F40ADDE21123DC1E6AE8D31E`.
+The three other Current DLLs retain the prior 31-case payload bytes.
+
+Artifacts are under `artifacts/dhe-frozen-static-resources-20260910`. Host-02 at
+lab `cdea2c2` compiles Current against the real captured Native source and passes
+all 45 CLR reference cases in `resource-01/reference.json`. Resource generation
+then rejects exactly six ordinary static fields, before any Player update.
+`admission-01/result.json` confirms all six are detected and selected, and the
+complete 40-assembly ordinary guard inventory has no holes. The other native
+copy/owner obligations are discharged by the existing frozen-source proof.
+
+The candidate admission requires original frozen source identity, a selected
+static field, selected/covered concrete affected methods and every owner cctor.
+Unselected readers, writers, ref access, clear operations or cctors must retain
+the rejection. Ordinary ThreadStatic and RVA fields stay outside this proof.
+Resource generation must require current-static-value-storage-v1 and shared-
+type-initialization-v1 for ordinary fields as well as hotfix fields. This is
+only an admission candidate until the same 45-case bytes execute in a real
+immutable Player. No native source has changed at this step.

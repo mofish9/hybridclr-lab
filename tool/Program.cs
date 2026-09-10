@@ -1223,7 +1223,7 @@ internal static partial class Program
             };
             if (names.Except(identityAssemblyNames, StringComparer.OrdinalIgnoreCase).Any())
                 requiredRuntimeCapabilities.Add("mixed-interpreter-source-batch-v1");
-            if (execution.Impact.StaticValueFields.Any(field => !field.OrdinaryAot))
+            if (execution.Impact.StaticValueFields.Length != 0)
             {
                 requiredRuntimeCapabilities.Add("current-static-value-storage-v1");
                 requiredRuntimeCapabilities.Add("shared-type-initialization-v1");
