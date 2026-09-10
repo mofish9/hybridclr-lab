@@ -1,6 +1,29 @@
 # DHE evolution implementation and validation
 
-## Active checkpoint: new assemblies and mixed metadata batches
+## Active checkpoint: ordinary static storage across two Base layouts
+
+HybridCLR `9e7b601`, IL2CPP `8a13baf` and package `b51473f` pass the same 46-case
+Current on immutable Unity 2022 Windows Base-27 and Base-28. Lab admission
+`29f3d9d` requires captured ordinary storage, complete affected-method and
+initializer selections, and complete Base guards. Workload `983415f` adds
+static values, readonly/cctor behavior, byref, reflection, generic owners,
+mixed instance/static layouts, GC retention, concurrent/failing initialization
+and a real Player counter proof that unaffected readers remain AOT.
+
+All 19 shared-resource checks pass. Read-only C# audit `2a0a645` rehashes 131
+files against the original immutable evidence and verifies five full successful
+or restored 46-case sequences plus five pre-entry rejections. The new-layout
+Base needs no frozen source payload; the old Base adapts its original ordinary
+IL. Both consume identical Current DLLs and retain fixed ordinary source code.
+See `../reports/dhe-frozen-static-resources.md` for exact identities, PIDs,
+reproductions and rollback. Runtime code and its prior native gate are unchanged.
+
+Ordinary ThreadStatic/RVA, mixed-batch MV failure/retry and module initializers,
+native-only ABI boundaries, broader Unity behavior and production-equivalent
+performance/memory remain open. Tuanjie follows Unity 2022 Windows; no new Unity
+2021 work is in scope. The full DHE goal and Release qualification are incomplete.
+
+## Preceding checkpoint: new assemblies and mixed metadata batches
 
 The active Unity 2022 candidate is HybridCLR `9e7b601`, IL2CPP `8a13baf`, package
 `b51473f`, lab `b136328`. All 31 cases pass on three immutable Windows Bases with
