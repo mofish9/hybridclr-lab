@@ -12,8 +12,13 @@ including embedded NUL. Ordinary module initialization stays eager exactly once.
 The separate Base-37 inline resource reports `18:2:1`, preserving its unchanged AOT
 caller and interpreting the changed callee; its 19-check audit rehashes 67 files.
 Source-bound resource runner/tool is lab `807e63a`; independent auditor is `7f32432`.
-Actual addition to a Base without a module cctor, public post-commit failure recovery,
-ordinary ThreadStatic/RVA, broader Unity behavior and performance remain open.
+Base-38 then passes startup/no-op without a hotfix module cctor. The unchanged
+changed/chained Current resources serve Base-36/37/38, each passing 20 workflow
+checks and five complete successful/restored 46-case executions plus three
+pre-entry rejections. Auditor `7c44bd9` rehashes 176 files per resource and verifies
+Base-38's actual `false -> true` module-cctor transition from its original snapshot.
+Public post-commit failure recovery, ordinary ThreadStatic/RVA, broader Unity
+behavior and performance remain open.
 The full goal is incomplete. Unity 2022 Windows first, then Tuanjie; no new Unity
 2021 work or production/ARM64 extrapolation.
 

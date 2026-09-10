@@ -23,8 +23,10 @@ Base-36/37. Each resource shares identical Current DLLs across both Bases and
 passes all 46 reference cases. The inline probe separately proves an unchanged
 AOT caller invoking its changed interpreted callee. See
 `reports/dhe-aot-module-evolution-windows.md` for exact v31 source/build identities,
-independent audits and earlier preserved failures. Adding a module initializer
-to a Base without one and public post-commit failure recovery remain pending.
+independent audits and earlier preserved failures. Actual addition to Base-38
+without a module initializer also passes: one resource serves all three Bases,
+with 20/20 workflow checks and full 46-case sequences. Public post-commit
+initialization-failure state and recovery remain the next implementation gate.
 This is conditional Windows correctness, not a full DHE release. Tuanjie follows
 Unity 2022; no new Unity 2021 work is in scope.
 

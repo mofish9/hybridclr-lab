@@ -4,7 +4,9 @@ Current checkpoint: the v31 candidate passes all four preserved multi-Base
 resource variants on immutable Unity 2022 Windows Base-36/37. The unchanged AOT
 caller/changed inline callee probe also passes on Base-37. See the v31 evidence
 section at the end; earlier failures below retain their original identities.
-Actual addition of a module initializer to a Base without one is the next gate.
+Actual addition to Base-38 without a module initializer also passes: both preserved
+Current variants now serve Base-36/37/38 in one resource. Public post-commit
+initialization-failure state and recovery remain the next implementation gate.
 
 The preceding goal turn made verified progress in mixed retry and newly added
 interpreter module initialization (`dhe-mixed-transaction-windows.md`). Continue
@@ -289,10 +291,9 @@ Inline resource PID 19268 reports `DHE inline hotfix pass: 18:2:1`: unchanged
 caller remains AOT, only the changed callee enters the interpreter. No threshold
 was reduced and the caller was not forced into interpretation.
 
-The next gate builds Base-38 from the removed-initializer Current, preserving
-the existing ModuleState type but no module cctor, then replays the exact changed
-and chained Current resources. Public post-commit initialization-failure reporting
-and recovery, ordinary ThreadStatic/RVA, native-only ABI obligations, broader
+The following continuation closes the actual addition gate using Base-38 without
+a module cctor. Public post-commit initialization-failure reporting and recovery,
+ordinary ThreadStatic/RVA, native-only ABI obligations, broader
 Unity behavior and production-equivalent performance/memory remain open. This
 milestone conditionally passes Windows correctness only; it is not complete DHE
 or production qualification. Tuanjie follows Unity 2022; no new Unity 2021 work.
@@ -307,3 +308,69 @@ initializer side effects. Preserve all v28-v30 failures and their original input
 C: had about 11 GiB free. Automatic approval review rejected the attempted removal
 of Base-30..35 Bee `.obj`/`.pch` caches (`blocked by policy`); nothing was deleted.
 New large builds and replay outputs use D:. No stash or destructive cleanup occurred.
+
+## Actual initializer addition across three immutable Bases
+
+`D:/hybridclr_artifacts/dhe-aot-module-base-38` passes startup PID 22040 and no-op
+resource PID 17324. Its inputs derive from the exact removed-initializer Current,
+with the existing ModuleState type and no module cctor, four hotfix DLLs and an
+ordinary initializer. Bootstrap and entry prove hotfix runs/version `0:0`; ordinary
+initialization stays eager once. The existing `aot-module-next-base` C# workflow
+creates this input and Player; no runtime or package change was needed.
+
+Build identity: lab `7f3243284722dd7a9a0cfa18bad7c3b8e7423fd6`, host-17 SHA above,
+build tool SHA `981F134218C02D6003D8A3656E481512C9EF3B2C75398B26FCCE958EA96B416E`,
+and the same v31 package/runtime-05 combination.
+
+- Base ID: `31cb6340788ec6998b4532ded7dac79052e2bcb82ba2416329089867c84ee436`.
+- Build identity SHA: `382A403CE62C54D74FFC35444807C06D5539854E6F214A8512A88CFC423F35EB`.
+- Snapshot SHA: `7b267fd0b6855c49ca51190e7b9b6510561cf37994a089af2d2545d49b9c7505`.
+- GameAssembly SHA: `14E0D5960E0994D1EEBBE857A12D98A52ADE26386DC8E3366727D03C0F2691B6`.
+- Inline audit `dhe-v31-inline-base-38.json`: 4,969 indexed copies, zero missing;
+  all five signature/coverage checks pass.
+
+Runner/auditor lab `7c44bd960b3c0ff60ba1220b1e2ef03dc7a4b2d5`,
+`D:/hybridclr_artifacts/dhe-v31-host-18`, SHA
+`325911D9ACD35D6C6BD9FAE99758E220411FE9C3D373097E1CB5F6882ECFA08E`, uses unchanged
+tool-07 to generate two new resources, each supporting Base-36, Base-37 and
+Base-38. Current DLL set hashes equal the earlier changed/chained resources;
+neither the previously failing inputs nor the existing Players were rebuilt.
+
+| Output under `D:/hybridclr_artifacts` | Base-36 / 37 / 38 initial PIDs | Workflow checks | Successful / rejected | Audit checks / files |
+| --- | --- | --- | --- | --- |
+| `dhe-v31-added-01` | 24320 / 17880 / 4092 | 20/20 | 5 / 3 | 59 / 176 |
+| `dhe-v31-added-chained-01` | 18712 / 22220 / 22948 | 20/20 | 5 / 3 | 64 / 176 |
+
+Each sibling `dhe-v31-<variant>-audit-01.json` verifies all 46 reference cases
+per successful/restored run, all three original Base identities, and pre-entry
+rejections without initializer effects. The auditor reads each authenticated
+Base snapshot DLL directly: both resources record module-cctor transitions
+`true -> true`, `true -> true`, `false -> true`. Base-38 reports version 202,
+runs one; the chained resource additionally reports second-initializer runs one.
+Ordinary initializer counters remain one before and after load on Base-37/38.
+
+The shared resource manifests have SHA-256
+`855F35D065A826C8F6E13800C5E84EA0E08188198B009862770E4BF4F51A11AD` (added) and
+`5306A48FA03B1072ADE40C6115545350A7011855F41BD4A7B6D5AE02767A3727` (added/chained).
+Their Current set hashes remain `ed1d0b59e136874634c7f3ead29e93319cfb1d8df90894b563c7965808f89ce6`
+and `72c4a1f296248b50e0d01db1be3c68c2967938792cb1be546b40838273555f8c` respectively.
+The extended auditor also passes the preceding removed/chained workflows in
+`dhe-v31-removed-audit-02.json` (49 checks) and `dhe-v31-chained-audit-02.json`
+(53 checks), explicitly confirming `true -> false` and `true -> true` transitions.
+The first audits remain valid at their original auditor identity.
+
+Remaining P1 for release: `DheRuntime.LoadCurrentAssemblyImages` and
+`LoadAssemblyImages` can report a module exception as registration failure even
+though native metadata is committed. Their success-only bookkeeping has not yet
+recorded loaded assemblies, and `Reset` only clears managed state. Existing native
+exception tests prove committed visibility, but do not qualify public recovery.
+The next change must distinguish pre-commit rejection from post-commit failure,
+expose a stable restart-required state through the public API, and prevent managed
+reset/retry from implying native rollback. Verify failures and retries through
+the public resource loader on a new immutable Player, including mixed new-assembly
+and existing-only payloads. Recovery after commit means a fresh process choosing
+an accepted resource; never reset executed initializer side effects in place.
+
+All four relevant candidate worktrees are committed; no stash was created.
+This is still conditional Unity 2022 Windows correctness, with the broader goal,
+performance/memory qualification and Tuanjie follow-up incomplete.
