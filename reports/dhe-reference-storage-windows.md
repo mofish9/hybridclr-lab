@@ -2,6 +2,10 @@
 
 ## Current Base-63/64 checkpoint
 
+The subsequent existing-interface candidate and its separate failures are recorded
+in `dhe-reference-interface-windows.md`. They do not invalidate or expand the
+scope of the matched Base-63/64 result below.
+
 The cached native query and lifecycle failures are fixed in the tested candidate.
 Both immutable Bases pass the same four-DLL Current after pre-selection component
 creation, without replacing Base binaries. This remains a research candidate:
