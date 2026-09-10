@@ -24,15 +24,21 @@ namespace HybridCLR.Lab.UnitySerialization
             GameObject source = null, clone = null;
             try
             {
-                source = new GameObject("DHE serialization source"); source.SetActive(false);
+                source = new GameObject("DHE serialization source");
+#if !SERIALIZATION_READ_ONLY
+                source.SetActive(false);
+#endif
                 var component = (Evolving)source.AddComponent(typeof(Evolving));
                 component.Value = 17; component.Extra = 91000000019L;
+#if !SERIALIZATION_READ_ONLY
                 Require(component.Enabled == 0 && State.Disabled == disabled && State.Destroyed == destroyed,
                     "inactive-source-has-no-callback-effects");
-                string json = JsonUtility.ToJson(component);
+#endif
+                string json = JsonUtility.ToJson(component, false);
                 Console.WriteLine("DHE Unity serialization json: " + json);
                 Require(json.Contains("\"Value\":17"), "json-reads-existing-field");
                 Require(json.Contains("\"Extra\":91000000019"), "json-reads-added-field");
+#if !SERIALIZATION_READ_ONLY
                 JsonUtility.FromJsonOverwrite("{\"Value\":29,\"Extra\":91000000031}", component);
                 Require(component.Value == 29, "json-writes-existing-field");
                 Require(component.Extra == 91000000031L, "json-writes-added-field");
@@ -46,13 +52,20 @@ namespace HybridCLR.Lab.UnitySerialization
                 Require(component.Value == 43 && component.Extra == 91000000031L, "cloned-storage-is-independent");
                 GC.Collect(); GC.WaitForPendingFinalizers(); GC.Collect();
                 Require(copied.Value == 53 && copied.Extra == 91000000057L, "cloned-storage-survives-gc");
+#endif
             }
             finally
             {
+#if SERIALIZATION_READ_ONLY
+                if (source != null) UnityEngine.Object.Destroy(source);
+#else
                 if (clone != null) UnityEngine.Object.DestroyImmediate(clone);
                 if (source != null) UnityEngine.Object.DestroyImmediate(source);
+#endif
             }
+#if !SERIALIZATION_READ_ONLY
             Require(State.Disabled == disabled && State.Destroyed == destroyed, "fixture-preserves-lifecycle-state");
+#endif
             Console.WriteLine("DHE Unity serialization pass: " + count);
         }
     }

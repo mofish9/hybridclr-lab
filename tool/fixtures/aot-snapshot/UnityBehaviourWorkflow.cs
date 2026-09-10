@@ -7,7 +7,9 @@ internal static class UnityBehaviourWorkflow
 {
     internal static int SerializationCurrent(string[] args)
     {
-        if (args.Length != 5) throw new ArgumentException("unity-serialization-current <lab> <Base proof> <Current DLL root> <editor> <new output>");
+        if (args.Length < 5 || args.Length > 6 || args.Length == 6 && args[5] != "read")
+            throw new ArgumentException("unity-serialization-current <lab> <Base proof> <Current DLL root> <editor> <new output> [read]");
+        bool readOnly = args.Length == 6;
         string output = Path.GetFullPath(args[4]), current = Path.Combine(output, "current");
         if (Directory.Exists(output)) throw new IOException("Serialization fixture output must be new.");
         Directory.CreateDirectory(current);
@@ -19,9 +21,13 @@ internal static class UnityBehaviourWorkflow
         foreach (string path in Directory.GetFiles(args[2], "*.dll")) File.Copy(path, Path.Combine(current, Path.GetFileName(path)));
         string model = Path.Combine(current, "HybridCLR.ValueLayoutModel.dll");
         var names = Directory.GetFiles(current, "*.dll").Select(Path.GetFileNameWithoutExtension).ToHashSet();
+        string unityReferences = Path.Combine(Path.GetDirectoryName(Path.GetFullPath(args[3]))!, "Data/Managed/UnityEngine");
         FrozenStaticWorkflow.CompileAndMerge(Path.GetFullPath(args[0]), args[3], "UnitySerializationCases", model,
-            snapshot.Assemblies.Where(row => !row.Dhe && !names.Contains(row.AssemblyName)).Select(row => row.Path)
-                .Concat(Directory.GetFiles(current, "*.dll")), Path.Combine(output, "compiled"), false);
+            snapshot.Assemblies.Where(row => !row.Dhe && !names.Contains(row.AssemblyName)).Select(row => {
+                string complete = Path.Combine(unityReferences, row.AssemblyName + ".dll");
+                return row.AssemblyName.StartsWith("UnityEngine", StringComparison.Ordinal) && File.Exists(complete) ? complete : row.Path;
+            }).Concat(Directory.GetFiles(current, "*.dll")), Path.Combine(output, "compiled"), false,
+            readOnly ? "SERIALIZATION_READ_ONLY" : null);
         using var module = ModuleDefMD.Load(File.ReadAllBytes(model));
         var entry = module.Find("HybridCLR.Lab.ValueLayout.Factory", false)!.Methods.Single(method => method.Name == "GetRevision");
         var invoke = module.Find("HybridCLR.Lab.UnitySerialization.SerializationCases", false)!.Methods.Single(method => method.Name == "RunIfRequested");

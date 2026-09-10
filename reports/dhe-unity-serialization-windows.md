@@ -21,3 +21,16 @@ the initial JSON/clone subset. Changes go through committed source before tests;
 preserve all failing DLLs, resources, Players and logs. Unity 2022 Windows first,
 Tuanjie later, no new U21, CAT, formal tag/branch, Installer or remote change.
 Large outputs stay on D:. This is correctness work, not performance evidence.
+
+The first fixture compilation at lab `f0d16c5` fails against the old Base's stripped
+Unity references: SetActive, FromJsonOverwrite, Instantiate, GetComponent and
+DestroyImmediate are absent, and only ToJson(object, bool) remains. Preserve
+`dhe-unity-serialization-current-01/compiled/compile.log`; no Player ran. Compile
+valid Current code against complete Unity reference assemblies, and build dedicated
+next Bases with explicit serialization API linker roots. These are ordinary AOT
+API preservation requirements, not restored native code from a hotfix DLL.
+
+In parallel, a labelled read-only diagnostic uses the old Base's existing
+ToJson(object, bool) entry and checks its old/added field values. Its two assertions
+do not replace the complete eleven-assertion JSON/overwrite/clone suite. New Base
+roots and diagnostic selection are fixture code only; runtime/package stay frozen.
