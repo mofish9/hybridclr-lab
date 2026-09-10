@@ -77,3 +77,17 @@ unchanged. This separates independent failures from a previous case's damaged
 stack or failed initializer. It does not waive the complete default run or the
 same-Current multi-Base gate, and older payloads without a selector cannot pass
 the isolated-case gate.
+
+`resource-06` compiles the selector-enabled suite from lab `d71eac7`; its Current
+Model SHA is `6357038C9C8FAE10DEBF4578F169DF7A222826C22EA73C7199046BE5EFAF2284`.
+Its unchanged assertion bodies pass all 23 CLR cases, and the full proof-19 run
+still fails open generic copying (PID 16844). `isolated-01` uses host-07 from
+lab `68255f6` and this same staged payload. All 23 independent Players finish
+without timeout: 15 pass, 8 fail; binaries and all staged resources are unchanged.
+Failures: open generic copy, generic value/reference owners, array resize/byref,
+List and Dictionary, generic delegate, generic interface/virtual dispatch. The
+interface failure is MethodAccessException for IReader<Payload>.Read; other
+failures are value assertions. Nullable, both reflection cases, exception/finally,
+Current static/generic static/cyclic initialization, constructor defaults,
+ThreadStatic and concurrent first static touch pass individually on this identity.
+This is diagnostic evidence, not a passing complete suite.
