@@ -53,6 +53,7 @@ public static class DheValueLayoutImpact
         private readonly Dictionary<string, ModuleDefMD> modules = new(StringComparer.Ordinal);
         private readonly HashSet<string> hotfixAssemblies = new(StringComparer.Ordinal);
         private readonly HashSet<string> changed = new(StringComparer.Ordinal);
+        private readonly Dictionary<string, HashSet<string>> fieldTypeDependencies = new(StringComparer.Ordinal);
         private readonly Dictionary<string, HashSet<string>> layouts = new(StringComparer.Ordinal);
         private readonly Dictionary<string, bool> genericLayouts = new(StringComparer.Ordinal);
         private readonly Dictionary<string, TypeDef> layoutDefinitions = new(StringComparer.Ordinal);
@@ -215,6 +216,7 @@ public static class DheValueLayoutImpact
 
         private void ExpandExistingFieldTypeDependencies(Dictionary<string, MetaVersionSnapshot> baseline)
         {
+            foreach (string root in changed) fieldTypeDependencies.Add(root, new HashSet<string>(StringComparer.Ordinal) { root });
             var candidates = new List<TypeDef>();
             foreach (var entry in modules)
             {
@@ -227,22 +229,34 @@ public static class DheValueLayoutImpact
             {
                 added = false;
                 foreach (TypeDef type in candidates)
-                    if (!changed.Contains(TypeKey(type)) && type.Fields.Any(field =>
-                        !field.IsStatic && HasSelectedConcreteType(field.FieldType)))
-                        added |= changed.Add(TypeKey(type));
+                {
+                    var dependencies = new HashSet<string>(StringComparer.Ordinal);
+                    foreach (FieldDef field in type.Fields.Where(field => !field.IsStatic))
+                        CollectSelectedConcreteTypes(field.FieldType, dependencies);
+                    if (dependencies.Count == 0) continue;
+                    string key = TypeKey(type);
+                    if (!fieldTypeDependencies.TryGetValue(key, out var stored))
+                        fieldTypeDependencies.Add(key, stored = new HashSet<string>(StringComparer.Ordinal));
+                    int previous = stored.Count;
+                    stored.UnionWith(dependencies);
+                    added |= stored.Count != previous;
+                }
             } while (added);
         }
 
-        private bool HasSelectedConcreteType(TypeSig signature)
+        private void CollectSelectedConcreteTypes(TypeSig signature, HashSet<string> dependencies)
         {
             // T alone is not a declaration-wide dependency. Closed arguments are
             // mapped by the existing context-sensitive generic execution path.
-            if (signature == null || signature is CorLibTypeSig || signature is GenericSig) return false;
+            if (signature == null || signature is CorLibTypeSig || signature is GenericSig) return;
             if (signature is GenericInstSig generic)
-                return changed.Contains(TypeKey(generic.GenericType.TypeDefOrRef)) ||
-                    generic.GenericArguments.Any(HasSelectedConcreteType);
-            if (signature is TypeDefOrRefSig named && changed.Contains(TypeKey(named.TypeDefOrRef))) return true;
-            return signature.Next != null && HasSelectedConcreteType(signature.Next);
+            {
+                CollectSelectedConcreteTypes(generic.GenericType, dependencies);
+                foreach (TypeSig argument in generic.GenericArguments) CollectSelectedConcreteTypes(argument, dependencies);
+            }
+            else if (signature is TypeDefOrRefSig named && fieldTypeDependencies.TryGetValue(TypeKey(named.TypeDefOrRef), out var roots))
+                dependencies.UnionWith(roots);
+            if (signature.Next != null) CollectSelectedConcreteTypes(signature.Next, dependencies);
         }
 
         private void Signature(TypeSig? signature, Context context, HashSet<string> dependencies, ref bool open)
@@ -276,7 +290,7 @@ public static class DheValueLayoutImpact
                 throw new InvalidDataException("Recursive inline value layout: " + use.Key);
             var result = new HashSet<string>(StringComparer.Ordinal);
             bool generic = false;
-            if (changed.Contains(TypeKey(use.Definition))) result.Add(TypeKey(use.Definition));
+            if (fieldTypeDependencies.TryGetValue(TypeKey(use.Definition), out var roots)) result.UnionWith(roots);
             if (!use.Definition.IsValueType && use.Definition.BaseType != null)
             {
                 Use? parent = ResolveUse(use.Definition.BaseType.ToTypeSig(), use.Context);

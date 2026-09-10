@@ -81,6 +81,10 @@ internal static class ReferenceOwnerPlanTests
         var fixtureBefore = MetaVersionSnapshot.Create(fixturePaths[0]); var fixtureCurrent = MetaVersionSnapshot.Create(fixturePaths[1]);
         var fixture = ResourceExecutionPlanner.Compile(new[] { fixturePaths[0] }, new[] { fixturePaths[1] }, Array.Empty<string>());
         var fixturePlan = fixture.Plans["ReferenceOwners"];
+        checks["fixture-root-changes-exclude-dependent-owners"] = fixture.Impact.ChangedValueTypes.SequenceEqual(new[] { "ReferenceOwners|Cases.Root" });
+        checks["cycle-dependencies-retain-original-root"] = fixture.Impact.Layouts.Where(row =>
+                row.DefinitionIdentity == "ReferenceOwners|Cases.CycleA" || row.DefinitionIdentity == "ReferenceOwners|Cases.CycleB")
+            .Count(row => row.ChangedValueTypes.SequenceEqual(new[] { "ReferenceOwners|Cases.Root" })) == 2;
         foreach (string name in new[] { "Root", "Leaf", "Chain", "CycleA", "CycleB", "ArrayHolder", "ClosedHolder" })
         {
             var type = fixtureCurrent.Types.Single(row => row.Identity == "Cases." + name);
