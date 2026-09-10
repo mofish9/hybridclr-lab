@@ -20,17 +20,19 @@ internal static class UnityBehaviourWorkflow
             identity.GetProperty("assemblies").EnumerateArray().Select(row => row.GetProperty("assemblyName").GetString()!))!;
         foreach (string path in Directory.GetFiles(args[2], "*.dll")) File.Copy(path, Path.Combine(current, Path.GetFileName(path)));
         string model = Path.Combine(current, "HybridCLR.ValueLayoutModel.dll");
+        string merged = Path.Combine(output, "merged/HybridCLR.ValueLayoutModel.dll");
+        Directory.CreateDirectory(Path.GetDirectoryName(merged)!); File.Copy(model, merged);
         var names = Directory.GetFiles(current, "*.dll").Select(Path.GetFileNameWithoutExtension).ToHashSet();
         string data = Path.Combine(Path.GetDirectoryName(Path.GetFullPath(args[3]))!, "Data");
         string unityReferences = Path.Combine(data, "PlaybackEngines/WindowsStandaloneSupport/Variations/il2cpp/Managed");
         string facade = Path.Combine(data, "MonoBleedingEdge/lib/mono/unityaot-win32/Facades/netstandard.dll");
-        FrozenStaticWorkflow.CompileAndMerge(Path.GetFullPath(args[0]), args[3], "UnitySerializationCases", model,
+        FrozenStaticWorkflow.CompileAndMerge(Path.GetFullPath(args[0]), args[3], "UnitySerializationCases", merged,
             snapshot.Assemblies.Where(row => !row.Dhe && !names.Contains(row.AssemblyName) && row.AssemblyName != "netstandard").Select(row => {
                 string complete = Path.Combine(unityReferences, row.AssemblyName + ".dll");
                 return row.AssemblyName.StartsWith("UnityEngine", StringComparison.Ordinal) && File.Exists(complete) ? complete : row.Path;
             }).Append(facade).Concat(Directory.GetFiles(current, "*.dll")), Path.Combine(output, "compiled"), false,
             readOnly ? "SERIALIZATION_READ_ONLY" : null);
-        using var module = ModuleDefMD.Load(File.ReadAllBytes(model));
+        using var module = ModuleDefMD.Load(File.ReadAllBytes(merged));
         var entry = module.Find("HybridCLR.Lab.ValueLayout.Factory", false)!.Methods.Single(method => method.Name == "GetRevision");
         var invoke = module.Find("HybridCLR.Lab.UnitySerialization.SerializationCases", false)!.Methods.Single(method => method.Name == "RunIfRequested");
         // Keep the initializer verification and all 46 existing business cases.
@@ -40,6 +42,11 @@ internal static class UnityBehaviourWorkflow
             throw new InvalidDataException("Unexpected Current entry shape.");
         entry.Body.Instructions.Insert(insertion, Instruction.Create(OpCodes.Call, invoke));
         module.Write(model);
+        File.WriteAllText(Path.Combine(output, "entry-wiring.json"), JsonSerializer.Serialize(new {
+            merged, mergedSha256 = MetaVersionSnapshot.FileSha256(merged), current = model,
+            currentSha256 = MetaVersionSnapshot.FileSha256(model), readOnly,
+            scope = "Append the optional native Unity probe after existing business cases; preserve the compiler's merged output separately"
+        }, new JsonSerializerOptions { WriteIndented = true }));
         Console.WriteLine(current); return 0;
     }
 
