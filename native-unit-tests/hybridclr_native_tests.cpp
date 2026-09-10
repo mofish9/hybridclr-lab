@@ -2592,7 +2592,7 @@ static void TestDheReferenceInterfaceQuery()
     // Class::GetInterfaces retains the last pointer after exhaustion; repeated
     // end calls must keep that same owner, including a one-element Current table.
     CHECK(SelectReferenceInterfaceIterationClass(base, current, currentInterfaces) == current);
-    CHECK(SelectReferenceInterfaceIterationClass(base, current, currentInterfaces) == current);
+    CHECK(SelectReferenceInterfaceIterationClass(current, removed, currentInterfaces) == current);
     CHECK(SelectReferenceInterfaceIterationClass(removed, current, currentInterfaces) == current);
     CHECK(SelectReferenceInterfaceIterationClass(current, current, currentInterfaces) == current);
     std::free(removed); std::free(current); std::free(base);

@@ -25,6 +25,10 @@ string SetHash(IEnumerable<KeyValuePair<string, byte[]>> values) => (string)Setu
 const string assets = "Assets/DHE/", baseRoot = assets + "base/", manifestPath = assets + "dhe-resource-update.json";
 string emptyHash = Hash(Array.Empty<byte>());
 var cases = new Dictionary<string, bool>();
+var exportedCapabilities = DheRuntime.GetSupportedRuntimeCapabilities();
+exportedCapabilities[0] = "caller-mutated-capability";
+cases["runtime-capability-export-cannot-change-validation"] =
+    !DheRuntime.GetSupportedRuntimeCapabilities().Contains("caller-mutated-capability");
 var errors = new Dictionary<string, string>();
 var identities = new List<DheRuntimeIdentity>();
 var providers = new List<Provider>();
@@ -52,7 +56,7 @@ foreach (string version in new[] { "old", "new" })
         AotAnalysisSnapshotSha256 = HashText("analysis-snapshot" + version),
         NativeGuardSourceSha256 = HashText("guard" + version), NativeManifestSha256 = HashText("native" + version),
         AotMetadataSetId = emptyHash, RuntimeProtocol = "dhe-runtime-protocol-v1", RuntimeContract = ResourceUpdateCompatibility.CurrentNativeRuntimeContract,
-        RuntimeCapabilities = (string[])typeof(DheRuntime).GetField("NativeRuntimeCapabilities", BindingFlags.Static | BindingFlags.NonPublic).GetValue(null),
+        RuntimeCapabilities = DheRuntime.GetSupportedRuntimeCapabilities(),
         RuntimeAssetRoot = assets, BaseMetaVersionAssetRoot = baseRoot, AssemblyNames = names,
         BaseMetaVersionHashes = names.Select(name => Hash(beforeBytes[name])).ToArray(),
     };
