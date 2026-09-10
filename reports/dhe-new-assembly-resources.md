@@ -58,3 +58,12 @@ the new prepared-reference helper. `236ce15` exposes that loader operation and
 is the next candidate. The first managed-host run from an artifact directory
 also found a fixture-only schema path assumption; the runner now accepts an
 explicit lab root. Neither failed attempt is passing runtime evidence.
+
+`native-02` compiles the candidate sources, then finds two missing standalone
+test-VM definitions at link time (metadata lock and interpreter registration).
+The test VM now supplies those engine contracts, using the real target lock
+type, and checks that failed MV registration keeps a new assembly unpublished
+while a valid retry publishes it with both differential peers. This does not
+replace the real Windows Player gate. The relocated managed runner passes all
+81 existing validation/argument-selection checks in `managed-03.json`; its
+native calls are recorded, not executed.

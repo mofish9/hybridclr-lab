@@ -14,6 +14,7 @@
 #include <vector>
 
 #include "hybridclr/Il2CppCompatibleDef.h"
+#include "vm/MetadataCache.h"
 #if __has_include("hybridclr/DheRuntime.h")
 #include "hybridclr/DheRuntime.h"
 #define HYBRIDCLR_LAB_DHE_ENABLED 1
@@ -1028,6 +1029,31 @@ namespace
 		hybridclr::dhe::ResetForTests();
 		changed.isInterpterImpl = false;
 		secondChanged.isInterpterImpl = false;
+
+#if defined(HYBRIDCLR_DHE_HAS_INTERPRETER_BATCH)
+        Il2CppAssembly addedAssembly{};
+        Il2CppImage addedImage{};
+        addedAssembly.aname.name = "DheNativeResolver.Added";
+        addedAssembly.image = &addedImage;
+        addedImage.nameNoExt = addedAssembly.aname.name;
+        addedImage.assembly = &addedAssembly;
+        CHECK(!hybridclr::dhe::PrepareAndRegisterMetaVersions({
+            { &assembly, &baseMetaVersion, &currentMetaVersion },
+            { &secondAssembly, &invalidSecondBase, &invalidSecondCurrent }
+        }, { &addedAssembly }));
+        CHECK(il2cpp::vm::MetadataCache::GetAssemblyByName(addedAssembly.aname.name) == nullptr);
+        CHECK(!hybridclr::dhe::IsDheAssembly(&assembly) && !changed.isInterpterImpl);
+        CHECK(hybridclr::dhe::PrepareAndRegisterMetaVersions({
+            { &assembly, &baseMetaVersion, &currentMetaVersion },
+            { &secondAssembly, &secondBaseMetaVersion, &secondCurrentMetaVersion }
+        }, { &addedAssembly }));
+        CHECK(il2cpp::vm::MetadataCache::GetAssemblyByName(addedAssembly.aname.name) == &addedAssembly);
+        CHECK(hybridclr::dhe::IsDheAssembly(&assembly) && hybridclr::dhe::IsDheAssembly(&secondAssembly));
+        hybridclr::dhe::ResetForTests();
+        changed.isInterpterImpl = secondChanged.isInterpterImpl = false;
+        hybridclr::native_test::ClearDheResolver();
+        hybridclr::native_test::ConfigureDheResolver(&assembly, &image, klass);
+#endif
 		std::free(secondKlass);
 
 

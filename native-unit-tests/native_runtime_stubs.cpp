@@ -20,6 +20,7 @@
 #include "vm/Exception.h"
 #include "vm/Image.h"
 #include "vm/MetadataCache.h"
+#include "vm/MetadataLock.h"
 #include "metadata/GenericMetadata.h"
 #include "il2cpp-runtime-stats.h"
 #include "hybridclr/interpreter/Interpreter.h"
@@ -250,6 +251,7 @@ namespace utils
 
 namespace vm
 {
+    decltype(il2cpp::vm::g_MetadataLock) g_MetadataLock;
 #if HYBRIDCLR_UNITY_2021_OR_NEW
     namespace
     {
@@ -325,6 +327,11 @@ namespace vm
 				return resolver.assembly;
 		}
 		return nullptr;
+    }
+
+    void MetadataCache::RegisterInterpreterAssembly(Il2CppAssembly* assembly)
+    {
+        hybridclr::native_test::ConfigureDheResolver(assembly, assembly->image, nullptr);
     }
 
     const Il2CppGenericInst* MetadataCache::GetGenericInst(const Il2CppType* const* types,
