@@ -17,14 +17,16 @@ Their immutable inputs are recorded in `manifests/repo-lock.json`.
 
 ## Current phase
 
-The active candidate is extending **existing AOT hotfix module initialization
-and literal constant evolution** on Unity 2022 Windows. See
-`reports/dhe-aot-module-evolution-windows.md` for the passing startup/no-op
-results, preserved resource-registration failures, native regression fixes and
-the next immutable Player gates. This follow-up is not yet qualified for full
-Current resource replay or release. Earlier mixed-module results below retain
-their original runtime identities. Tuanjie follows Unity 2022; no new Unity
-2021 work is in scope.
+The active Unity 2022 Windows candidate passes preserved changed/removed/chained
+AOT hotfix module resources and 74 literal-reflection assertions on immutable
+Base-36/37. Each resource shares identical Current DLLs across both Bases and
+passes all 46 reference cases. The inline probe separately proves an unchanged
+AOT caller invoking its changed interpreted callee. See
+`reports/dhe-aot-module-evolution-windows.md` for exact v31 source/build identities,
+independent audits and earlier preserved failures. Adding a module initializer
+to a Base without one and public post-commit failure recovery remain pending.
+This is conditional Windows correctness, not a full DHE release. Tuanjie follows
+Unity 2022; no new Unity 2021 work is in scope.
 
 This research checkout extends the published DHE line below. Its current
 implementation and validation status is in
@@ -35,7 +37,7 @@ implementation and validation status is in
 `reports/dhe-frozen-resource-admission.md` and
 `docs/HybridCLR-DHE-Evolution-Validation.md`. Unity 2022 Windows is the active
 qualification target; Tuanjie follows it, and Unity 2021 is outside new work.
-The active mixed-module candidate passes two real module initializers and all
+The preceding mixed-module candidate passes two real module initializers and all
 46 cases on two immutable Bases with one identical six-DLL Current. All 31
 shared-resource checks pass; independent audit rehashes 163 files and verifies
 nine complete successful/restored runs plus 13 pre-entry rejections. A separate
@@ -44,8 +46,9 @@ pending-peer rejection and module reentry/exception tests. The MV generator now
 retains nonempty module owners; nine checks confirm initializer fingerprints and
 exact prior-MV compatibility. Native code is unchanged, so its real-header
 compile/CTest and earlier core/linker checks retain their exact prior identities.
-Existing AOT module initialization, public post-commit failure recovery, ordinary
-ThreadStatic/RVA and performance/Release qualification remain pending. Historical 0.1.35
+That preceding identity does not include the v31 follow-up above. Public post-commit
+failure recovery, ordinary ThreadStatic/RVA and performance/Release qualification
+remain pending. Historical 0.1.35
 release evidence below does not qualify this research snapshot.
 
 The DHE workflow is maintained as a separate, explicit validation lane. Its

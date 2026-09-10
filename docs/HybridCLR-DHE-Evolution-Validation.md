@@ -2,14 +2,20 @@
 
 ## Active checkpoint: existing AOT module and literal constant evolution
 
-See `../reports/dhe-aot-module-evolution-windows.md`. Existing hotfix module
-initializers now defer until Current selection in startup/no-op Players.
-Real changed/removed-module resource replay exposed constant admission and
-hidden module MethodDef lookup gaps. The candidate fixes those gaps, with
-reproducing native/managed regressions and immutable Player replays pending.
-Ordinary module guard inventory coverage is also being corrected; ordinary
-initializers must keep eager exactly-once execution. The milestone remains
-incomplete and is not a release qualification.
+See `../reports/dhe-aot-module-evolution-windows.md`. HybridCLR `8417ea0`, IL2CPP
+Unity 2022 `4d5052e`, package `6d59a27` pass real-header compile/CTest and startup,
+no-op and preserved changed/removed/chained/literal resources on Base-36/37.
+All four resources pass 16 workflow checks and complete 46-case reference sequences;
+independent audits verify four successful/restored executions and three pre-entry
+rejections per resource, rehashing 126 files. Literal resources also pass 74 assertions,
+including embedded NUL. Ordinary module initialization stays eager exactly once.
+The separate Base-37 inline resource reports `18:2:1`, preserving its unchanged AOT
+caller and interpreting the changed callee; its 19-check audit rehashes 67 files.
+Source-bound resource runner/tool is lab `807e63a`; independent auditor is `7f32432`.
+Actual addition to a Base without a module cctor, public post-commit failure recovery,
+ordinary ThreadStatic/RVA, broader Unity behavior and performance remain open.
+The full goal is incomplete. Unity 2022 Windows first, then Tuanjie; no new Unity
+2021 work or production/ARM64 extrapolation.
 
 ## Preceding checkpoint: mixed registration retry and new module initializers
 

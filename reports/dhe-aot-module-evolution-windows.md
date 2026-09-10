@@ -1,5 +1,11 @@
 # AOT hotfix module initialization after version selection
 
+Current checkpoint: the v31 candidate passes all four preserved multi-Base
+resource variants on immutable Unity 2022 Windows Base-36/37. The unchanged AOT
+caller/changed inline callee probe also passes on Base-37. See the v31 evidence
+section at the end; earlier failures below retain their original identities.
+Actual addition of a module initializer to a Base without one is the next gate.
+
 The preceding goal turn made verified progress in mixed retry and newly added
 interpreter module initialization (`dhe-mixed-transaction-windows.md`). Continue
 the full DHE goal on Unity 2022 Windows first, then Tuanjie. The initial runtime
@@ -208,3 +214,96 @@ must reject incapable Bases, including NUL defaults in new assemblies and
 frozen ordinary sources. These newest changes still need source-bound native,
 inline-definition and new immutable Player verification. No previous passing
 v30 numbers qualify v31; no release or platform extrapolation is authorized.
+
+## Immutable v31 resource replay and independent audits
+
+The committed candidate is HybridCLR `8417ea0cd0cc768f659fc539533038b3fae6280a`,
+IL2CPP Unity 2022 `4d5052e28b6be289f21cc3b79b349675483f2b38`, package
+`6d59a278cd9daab60a4d0f8df1f71e729a7e95f9`. Package canonical tree:
+`9D70528FD83F34375700929511F3678C7CC9B42A333605B5D04540C973D986E8`.
+These are research worktree commits, not a new formal branch/tag release.
+No CAT, Installer default, formal branch or remote was changed.
+
+Under `C:/hybridclr_optimize/artifacts/dhe-aot-module-evolution-20260910`,
+`runtime-05/DHE-Unity2022` binds runtime tree
+`1E3A6EEFDC31D12465C9457177BBD084BA1B1B17385C1879969E0E1900050F65`, manifest
+`D387B5C0B0221E294D705DA1102A4A027F21A7132D77B734B4BA915F10DC69C1`.
+`native-06` passes real Unity 2022.3.62f3 headers, compile/CTest, with
+`mergeReady=true`, `surrogateExternalHeadersUsed=false`. Preserve `native-05`'s
+earlier test-host linker failure; lab `a39064f` supplied its missing `Memory::Calloc`
+stub. `managed-04.json` passes 81/81 package validation/native-argument-selection
+checks; it records native arguments without executing native calls. `policy-05`
+passes 52/52 checks on lab `807e63a`, including scalar constant-kind rejection.
+
+The following Players are archived under `D:/hybridclr_artifacts`. Both were
+built on clean lab `a39064f`, host-15 SHA
+`ACB579D61E907FA3377F0F2F0650E03FE15B48448AD915E174577212B686B299` and build tool SHA
+`BED46F7C977C9FF8ACFE79E88C753014C655B3E19B3BC7C033FCAEBBDFED1276`.
+Do not relabel their build tool as the newer resource-generation tool below.
+
+| Base directory | Input | Startup / no-op PIDs | Base ID | GameAssembly SHA-256 |
+| --- | --- | --- | --- | --- |
+| `dhe-aot-module-base-36` | Exact Base-30 inputs; old layout, module 101, three hotfix DLLs | 20944 / 23040 | `d934240254f353947833eec69935be56cda940c0a8b05de2f5e7c15b55fd9cb0` | `933212378409DBB8C1EFCFDEC6188C2FDCB8C5EE291033BF8A4CCF827B7AE790` |
+| `dhe-aot-module-base-37` | Grown layout, module 202, baseline literals and inline probe, ordinary initializer, four hotfix DLLs | 24552 / 23892 | `797d156fe84be7bce27874396fa2755e85daba6db19232165bd27710159ccda0` | `5550452542532C8CEB512705A17EF435EFA17ADDB551080DF3E00920EBD46385` |
+
+`inline-base-36.json` and `inline-base-37.json` audit 4,946 and 4,970 actual
+indexed inline copies respectively, with zero missing guards. ABI/context
+mismatch and foreign-symbol rejection checks also pass. Base-37 generated C++
+confirms its non-inlined `InlineHotfixCaller.Invoke` calls the guarded
+`InlineHotfixCallee.Read_inline` copy. Startup/no-op logs report `17:2:0`.
+
+Resource workflows ran on clean lab `807e63afa3967ade138f2a1b8e3020c4594b2f97`,
+host-16 SHA `4D565FB03AD63BAF560122136E43388AF9F4A5388A5E3E9B86706FDFFE43257C`,
+tool-07 SHA `75597987BAE9B0F11E34D0DBC5C0C06A60EDC810F5A3A297C884F1E1894D12B1`.
+Every workflow preserves the exact pre-existing Current DLL bytes. Independent
+auditor lab `7f32432`, `D:/hybridclr_artifacts/dhe-v31-host-17`, SHA
+`8424DF4F598B5204F31EAD19F4DB0B1FACB551E433E5F6F4968867A90EFB3E9F`, rehashes
+original Base identities, Players, snapshots, original Current DLLs and staged
+resources, and verifies complete successful/restored traces and pre-entry failures.
+
+All outputs below are under `D:/hybridclr_artifacts`; each audit is the sibling
+`dhe-v31-<variant>-audit-01.json`. Every successful execution matches the full
+46-case CLR reference sequence, differential zero.
+
+| Resource output | Bases | Initial Player PIDs | Workflow checks | Successful / rejected runs | Audit checks / files |
+| --- | --- | --- | --- | --- | --- |
+| `dhe-v31-changed-01` | 36, 37 | 19752 / 18948 | 16/16 | 4 / 3 | 48 / 126 |
+| `dhe-v31-removed-01` | 36, 37 | 13612 / 18704 | 16/16 | 4 / 3 | 48 / 126 |
+| `dhe-v31-chained-01` | 36, 37 | 17620 / 5536 | 16/16 | 4 / 3 | 52 / 126 |
+| `dhe-v31-literals-01` | 36, 37 | 16216 / 20588 | 16/16 | 4 / 3 | 52 / 126 |
+| `dhe-v31-inline-01` | 37 | 19268 | 7/7 | 1 / 0 | 19 / 67 |
+
+For each two-Base resource, both Bases select one identical Current DLL set.
+Base-36 additionally exercises the new-DLL missing/corrupt/restored path and
+frozen-snapshot substitution/restoration; Base-37 already contains that DLL and
+needs no frozen projection for this layout. The single-Base inline row has no
+new-DLL or frozen-source corruption runs; do not infer those from its seven checks.
+
+The updated module runs once at version 202; removal runs zero times. The chained
+variant also runs its real second C# initializer exactly once. All hotfix counters
+are zero before load. Base-37's ordinary initializer remains eager, counter one
+before and after load. Retained and fresh reflection handles read Current constants.
+The literal variant passes all 74 additional numeric/string/null/enum/generic
+reflection assertions on both Bases, retaining the exact `Current 常量\0尾` string.
+Inline resource PID 19268 reports `DHE inline hotfix pass: 18:2:1`: unchanged
+caller remains AOT, only the changed callee enters the interpreter. No threshold
+was reduced and the caller was not forced into interpretation.
+
+The next gate builds Base-38 from the removed-initializer Current, preserving
+the existing ModuleState type but no module cctor, then replays the exact changed
+and chained Current resources. Public post-commit initialization-failure reporting
+and recovery, ordinary ThreadStatic/RVA, native-only ABI obligations, broader
+Unity behavior and production-equivalent performance/memory remain open. This
+milestone conditionally passes Windows correctness only; it is not complete DHE
+or production qualification. Tuanjie follows Unity 2022; no new Unity 2021 work.
+
+Rollback keeps the archived Players and selects the preceding runtime/package/tool
+combination when building a new Base. Already shipped Players cannot acquire new
+native capabilities from DLL resources; capability admission must continue to
+reject them. For an existing capable Base, select a previously accepted resource
+at process startup. Do not claim in-process rollback after metadata commit or
+initializer side effects. Preserve all v28-v30 failures and their original inputs.
+
+C: had about 11 GiB free. Automatic approval review rejected the attempted removal
+of Base-30..35 Bee `.obj`/`.pch` caches (`blocked by policy`); nothing was deleted.
+New large builds and replay outputs use D:. No stash or destructive cleanup occurred.
