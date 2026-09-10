@@ -17,6 +17,7 @@ internal sealed class ResourceUpdateCompatibility
 		"atomic-multi-assembly-registration-v1",
         "current-storage-execution-plan-array-v1",
         PhysicalInterfaceAdditionCapability,
+        ResourceExecutionPlan.GenericContextCapability,
         "current-parameter-default-metadata-v1",
         "shared-type-initialization-v1",
         "current-static-value-storage-v1",
@@ -99,7 +100,8 @@ internal sealed class ResourceUpdateCompatibility
     public static ResourceUpdateCompatibility Analyze(MetaVersionSnapshot baseline,
         MetaVersionSnapshot current, IEnumerable<string>? addressTakenFields = null,
         bool usesUnresolvedCallStubs = true, IEnumerable<MetaVersionSnapshot>? currentAssemblySet = null,
-        IEnumerable<string>? currentStorageTypes = null, IEnumerable<uint>? currentExecutionMethodTokens = null)
+        IEnumerable<string>? currentStorageTypes = null, IEnumerable<uint>? currentExecutionMethodTokens = null,
+        IEnumerable<uint>? currentGenericContextMethodTokens = null)
     {
         var baselineMethods = baseline.Methods.ToDictionary(method => method.StableId,
             StringComparer.OrdinalIgnoreCase);
@@ -116,6 +118,18 @@ internal sealed class ResourceUpdateCompatibility
         var unsupported = new List<string>();
         var physicalTypes = new HashSet<string>(currentStorageTypes ?? Array.Empty<string>(), StringComparer.Ordinal);
         var executionTokens = new HashSet<uint>(currentExecutionMethodTokens ?? Array.Empty<uint>());
+        uint[] conditionalTokens = (currentGenericContextMethodTokens ?? Array.Empty<uint>()).ToArray();
+        var currentMethodsByToken = current.Methods.ToDictionary(method => method.Token);
+        if (conditionalTokens.Distinct().Count() != conditionalTokens.Length)
+            unsupported.Add("duplicate-conditional-generic-selection");
+        foreach (uint token in conditionalTokens)
+        {
+            if (!executionTokens.Contains(token) || !currentMethodsByToken.TryGetValue(token, out var method) ||
+                (method.GenericParameterCount == 0 && method.DeclaringTypeGenericParameterCount == 0) ||
+                physicalTypes.Contains(method.DeclaringTypeStableId) ||
+                !baselineMethods.TryGetValue(method.StableId, out var previous) || previous.Version != method.Version)
+                unsupported.Add("invalid-conditional-generic-selection:" + token.ToString("X8"));
+        }
         if (!string.Equals(baseline.AssemblyName, current.AssemblyName,
                 StringComparison.Ordinal))
             unsupported.Add("assembly-name-change:" + baseline.AssemblyName + "->" +
@@ -295,6 +309,9 @@ internal sealed class ResourceUpdateCompatibility
             requiredCapabilities.Add(PhysicalInterfaceAdditionCapability);
         if (physicalTypes.Count != 0 || executionTokens.Count != 0)
             requiredCapabilities.Add("current-storage-execution-plan-array-v1");
+        if (conditionalTokens.Length != 0 || current.Methods.Any(method => executionTokens.Contains(method.Token) &&
+                (method.GenericParameterCount != 0 || method.DeclaringTypeGenericParameterCount != 0)))
+            requiredCapabilities.Add(ResourceExecutionPlan.GenericContextCapability);
         if (requiresClassVirtualMethods)
             requiredCapabilities.Add("existing-class-virtual-methods-v1");
         if (current.Fields.Any(field => !field.IsStatic && field.DeclaringTypeIsGeneric &&

@@ -56,6 +56,12 @@
         },
         "currentStorageTypeTokenCount": { "type": "integer", "minimum": 0 },
         "currentExecutionMethodTokenCount": { "type": "integer", "minimum": 0 },
+        "currentGenericContextMethodTokenCount": { "type": "integer", "minimum": 0 },
+        "currentGenericContextMethodTokens": {
+          "type": ["array", "null"],
+          "uniqueItems": true,
+          "items": { "type": "integer", "minimum": 100663297, "maximum": 117440511 }
+        },
         "currentStorageTypeTokens": {
           "type": "array",
           "uniqueItems": true,

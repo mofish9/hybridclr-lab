@@ -8,6 +8,9 @@ internal sealed record ResourceExecutionPlan(int SchemaVersion, string AssemblyN
     int CurrentStorageTypeTokenCount, int CurrentExecutionMethodTokenCount)
 {
     public const string Capability = "current-storage-execution-plan-array-v1";
+    public const string GenericContextCapability = "hotfix-generic-context-dispatch-v1";
+    public uint[] CurrentGenericContextMethodTokens { get; init; } = Array.Empty<uint>();
+    public int CurrentGenericContextMethodTokenCount { get; init; }
 
     public string CanonicalBinding()
     {
@@ -28,12 +31,18 @@ internal sealed record ResourceExecutionPlan(int SchemaVersion, string AssemblyN
             !Hash(BaseMetaVersionSha256) || !Hash(CurrentMetaVersionSha256))
             throw new InvalidDataException("Execution plan identity is invalid.");
         Tokens(CurrentStorageTypeTokens, 2, 1); Tokens(CurrentExecutionMethodTokens, 6, 0);
+        uint[] conditional = CurrentGenericContextMethodTokens ?? Array.Empty<uint>();
+        Tokens(conditional, 6, 0);
+        if (CurrentGenericContextMethodTokenCount != conditional.Length ||
+            conditional.Any(token => !CurrentExecutionMethodTokens.Contains(token)))
+            throw new InvalidDataException("Conditional generic methods must be counted execution-plan selections.");
         if (CurrentStorageTypeTokenCount != CurrentStorageTypeTokens.Length ||
             CurrentExecutionMethodTokenCount != CurrentExecutionMethodTokens.Length)
             throw new InvalidDataException("Execution plan token counts do not match its selections.");
         return AssemblyName + "|" + BaseMetaVersionSha256.ToUpperInvariant() + "|" + CurrentMetaVersionSha256.ToUpperInvariant() +
             "|" + string.Join(",", CurrentStorageTypeTokens.Select(token => token.ToString("X8"))) +
-            "|" + string.Join(",", CurrentExecutionMethodTokens.Select(token => token.ToString("X8")));
+            "|" + string.Join(",", CurrentExecutionMethodTokens.Select(token => token.ToString("X8"))) +
+            (conditional.Length == 0 ? "" : "|generic=" + string.Join(",", conditional.Select(token => token.ToString("X8"))));
     }
 }
 
@@ -90,8 +99,17 @@ internal static class ResourceExecutionPlanner
             uint[] executable = selectedMethods.Where(method => CanExecute(method.Flags) && CanExecute(baseMethods[method.StableId].Flags))
                 .Select(method => method.Token).Distinct().OrderBy(token => token).ToArray();
             uint[] physicalTokens = selectedTypes.Select(type => type.Token).Distinct().OrderBy(token => token).ToArray();
+            var inspected = impact.Methods.Where(method => method.AssemblyName == entry.Key &&
+                    method.Decision == "inspect-generic-context" && method.ChangedValueTypes.Length == 0)
+                .Select(method => method.CurrentMethodToken).ToHashSet();
+            uint[] conditional = selectedMethods.Where(method => executable.Contains(method.Token) &&
+                    inspected.Contains(method.Token) && !selectedOwners.Contains(method.DeclaringTypeStableId) &&
+                    (method.GenericParameterCount != 0 || method.DeclaringTypeGenericParameterCount != 0) &&
+                    method.Version == baseMethods[method.StableId].Version)
+                .Select(method => method.Token).OrderBy(token => token).ToArray();
             var plan = new ResourceExecutionPlan(1, entry.Key, Hash(baseline.ToBinary()), Hash(current.ToBinary()),
-                physicalTokens, executable, physicalTokens.Length, executable.Length);
+                physicalTokens, executable, physicalTokens.Length, executable.Length)
+            { CurrentGenericContextMethodTokens = conditional, CurrentGenericContextMethodTokenCount = conditional.Length };
             plan.CanonicalBinding(); plans.Add(entry.Key, plan);
         }
         return new(impact, plans, errors.ToArray());

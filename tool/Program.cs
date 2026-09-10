@@ -1259,7 +1259,8 @@ internal static partial class Program
                     currentStorageTypes: execution.Plans.TryGetValue(baselineRecord.name, out var executionPlan)
                         ? currentSnapshot.Types.Where(type => executionPlan.CurrentStorageTypeTokens.Contains(type.Token)).Select(type => type.StableId)
                         : Array.Empty<string>(),
-                    currentExecutionMethodTokens: executionPlan?.CurrentExecutionMethodTokens);
+                    currentExecutionMethodTokens: executionPlan?.CurrentExecutionMethodTokens,
+                    currentGenericContextMethodTokens: executionPlan?.CurrentGenericContextMethodTokens);
                 requiredRuntimeCapabilities.UnionWith(
                     compatibility.RequiredRuntimeCapabilities);
                 var missingGuards = compatibility.GuardRequiredMethods.Where(method =>
