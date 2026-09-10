@@ -68,3 +68,15 @@ Report exact source/build identities and retain every failure. No performance,
 Tuanjie, mobile or production claim follows from Windows correctness. Tuanjie
 comes after Windows stability; no new Unity 2021 work. Keep formal branches, tags,
 Installer defaults and CAT unchanged; rollback as a complete candidate set.
+
+## Player conditional dispatch evidence
+
+Append an optional Current-only probe without changing Identity<T> or rebuilding
+Base-68/69. Close the existing method over Payload and Envelope<Payload>, whose
+AOT instantiations already exist in both Bases. Derive affected/unaffected from
+each Base's bound storage plan, never its revision number. Warm reflection first,
+then isolate one invocation between dispatch counter resets and reads. Require
+the expected selection, exact value/reference preservation and one changed DHE
+entry for affected instances versus zero for unaffected instances. AOT counters
+include reflection wrappers and cannot supply per-method timing. Bind all source,
+plan, input and binary hashes; retain failed probes without changing the oracle.
