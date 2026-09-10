@@ -15,6 +15,7 @@
     </AssemblyAttribute>
     <Compile Remove="Unity/**/*.cs" />
     <Compile Include="$(DhePackageRoot)/Editor/Commands/DheAotAnalysisSnapshot.cs" Link="Package/DheAotAnalysisSnapshot.cs" />
+    <Compile Include="$(DhePackageRoot)/Editor/Commands/DheOrdinaryGuardInventory.cs" Link="Package/DheOrdinaryGuardInventory.cs" />
     <Compile Include="../../AotAnalysisSnapshot.cs" Link="Tool/AotAnalysisSnapshot.cs" />
     <Compile Include="../../MetaVersion.cs" Link="Tool/MetaVersion.cs" />
     <Compile Include="../../ResourceUpdateCompatibility.cs" Link="Tool/ResourceUpdateCompatibility.cs" />

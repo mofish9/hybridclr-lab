@@ -66,18 +66,13 @@ internal static class UnityWorkflow
                 "-dheCurrentRoot", Path.Combine(build, "current"), "-dheMode", "Exploratory", "-dheBootstrap", "true",
                 "-dheProjectPlan", plan, "-dheEngineWorkflow", "Unity2022Fgs", "-dheIl2CppCodeGeneration", "OptimizeSize",
                 "-dheOrdinaryGuardMvRoot", ordinaryGuardRoot,
+                "-dheGuardAllOrdinaryAot", allOrdinaryGuards ? "true" : "false",
                 "-logFile", Path.Combine(output, phase + ".log"));
         }
         Phase("Prepare");
         var prepared = JsonSerializer.Deserialize<JsonElement>(File.ReadAllText(Path.Combine(build, "adapter/prepare.json")));
         string stripped = prepared.GetProperty("currentSourceRoot").GetString();
-        if (allOrdinaryGuards)
-        {
-            Execute("dotnet", tool, "ordinary-guard-inventory", "-AotRoot", stripped,
-                "-SettingsFile", Path.Combine(project, "ProjectSettings/HybridCLRSettings.asset"),
-                "-IdentityType", "HybridCLR.Lab.Snapshot.DheBuildIdentity", "-OutputRoot", ordinaryGuardRoot);
-        }
-        else
+        if (!allOrdinaryGuards)
             FrozenEntryWorkflow.WriteGuardJson(Path.Combine(stripped, "HybridCLR.ValueLayoutNative.dll"),
                 Path.Combine(ordinaryGuardRoot, "HybridCLR.ValueLayoutNative.mv.json"));
         if (frozenEntryProbe && !allOrdinaryGuards)
@@ -97,7 +92,8 @@ internal static class UnityWorkflow
             .Select(row => child == null ? row.GetString() : row.GetProperty(child).GetString()).ToArray();
         var snapshot = AotAnalysisSnapshot.Read(identityPath, identity.RootElement, Names("aotAssemblyNames"), Names("assemblies", "assemblyName"));
         string nativeManifest = Path.Combine(build, "native/dhe-native-manifest.json");
-        if (allOrdinaryGuards) FrozenEntryWorkflow.VerifyOrdinaryCoverage(snapshot, ordinaryGuardRoot, nativeManifest, output);
+        if (allOrdinaryGuards) FrozenEntryWorkflow.VerifyOrdinaryCoverage(snapshot,
+            Path.Combine(build, "native/ordinary-guards"), nativeManifest, output);
         var toolAssembly = System.Reflection.Assembly.LoadFrom(tool);
         toolAssembly.GetType("HybridCLR.DheTool.Program", true)
             .GetMethod("ValidateNativeFinalizeEvidence", System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.Static)

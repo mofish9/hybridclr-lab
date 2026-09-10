@@ -77,15 +77,23 @@ namespace HybridCLR.Lab.Editor
             },
             ResolvePlayerOutput = (target, output) => Path.Combine(output, "player", "Snapshot.exe"),
             AdditionalGuardMvJsonPaths = OrdinaryGuardMvJsonPaths(),
+            GuardOrdinaryAotMethods = GuardAllOrdinaryAot(),
         };
 
         private static string[] OrdinaryGuardMvJsonPaths()
         {
+            if (GuardAllOrdinaryAot()) return Array.Empty<string>();
             string[] args = Environment.GetCommandLineArgs();
             int index = Array.IndexOf(args, "-dheOrdinaryGuardMvRoot");
             if (index < 0 || index + 1 >= args.Length) return Array.Empty<string>();
             string root = Path.GetFullPath(args[index + 1]);
             return Directory.Exists(root) ? Directory.GetFiles(root, "*.mv.json") : Array.Empty<string>();
+        }
+        private static bool GuardAllOrdinaryAot()
+        {
+            string[] args = Environment.GetCommandLineArgs();
+            int index = Array.IndexOf(args, "-dheGuardAllOrdinaryAot");
+            return index >= 0 && index + 1 < args.Length && args[index + 1] == "true";
         }
     }
 }
