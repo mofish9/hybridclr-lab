@@ -16,8 +16,10 @@ internal static class UnityBehaviourWorkflow
 
     internal static int ReferenceCurrent(string[] args)
     {
-        if (args.Length < 5 || args.Length > 6 || args.Length == 6 && args[5] != "generic" && args[5] != "dispatch")
-            throw new ArgumentException("unity-reference-current <lab> <Base proof> <Current DLL root> <editor> <new output> [generic|dispatch]");
+        if (args.Length < 5 || args.Length > 6 || args.Length == 6 && args[5] != "generic" && args[5] != "dispatch" && args[5] != "callbacks")
+            throw new ArgumentException("unity-reference-current <lab> <Base proof> <Current DLL root> <editor> <new output> [generic|dispatch|callbacks]");
+        if (args.Length == 6 && args[5] == "callbacks")
+            return CompileNativeProbe(args, "UnitySerializationCallbackCases", "HybridCLR.Lab.UnityReference.SerializationCallbackCases", false);
         if (args.Length == 6 && args[5] == "dispatch")
             return CompileNativeProbe(args, "UnityReferenceDispatchCases", "HybridCLR.Lab.UnityReference.DispatchCases", false);
         if (args.Length == 6)
@@ -50,6 +52,22 @@ internal static class UnityBehaviourWorkflow
             }).Append(facade).Concat(Directory.GetFiles(current, "*.dll")), Path.Combine(output, "compiled"), false,
             readOnly ? "SERIALIZATION_READ_ONLY" : null);
         using var module = ModuleDefMD.Load(File.ReadAllBytes(merged));
+        if (fixture == "UnitySerializationCallbackCases")
+        {
+            var receiver = module.Find("HybridCLR.Lab.UnityCases.EvolvingBehaviour", false)!;
+            var donor = module.Find("HybridCLR.Lab.UnityReference.SerializationCallbackTemplate", false)!;
+            var contract = donor.Interfaces.Single().Interface;
+            if (receiver.Interfaces.Any(row => row.Interface.FullName == contract.FullName))
+                throw new InvalidDataException("Callback interface already exists in fixture input.");
+            receiver.Interfaces.Add(new InterfaceImplUser(contract));
+            foreach (string name in new[] { "OnBeforeSerialize", "OnAfterDeserialize" })
+            {
+                if (receiver.Methods.Any(row => row.Name == name)) throw new InvalidDataException("Callback method already exists.");
+                var method = donor.Methods.Single(row => row.Name == name);
+                donor.Methods.Remove(method); receiver.Methods.Add(method);
+            }
+            donor.Interfaces.Clear();
+        }
         var entry = module.Find("HybridCLR.Lab.ValueLayout.Factory", false)!.Methods.Single(method => method.Name == "GetRevision");
         var invoke = module.Find(probeType, false)!.Methods.Single(method => method.Name == "RunIfRequested");
         // Keep the initializer verification and all 46 existing business cases.
