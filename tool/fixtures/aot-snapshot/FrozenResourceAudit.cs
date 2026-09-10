@@ -46,7 +46,7 @@ internal static class FrozenResourceAudit
         string[] unityExpected = {
             "awake-current-value", "on-enable-current-value", "awake-diff-selection", "added-instance-field", "added-component-awake",
             "start-current-value", "update-current-value", "late-update-current-value", "coroutine-resumed-across-frames",
-            "on-disable-current-value", "unchanged-reader-not-selected", "unchanged-reader-stays-aot", "added-reference-survives-gc",
+            "on-disable-current-value", "layout-dependent-reader-selection", "layout-dependent-reader-execution", "unaffected-method-stays-aot", "added-reference-survives-gc",
             "disable-not-repeated-on-destroy", "on-destroy-current-value", "real-multiple-frames"
         };
         Require("workflow-passed", result.GetProperty("passed").GetBoolean() &&
@@ -157,7 +157,7 @@ internal static class FrozenResourceAudit
                 {
                     ProbeSequence("unityChecks", "DHE Unity check: ", unityExpected);
                     Require(key + "-real-unity-completed", report.GetProperty("stage").GetString() == "unity-component-complete" &&
-                        log.Count(line => line == "DHE Unity component pass: 2:16") == 1 &&
+                        log.Count(line => line == "DHE Unity component pass: 2:17") == 1 &&
                         Array.FindLastIndex(log, line => line.StartsWith("DHE case begin: ", StringComparison.Ordinal)) <
                         Array.FindIndex(log, line => line == "DHE Unity check: awake-current-value"));
                 }

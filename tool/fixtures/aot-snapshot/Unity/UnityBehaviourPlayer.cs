@@ -65,11 +65,19 @@ namespace HybridCLR.Lab.Snapshot
                     Require(Read("CoroutineSteps") == 2 * delta, "coroutine-resumed-across-frames");
                     Require(State("Disabled") == delta, "on-disable-current-value");
                     MethodInfo reader = componentType.GetMethod("ReadUnchanged");
-                    Require(!RuntimeApi.IsDifferentialMethodChanged(reader), "unchanged-reader-not-selected");
+                    // The IL is unchanged, but its owner layout gains fields.
+                    // That dependency legitimately selects the reader on the old Base.
+                    Require(RuntimeApi.IsDifferentialMethodChanged(reader) == expectedChanged, "layout-dependent-reader-selection");
                     reader.Invoke(component, null); RuntimeApi.ResetDifferentialDispatchCounters();
                     int actual = (int)reader.Invoke(component, null);
                     int aot = RuntimeApi.GetDifferentialAotEntryCount(), interpreted = RuntimeApi.GetDifferentialInterpreterEntryCount();
-                    Require(actual == Read("Value") + 1 && aot >= 1 && interpreted == 0, "unchanged-reader-stays-aot");
+                    Require(actual == Read("Value") + 1 && (expectedChanged ? interpreted >= 1 : aot >= 1 && interpreted == 0), "layout-dependent-reader-execution");
+                    MethodInfo unaffected = typeof(ValueLayout.Factory).GetMethod("UnchangedRevision");
+                    unaffected.Invoke(null, null); RuntimeApi.ResetDifferentialDispatchCounters();
+                    int sentinel = (int)unaffected.Invoke(null, null);
+                    aot = RuntimeApi.GetDifferentialAotEntryCount(); interpreted = RuntimeApi.GetDifferentialInterpreterEntryCount();
+                    Require(sentinel == 5 && !RuntimeApi.IsDifferentialMethodChanged(unaffected) && aot >= 1 && interpreted == 0,
+                        "unaffected-method-stays-aot");
                     phase = 2; return;
                 }
                 if (phase == 2)

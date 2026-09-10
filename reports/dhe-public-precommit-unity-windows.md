@@ -21,7 +21,7 @@ same Current DLLs. Exercise Awake/OnEnable/Start/Update/LateUpdate/OnDisable/
 OnDestroy, IEnumerator coroutine scheduling, additional instance fields and their
 GC roots, and a newly added component type. Create components only after DHE
 selection, matching the required before-business-entry workflow. An unchanged
-reader must retain AOT while changed callbacks use Current. Compare two Bases
+method without changed layout dependencies must retain AOT while changed callbacks use Current. Compare two Bases
 with original and evolved component definitions, using one unchanged Current set.
 Retain the existing 46-case resource reference and initializer invariants.
 
@@ -48,4 +48,25 @@ hash and MV assembly hash, restoring records in finally. It requires an actual
 native hierarchy-cycle exception at phase 1, no metadata publication, and restart
 required even after restoring the valid inputs. This bypasses resource admission
 solely for fault injection. A successful fresh-process valid-resource run remains
-required. No Player evidence for these new probes has passed yet.
+required.
+
+Base-43/44 subsequently pass construction, startup and no-op resource loading at
+lab `e45eed9` (host-05), with the same runtime/package identities above. Shared
+resource attempt `dhe-unity-shared-resource-01` on Base-43 passes all 46 business
+cases, all 12 public prepared-MV rejection/retry assertions, then the first ten
+Unity checks. It fails the fixture assertion `unchanged-reader-not-selected`.
+This assertion incorrectly ignores dependency changes: `ReadUnchanged` reads an
+instance field on the type that gains fields, and `StableMethodDependencyShape`
+includes the owner layout version. It must be interpreted on the old Base, while
+the same-layout new Base may use its AOT version. The corrected fixture measures
+both modes and separately measures `Factory.UnchangedRevision`, whose dependencies
+are unchanged, requiring AOT entries and zero interpreter entries. It retains
+the real coroutine and added-field/GC/lifecycle assertions. No runtime policy is
+weakened or changed. The failed immutable Players/resource/results are preserved.
+
+The independent Base-43 preparation probe passes all 11 assertions with the real
+native `BadImageFormatException: type parent hierarchy contains a cycle` at phase
+1, no publication/initializer effects, rejected corrected retry and rejected reset.
+The normal Unity 2022 compiler separately rejects the equivalent self-parent C#
+control with CS0146 (`dhe-unity-preparation-cycle-compiler-01.cs`). Complete
+fresh-process recovery and both corrected Unity component suites remain pending.

@@ -59,7 +59,7 @@ internal static class UnityPublicProbeWorkflow
                 string baseline = Path.Combine(output, "baseline-" + index + ".json");
                 Execute(player, Common(baseline, baseRun).Concat(new[] { "-unityBehaviourProbe", "base" }).ToArray());
                 var baselineResult = Read(baseline);
-                int delta = baselineResult.GetProperty("unityBaseDelta").GetInt32(), baselineCount = delta == 1 ? 13 : 16;
+                int delta = baselineResult.GetProperty("unityBaseDelta").GetInt32(), baselineCount = delta == 1 ? 14 : 17;
                 Require(baselineResult.GetProperty("passed").GetBoolean() && baselineResult.GetProperty("unityChecks").GetArrayLength() == baselineCount &&
                     File.ReadAllLines(baseline + ".log").Count(line => line == "DHE Unity component pass: " + delta + ":" + baselineCount) == 1, "base-unity-semantics-" + index);
                 string rejected = Path.Combine(output, "preparation-" + index + ".json");
@@ -76,8 +76,8 @@ internal static class UnityPublicProbeWorkflow
                 string restored = Path.Combine(output, "fresh-process-" + index + ".json");
                 Execute(player, Common(restored, currentRun).Concat(new[] { "-snapshotResourceRoot", stage, "-unityBehaviourProbe", "current" }).ToArray());
                 var recovered = Read(restored); string[] recoveredLog = File.ReadAllLines(restored + ".log");
-                Require(recovered.GetProperty("passed").GetBoolean() && recovered.GetProperty("unityChecks").GetArrayLength() == 16 &&
-                    recoveredLog.Count(line => line == "DHE Unity component pass: 2:16") == 1 &&
+                Require(recovered.GetProperty("passed").GetBoolean() && recovered.GetProperty("unityChecks").GetArrayLength() == 17 &&
+                    recoveredLog.Count(line => line == "DHE Unity component pass: 2:17") == 1 &&
                     recoveredLog.Where(line => line.StartsWith("DHE case begin: ")).Select(line => line.Substring(16)).SequenceEqual(expected), "fresh-process-current-recovery-" + index);
                 foreach (string report in new[] { baseline, rejected, restored }) { Track(report); Track(report + ".log"); }
             }
