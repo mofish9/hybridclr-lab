@@ -18,6 +18,15 @@ namespace HybridCLR.Lab.ResourceCases
         [MethodImpl(MethodImplOptions.NoInlining)]
         private static WeakReference InstallReference()
         { object marker = new object(); NativeStaticOwner.Set(Make(59, marker)); return new WeakReference(marker); }
+        [MethodImpl(MethodImplOptions.NoInlining)]
+        private static void VerifyNativeDispatch()
+        {
+            HybridCLR.RuntimeApi.ResetDifferentialDispatchCounters();
+            int neighbor = NativeStaticOwner.ReadNeighbor(); int runs = NativeStaticOwner.ReadRuns();
+            int native = HybridCLR.RuntimeApi.GetDifferentialAotEntryCount();
+            int interpreted = HybridCLR.RuntimeApi.GetDifferentialInterpreterEntryCount();
+            Require(neighbor == 101 && runs == 1 && native >= 2 && interpreted == 0, "unchanged-readers-stay-aot");
+        }
         public static string[] Run()
         {
             var records = new List<string>(); object marker = new object(); Payload value = Make(53, marker);
@@ -100,13 +109,7 @@ namespace HybridCLR.Lab.ResourceCases
                 // Player additionally proves that unaffected neighbor readers
                 // still enter AOT after frozen-source storage adaptation.
                 if (typeof(object).Assembly.GetName().Name == "mscorlib")
-                {
-                    HybridCLR.RuntimeApi.ResetDifferentialDispatchCounters();
-                    int neighbor = NativeStaticOwner.ReadNeighbor(); int runs = NativeStaticOwner.ReadRuns();
-                    int native = HybridCLR.RuntimeApi.GetDifferentialAotEntryCount();
-                    int interpreted = HybridCLR.RuntimeApi.GetDifferentialInterpreterEntryCount();
-                    Require(neighbor == 101 && runs == 1 && native >= 2 && interpreted == 0, "unchanged-readers-stay-aot");
-                }
+                    VerifyNativeDispatch();
             });
             return records.ToArray();
         }
