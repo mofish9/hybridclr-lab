@@ -32,16 +32,16 @@ internal static class HotfixGenericBodyCurrent
             Instruction.Create(OpCodes.Add), Instruction.Create(OpCodes.Stsfld, count), Instruction.Create(OpCodes.Ret) })
             record.Body.Instructions.Add(instruction);
         var require = Method("Require");
-        var success = Instruction.Create(OpCodes.Ldstr, "DHE changed generic body pass: 3");
+        var success = Instruction.Create(OpCodes.Ldstr, "DHE changed generic body pass: 4");
         var exceptionType = new TypeRefUser(module, "System", "InvalidOperationException", module.CorLibTypes.AssemblyRef);
         var exceptionConstructor = new MemberRefUser(module, ".ctor",
             MethodSig.CreateInstance(module.CorLibTypes.Void, module.CorLibTypes.String), exceptionType);
         var write = new MemberRefUser(module, "WriteLine",
             MethodSig.CreateStatic(module.CorLibTypes.Void, module.CorLibTypes.String),
             new TypeRefUser(module, "System", "Console", module.CorLibTypes.AssemblyRef));
-        foreach (var instruction in new[] { Instruction.Create(OpCodes.Ldsfld, count), Instruction.Create(OpCodes.Ldc_I4_3),
+        foreach (var instruction in new[] { Instruction.Create(OpCodes.Ldsfld, count), Instruction.Create(OpCodes.Ldc_I4_4),
             Instruction.Create(OpCodes.Beq, success),
-            Instruction.Create(OpCodes.Ldstr, "Changed generic body must execute exactly three times."),
+            Instruction.Create(OpCodes.Ldstr, "Changed generic body must execute exactly four times, including reflection."),
             Instruction.Create(OpCodes.Newobj, exceptionConstructor), Instruction.Create(OpCodes.Throw),
             success, Instruction.Create(OpCodes.Call, write), Instruction.Create(OpCodes.Ret) })
             require.Body.Instructions.Add(instruction);
@@ -56,9 +56,9 @@ internal static class HotfixGenericBodyCurrent
         File.WriteAllText(Path.Combine(output, "fixture.json"), JsonSerializer.Serialize(new
         {
             source, current, sourceModelSha256 = Hash(Path.Combine(source, "HybridCLR.ValueLayoutModel.dll")),
-            currentModelSha256 = Hash(modelPath), expectedCalls = 3,
+            currentModelSha256 = Hash(modelPath), expectedCalls = 4,
             hostSha256 = Hash(typeof(HotfixGenericBodyCurrent).Assembly.Location),
-            scope = "Change the existing generic method body; preserve its three value-copy cases and require observable Current execution after all 46 business cases"
+            scope = "Change the existing generic method body; preserve direct, reflection and delegate value copies and require four observable Current executions after all 46 business cases"
         }, new JsonSerializerOptions { WriteIndented = true }));
         Console.WriteLine(current); return 0;
     }
