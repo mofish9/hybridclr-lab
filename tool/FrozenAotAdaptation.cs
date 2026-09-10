@@ -3,9 +3,9 @@ using dnlib.DotNet;
 
 namespace HybridCLR.DheTool;
 
-// A diagnostic compiler result, deliberately separate from resource admission.
-// Guards and native ABI obligations must be proved by a Base build before these
-// selections can become a loadable resource execution plan.
+// Compiler selections remain separate from resource admission. Guards and native
+// ABI obligations must be proved by the Base build before these selections can
+// become a loadable resource execution plan.
 internal sealed record FrozenAotMethod(uint Token, string Identity, string[] Reasons);
 internal sealed record FrozenAotObligation(string Kind, string AssemblyName, uint Token, string Identity);
 internal sealed record FrozenAotAssemblyPlan(string AssemblyName, string SnapshotSha256,

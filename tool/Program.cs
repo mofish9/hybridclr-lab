@@ -4401,7 +4401,8 @@ internal static partial class Program
         "Resource release plan accepts one config-relative JSON document with -Config, " +
         "joins the immutable Base runner catalog to every active Base, and generates the " +
         "exact resource-release-qualify config without starting a Player. " +
-        "Resource-update accepts -FrozenAotPlans (one Base-bound frozen source plan per Base).",
+        "Resource-update automatically compiles frozen AOT adaptations against each authenticated Base snapshot.",
+        "Optional -FrozenAotPlans imports one Base/Current-bound plan per Base and independently validates its selections.",
         "Resource release qualify accepts one config-relative JSON document with -Config, " +
         "stages and directly starts every process runner, accepts authenticated distributed " +
         "prequalified reports, and emits one exact-coverage aggregate gate.",
