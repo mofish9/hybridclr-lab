@@ -1,5 +1,9 @@
 # Reference hierarchy queries: Unity 2022 Windows
 
+The subsequent existing-interface removal/replacement checkpoint and its
+compiler-method-flag limitation are recorded in `dhe-reference-interface-evolution-windows.md`.
+Its evidence does not change the source identities or failures preserved below.
+
 This continues the two-Base owner checkpoint in `dhe-reference-owner-windows.md`.
 It remains an incomplete research candidate. Interface removal/replacement and
 parent changes require actual Player qualification; policy admission alone is
