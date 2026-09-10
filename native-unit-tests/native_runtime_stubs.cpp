@@ -237,6 +237,11 @@ namespace utils
         return std::malloc(size);
     }
 
+    void* Memory::Calloc(size_t count, size_t size)
+    {
+        return std::calloc(count, size);
+    }
+
     void Memory::Free(void* memory)
     {
         std::free(memory);
