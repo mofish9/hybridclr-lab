@@ -119,8 +119,15 @@ namespace HybridCLR.Lab.Snapshot
                 }
                 if (!loadedCurrent)
                     throw new InvalidDataException(code + ":" + error);
+                // Post-load probe failures must still report the committed
+                // assembly set and distinguish their stage from native load.
+                result.loadedAssemblyNames = DheRuntime.LoadedAssemblyNames;
+                result.loadedAssemblies = result.plannedAssemblies.Intersect(result.loadedAssemblyNames, StringComparer.OrdinalIgnoreCase).Count();
                 if (virtualReceiverCache != null)
+                {
+                    result.stage = "virtual-signature-old-receiver";
                     result.virtualReceiverChecks = virtualReceiverCache.Verify();
+                }
                 if (referenceCache != null)
                 {
                     result.referenceCacheChecks = referenceCache.Verify(out string cacheFailure);

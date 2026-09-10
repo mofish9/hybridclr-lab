@@ -114,3 +114,13 @@ definition of the selected method, rejects generic parents, and checks physical
 storage selection along the parent chain. Keep those original assertions intact.
 Native02 (exception-helper namespace) and native04 (test-link dependency) are
 preserved failed compile attempts; neither has a passing Player claim.
+
+Base-85 (`fdf1299` / `816778a`, native06) passes all 25 updated checks, all 25
+unchanged checks and the 46 business cases. Its first cached-receiver probe
+confirms logical identity and new storage, then receives a direct TargetException
+from reflection when invoking the old receiver. The test incorrectly accepted
+only the later old-AOT-frame guard. Preserve that failed probe; the corrected
+expectation accepts the exact two documented rejection routes and records which
+one occurs, while still rejecting the body's own InvalidOperationException and
+requiring new-receiver execution and preserved object data. A fresh Player is
+required to complete the corrected six-check probe; no Base-85 result is rewritten.

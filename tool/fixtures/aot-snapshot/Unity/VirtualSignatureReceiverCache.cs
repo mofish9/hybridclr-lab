@@ -38,10 +38,19 @@ namespace HybridCLR.Lab.Snapshot
             bool Reject(MethodInfo method)
             {
                 try { method.Invoke(oldReceiver, null); }
+                catch (TargetException)
+                {
+                    // Reflection rejects the physical receiver before invoking
+                    // the body. This is the normal MethodInfo contract.
+                    Console.WriteLine("DHE virtual receiver rejection: TargetException");
+                    return true;
+                }
                 catch (TargetInvocationException error)
                 {
-                    return error.InnerException is ExecutionEngineException &&
+                    bool guarded = error.InnerException is ExecutionEngineException &&
                         error.InnerException.Message.Contains("old AOT ABI");
+                    if (guarded) Console.WriteLine("DHE virtual receiver rejection: old-AOT-frame");
+                    return guarded;
                 }
                 return false;
             }

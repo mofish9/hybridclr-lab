@@ -180,7 +180,10 @@ internal static class UnitySerializationWorkflow
             "cached-method-rejects-old-receiver", "fresh-method-rejects-old-receiver",
             "current-receiver-invokes-body", "rejection-preserves-receivers" };
         string[] virtualReceiverChecks = OptionalChecks("virtualReceiverChecks");
+        string[] virtualReceiverRejections = lines.Where(line => line.StartsWith("DHE virtual receiver rejection: "))
+            .Select(line => line["DHE virtual receiver rejection: ".Length..]).ToArray();
         bool virtualReceiverPassed = !virtualReceiverCache || virtualReceiverChecks.SequenceEqual(virtualReceiverExpected) &&
+            virtualReceiverRejections.Length == 2 && virtualReceiverRejections.All(kind => kind == "TargetException" || kind == "old-AOT-frame") &&
             lines.Where(line => line.StartsWith("DHE virtual receiver check: "))
                 .Select(line => line["DHE virtual receiver check: ".Length..]).SequenceEqual(virtualReceiverExpected);
         bool lifecyclePassed = !lifecycle || unityChecks.SequenceEqual(unityExpected) &&
@@ -225,7 +228,7 @@ internal static class UnitySerializationWorkflow
         File.WriteAllText(Path.Combine(output, "result.json"), JsonSerializer.Serialize(new { passed, immutable, checks, expected = sequence,
             lifecycle, lifecyclePassed, lifecycleSelection, unityChecks, cached, cachePassed, cacheChecks, currentReferenceStorageSelected,
             cacheCurrentModelSha256, cachedBaseMethodCount, callbacks, callbackControl, callbackFixturePassed, hierarchy, interfaceEvolution, evolutionMode, evolutionFixturePassed,
-            virtualSignatures, virtualReceiverCache, virtualReceiverPassed, virtualReceiverChecks,
+            virtualSignatures, virtualReceiverCache, virtualReceiverPassed, virtualReceiverChecks, virtualReceiverRejections,
             declarations, declarationMode, declarationFixturePassed, declarationCacheExpectation,
             declarationParameterObjects = lines.Where(line => line.StartsWith("DHE declaration parameter objects ")).ToArray(),
             error = report.GetProperty("error").GetString(), proof, source, labHead, playerSha256 = playerHash, gameAssemblySha256 = gameHash,
