@@ -21,6 +21,8 @@ namespace HybridCLR.Lab.Snapshot
             public string[] plannedAssemblies, loadedAssemblyNames, differentialAssemblies, interpreterOnlyAssemblies;
             public string[] records;
             public string[] recoveryChecks;
+            public string[] precommitChecks, unityChecks;
+            public int unityBaseDelta;
             public long ordinaryAotReferenceResult;
             public long ordinaryAotEchoExtra;
             public int ordinaryAotStaticNeighbor;
@@ -50,6 +52,8 @@ namespace HybridCLR.Lab.Snapshot
             {
                 var identity = DheBuildIdentity.Create();
                 result.baseId = identity.BaseId; result.aotAnalysisSnapshotSha256 = identity.AotAnalysisSnapshotSha256;
+                var unityType = typeof(ValueLayout.Factory).Assembly.GetType("HybridCLR.Lab.UnityCases.EvolvingBehaviour");
+                if (unityType != null) result.unityBaseDelta = (int)unityType.GetField("Delta", System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.Static).GetRawConstantValue();
                 var moduleState = typeof(ValueLayout.Factory).Assembly.GetType("HybridCLR.Lab.ModuleEvolution.ModuleState");
                 System.Reflection.FieldInfo moduleConstant = null;
                 if (moduleState != null)
@@ -87,6 +91,8 @@ namespace HybridCLR.Lab.Snapshot
                 result.interpreterOnlyAssemblies = DheRuntime.InterpreterOnlyAssemblyNames;
                 result.stage = "load-current-batch";
                 byte[][] currentDlls = result.plannedAssemblies.Select(name => provider.LoadBytes(records[name].current)).ToArray();
+                if (Array.IndexOf(args, "-publicPrecommitProbe") >= 0)
+                    result.precommitChecks = PublicPrecommitPlayer.RejectThenRestore(result.plannedAssemblies, currentDlls);
                 bool loadedCurrent = DheRuntime.LoadCurrentAssemblyImages(result.plannedAssemblies, currentDlls, out var code, out error);
                 if (Array.IndexOf(args, "-publicFailureProbe") >= 0)
                 {
@@ -99,6 +105,7 @@ namespace HybridCLR.Lab.Snapshot
                 }
                 if (!loadedCurrent)
                     throw new InvalidDataException(code + ":" + error);
+                result.precommitChecks = PublicPrecommitPlayer.VerifyRetry(result.precommitChecks);
                 // LoadedAssemblyNames also includes authenticated frozen AOT
                 // sources. Count only the Current payload for this assertion.
                 result.loadedAssemblyNames = DheRuntime.LoadedAssemblyNames;
@@ -141,6 +148,18 @@ namespace HybridCLR.Lab.Snapshot
                     result.sentinel == 5 &&
                     !RuntimeApi.IsDifferentialMethodChanged(typeof(ValueLayout.Factory).GetMethod("UnchangedRevision"));
                 result.stage = "complete";
+                int unityProbe = Array.IndexOf(args, "-unityBehaviourProbe");
+                if (unityProbe >= 0)
+                {
+                    if (!result.passed) throw new InvalidOperationException("Business entry failed before Unity callback validation.");
+                    result.passed = false; result.stage = "unity-component-frames";
+                    int expectedDelta = args[unityProbe + 1] == "current" ? 2 : result.unityBaseDelta;
+                    UnityBehaviourPlayer.Begin(expectedDelta, result.unityBaseDelta, (checks, failure) => {
+                        result.unityChecks = checks; result.error = failure; result.passed = failure == null; result.stage = "unity-component-complete";
+                        File.WriteAllText(args[index + 1], JsonUtility.ToJson(result, true)); Application.Quit(result.passed ? 0 : 1);
+                    });
+                    return;
+                }
             }
             catch (Exception exception) { result.error = exception.ToString(); }
             File.WriteAllText(args[index + 1], JsonUtility.ToJson(result, true));

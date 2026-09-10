@@ -1,0 +1,52 @@
+using System.Text.Json;
+using dnlib.DotNet;
+using dnlib.DotNet.Emit;
+using HybridCLR.DheTool;
+
+internal static class UnityBehaviourWorkflow
+{
+    internal static int Compile(string[] args)
+    {
+        if (args.Length != 6 || (args[4] != "base" && args[4] != "current"))
+            throw new ArgumentException("unity-behaviour-current <lab> <Base proof> <original DLL root> <editor> <base|current> <new output>");
+        string output = Path.GetFullPath(args[5]), current = Path.Combine(output, "current");
+        if (Directory.Exists(output)) throw new IOException("Unity fixture output must be new.");
+        Directory.CreateDirectory(current);
+        string identityPath = Path.Combine(args[1], "base/build-identity.json");
+        var identity = JsonSerializer.Deserialize<JsonElement>(File.ReadAllBytes(identityPath));
+        var snapshot = AotAnalysisSnapshot.Read(identityPath, identity,
+            identity.GetProperty("aotAssemblyNames").EnumerateArray().Select(row => row.GetString()!),
+            identity.GetProperty("assemblies").EnumerateArray().Select(row => row.GetProperty("assemblyName").GetString()!))!;
+        foreach (string path in Directory.GetFiles(args[2], "*.dll")) File.Copy(path, Path.Combine(current, Path.GetFileName(path)));
+        var names = Directory.GetFiles(current, "*.dll").Select(Path.GetFileNameWithoutExtension).ToHashSet();
+        FrozenStaticWorkflow.CompileAndMerge(Path.GetFullPath(args[0]), args[3], "UnityBehaviourCases",
+            Path.Combine(current, "HybridCLR.ValueLayoutModel.dll"),
+            snapshot.Assemblies.Where(row => !row.Dhe && !names.Contains(row.AssemblyName)).Select(row => row.Path)
+                .Concat(Directory.GetFiles(current, "*.dll")), Path.Combine(output, "compiled"), false,
+            args[4] == "current" ? "UNITY_CASE_CURRENT" : null);
+        Console.WriteLine(current); return 0;
+    }
+
+    internal static int BaseInputs(string[] args)
+    {
+        if (args.Length != 3) throw new ArgumentException("unity-behaviour-base-inputs <Base proof> <Unity Current DLL root> <new output>");
+        string output = Path.GetFullPath(args[2]);
+        if (Directory.Exists(output)) throw new IOException("Base inputs must be new.");
+        Directory.CreateDirectory(output);
+        foreach (string file in Directory.GetFiles(args[1], "*.dll")) File.Copy(file, Path.Combine(output, Path.GetFileName(file)));
+        string identityPath = Path.Combine(args[0], "base/build-identity.json");
+        var identity = JsonSerializer.Deserialize<JsonElement>(File.ReadAllBytes(identityPath));
+        var snapshot = AotAnalysisSnapshot.Read(identityPath, identity,
+            identity.GetProperty("aotAssemblyNames").EnumerateArray().Select(row => row.GetString()!),
+            identity.GetProperty("assemblies").EnumerateArray().Select(row => row.GetProperty("assemblyName").GetString()!))!;
+        var native = snapshot.Assemblies.Single(row => row.AssemblyName == "HybridCLR.ValueLayoutNative");
+        File.Copy(native.Path, Path.Combine(output, native.AssemblyName + ".dll"));
+        string model = Path.Combine(output, "HybridCLR.ValueLayoutModel.dll");
+        using var module = ModuleDefMD.Load(File.ReadAllBytes(model));
+        var entry = module.Find("HybridCLR.Lab.ValueLayout.Factory", false)!.Methods.Single(method => method.Name == "GetRevision");
+        entry.Body = new CilBody();
+        entry.Body.Instructions.Add(Instruction.Create(OpCodes.Call, module.Find("HybridCLR.Lab.ModuleEvolution.ModuleState", false)!.Methods.Single(method => method.Name == "Verify")));
+        entry.Body.Instructions.Add(Instruction.Create(OpCodes.Ldc_I4, 59)); entry.Body.Instructions.Add(Instruction.Create(OpCodes.Ret));
+        module.Write(model); Console.WriteLine(output); return 0;
+    }
+}

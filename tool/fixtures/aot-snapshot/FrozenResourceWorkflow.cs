@@ -151,7 +151,10 @@ internal static class FrozenResourceWorkflow
 
     public static int Run(string[] args)
     {
-        if (args.Length < 4 || args.Length > 6) throw new ArgumentException("frozen-resource-workflow <lab> <comma-separated immutable proof roots> <tool.dll> <new output> [Unity editor executable for expanded suite OR existing Current directory] [Current settings file]");
+        if (args.Length < 4 || args.Length > 7) throw new ArgumentException("frozen-resource-workflow <lab> <comma-separated immutable proof roots> <tool.dll> <new output> [Unity editor executable for expanded suite OR existing Current directory] [Current settings file] [precommit|unity|precommit-unity]");
+        string validationMode = args.Length == 7 ? args[6] : "";
+        if (validationMode != "" && validationMode != "precommit" && validationMode != "unity" && validationMode != "precommit-unity")
+            throw new ArgumentException("Unknown Player validation mode.");
         string lab = Path.GetFullPath(args[0]), tool = Path.GetFullPath(args[2]), output = Path.GetFullPath(args[3]);
         string[] proofs = args[1].Split(',').Select(Path.GetFullPath).ToArray();
         if (Directory.Exists(output)) throw new IOException("Output must be new.");
@@ -166,6 +169,11 @@ internal static class FrozenResourceWorkflow
             {
                 start.ArgumentList.Add("-expectedModuleConstant");
                 start.ArgumentList.Add(expectedModuleConstant.Value.ToString(System.Globalization.CultureInfo.InvariantCulture));
+            }
+            if (arguments.Contains("-snapshotResult"))
+            {
+                if (validationMode.Contains("precommit")) { start.ArgumentList.Add("-publicPrecommitProbe"); start.ArgumentList.Add("true"); }
+                if (validationMode.Contains("unity")) { start.ArgumentList.Add("-unityBehaviourProbe"); start.ArgumentList.Add("current"); }
             }
             using var process = Process.Start(start)!;
             Console.WriteLine("Frozen resource: " + Path.GetFileName(exe) + " PID " + process.Id);
@@ -200,7 +208,7 @@ internal static class FrozenResourceWorkflow
         Execute("dotnet", host, "frozen-resource-reference", current, snapshots[0].Assemblies.Single(row => row.AssemblyName == NativeName).Path, referenceFile);
         string resource = Path.Combine(output, "resource");
         Execute("dotnet", tool, "resource-update", "-CurrentRoot", current,
-            "-SettingsFile", args.Length == 6 ? Path.GetFullPath(args[5]) : Path.Combine(proofs[0], "project/ProjectSettings/HybridCLRSettings.asset"),
+            "-SettingsFile", args.Length >= 6 ? Path.GetFullPath(args[5]) : Path.Combine(proofs[0], "project/ProjectSettings/HybridCLRSettings.asset"),
             "-BaseRoots", Join("baseline"), "-BaseNativeManifests", Join("native/dhe-native-manifest.json"), "-BaseBuildIdentities", Join("build-identity.json"),
             "-AotMetadataRoots", string.Join(",", snapshots.Select(snapshot => Path.Combine(Path.GetDirectoryName(snapshot.ManifestPath)!, "assemblies"))),
             "-Mode", "Exploratory", "-OutputRoot", resource);
@@ -310,7 +318,7 @@ internal static class FrozenResourceWorkflow
         if (reuseCurrent) checks["exact-existing-current-bytes-preserved"] = FrozenAotSourcePlan.CurrentSetHash(Directory.GetFiles(sourceCurrent, "*.dll")) ==
             FrozenAotSourcePlan.CurrentSetHash(Directory.GetFiles(current, "*.dll"));
         bool passed = checks.Values.All(value => value);
-        File.WriteAllText(Path.Combine(output, "result.json"), JsonSerializer.Serialize(new { passed, checks, players, labHead,
+        File.WriteAllText(Path.Combine(output, "result.json"), JsonSerializer.Serialize(new { passed, checks, players, labHead, validationMode,
             hostSha256 = Hash(host), toolSha256 = Hash(tool), currentAssemblySetSha256 = FrozenAotSourcePlan.CurrentSetHash(Directory.GetFiles(current, "*.dll")),
             resourceManifestSha256 = Hash(Path.Combine(resource, "dhe-resource-update.json")), expected,
             scope = "Standard resource generation/staging/public loading with original ordinary Base IL and evolved Current value fields" }, Json));
