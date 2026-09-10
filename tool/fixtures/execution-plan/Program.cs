@@ -454,6 +454,73 @@ cases["non-il-storage-member-requires-bridge"] = staticCompilation.UnsupportedCh
 var addedSnapshot = MetaVersionSnapshot.Create(mutated[1].Single(path => path.EndsWith("HybridCLR.ValueLayoutModel.dll")));
 cases["new-method-is-not-a-base-entry"] = !staticCompilation.Plans[addedSnapshot.AssemblyName].CurrentExecutionMethodTokens.Contains(
     addedSnapshot.Methods.Single(method => method.Name == "NewHelper").Token);
+// Public lifecycle assertions inspect optional APIs by reflection so the same
+// tests can demonstrate failures against the archived preceding package source.
+object PublicState(string name) => typeof(DheRuntime).GetProperty(name, BindingFlags.Public | BindingFlags.Static)?.GetValue(null);
+Provider InitializeRecoveryResource()
+{
+    RuntimeApi.SimulateNewProcess();
+    var provider = providers[0].Copy(); var manifest = Clone(manifestDocument);
+    provider.Bytes[assets + "validation.json"] = Encoding.UTF8.GetBytes(validationDocument.ToJsonString());
+    provider.Bytes[assets + "dhe-runtime-plan.json"] = Encoding.UTF8.GetBytes(planDocument.ToJsonString());
+    manifest["validationSha256"] = Hash(provider.Bytes[assets + "validation.json"]);
+    manifest["runtimePlanSha256"] = Hash(provider.Bytes[assets + "dhe-runtime-plan.json"]);
+    provider.Bytes[manifestPath] = Encoding.UTF8.GetBytes(manifest.ToJsonString());
+    if (!DheRuntime.InitializeFromResourceUpdate(provider, identities[0], manifestPath, out string error, assets))
+        throw new InvalidOperationException(error);
+    return provider;
+}
+bool ResetRejected() { try { DheRuntime.Reset(); return false; } catch (InvalidOperationException) { return true; } }
+foreach (int phase in new[] { 1, 3 })
+{
+    var provider = InitializeRecoveryResource(); string[] names = DheRuntime.PlannedAssemblyNames;
+    byte[][] dlls = names.Select(name => provider.Bytes[assets + name + ".dll.bytes"]).ToArray();
+    RuntimeApi.NextPhase = phase; RuntimeApi.ThrowOnCall = true;
+    bool accepted = DheRuntime.LoadCurrentAssemblyImages(names, dlls, out var code, out string error);
+    string prefix = "public-failure-phase-" + phase + ":";
+    cases[prefix + "correct-outcome"] = !accepted && code.ToString() == (phase == 3 ? "DHE_INITIALIZATION_FAILED" : "DHE_RESTART_REQUIRED");
+    cases[prefix + "restart-state"] = PublicState("RestartRequired") is true && PublicState("LoadState")?.ToString() == "RestartRequired";
+    cases[prefix + "confirmed-commit"] = Equals(PublicState("MetadataCommitted"), phase == 3);
+    cases[prefix + "original-exception"] = error.Contains("DHE deliberate public module failure") && Equals(PublicState("LastLoadError"), error);
+    cases[prefix + "reset-rejected"] = ResetRejected();
+    cases[prefix + "reinitialize-rejected"] = !DheRuntime.InitializeFromResourceUpdate(provider, identities[0], manifestPath, out _, assets);
+    int count = RuntimeApi.Calls;
+    cases[prefix + "retry-rejected-without-native-call"] = !DheRuntime.LoadCurrentAssemblyImages(names, dlls, out var retryCode, out string retryError) &&
+        retryCode.ToString() == "DHE_RESTART_REQUIRED" && RuntimeApi.Calls == count && retryError == error;
+    cases[prefix + "published-set-visible"] = phase == 3 ? DheRuntime.LoadedAssemblyNames.SequenceEqual(names) : DheRuntime.LoadedAssemblyNames.Length == 0;
+}
+{
+    var provider = InitializeRecoveryResource(); string[] names = DheRuntime.PlannedAssemblyNames;
+    byte[][] dlls = names.Select(name => provider.Bytes[assets + name + ".dll.bytes"]).ToArray();
+    var damaged = (byte[][])dlls.Clone(); damaged[0] = damaged[0].Concat(new byte[] { 0 }).ToArray();
+    cases["public-prevalidation-no-native-effects"] = !DheRuntime.LoadCurrentAssemblyImages(names, damaged, out _, out _) &&
+        RuntimeApi.Calls == 0 && PublicState("RestartRequired") is false;
+    RuntimeApi.NextPhase = 2; RuntimeApi.NextCode = LoadImageErrorCode.DHE_MV_REGISTRATION_FAILED;
+    cases["public-prepared-rejection-retryable"] = !DheRuntime.LoadCurrentAssemblyImages(names, dlls, out _, out _) &&
+        PublicState("LoadState")?.ToString() == "Rejected" && PublicState("RestartRequired") is false && PublicState("MetadataCommitted") is false;
+    cases["public-prepared-graph-cannot-reset"] = ResetRejected();
+    RuntimeApi.NextPhase = 4; RuntimeApi.NextCode = LoadImageErrorCode.OK;
+    bool reentry = false, reset = false, configure = false, observedLoading = false;
+    RuntimeApi.OnCall = () =>
+    {
+        var worker = new Thread(() => {
+            observedLoading = PublicState("LoadState")?.ToString() == "Loading";
+            reentry = !DheRuntime.LoadCurrentAssemblyImages(names, dlls, out var code, out _) && code.ToString() == "DHE_LOAD_IN_PROGRESS";
+            reset = ResetRejected();
+            configure = !DheRuntime.InitializeFromResourceUpdate(provider, identities[0], manifestPath, out _, assets);
+        }) { IsBackground = true };
+        worker.Start(); if (!worker.Join(2000)) throw new TimeoutException("Public load reentry blocked.");
+    };
+    cases["public-corrected-native-retry-succeeds"] = DheRuntime.LoadCurrentAssemblyImages(names, dlls, out _, out _) &&
+        PublicState("LoadState")?.ToString() == "Ready" && PublicState("MetadataCommitted") is true && PublicState("RestartRequired") is false;
+    cases["public-worker-reentry-rejected"] = reentry && observedLoading;
+    cases["public-worker-reset-rejected"] = reset;
+    cases["public-worker-reinitialize-rejected"] = configure;
+    cases["public-success-does-not-permit-reset"] = ResetRejected();
+    int count = RuntimeApi.Calls;
+    cases["public-success-does-not-reload-native-graph"] = !DheRuntime.LoadCurrentAssemblyImages(names, dlls, out _, out _) &&
+        RuntimeApi.Calls == count && PublicState("LoadState")?.ToString() == "Ready" && PublicState("MetadataCommitted") is true;
+}
 Directory.CreateDirectory(Path.GetDirectoryName(output));
 string packageRoot = Assembly.GetExecutingAssembly().GetCustomAttributes<AssemblyMetadataAttribute>()
     .Single(attribute => attribute.Key == "DhePackageRoot").Value;
@@ -470,7 +537,8 @@ File.WriteAllText(output, JsonSerializer.Serialize(new { passed = cases.Values.A
     scope = "Package resource validation and native argument selection on .NET host; native calls are recorded, not executed",
     cases, errors, sourceInputs = root, labHead = GitHead(labRoot),
     packageHead = GitHead(packageRoot), hostSha256 = Hash(File.ReadAllBytes(Assembly.GetExecutingAssembly().Location)),
-    toolSha256 = Hash(File.ReadAllBytes(args[2])), packageSources = new[] { "DheRuntime.cs", "DheExecutionPlan.cs", "LoadImageErrorCode.cs", "HomologousImageMode.cs" }
+    toolSha256 = Hash(File.ReadAllBytes(args[2])), packageSources = new[] { "DheRuntime.cs", "DheRuntime.Loading.cs", "DheExecutionPlan.cs", "LoadImageErrorCode.cs", "HomologousImageMode.cs" }
+        .Where(name => File.Exists(Path.Combine(packageRoot, "Runtime", name)))
         .Select(name => new { path = name, sha256 = Hash(File.ReadAllBytes(Path.Combine(packageRoot, "Runtime", name))) }).ToArray() }, json));
 foreach (var check in cases) Console.WriteLine(check.Key + ": " + check.Value +
     (check.Value || !errors.TryGetValue(check.Key, out string detail) ? "" : " " + detail));
