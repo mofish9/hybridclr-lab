@@ -9,7 +9,8 @@ internal static class UnitySerializationWorkflow
     {
         string declarationMode = args.Length == 6 ? (args[5].EndsWith("-cached", StringComparison.Ordinal) ? args[5][..^7] : args[5]) : "";
         bool declarations = new[] { "declaration-nonvirtual-3", "declaration-virtual-7", "declaration-nonvirtual-11" }.Contains(declarationMode);
-        if (args.Length != 6 || (!declarations && !new[] { "read", "full", "full-unity", "reference", "full-unity-cached", "reference-cached", "reference-generic", "reference-generic-cached", "reference-dispatch", "reference-callbacks", "reference-callbacks-cached", "reference-callbacks-control", "reference-callbacks-control-cached", "hierarchy-query", "hierarchy-query-cached", "interface-remove", "interface-remove-cached", "interface-remove-methods", "interface-remove-methods-cached", "interface-replace", "interface-replace-cached", "interface-remove-compiler", "interface-remove-compiler-cached" }.Contains(args[5])))
+        bool virtualSignatures = args.Length == 6 && args[5] == "virtual-signatures";
+        if (args.Length != 6 || (!virtualSignatures && !declarations && !new[] { "read", "full", "full-unity", "reference", "full-unity-cached", "reference-cached", "reference-generic", "reference-generic-cached", "reference-dispatch", "reference-callbacks", "reference-callbacks-cached", "reference-callbacks-control", "reference-callbacks-control-cached", "hierarchy-query", "hierarchy-query-cached", "interface-remove", "interface-remove-cached", "interface-remove-methods", "interface-remove-methods-cached", "interface-replace", "interface-replace-cached", "interface-remove-compiler", "interface-remove-compiler-cached" }.Contains(args[5])))
             throw new ArgumentException("unity-serialization-replay <lab> <tool.dll> <Base proof> <resource workflow output> <new output> <read|full|full-unity|reference|full-unity-cached|reference-cached|reference-generic|reference-generic-cached|reference-dispatch|reference-callbacks|reference-callbacks-cached|reference-callbacks-control|reference-callbacks-control-cached|hierarchy-query|hierarchy-query-cached|interface-remove|interface-remove-cached|interface-remove-methods|interface-remove-methods-cached|interface-replace|interface-replace-cached|interface-remove-compiler|interface-remove-compiler-cached>");
         bool hierarchy = args[5].StartsWith("hierarchy-query", StringComparison.Ordinal);
         bool interfaceEvolution = args[5].StartsWith("interface-", StringComparison.Ordinal);
@@ -122,7 +123,7 @@ internal static class UnitySerializationWorkflow
         }
         Execute(player, true, "-batchmode", "-nographics", "-snapshotResult", reportPath, "-snapshotResourceRoot", stage,
             "-expectedRevision", "73", "-expectedAssemblies", "4", "-expectedModuleConstant", "202",
-            declarations ? "-unityDeclarationProbe" : hierarchy ? "-unityHierarchyQueryProbe" : interfaceEvolution ? "-unityInterfaceEvolutionProbe" : callbacks ? "-unitySerializationCallbackProbe" : dispatch ? "-unityReferenceDispatchProbe" : generic ? "-unityReferenceGenericProbe" : reference ? "-unityReferenceProbe" : "-unitySerializationProbe", "true", "-logFile", log);
+            virtualSignatures ? "-virtualSignatureProbe" : declarations ? "-unityDeclarationProbe" : hierarchy ? "-unityHierarchyQueryProbe" : interfaceEvolution ? "-unityInterfaceEvolutionProbe" : callbacks ? "-unitySerializationCallbackProbe" : dispatch ? "-unityReferenceDispatchProbe" : generic ? "-unityReferenceGenericProbe" : reference ? "-unityReferenceProbe" : "-unitySerializationProbe", "true", "-logFile", log);
         var report = Read(reportPath); string[] lines = File.ReadAllLines(log);
         string[] sequence = { "inactive-source-has-no-callback-effects", "json-reads-existing-field", "json-reads-added-field",
             "json-writes-existing-field", "json-writes-added-field", "old-json-preserves-added-field", "clone-copies-existing-field",
@@ -158,7 +159,8 @@ internal static class UnitySerializationWorkflow
             "direct-default-argument", "reflected-explicit-argument", "reflected-default-argument", "interface-public-queries",
             "interface-explicit-call-or-absence", "interface-default-call-or-absence", "interface-map-or-rejection",
             "native-before-callback-selection", "native-after-callback-selection", "fixture-preserves-lifecycle-state" };
-        string prefix = declarations ? "DHE Unity declaration" : hierarchy ? "DHE Unity hierarchy query" : interfaceEvolution ? "DHE Unity interface evolution" : callbacks ? "DHE Unity serialization callback" : dispatch ? "DHE Unity reference dispatch" : generic ? "DHE Unity reference generic" : reference ? "DHE Unity reference" : "DHE Unity serialization";
+        if (virtualSignatures) sequence = VirtualSignatureWorkflow.Expected;
+        string prefix = virtualSignatures ? "DHE virtual signature" : declarations ? "DHE Unity declaration" : hierarchy ? "DHE Unity hierarchy query" : interfaceEvolution ? "DHE Unity interface evolution" : callbacks ? "DHE Unity serialization callback" : dispatch ? "DHE Unity reference dispatch" : generic ? "DHE Unity reference generic" : reference ? "DHE Unity reference" : "DHE Unity serialization";
         string[] checks = lines.Where(line => line.StartsWith(prefix + " check: ")).Select(line => line.Substring((prefix + " check: ").Length)).ToArray();
         string[] unityExpected = {
             "awake-current-value", "on-enable-current-value", "awake-diff-selection", "added-instance-field", "added-component-awake",
@@ -211,13 +213,13 @@ internal static class UnitySerializationWorkflow
         File.WriteAllText(Path.Combine(output, "result.json"), JsonSerializer.Serialize(new { passed, immutable, checks, expected = sequence,
             lifecycle, lifecyclePassed, lifecycleSelection, unityChecks, cached, cachePassed, cacheChecks, currentReferenceStorageSelected,
             cacheCurrentModelSha256, cachedBaseMethodCount, callbacks, callbackControl, callbackFixturePassed, hierarchy, interfaceEvolution, evolutionMode, evolutionFixturePassed,
-            declarations, declarationMode, declarationFixturePassed, declarationCacheExpectation,
+            virtualSignatures, declarations, declarationMode, declarationFixturePassed, declarationCacheExpectation,
             declarationParameterObjects = lines.Where(line => line.StartsWith("DHE declaration parameter objects ")).ToArray(),
             error = report.GetProperty("error").GetString(), proof, source, labHead, playerSha256 = playerHash, gameAssemblySha256 = gameHash,
             hostSha256 = Hash(typeof(UnitySerializationWorkflow).Assembly.Location), toolSha256 = Hash(tool),
             resourceManifestSha256 = Hash(Path.Combine(source, "resource/dhe-resource-update.json")),
             resultSha256 = Hash(reportPath), logSha256 = Hash(log), records,
-            scope = declarations ? "Compiler declarations, interface map, direct/reflected calls, optional arguments and native callback selection" : hierarchy ? "Public Current interface enumeration, ancestry and generic parameter controls" : interfaceEvolution ? "Removed or replaced existing interfaces, managed dispatch and absence of native serialization callbacks" : callbackControl ? "Native serialization callback control using a new interpreter component; no existing-interface qualification" : callbacks ? "Added native serialization callbacks on an evolved component interface" : dispatch ? "Diagnostic value/selection/counter logging; not an execution-counter qualification" : reference ? "Public reference type identity and native allocation on an immutable Base" : lifecycle ?
+            scope = virtualSignatures ? "Managed reference/value/byref/generic virtual signatures, delegates, reflection, exceptions and concurrent calls" : declarations ? "Compiler declarations, interface map, direct/reflected calls, optional arguments and native callback selection" : hierarchy ? "Public Current interface enumeration, ancestry and generic parameter controls" : interfaceEvolution ? "Removed or replaced existing interfaces, managed dispatch and absence of native serialization callbacks" : callbackControl ? "Native serialization callback control using a new interpreter component; no existing-interface qualification" : callbacks ? "Added native serialization callbacks on an evolved component interface" : dispatch ? "Diagnostic value/selection/counter logging; not an execution-counter qualification" : reference ? "Public reference type identity and native allocation on an immutable Base" : lifecycle ?
                 "Complete native serialization and lifecycle sequences on an immutable Base" :
                 args[5] == "read" ? "Native JSON read diagnostic only; complete serialization is still required" : "Native JSON/overwrite/clone assertions on an immutable Base"
         }, new JsonSerializerOptions { WriteIndented = true }));

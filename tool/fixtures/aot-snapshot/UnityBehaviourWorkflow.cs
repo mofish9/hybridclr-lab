@@ -16,6 +16,8 @@ internal static class UnityBehaviourWorkflow
 
     internal static int ReferenceCurrent(string[] args)
     {
+        if (args.Length == 6 && new[] { "virtual-signatures-base", "virtual-signatures-current" }.Contains(args[5]))
+            return CompileNativeProbe(args, "VirtualSignatureCases", "HybridCLR.Lab.VirtualSignatures.Cases", false);
         if (args.Length == 6 && new[] { "declaration-nonvirtual-3", "declaration-virtual-7", "declaration-nonvirtual-11" }.Contains(args[5]))
             return CompileNativeProbe(args, "UnityDeclarationCases", "HybridCLR.Lab.Declarations.DeclarationCases", false);
         if (args.Length < 5 || args.Length > 6 || args.Length == 6 && args[5] != "generic" && args[5] != "dispatch" && args[5] != "callbacks" && args[5] != "callbacks-control" && args[5] != "hotfix-generic-dispatch" && args[5] != "hierarchy-query" && args[5] != "interface-remove" && args[5] != "interface-remove-methods" && args[5] != "interface-replace" && args[5] != "interface-remove-compiler")
@@ -60,6 +62,7 @@ internal static class UnityBehaviourWorkflow
                 return row.AssemblyName.StartsWith("UnityEngine", StringComparison.Ordinal) && File.Exists(complete) ? complete : row.Path;
             }).Append(facade).Concat(Directory.GetFiles(current, "*.dll")), Path.Combine(output, "compiled"), false,
             readOnly ? "SERIALIZATION_READ_ONLY" : callbackControl ? "SERIALIZATION_CALLBACK_CONTROL" :
+                args.Length > 5 && args[5] == "virtual-signatures-base" ? "VIRTUAL_SIGNATURE_BASE" :
                 args.Length > 5 && args[5] == "declaration-virtual-7" ? "DECLARATION_VIRTUAL_7" :
                 args.Length > 5 && args[5] == "declaration-nonvirtual-11" ? "DECLARATION_NONVIRTUAL_11" :
                 args.Length > 5 && args[5] == "interface-replace" ? "INTERFACE_REPLACEMENT" :
