@@ -156,11 +156,17 @@ internal static class FrozenResourceWorkflow
         string[] proofs = args[1].Split(',').Select(Path.GetFullPath).ToArray();
         if (Directory.Exists(output)) throw new IOException("Output must be new.");
         Directory.CreateDirectory(output);
+        int? expectedModuleConstant = null;
         string Execute(string exe, params string[] arguments)
         {
             var start = new ProcessStartInfo(exe) { WorkingDirectory = lab, UseShellExecute = false, CreateNoWindow = true,
                 WindowStyle = ProcessWindowStyle.Hidden, RedirectStandardOutput = true, RedirectStandardError = true };
             foreach (string value in arguments) start.ArgumentList.Add(value);
+            if (expectedModuleConstant.HasValue && arguments.Contains("-snapshotResult"))
+            {
+                start.ArgumentList.Add("-expectedModuleConstant");
+                start.ArgumentList.Add(expectedModuleConstant.Value.ToString(System.Globalization.CultureInfo.InvariantCulture));
+            }
             using var process = Process.Start(start)!;
             Console.WriteLine("Frozen resource: " + Path.GetFileName(exe) + " PID " + process.Id);
             var stdout = process.StandardOutput.ReadToEndAsync(); var stderr = process.StandardError.ReadToEndAsync();
@@ -176,6 +182,9 @@ internal static class FrozenResourceWorkflow
         bool reuseCurrent = args.Length >= 5 && Directory.Exists(args[4]);
         string sourceCurrent = reuseCurrent ? Path.GetFullPath(args[4]) : Path.Combine(proofs[0], "frozen-entry-current");
         foreach (string source in Directory.GetFiles(sourceCurrent, "*.dll")) File.Copy(source, Path.Combine(current, Path.GetFileName(source)));
+        using (var module = ModuleDefMD.Load(Path.Combine(current, ModelName + ".dll")))
+            expectedModuleConstant = module.Find("HybridCLR.Lab.ModuleEvolution.ModuleState", false)?
+                .Fields.Single(field => field.Name == "ExpectedVersion").Constant?.Value as int?;
         string Join(string suffix) => string.Join(",", proofs.Select(proof => Path.Combine(proof, "base", suffix)));
         var snapshots = proofs.Select(proof => {
             string path = Path.Combine(proof, "base/build-identity.json"); var identity = Read(path);

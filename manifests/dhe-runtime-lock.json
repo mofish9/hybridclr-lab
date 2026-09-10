@@ -35,8 +35,8 @@
       "repository": "il2cpp_plus",
       "sourceMode": "integrated",
       "baseCommit": "bf15337e189ae7da5876aa51c9b896a36c52a155",
-      "integratedCommit": "8a13baf1ec45068fbb9535beea03425b717f501b",
-      "expectedTreeSha256": "F2BD86EF123874015282F992AD94834200541156607065D06FC9F6F351B2AC67",
+      "integratedCommit": "4d5052e28b6be289f21cc3b79b349675483f2b38",
+      "expectedTreeSha256": "EC73E20F925C82B6EDBEFF9E182EC4994E1FFEFCAA0F591B0390A95DEDB6B3A0",
       "engineWorkflows": [
         "Unity2022Fgs"
       ],
@@ -65,8 +65,8 @@
       "repository": "hybridclr_unity",
       "sourceMode": "integrated",
       "baseCommit": "623073baafd5a1d12ea46df8145de9fddc899fac",
-      "integratedCommit": "0f0dd21826f11e601ecdb9391c7fe788c6b09275",
-      "expectedTreeSha256": "0442EF27362EE1E91EE4424FA8532F16AF3456A630ADEC2D3B9F025782ED2679",
+      "integratedCommit": "3c685631067559812d438f61286155a736feb50d",
+      "expectedTreeSha256": "5AE04C0A78E05256A290FA3EC9B416FC13120402D082B5B27B9B5F086AC25E99",
       "treeHashIgnoredPaths": [
         "Editor/BuildProcessors/AddLil2cppSourceCodeToXcodeproj2023OrNewer.cs.meta"
       ],

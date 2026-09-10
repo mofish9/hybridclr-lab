@@ -4,7 +4,7 @@ internal sealed class ResourceUpdateCompatibility
 {
 	public const string Policy = "dhe-proven-safe-subset-v1";
 	public const string RuntimeProtocol = "dhe-runtime-protocol-v1";
-    public const string CurrentNativeRuntimeContract = "dhe-runtime-v28";
+    public const string CurrentNativeRuntimeContract = "dhe-runtime-v29";
     public static readonly string[] KnownRuntimeCapabilities =
     {
 		"aot-guard-v1",
@@ -22,6 +22,7 @@ internal sealed class ResourceUpdateCompatibility
 		"frozen-aot-snapshot-source-binding-v1",
         "mixed-interpreter-source-batch-v1",
         "deferred-aot-module-initialization-v1",
+        "current-literal-field-values-v1",
         "frozen-generic-context-dispatch-v1",
 		"supplemental-existing-type-instance-fields-v1",
         "supplemental-existing-type-static-fields-v1",
@@ -176,7 +177,8 @@ internal sealed class ResourceUpdateCompatibility
 			else if (!string.Equals(field.NonCustomMetadataVersion,
 					 currentField.NonCustomMetadataVersion,
                          StringComparison.OrdinalIgnoreCase) &&
-                     (field.IsStatic || !physicalTypes.Contains(field.DeclaringTypeStableId)))
+                     (field.IsStatic || !physicalTypes.Contains(field.DeclaringTypeStableId)) &&
+                     !IsSupportedLiteralValueEvolution(field, currentField))
                 unsupported.Add("existing-field-metadata-change:" + field.Identity);
         }
         var allAddressTakenFields = new HashSet<string>(addressTakenFields ??
@@ -261,6 +263,10 @@ internal sealed class ResourceUpdateCompatibility
         };
         if (parameterDefaultsChanged || added.Any(method => method.HasParameterDefaults))
             requiredCapabilities.Add("current-parameter-default-metadata-v1");
+        if (baseline.Fields.Any(field => currentFields.TryGetValue(field.StableId, out var currentField) &&
+                !string.Equals(field.NonCustomMetadataVersion, currentField.NonCustomMetadataVersion, StringComparison.OrdinalIgnoreCase) &&
+                IsSupportedLiteralValueEvolution(field, currentField)))
+            requiredCapabilities.Add("current-literal-field-values-v1");
         if (baseline.Methods.Concat(current.Methods).Any(method => method.DeclaringType == "<Module>" && method.Name == ".cctor"))
             requiredCapabilities.Add("deferred-aot-module-initialization-v1");
         if (changed.Concat(removed).Any(method => method.Name == ".cctor") ||
@@ -482,6 +488,13 @@ internal sealed class ResourceUpdateCompatibility
     private static bool MethodCanHaveAotEntry(MetaVersionMethod method) =>
         (method.Flags & 8u) != 0 && (method.Flags & (2u | 4u)) == 0;
 
+    private static bool IsSupportedLiteralValueEvolution(MetaVersionField before, MetaVersionField after) =>
+        before.IsStatic && after.IsStatic && before.IsLiteral && after.IsLiteral &&
+        before.HasConstant && after.HasConstant && !before.HasRva && !after.HasRva &&
+        !before.IsThreadStatic && !after.IsThreadStatic &&
+        before.ConstantIndependentMetadataVersion.Length != 0 &&
+        string.Equals(before.ConstantIndependentMetadataVersion, after.ConstantIndependentMetadataVersion,
+            StringComparison.OrdinalIgnoreCase);
 	private static bool HasOnlySupportedStaticFieldEvolution(MetaVersionType type,
         IReadOnlyDictionary<string, MetaVersionField> baselineFields,
         IReadOnlyDictionary<string, MetaVersionField> currentFields)
@@ -495,7 +508,8 @@ internal sealed class ResourceUpdateCompatibility
 		if (before.Any(field => currentFields.TryGetValue(field.StableId,
 				out MetaVersionField? current) &&
             !string.Equals(field.NonCustomMetadataVersion,
-				current.NonCustomMetadataVersion, StringComparison.OrdinalIgnoreCase)))
+				current.NonCustomMetadataVersion, StringComparison.OrdinalIgnoreCase) &&
+            !IsSupportedLiteralValueEvolution(field, current)))
             return false;
         return after.Where(field => !baselineFields.ContainsKey(field.StableId)).All(field =>
             field.IsStatic && !field.IsThreadStatic && !field.HasRva);

@@ -378,7 +378,12 @@ internal sealed class MetaVersionSnapshot
             Hash("dhe-field-noncustom-metadata\n" +
                 StableFieldMetadataWithoutOwnAttributes(field)),
             Hash("dhe-field-custom-attributes\n" + Attributes(field.CustomAttributes)),
-            field.CustomAttributes.Count != 0);
+            field.CustomAttributes.Count != 0)
+        {
+            ConstantIndependentMetadataVersion = Hash("dhe-field-constant-independent\n" +
+                StableFieldMetadataWithoutOwnAttributes(field, true)),
+            HasConstant = field.HasConstant,
+        };
     }
 
     private static string StableTypeShape(TypeDef type)
@@ -493,10 +498,10 @@ internal sealed class MetaVersionSnapshot
         ConstantShape(field.HasConstant ? field.Constant : null), field.RVA, BytesHash(field.InitialValue),
         field.MarshalType?.ToString() ?? "", Attributes(field.CustomAttributes));
 
-    private static string StableFieldMetadataWithoutOwnAttributes(FieldDef field) => string.Join(":",
+    private static string StableFieldMetadataWithoutOwnAttributes(FieldDef field, bool ignoreConstant = false) => string.Join(":",
         field.DeclaringType?.FullName ?? "", field.Name.String, field.FieldType.FullName,
         ((uint)field.Attributes).ToString("x8"), field.FieldOffset,
-        ConstantShape(field.HasConstant ? field.Constant : null), field.RVA, BytesHash(field.InitialValue),
+        ignoreConstant ? "" : ConstantShape(field.HasConstant ? field.Constant : null), field.RVA, BytesHash(field.InitialValue),
         field.MarshalType?.ToString() ?? "", RuntimeSemanticFieldAttributes(field.CustomAttributes));
 
 	private static string FieldIdentity(FieldDef field) =>
@@ -821,4 +826,8 @@ internal sealed record MetaVersionField(string Identity, string StableId, string
 	bool DeclaringTypeIsValueType, bool AddressTaken, bool HasUnsupportedSidecarType,
 	[property: JsonIgnore] string NonCustomMetadataVersion,
 	[property: JsonIgnore] string CustomAttributeVersion,
-	[property: JsonIgnore] bool HasCustomAttributes);
+	[property: JsonIgnore] bool HasCustomAttributes)
+{
+    [JsonIgnore] public string ConstantIndependentMetadataVersion { get; init; } = "";
+    [JsonIgnore] public bool HasConstant { get; init; }
+}

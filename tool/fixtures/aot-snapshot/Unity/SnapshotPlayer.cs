@@ -16,6 +16,7 @@ namespace HybridCLR.Lab.Snapshot
             public string baseId, aotAnalysisSnapshotSha256, error, stage;
             public int loadedAssemblies, revision, sentinel;
             public int moduleRunsBeforeLoad = -1;
+            public int moduleConstantBeforeLoad, moduleConstantAfterLoad, moduleConstantFresh, moduleConstantValue;
             public int ordinaryModuleRunsBeforeLoad = -1, ordinaryModuleRunsAfterLoad = -1;
             public string[] plannedAssemblies, loadedAssemblyNames, differentialAssemblies, interpreterOnlyAssemblies;
             public string[] records;
@@ -49,12 +50,15 @@ namespace HybridCLR.Lab.Snapshot
                 var identity = DheBuildIdentity.Create();
                 result.baseId = identity.BaseId; result.aotAnalysisSnapshotSha256 = identity.AotAnalysisSnapshotSha256;
                 var moduleState = typeof(ValueLayout.Factory).Assembly.GetType("HybridCLR.Lab.ModuleEvolution.ModuleState");
+                System.Reflection.FieldInfo moduleConstant = null;
                 if (moduleState != null)
                 {
                     result.stage = "before-module-version-selection";
                     result.moduleRunsBeforeLoad = (int)moduleState.GetField("Runs").GetValue(null);
                     if (result.moduleRunsBeforeLoad != 0)
                         throw new InvalidDataException("Hotfix AOT module initialized before the Current version was selected.");
+                    moduleConstant = moduleState.GetField("ExpectedVersion", System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.Static);
+                    result.moduleConstantBeforeLoad = (int)moduleConstant.GetRawConstantValue();
                 }
                 var ordinaryModule = typeof(HybridCLR.Lab.ValueLayoutNative.NativeBoundary).Assembly.GetType("HybridCLR.Lab.ValueLayoutNative.OrdinaryModuleState");
                 if (ordinaryModule != null)
@@ -88,6 +92,18 @@ namespace HybridCLR.Lab.Snapshot
                 // sources. Count only the Current payload for this assertion.
                 result.loadedAssemblyNames = DheRuntime.LoadedAssemblyNames;
                 result.loadedAssemblies = result.plannedAssemblies.Intersect(result.loadedAssemblyNames, StringComparer.OrdinalIgnoreCase).Count();
+                if (moduleConstant != null)
+                {
+                    int constantIndex = Array.IndexOf(args, "-expectedModuleConstant");
+                    int expectedConstant = constantIndex < 0 ? result.moduleConstantBeforeLoad : int.Parse(args[constantIndex + 1]);
+                    result.moduleConstantAfterLoad = (int)moduleConstant.GetRawConstantValue();
+                    result.moduleConstantValue = (int)moduleConstant.GetValue(null);
+                    result.moduleConstantFresh = (int)typeof(ValueLayout.Factory).Assembly.GetType("HybridCLR.Lab.ModuleEvolution.ModuleState")
+                        .GetField("ExpectedVersion", System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.Static).GetRawConstantValue();
+                    if (result.moduleConstantAfterLoad != expectedConstant || result.moduleConstantFresh != expectedConstant ||
+                        result.moduleConstantValue != expectedConstant)
+                        throw new InvalidDataException("DHE literal reflection did not select the expected Current value.");
+                }
                 if (ordinaryModule != null)
                 {
                     result.ordinaryModuleRunsAfterLoad = (int)ordinaryModule.GetField("Runs").GetValue(null);
