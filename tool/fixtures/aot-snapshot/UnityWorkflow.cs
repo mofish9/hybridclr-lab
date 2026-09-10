@@ -46,7 +46,7 @@ internal static class UnityWorkflow
         // This dedicated fixture has its own Player, retaining only the shared
         // project/bootstrap configuration from the earlier storage probe.
         File.Delete(Path.Combine(project, "Assets/CurrentStorageRuntime.cs"));
-        foreach (var pair in new[] { ("SnapshotPlayer.cs", "Assets"), ("SnapshotWorkflowBuild.cs", "Assets/Editor") })
+        foreach (var pair in new[] { ("SnapshotPlayer.cs", "Assets"), ("PublicLoadFailurePlayer.cs", "Assets"), ("SnapshotWorkflowBuild.cs", "Assets/Editor") })
             File.Copy(Path.Combine(lab, "tool/fixtures/aot-snapshot/Unity", pair.Item1), Path.Combine(project, pair.Item2, pair.Item1));
         if (mixedTransactionProbe)
             File.Copy(Path.Combine(lab, "tool/fixtures/aot-snapshot/Unity/MixedTransactionPlayer.cs"), Path.Combine(project, "Assets/MixedTransactionPlayer.cs"));

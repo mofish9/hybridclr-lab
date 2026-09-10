@@ -33,6 +33,24 @@ namespace HybridCLR.Lab.ModuleEvolution
         {
             Runs++; Version = ExpectedVersion;
             Console.WriteLine("DHE selected module: " + Version + ":" + Runs);
+#if MODULE_PUBLIC_REENTRY
+            Exception failure = null;
+            var worker = new System.Threading.Thread(() => {
+                try
+                {
+                    if (HybridCLR.DheRuntime.LoadCurrentAssemblyImages(null, null, out var code, out _) || code.ToString() != "DHE_LOAD_IN_PROGRESS")
+                        throw new InvalidOperationException("Public reentry did not report in-progress.");
+                    bool resetRejected = false;
+                    try { HybridCLR.DheRuntime.Reset(); } catch (InvalidOperationException) { resetRejected = true; }
+                    if (!resetRejected) throw new InvalidOperationException("Public reentry reset was accepted.");
+                    if (HybridCLR.DheRuntime.Initialize(null, null, out _)) throw new InvalidOperationException("Public reentry configuration was accepted.");
+                }
+                catch (Exception error) { failure = error; }
+            }) { IsBackground = true };
+            worker.Start(); if (!worker.Join(10000)) throw new TimeoutException("Public reentry deadlocked.");
+            if (failure != null) throw failure;
+            Console.WriteLine("DHE public reentry pass");
+#endif
 #if MODULE_FAILURE
             throw new InvalidOperationException("DHE deliberate public module failure");
 #endif

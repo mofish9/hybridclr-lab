@@ -27,8 +27,8 @@ internal static class AotModuleWorkflow
     }
     internal static int Current(string[] args)
     {
-        if (args.Length != 6 || (args[4] != "changed" && args[4] != "removed" && args[4] != "chained" && args[4] != "failed"))
-            throw new ArgumentException("aot-module-current <lab> <old Base proof> <46-case Current> <Unity editor> <changed|removed|chained|failed> <new output>");
+        if (args.Length != 6 || (args[4] != "changed" && args[4] != "removed" && args[4] != "chained" && args[4] != "failed" && args[4] != "failed-reentry"))
+            throw new ArgumentException("aot-module-current <lab> <old Base proof> <46-case Current> <Unity editor> <changed|removed|chained|failed|failed-reentry> <new output>");
         string output = Path.GetFullPath(args[5]), current = Path.Combine(output, "current");
         if (Directory.Exists(output)) throw new IOException("Current output must be new.");
         Directory.CreateDirectory(current); var snapshot = Snapshot(args[1]);
@@ -37,7 +37,8 @@ internal static class AotModuleWorkflow
             Path.Combine(current, "HybridCLR.ValueLayoutModel.dll"), snapshot.Assemblies.Where(row => !row.Dhe).Select(row => row.Path)
                 .Concat(Directory.GetFiles(current, "*.dll")), Path.Combine(output, "compiled"), false,
             args[4] == "removed" ? "MODULE_CURRENT,MODULE_REMOVED" : args[4] == "chained" ? "MODULE_CURRENT,MODULE_CHAIN" :
-                args[4] == "failed" ? "MODULE_CURRENT,MODULE_FAILURE" : "MODULE_CURRENT", true);
+                args[4] == "failed" ? "MODULE_CURRENT,MODULE_FAILURE" :
+                args[4] == "failed-reentry" ? "MODULE_CURRENT,MODULE_FAILURE,MODULE_PUBLIC_REENTRY" : "MODULE_CURRENT", true);
         Console.WriteLine(current); return 0;
     }
     internal static int NextBase(string[] args)

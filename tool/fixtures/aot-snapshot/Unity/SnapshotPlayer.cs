@@ -20,6 +20,7 @@ namespace HybridCLR.Lab.Snapshot
             public int ordinaryModuleRunsBeforeLoad = -1, ordinaryModuleRunsAfterLoad = -1;
             public string[] plannedAssemblies, loadedAssemblyNames, differentialAssemblies, interpreterOnlyAssemblies;
             public string[] records;
+            public string[] recoveryChecks;
             public long ordinaryAotReferenceResult;
             public long ordinaryAotEchoExtra;
             public int ordinaryAotStaticNeighbor;
@@ -85,8 +86,18 @@ namespace HybridCLR.Lab.Snapshot
                 result.differentialAssemblies = DheRuntime.DifferentialAssemblyNames;
                 result.interpreterOnlyAssemblies = DheRuntime.InterpreterOnlyAssemblyNames;
                 result.stage = "load-current-batch";
-                if (!DheRuntime.LoadCurrentAssemblyImages(result.plannedAssemblies,
-                    result.plannedAssemblies.Select(name => provider.LoadBytes(records[name].current)).ToArray(), out var code, out error))
+                byte[][] currentDlls = result.plannedAssemblies.Select(name => provider.LoadBytes(records[name].current)).ToArray();
+                bool loadedCurrent = DheRuntime.LoadCurrentAssemblyImages(result.plannedAssemblies, currentDlls, out var code, out error);
+                if (Array.IndexOf(args, "-publicFailureProbe") >= 0)
+                {
+                    if (loadedCurrent) throw new InvalidOperationException("Expected the deliberate module initialization failure.");
+                    result.recoveryChecks = PublicLoadFailurePlayer.Verify(provider, identity, root, result.plannedAssemblies, currentDlls, code, error);
+                    result.loadedAssemblyNames = DheRuntime.LoadedAssemblyNames;
+                    result.loadedAssemblies = result.plannedAssemblies.Intersect(result.loadedAssemblyNames, StringComparer.OrdinalIgnoreCase).Count();
+                    result.error = error; result.stage = "expected-module-failure"; result.passed = true;
+                    File.WriteAllText(args[index + 1], JsonUtility.ToJson(result, true)); Application.Quit(0); return;
+                }
+                if (!loadedCurrent)
                     throw new InvalidDataException(code + ":" + error);
                 // LoadedAssemblyNames also includes authenticated frozen AOT
                 // sources. Count only the Current payload for this assertion.
