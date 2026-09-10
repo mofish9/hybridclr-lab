@@ -40,3 +40,19 @@ no claim of runtime support is made until the same Current passes the Players.
 Rollback selects the preceding matching source locks and a compatible archived
 resource, then restarts the Player. Do not rewrite Base identities/capabilities
 or unload a committed Current set in process.
+
+The preserved first candidate fails real existing-type Players: Base-89 passes
+eleven of sixteen parent checks but inherited fields/methods fail reflection;
+Base-90 stops at the Current-call-frame guard. Base-81 passes as a new-type
+control only. The native frame control at lab 3d54300 compiles against the
+unchanged fdf1299 runtime and fails its fifteen positive physical-frame checks.
+All unresolved/different-layout and existing receiver guards remain passing.
+
+The next candidate compares actual physical signature classes, retains the
+staged receiver/parent proof, and queries published Current ancestry for member
+reflection without changing raw Class::GetParent or object layouts. Package
+capabilities explicitly distinguish these changes. Existing-type parent updates
+require both capabilities; no-op and wholly new types do not need the parent
+capability. Old Base inventories stay immutable. Reflection traversal includes
+properties/events; those need additional Player probes beyond the original
+sixteen checks. Source locks select this candidate, not a passing Player claim.

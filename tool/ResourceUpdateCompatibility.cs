@@ -11,6 +11,8 @@ internal sealed class ResourceUpdateCompatibility
     internal const string GenericMethodImplOwnerCapability = "current-generic-methodimpl-owners-v1";
     internal const string VirtualSignatureFrameCapability = "current-virtual-signature-frames-v1";
     internal const string ScalarInstanceFrameCapability = "current-scalar-instance-frames-v1";
+    internal const string PhysicalParentEvolutionCapability = "physical-current-parent-evolution-v1";
+    internal const string IdenticalPhysicalFrameCapability = "current-identical-physical-frames-v1";
 	public const string Policy = "dhe-proven-safe-subset-v1";
 	public const string RuntimeProtocol = "dhe-runtime-protocol-v1";
     public const string CurrentNativeRuntimeContract = "dhe-runtime-v32";
@@ -33,6 +35,8 @@ internal sealed class ResourceUpdateCompatibility
         GenericMethodImplOwnerCapability,
         VirtualSignatureFrameCapability,
         ScalarInstanceFrameCapability,
+        PhysicalParentEvolutionCapability,
+        IdenticalPhysicalFrameCapability,
         ResourceExecutionPlan.GenericContextCapability,
         "current-parameter-default-metadata-v1",
         "shared-type-initialization-v1",
@@ -273,6 +277,7 @@ internal sealed class ResourceUpdateCompatibility
             !string.Equals(type.Version, currentType.Version, StringComparison.OrdinalIgnoreCase)).ToArray();
         bool requiresPhysicalInterfaceAddition = false;
         bool requiresPhysicalInterfaceEvolution = false;
+        bool requiresPhysicalParentEvolution = false;
         foreach (MetaVersionType type in changedTypes)
         {
             MetaVersionType currentType = currentTypes[type.StableId];
@@ -284,6 +289,7 @@ internal sealed class ResourceUpdateCompatibility
                 HasOnlySupportedPhysicalParentEvolution(type, currentType, baseline, current, currentAssemblySet);
             requiresPhysicalInterfaceAddition |= physicalInterfaceAddition;
             requiresPhysicalInterfaceEvolution |= physicalInterfaceEvolution;
+            requiresPhysicalParentEvolution |= physicalParentEvolution;
             if (!string.Equals(type.LayoutVersion, currentType.LayoutVersion, StringComparison.OrdinalIgnoreCase) &&
                 ((!string.Equals(type.NonFieldLayoutVersion, currentType.NonFieldLayoutVersion,
                      StringComparison.OrdinalIgnoreCase) && !physicalInterfaceAddition && !physicalInterfaceEvolution && !physicalParentEvolution) ||
@@ -320,6 +326,11 @@ internal sealed class ResourceUpdateCompatibility
         };
         if (current.HasEmbeddedNullStringDefaults)
             requiredCapabilities.Add("length-preserved-constant-strings-v1");
+        if (requiresPhysicalParentEvolution)
+        {
+            requiredCapabilities.Add(PhysicalParentEvolutionCapability);
+            requiredCapabilities.Add(IdenticalPhysicalFrameCapability);
+        }
         if (parameterDefaultsChanged || added.Any(method => method.HasParameterDefaults))
             requiredCapabilities.Add("current-parameter-default-metadata-v1");
         if (parameterDefaultsChanged || physicalTypes.Count != 0 || conditionalTokens.Length != 0)

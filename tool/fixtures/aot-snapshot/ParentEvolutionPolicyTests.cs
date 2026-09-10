@@ -47,13 +47,17 @@ internal static class ParentEvolutionPolicyTests
         checks["old-insertion-admitted"] = inserted.Compatible;
         checks["grown-insertion-admitted"] = Analyze("grown-insertion", roots[1], roots[2]).Compatible;
         checks["removal-planning-admitted"] = Analyze("removal", roots[2], roots[1]).Compatible;
-        checks["new-type-control-admitted"] = Analyze("new-type", roots[3], roots[2]).Compatible;
+        var newType = Analyze("new-type", roots[3], roots[2]);
+        checks["new-type-control-admitted"] = newType.Compatible;
+        checks["new-type-needs-no-parent-runtime"] = !newType.RequiredRuntimeCapabilities.Contains(ResourceUpdateCompatibility.PhysicalParentEvolutionCapability);
         var noop = Analyze("no-op", roots[2], roots[2]);
         checks["no-op-keeps-methods"] = noop.Compatible && noop.ChangedMethodCount == 0;
+        checks["no-op-needs-no-parent-runtime"] = !noop.RequiredRuntimeCapabilities.Contains(ResourceUpdateCompatibility.PhysicalParentEvolutionCapability);
         checks["missing-physical-selection-rejected"] = !Analyze("missing-selection", roots[1], roots[2], false).Compatible;
         foreach (string capability in new[] { "current-storage-execution-plan-array-v1",
             ResourceUpdateCompatibility.PhysicalInterfaceMapCapability, ResourceUpdateCompatibility.ReferenceVirtualInvocationCapability,
-            ResourceUpdateCompatibility.VirtualSignatureFrameCapability })
+            ResourceUpdateCompatibility.VirtualSignatureFrameCapability,
+            ResourceUpdateCompatibility.PhysicalParentEvolutionCapability, ResourceUpdateCompatibility.IdenticalPhysicalFrameCapability })
         {
             checks[capability + ":required"] = inserted.RequiredRuntimeCapabilities.Contains(capability);
             checks[capability + ":missing-rejected"] = !ResourceUpdateCompatibility.CanExecuteUpdate(
