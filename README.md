@@ -17,7 +17,17 @@ Their immutable inputs are recorded in `manifests/repo-lock.json`.
 
 ## Current phase
 
-The latest Windows checkpoint passes **public pre-commit recovery and real Unity
+The active investigation is **Unity serialization of evolved reference layouts**.
+The full eleven-check JSON/overwrite/clone suite fails on immutable old-layout
+Base-47 but passes on same-layout Base-48 with identical Current DLLs. Native
+tracing confirms Unity consumes field offsets and bypasses sidecar value APIs.
+An isolated physical Current storage prototype fixes serialization on Base-47,
+but still fails native component creation/callbacks. Allocation routing is being
+tested in separate runtime worktrees; it is not qualified or published. See
+`reports/dhe-unity-serialization-windows.md` for exact evidence and open gates.
+Unity 2022 Windows comes first; Tuanjie follows; no new Unity 2021 work.
+
+The latest completed Windows checkpoint passes **public pre-commit recovery and real Unity
 component evolution**. At lab `69b700c`, two immutable Bases consume one identical
 four-DLL Current and pass all 46 reference cases, 12 public rejection/retry checks
 and 17 Unity checks. Two actual native preparation exceptions require restart;
