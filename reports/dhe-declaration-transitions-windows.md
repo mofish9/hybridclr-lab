@@ -138,7 +138,8 @@ parameter correction is exercised both with and without physical storage
 selection, and the declaration change is tested in both directions.
 
 Base-81 cold replays use the final three-Base resources and each pass 17 checks,
-at shared-<variant>-base81-declaration-<variant>-02. The virtual map has one
+at shared-virtual-base81-declaration-virtual-7-02 and
+shared-nonvirtual11-base81-declaration-nonvirtual-11-02. The virtual map has one
 non-null target, the same method identity as normal reflection, and invocation
 returns 68. This is the correction of the original missing-interface Base-75
 failure. Base-81 has no original Measure or IOperation handle to warm; it is not
