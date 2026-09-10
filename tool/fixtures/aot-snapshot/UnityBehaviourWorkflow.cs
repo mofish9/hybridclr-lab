@@ -1,4 +1,5 @@
 using System.Text.Json;
+using System.Security.Cryptography;
 using dnlib.DotNet;
 using dnlib.DotNet.Emit;
 using HybridCLR.DheTool;
@@ -43,8 +44,8 @@ internal static class UnityBehaviourWorkflow
         entry.Body.Instructions.Insert(insertion, Instruction.Create(OpCodes.Call, invoke));
         module.Write(model);
         File.WriteAllText(Path.Combine(output, "entry-wiring.json"), JsonSerializer.Serialize(new {
-            merged, mergedSha256 = MetaVersionSnapshot.FileSha256(merged), current = model,
-            currentSha256 = MetaVersionSnapshot.FileSha256(model), readOnly,
+            merged, mergedSha256 = Convert.ToHexString(SHA256.HashData(File.ReadAllBytes(merged))), current = model,
+            currentSha256 = Convert.ToHexString(SHA256.HashData(File.ReadAllBytes(model))), readOnly,
             scope = "Append the optional native Unity probe after existing business cases; preserve the compiler's merged output separately"
         }, new JsonSerializerOptions { WriteIndented = true }));
         Console.WriteLine(current); return 0;
