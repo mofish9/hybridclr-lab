@@ -14,6 +14,7 @@
       <_Parameter2>$(DhePackageRoot)</_Parameter2>
     </AssemblyAttribute>
     <Compile Remove="Unity/**/*.cs" />
+    <Compile Remove="Workloads/**/*.cs" />
     <Compile Include="$(DhePackageRoot)/Editor/Commands/DheAotAnalysisSnapshot.cs" Link="Package/DheAotAnalysisSnapshot.cs" />
     <Compile Include="$(DhePackageRoot)/Editor/Commands/DheOrdinaryGuardInventory.cs" Link="Package/DheOrdinaryGuardInventory.cs" />
     <Compile Include="../../AotAnalysisSnapshot.cs" Link="Tool/AotAnalysisSnapshot.cs" />

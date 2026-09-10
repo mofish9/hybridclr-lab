@@ -49,10 +49,12 @@ internal static class FrozenResourceWorkflow
             : File.Exists(Path.Combine(current, name.Name + ".dll"))
                 ? AssemblyLoadContext.Default.LoadFromAssemblyPath(Path.Combine(current, name.Name + ".dll")) : null;
         var model = AssemblyLoadContext.Default.LoadFromAssemblyPath(Path.Combine(current, ModelName + ".dll"));
-        var records = (string[])model.GetType(ProbeName, true)!.GetMethod("Run")!.Invoke(null, null)!;
+        var probe = model.GetType(FrozenResourceCasesCompiler.ProbeName) ?? model.GetType(ProbeName, true)!;
+        int expectedCount = probe.FullName == FrozenResourceCasesCompiler.ProbeName ? FrozenResourceCasesCompiler.CaseCount : 4;
+        var records = (string[])probe.GetMethod("Run")!.Invoke(null, null)!;
         int revision = (int)model.GetType("HybridCLR.Lab.ValueLayout.Factory", true)!.GetMethod("GetRevision")!.Invoke(null, null)!;
-        File.WriteAllText(args[2], JsonSerializer.Serialize(new { passed = records.Length == 4 && revision == 73, records, revision }, Json));
-        return records.Length == 4 && revision == 73 ? 0 : 1;
+        File.WriteAllText(args[2], JsonSerializer.Serialize(new { passed = records.Length == expectedCount && revision == 73, records, revision }, Json));
+        return records.Length == expectedCount && revision == 73 ? 0 : 1;
     }
 
     // The real business entry returns a new revision only after all value-copy
@@ -126,7 +128,7 @@ internal static class FrozenResourceWorkflow
 
     public static int Run(string[] args)
     {
-        if (args.Length != 4) throw new ArgumentException("frozen-resource-workflow <lab> <comma-separated immutable proof roots> <tool.dll> <new output>");
+        if (args.Length != 4 && args.Length != 5) throw new ArgumentException("frozen-resource-workflow <lab> <comma-separated immutable proof roots> <tool.dll> <new output> [Unity editor executable for expanded C# suite]");
         string lab = Path.GetFullPath(args[0]), tool = Path.GetFullPath(args[2]), output = Path.GetFullPath(args[3]);
         string[] proofs = args[1].Split(',').Select(Path.GetFullPath).ToArray();
         if (Directory.Exists(output)) throw new IOException("Output must be new.");
@@ -149,13 +151,14 @@ internal static class FrozenResourceWorkflow
         string labHead = Execute("git", "-C", lab, "rev-parse", "HEAD");
         string current = Path.Combine(output, "current"); Directory.CreateDirectory(current);
         foreach (string source in Directory.GetFiles(Path.Combine(proofs[0], "frozen-entry-current"), "*.dll")) File.Copy(source, Path.Combine(current, Path.GetFileName(source)));
-        AddProbe(current);
         string Join(string suffix) => string.Join(",", proofs.Select(proof => Path.Combine(proof, "base", suffix)));
         var snapshots = proofs.Select(proof => {
             string path = Path.Combine(proof, "base/build-identity.json"); var identity = Read(path);
             return AotAnalysisSnapshot.Read(path, identity, identity.GetProperty("aotAssemblyNames").EnumerateArray().Select(row => row.GetString()!),
                 identity.GetProperty("assemblies").EnumerateArray().Select(row => row.GetProperty("assemblyName").GetString()!))!;
         }).ToArray();
+        if (args.Length == 5) FrozenResourceCasesCompiler.Compile(lab, current, snapshots[0], args[4], output, Execute);
+        else AddProbe(current);
         string referenceFile = Path.Combine(output, "reference.json"), host = typeof(FrozenResourceWorkflow).Assembly.Location;
         Execute("dotnet", host, "frozen-resource-reference", current, snapshots[0].Assemblies.Single(row => row.AssemblyName == NativeName).Path, referenceFile);
         string resource = Path.Combine(output, "resource");
@@ -183,7 +186,7 @@ internal static class FrozenResourceWorkflow
             var result = Read(report);
             checks["standard-resource-player-" + index] = result.GetProperty("passed").GetBoolean() && result.GetProperty("resourceUpdate").GetBoolean() &&
                 result.GetProperty("revision").GetInt32() == Read(referenceFile).GetProperty("revision").GetInt32() &&
-                result.GetProperty("sentinel").GetInt32() == 5 && expected.Length == 4;
+                result.GetProperty("sentinel").GetInt32() == 5 && expected.Length == (args.Length == 5 ? FrozenResourceCasesCompiler.CaseCount : 4);
             string snapshotAsset = Path.Combine(stage, "payload/frozen-aot", result.GetProperty("baseId").GetString()!, "snapshot.json");
             if (File.Exists(snapshotAsset))
             {
