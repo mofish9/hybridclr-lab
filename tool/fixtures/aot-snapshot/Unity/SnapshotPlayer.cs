@@ -28,6 +28,7 @@ namespace HybridCLR.Lab.Snapshot
             public int ordinaryAotStaticNeighbor;
             public string[] virtualNoopChecks;
             public string[] virtualReceiverChecks;
+            public string[] parentTransitionCacheChecks;
             public int virtualNoopMethods, virtualNoopAotEntries, virtualNoopInterpreterEntries;
         }
         private sealed class Provider : IDheRuntimeAssetProvider
@@ -61,6 +62,8 @@ namespace HybridCLR.Lab.Snapshot
                     ? UnityReferenceCachePlayer.Capture(unityType) : null;
                 VirtualSignatureReceiverCache virtualReceiverCache = Array.IndexOf(args, "-virtualSignatureOldReceiverProbe") >= 0
                     ? VirtualSignatureReceiverCache.Capture(typeof(ValueLayout.Factory).Assembly) : null;
+                ParentTransitionReceiverCache parentTransitionCache = Array.IndexOf(args, "-parentTransitionCacheProbe") >= 0
+                    ? ParentTransitionReceiverCache.Capture(typeof(ValueLayout.Factory).Assembly) : null;
                 var moduleState = typeof(ValueLayout.Factory).Assembly.GetType("HybridCLR.Lab.ModuleEvolution.ModuleState");
                 System.Reflection.FieldInfo moduleConstant = null;
                 if (moduleState != null)
@@ -127,6 +130,11 @@ namespace HybridCLR.Lab.Snapshot
                 {
                     result.stage = "virtual-signature-old-receiver";
                     result.virtualReceiverChecks = virtualReceiverCache.Verify();
+                }
+                if (parentTransitionCache != null)
+                {
+                    result.stage = "parent-transition-cached-receiver";
+                    result.parentTransitionCacheChecks = parentTransitionCache.Verify();
                 }
                 if (referenceCache != null)
                 {

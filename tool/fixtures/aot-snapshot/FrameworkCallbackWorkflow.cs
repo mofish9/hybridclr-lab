@@ -52,13 +52,14 @@ internal static class FrameworkCallbackWorkflow
 
     internal static int Replay(string[] args)
     {
-        if (args.Length != 5) throw new ArgumentException("framework-callback-replay <lab> <tool.dll> <Base proof> <shared resource> <new output>");
+        bool parentCache = args.Length == 6 && args[5] == "parent-transition-cached";
+        if (args.Length != 5 && !parentCache) throw new ArgumentException("framework-callback-replay <lab> <tool.dll> <Base proof> <shared resource> <new output> [parent-transition-cached]");
         string output = Path.GetFullPath(args[4]);
         if (Directory.Exists(output)) throw new IOException("Replay output must be new.");
         Directory.CreateDirectory(output);
         string player = Path.Combine(output, "virtual-business");
         int prior = -1; string error = null;
-        try { prior = UnitySerializationWorkflow.Replay(args.Take(4).Concat(new[] { player, "virtual-signatures" }).ToArray()); }
+        try { prior = UnitySerializationWorkflow.Replay(args.Take(4).Concat(new[] { player, parentCache ? "parent-transition-cached" : "virtual-signatures" }).ToArray()); }
         catch (Exception exception) { error = exception.ToString(); }
         string log = Path.Combine(player, "player.json.log"), previous = Path.Combine(player, "result.json");
         string[] lines = File.Exists(log) ? File.ReadAllLines(log) : Array.Empty<string>();

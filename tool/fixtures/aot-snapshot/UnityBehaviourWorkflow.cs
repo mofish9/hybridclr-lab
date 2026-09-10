@@ -16,6 +16,8 @@ internal static class UnityBehaviourWorkflow
 
     internal static int ReferenceCurrent(string[] args)
     {
+        if (args.Length == 6 && (args[5] == "parent-removal" || args[5] == "parent-replacement"))
+            return CompileNativeProbe(args, "ParentTransitionCases", "HybridCLR.Lab.ParentTransitions.Cases", false);
         if (args.Length == 6 && args[5] == "parent-insertion")
             return CompileNativeProbe(args, "ParentEvolutionCases", "HybridCLR.Lab.ParentEvolution.Cases", false);
         if (args.Length == 6 && args[5] == "framework-callbacks")
@@ -66,6 +68,7 @@ internal static class UnityBehaviourWorkflow
                 return row.AssemblyName.StartsWith("UnityEngine", StringComparison.Ordinal) && File.Exists(complete) ? complete : row.Path;
             }).Append(facade).Concat(Directory.GetFiles(current, "*.dll")), Path.Combine(output, "compiled"), false,
             readOnly ? "SERIALIZATION_READ_ONLY" : callbackControl ? "SERIALIZATION_CALLBACK_CONTROL" :
+                args.Length > 5 && args[5] == "parent-replacement" ? "PARENT_REPLACEMENT" :
                 args.Length > 5 && args[5] == "virtual-signatures-base" ? "VIRTUAL_SIGNATURE_BASE" :
                 args.Length > 5 && args[5] == "declaration-virtual-7" ? "DECLARATION_VIRTUAL_7" :
                 args.Length > 5 && args[5] == "declaration-nonvirtual-11" ? "DECLARATION_NONVIRTUAL_11" :
@@ -155,6 +158,25 @@ internal static class UnityBehaviourWorkflow
             donor.Interfaces.Clear();
         }
         var entry = module.Find("HybridCLR.Lab.ValueLayout.Factory", false)!.Methods.Single(method => method.Name == "GetRevision");
+        if (fixture == "ParentTransitionCases")
+        {
+            const string formerParent = "HybridCLR.Lab.ParentEvolution.ProcessorMiddle";
+            var receiver = module.Find("HybridCLR.Lab.VirtualSignatures.Processor", false)!;
+            if (receiver.BaseType?.FullName != formerParent)
+                throw new InvalidDataException("Parent transition requires the preserved inserted-parent Current.");
+            var nextParent = module.Find(args[5] == "parent-removal" ? "HybridCLR.Lab.VirtualSignatures.ProcessorRoot" :
+                "HybridCLR.Lab.ParentTransitions.ReplacementParent", false)!;
+            var constructor = receiver.Methods.Single(method => method.IsInstanceConstructor);
+            var calls = constructor.Body.Instructions.Where(instruction => instruction.OpCode == OpCodes.Call &&
+                instruction.Operand is IMethod method && method.Name == ".ctor" && method.DeclaringType.FullName == formerParent).ToArray();
+            if (calls.Length != 1) throw new InvalidDataException("Expected exactly one former parent constructor call.");
+            receiver.BaseType = nextParent; calls[0].Operand = nextParent.Methods.Single(method => method.IsInstanceConstructor);
+            var previous = entry.Body.Instructions.Where(instruction => instruction.OpCode == OpCodes.Call &&
+                instruction.Operand is IMethod method && method.DeclaringType.FullName == "HybridCLR.Lab.ParentEvolution.Cases" &&
+                method.Name == "RunIfRequested").ToArray();
+            if (previous.Length != 1) throw new InvalidDataException("Expected the original insertion probe entry.");
+            entry.Body.Instructions.Remove(previous[0]);
+        }
         var invoke = module.Find(probeType, false)!.Methods.Single(method => method.Name == "RunIfRequested");
         // Keep the initializer verification and all 46 existing business cases.
         // The new Unity-only call executes immediately before successful return.
