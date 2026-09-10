@@ -129,11 +129,14 @@ internal static class MixedTransactionWorkflow
         if (playerHash != original.GetProperty("playerSha256").GetString() || gameHash != original.GetProperty("gameAssemblySha256").GetString())
             throw new InvalidDataException("Original Player changed.");
         string resultPath = Path.Combine(output, "player.json");
-        var start = new ProcessStartInfo(player) { UseShellExecute = false, CreateNoWindow = true, WindowStyle = ProcessWindowStyle.Hidden };
+        var start = new ProcessStartInfo(player) { UseShellExecute = false, CreateNoWindow = true, WindowStyle = ProcessWindowStyle.Hidden,
+            RedirectStandardOutput = true, RedirectStandardError = true };
         foreach (string argument in new[] { "-batchmode", "-nographics", "-mixedTransactionPlan", plan, "-mixedTransactionResult", resultPath,
             "-mixedTransactionMode", mode, "-logFile", resultPath + ".log" }) start.ArgumentList.Add(argument);
         using var process = Process.Start(start)!; Console.WriteLine("Mixed transaction Player PID " + process.Id);
+        var stdout = process.StandardOutput.ReadToEndAsync(); var stderr = process.StandardError.ReadToEndAsync();
         if (!process.WaitForExit(120000)) { process.Kill(true); process.WaitForExit(); }
+        File.WriteAllText(Path.Combine(output, "player-console.log"), stdout.GetAwaiter().GetResult() + stderr.GetAwaiter().GetResult());
         var result = File.Exists(resultPath) ? Read(resultPath) : default;
         string[] expected = Read(Path.Combine(inputs, "reference.json")).GetProperty("records").EnumerateArray().Select(row => row.GetString()!).ToArray();
         string[] actual = File.Exists(resultPath + ".log") ? File.ReadLines(resultPath + ".log").Where(line => line.StartsWith("DHE case begin: ")).Select(line => line.Substring(16)).ToArray() : Array.Empty<string>();
