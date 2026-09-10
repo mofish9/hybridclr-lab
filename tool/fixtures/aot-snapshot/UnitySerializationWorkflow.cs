@@ -6,10 +6,11 @@ internal static class UnitySerializationWorkflow
 {
     internal static int Replay(string[] args)
     {
-        if (args.Length != 6 || args[5] != "read" && args[5] != "full" && args[5] != "full-unity" && args[5] != "reference")
-            throw new ArgumentException("unity-serialization-replay <lab> <tool.dll> <Base proof> <resource workflow output> <new output> <read|full|full-unity|reference>");
-        bool reference = args[5] == "reference";
-        bool lifecycle = args[5] == "full-unity";
+        if (args.Length != 6 || !new[] { "read", "full", "full-unity", "reference", "full-unity-cached", "reference-cached" }.Contains(args[5]))
+            throw new ArgumentException("unity-serialization-replay <lab> <tool.dll> <Base proof> <resource workflow output> <new output> <read|full|full-unity|reference|full-unity-cached|reference-cached>");
+        bool reference = args[5].StartsWith("reference", StringComparison.Ordinal);
+        bool lifecycle = args[5].StartsWith("full-unity", StringComparison.Ordinal);
+        bool cached = args[5].EndsWith("-cached", StringComparison.Ordinal);
         string lab = Path.GetFullPath(args[0]), tool = Path.GetFullPath(args[1]), proof = Path.GetFullPath(args[2]),
             source = Path.GetFullPath(args[3]), output = Path.GetFullPath(args[4]);
         if (Directory.Exists(output)) throw new IOException("Replay output must be new.");
@@ -25,6 +26,10 @@ internal static class UnitySerializationWorkflow
             if (lifecycle && arguments.Contains("-snapshotResult"))
             {
                 start.ArgumentList.Add("-unityBehaviourProbe"); start.ArgumentList.Add("current");
+            }
+            if (cached && arguments.Contains("-snapshotResult"))
+            {
+                start.ArgumentList.Add("-unityReferenceCacheProbe"); start.ArgumentList.Add("true");
             }
             using var process = Process.Start(start)!;
             var stdout = process.StandardOutput.ReadToEndAsync(); var stderr = process.StandardError.ReadToEndAsync();
@@ -76,18 +81,29 @@ internal static class UnitySerializationWorkflow
             "on-disable-current-value", "layout-dependent-reader-selection", "layout-dependent-reader-execution", "unaffected-method-stays-aot",
             "added-reference-survives-gc", "disable-not-repeated-on-destroy", "on-destroy-current-value", "real-multiple-frames"
         };
-        string[] unityChecks = lifecycle ? report.GetProperty("unityChecks").EnumerateArray().Select(row => row.GetString()!).ToArray() : Array.Empty<string>();
+        string[] OptionalChecks(string property) => report.TryGetProperty(property, out var value) && value.ValueKind == JsonValueKind.Array
+            ? value.EnumerateArray().Select(row => row.GetString()!).ToArray() : Array.Empty<string>();
+        string[] unityChecks = lifecycle ? OptionalChecks("unityChecks") : Array.Empty<string>();
         bool lifecyclePassed = !lifecycle || unityChecks.SequenceEqual(unityExpected) &&
             lines.Where(line => line.StartsWith("DHE Unity check: ")).Select(line => line.Substring("DHE Unity check: ".Length)).SequenceEqual(unityExpected) &&
             lines.Count(line => line == "DHE Unity component pass: 2:17") == 1 &&
             report.GetProperty("stage").GetString() == "unity-component-complete";
+        string[] cacheExpected = {
+            "cached-type-identity-stable", "cached-type-hash-stable", "cached-type-dictionary-lookup", "old-object-public-type-stable",
+            "cached-type-allocation-has-current-storage", "cached-field-reads-current-object", "cached-field-writes-current-object",
+            "cached-field-retains-old-object-storage", "current-field-validates-physical-receiver", "rejected-access-preserves-both-objects"
+        };
+        string[] cacheChecks = cached ? OptionalChecks("referenceCacheChecks") : Array.Empty<string>();
+        bool cachePassed = !cached || cacheChecks.SequenceEqual(cacheExpected) &&
+            lines.Where(line => line.StartsWith("DHE reference cache check: ")).Select(line => line.Substring("DHE reference cache check: ".Length)).SequenceEqual(cacheExpected) &&
+            lines.Count(line => line == "DHE reference cache pass: 10") == 1;
         bool immutable = Hash(player) == playerHash && Hash(game) == gameHash && stageHashes.All(row => Hash(row.Key) == row.Value);
-        bool passed = immutable && lifecyclePassed && report.GetProperty("passed").GetBoolean() && checks.SequenceEqual(sequence) &&
+        bool passed = immutable && cachePassed && lifecyclePassed && report.GetProperty("passed").GetBoolean() && checks.SequenceEqual(sequence) &&
             lines.Count(line => line == prefix + " pass: " + sequence.Length) == 1 &&
             lines.Where(line => line.StartsWith("DHE case begin: ")).Select(line => line.Substring(16)).SequenceEqual(
                 Read(Path.Combine(source, "reference.json")).GetProperty("records").EnumerateArray().Select(row => row.GetString()));
         File.WriteAllText(Path.Combine(output, "result.json"), JsonSerializer.Serialize(new { passed, immutable, checks, expected = sequence,
-            lifecycle, lifecyclePassed, unityChecks,
+            lifecycle, lifecyclePassed, unityChecks, cached, cachePassed, cacheChecks,
             error = report.GetProperty("error").GetString(), proof, source, labHead, playerSha256 = playerHash, gameAssemblySha256 = gameHash,
             hostSha256 = Hash(typeof(UnitySerializationWorkflow).Assembly.Location), toolSha256 = Hash(tool),
             resourceManifestSha256 = Hash(Path.Combine(source, "resource/dhe-resource-update.json")),
