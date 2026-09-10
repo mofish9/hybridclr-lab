@@ -54,6 +54,10 @@ namespace HybridCLR
             byte[][] dlls, byte[][] before, byte[][] after, uint[][] types, uint[][] methods,
             int[] sourceKinds, uint[][] excluded, uint[][] conditional)
         { Calls++; LastTypes = types; LastMethods = methods; LastConditional = conditional; LastSourceKinds = sourceKinds; return LoadImageErrorCode.OK; }
+        public static LoadImageErrorCode LoadDifferentialHybridAssemblyBatch(
+            byte[][] dlls, byte[][] before, byte[][] after, uint[][] types, uint[][] methods,
+            int[] sourceKinds, uint[][] excluded, uint[][] conditional, byte[][] interpreterDlls)
+        { Calls++; LastTypes = types; LastMethods = methods; LastConditional = conditional; LastSourceKinds = sourceKinds; return LoadImageErrorCode.OK; }
         public static LoadImageErrorCode LoadDifferentialHybridAssembliesWithMetaVersionAndExecutionPlanAndSources(
             byte[][] dlls, byte[][] before, byte[][] after, uint[][] types, uint[][] methods,
             int[] sourceKinds, uint[][] excluded)

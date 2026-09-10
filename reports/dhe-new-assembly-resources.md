@@ -23,3 +23,32 @@ authentication. Research sources must be committed before source-bound runs.
 No performance, mobile, Tuanjie or production qualification follows from these
 Windows correctness cases. Native sources are unchanged until a real failure
 requires a correction; the prior real-header gate remains tied to runtime-04.
+
+## Reproduction and implementation boundary
+
+Lab `0d20eba` compiles the four-DLL Current in `current-01` using the real Unity
+compiler. All 31 CLR reference cases pass. Proof-22 (fixture lab `895543d`) starts
+successfully with the original three differential DLLs. Its `resource-01` run
+(PID 19200) is rejected at `load-differential`: AddedBase from
+HybridCLR.ValueLayoutAdded cannot be resolved. No business entry executes.
+The tool has correctly selected three differential and one interpreter-only
+assembly, so this is a metadata initialization ordering failure, not an assembly
+count assertion or compiler error. Preserve this exact Current for the fix.
+
+Extend the native metadata transaction with interpreter-only peers. Parse all
+inputs first; allocate hidden images, prepare all definitions, then resolve all
+signatures/layouts under a thread-local preparation scope. Publish new assemblies
+only after successful DHE registration, with the metadata lock held through
+registration so name lookups cannot observe the intermediate state. Run new
+module initializers after the complete metadata graph is available. Retain
+failed metadata allocations and bind retries to the same peer names/hashes;
+never silently reuse a partial graph with different DLLs. New assembly names
+must be absent from the Base/runtime assembly inventory, including ordinary AOT.
+
+New interpreter image declarations must use Current representations of evolved
+value types. Member lookup compares logical type identities across Base/Current
+representations without weakening physical ABI/layout checks. A package helper
+will accept the complete Current set, authenticate it, and pass differential,
+frozen and new interpreter images through the native batch. Existing APIs remain
+available; MV schema stays 1. Add a capability so older Bases reject resources
+that need this new mixed transaction rather than reaching an unresolved parent.

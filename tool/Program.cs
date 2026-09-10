@@ -1221,6 +1221,8 @@ internal static partial class Program
                 "resource-update-plan-integrity-v1",
                 "resource-update-aot-metadata-set-selection-v1",
             };
+            if (names.Except(identityAssemblyNames, StringComparer.OrdinalIgnoreCase).Any())
+                requiredRuntimeCapabilities.Add("mixed-interpreter-source-batch-v1");
             if (execution.Impact.StaticValueFields.Any(field => !field.OrdinaryAot))
             {
                 requiredRuntimeCapabilities.Add("current-static-value-storage-v1");

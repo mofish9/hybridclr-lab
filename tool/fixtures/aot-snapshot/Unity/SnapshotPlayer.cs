@@ -62,14 +62,10 @@ namespace HybridCLR.Lab.Snapshot
                 result.plannedAssemblies = DheRuntime.PlannedAssemblyNames;
                 result.differentialAssemblies = DheRuntime.DifferentialAssemblyNames;
                 result.interpreterOnlyAssemblies = DheRuntime.InterpreterOnlyAssemblyNames;
-                result.stage = "load-differential";
-                if (!DheRuntime.LoadAssemblyImages(result.differentialAssemblies,
-                    result.differentialAssemblies.Select(name => provider.LoadBytes(records[name].current)).ToArray(), out var code, out error))
+                result.stage = "load-current-batch";
+                if (!DheRuntime.LoadCurrentAssemblyImages(result.plannedAssemblies,
+                    result.plannedAssemblies.Select(name => provider.LoadBytes(records[name].current)).ToArray(), out var code, out error))
                     throw new InvalidDataException(code + ":" + error);
-                result.stage = "load-interpreter-only";
-                foreach (string name in result.interpreterOnlyAssemblies)
-                    if (!DheRuntime.LoadInterpreterAssemblyImage(name, provider.LoadBytes(records[name].current), out _, out code, out error))
-                        throw new InvalidDataException(code + ":" + error);
                 // LoadedAssemblyNames also includes authenticated frozen AOT
                 // sources. Count only the Current payload for this assertion.
                 result.loadedAssemblyNames = DheRuntime.LoadedAssemblyNames;
