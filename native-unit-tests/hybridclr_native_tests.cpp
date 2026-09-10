@@ -1294,12 +1294,21 @@ namespace
         // and every argument/return ABI. Public logical type equality is not
         // sufficient to apply Current code to a pre-selection allocation.
         Il2CppObject oldReceiver{}, currentReceiver{}, derivedReceiver{}, unrelatedReceiver{};
-        Il2CppClass derivedClass{}, unrelatedClass{};
+        // Il2CppClass ends in a zero-length vtable; MSVC requires allocated storage.
+        auto* derivedClass = static_cast<Il2CppClass*>(std::calloc(1, sizeof(Il2CppClass)));
+        auto* unrelatedClass = static_cast<Il2CppClass*>(std::calloc(1, sizeof(Il2CppClass)));
+        CHECK(derivedClass != nullptr && unrelatedClass != nullptr);
+        if (!derivedClass || !unrelatedClass)
+        {
+            std::free(derivedClass); std::free(unrelatedClass);
+            std::free(executionClass); std::free(klass);
+            return;
+        }
         oldReceiver.klass = klass;
         currentReceiver.klass = executionClass;
-        derivedClass.parent = executionClass;
-        derivedReceiver.klass = &derivedClass;
-        unrelatedReceiver.klass = &unrelatedClass;
+        derivedClass->parent = executionClass;
+        derivedReceiver.klass = derivedClass;
+        unrelatedReceiver.klass = unrelatedClass;
         Il2CppType nativeArgument{}, nativeReturn{}, otherArgument{}, otherReturn{};
         const Il2CppType* baseArguments[] = { &nativeArgument };
         const Il2CppType* currentArguments[] = { &otherArgument };
@@ -1324,7 +1333,7 @@ namespace
             hybridclr::dhe::ResetForTests();
             physicalCurrent.isInterpterImpl = false;
         };
-        for (uint8_t kind : { IL2CPP_TYPE_VOID, IL2CPP_TYPE_BOOLEAN, IL2CPP_TYPE_CHAR,
+        for (auto kind : { IL2CPP_TYPE_VOID, IL2CPP_TYPE_BOOLEAN, IL2CPP_TYPE_CHAR,
             IL2CPP_TYPE_I1, IL2CPP_TYPE_U1, IL2CPP_TYPE_I2, IL2CPP_TYPE_U2,
             IL2CPP_TYPE_I4, IL2CPP_TYPE_U4, IL2CPP_TYPE_I8, IL2CPP_TYPE_U8,
             IL2CPP_TYPE_R4, IL2CPP_TYPE_R8, IL2CPP_TYPE_I, IL2CPP_TYPE_U,
@@ -1335,7 +1344,7 @@ namespace
             changed.parameters_count = physicalCurrent.parameters_count = kind == IL2CPP_TYPE_VOID ? 0 : 1;
             CheckNativeFrame(true);
         }
-        for (uint8_t kind : { IL2CPP_TYPE_VALUETYPE, IL2CPP_TYPE_CLASS, IL2CPP_TYPE_GENERICINST,
+        for (auto kind : { IL2CPP_TYPE_VALUETYPE, IL2CPP_TYPE_CLASS, IL2CPP_TYPE_GENERICINST,
             IL2CPP_TYPE_VAR, IL2CPP_TYPE_MVAR, IL2CPP_TYPE_PTR, IL2CPP_TYPE_FNPTR, IL2CPP_TYPE_TYPEDBYREF })
         {
             nativeArgument.type = otherArgument.type = kind;
@@ -1356,6 +1365,7 @@ namespace
         changed.parameters_count = physicalCurrent.parameters_count = 0;
         changed.parameters = physicalCurrent.parameters = nullptr;
         changed.return_type = physicalCurrent.return_type = &scalarType;
+        std::free(derivedClass); std::free(unrelatedClass);
 #endif
 
         // Failure while preparing a later Current entry restores earlier
