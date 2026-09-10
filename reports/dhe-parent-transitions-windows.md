@@ -91,6 +91,11 @@ adds fifteen checks for old-field writes, unrelated/null targets, invalid values
 custom Binder execution and logical ancestry, static/literal/open generic fields
 and data preservation. None are claimed as a Player pass yet.
 
+Base-98 proceeds through Installer and compilation but fails copying
+GameAssembly.pdb during BuildScriptsOnly: the build log explicitly reports disk
+space exhaustion. Its partial output and log are preserved, with no completed
+Base identity or successful Player proof. This does not qualify runtime02.
+
 ## Workspace, space and next gates
 
 All changes are isolated candidate commits. No CAT, formal branch/tag/push or
@@ -99,6 +104,11 @@ are retained. Projects90/95/96 were losslessly NTFS-compressed, saving about
 1.25 GiB each. Attempted removal of Base-97's failed generated project was
 automatically policy-blocked; nothing was deleted. Additional archived Player
 compression checks full file-tree hashes before/after each directory.
+Forty-five archived Player directories subsequently passed those full-tree
+checks. The final twenty-five receipts are retained in
+`artifacts/dhe-parent-transitions/archive-compression-01.json`; the earlier twenty
+are in command receipts. C: has approximately 7.9 GiB available after this work.
+No files were deleted and no executable-compression/reparse mechanism was used.
 
 Next: build a new immutable Player with runtime02, replay the exact two Current
 sets cold and cached, then finish compatible multi-Base resources, independent
