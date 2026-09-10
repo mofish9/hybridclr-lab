@@ -53,7 +53,7 @@ internal static class FrozenResourceAudit
             manifest.GetProperty("supportedBases").EnumerateArray().All(row => row.GetProperty("currentAssemblySetSha256").GetString() == currentSet));
         string[] originalNames = Directory.GetFiles(current, "*.dll").Select(Path.GetFileNameWithoutExtension).OrderBy(name => name, StringComparer.Ordinal).ToArray()!;
         int? moduleConstant = null, literalNumber = null;
-        bool selectedInitializer = false, secondInitializer = false;
+        bool selectedInitializer = false, secondInitializer = false, inlineHotfix = false;
         using (var model = ModuleDefMD.Load(Path.Combine(current, "HybridCLR.ValueLayoutModel.dll")))
         {
             moduleConstant = model.Find("HybridCLR.Lab.ModuleEvolution.ModuleState", false)?
@@ -63,6 +63,7 @@ internal static class FrozenResourceAudit
                 .Methods.Any(method => method.Name == "InitializeSecond") == true;
             literalNumber = model.Find("HybridCLR.Lab.ModuleEvolution.LiteralFieldCases", false)?
                 .Fields.Single(field => field.Name == "Number").Constant?.Value as int?;
+            inlineHotfix = model.Find("HybridCLR.Lab.ModuleEvolution.InlineHotfixCases", false) != null;
         }
         var payloads = manifest.GetProperty("payloadVariants")[0].GetProperty("assemblies").EnumerateArray().ToArray();
         Require("complete-original-current", payloads.Select(row => row.GetProperty("assemblyName").GetString()).OrderBy(name => name, StringComparer.Ordinal).SequenceEqual(originalNames));
@@ -131,6 +132,17 @@ internal static class FrozenResourceAudit
                 }
                 if (literalNumber.HasValue)
                     Require(key + "-literal-reflection-suite", log.Count(line => line == "DHE literal reflection pass: " + literalNumber.Value + ":74") == 1);
+                if (inlineHotfix)
+                {
+                    string[] inlineRecords = log.Where(line => line.StartsWith("DHE inline hotfix pass: ", StringComparison.Ordinal)).ToArray();
+                    Require(key + "-inline-hotfix-measured-once", inlineRecords.Length == 1);
+                    string[] counts = inlineRecords[0].Substring("DHE inline hotfix pass: ".Length).Split(':');
+                    // The resource fixture updates only the callee (17 -> 18).
+                    // Keep its unchanged AOT caller and one interpreted entry
+                    // as independent evidence beyond the general case sequence.
+                    Require(key + "-inline-hotfix-current-with-aot-caller", counts.Length == 3 && counts[0] == "18" &&
+                        int.TryParse(counts[1], out int aotEntries) && aotEntries >= 2 && counts[2] == "1");
+                }
                 if (report.TryGetProperty("ordinaryModuleRunsAfterLoad", out var ordinaryAfter) && ordinaryBefore.ValueKind != JsonValueKind.Undefined && ordinaryBefore.GetInt32() >= 0)
                     Require(key + "-ordinary-module-not-reinitialized", ordinaryAfter.GetInt32() == 1);
                 if (modules.Length != 0)
@@ -153,6 +165,8 @@ internal static class FrozenResourceAudit
                 if (moduleConstant.HasValue)
                     Require(key + "-no-hotfix-module-side-effects", !log.Any(line => line.StartsWith("DHE selected module: ", StringComparison.Ordinal) ||
                         line.StartsWith("DHE second AOT module initializer: ", StringComparison.Ordinal)));
+                if (inlineHotfix)
+                    Require(key + "-no-inline-business-entry", !log.Any(line => line.StartsWith("DHE inline hotfix pass: ", StringComparison.Ordinal)));
                 rejectedRuns++;
             }
             files[Path.GetFullPath(reportPath)] = Hash(reportPath);
@@ -160,6 +174,7 @@ internal static class FrozenResourceAudit
         }
         Require("successful-run-per-base", successfulRuns >= bases.Count);
         File.WriteAllText(args[2], JsonSerializer.Serialize(new { passed = true, workflowResultSha256 = Hash(resultPath),
+            auditHostSha256 = Hash(typeof(FrozenResourceAudit).Assembly.Location),
             caseCount = expected.Length, baseCount = bases.Count, successfulRuns, rejectedRuns, expectedModuleInitializers = modules,
             checks, rehashedFileCount = files.Count, files,
             scope = "Independent read-only original Base/Current identity and full successful/restored case-sequence audit; no performance or platform extrapolation"
