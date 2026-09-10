@@ -1,6 +1,28 @@
 # DHE evolution implementation and validation
 
-## Active checkpoint: existing AOT module and literal constant evolution
+## Active checkpoint: public load outcome and process recovery
+
+See `../reports/dhe-public-load-recovery-windows.md`. HybridCLR `988a7aa`, IL2CPP
+Unity 2022 `4d5052e`, package `2d7355f` add a tracked native load phase and a public
+restart-required state. All 106 host checks and real-header native compile/CTest
+pass. Base-39/40 prove post-commit module exceptions retain Current visibility,
+reject reset/configuration/retry without rerunning the initializer, and preserve
+the original error. Real worker reentry completes without deadlock. Two independent
+failure audits rehash 108 files each and verify every public failure assertion.
+
+The same immutable Players recover in fresh processes to the normal 46-case
+resource. The inline regression also retains its AOT caller, interpreted changed
+callee and all 74 literal checks. One shared Current subsequently passes all 46
+cases on four Bases spanning v31/v32, with 29 workflow checks and a 91-check audit
+of 235 files, eight successful/restored runs and six pre-entry rejections.
+
+Public native preparation exception/prepared-MV retry currently has host evidence;
+the preceding actual native retry Player retains its old identity. Complete those
+public Player paths, ordinary ThreadStatic/RVA and native ABI boundaries, broader
+Unity behavior, and performance/memory before qualifying the whole goal. Tuanjie
+follows Unity 2022 Windows. No new Unity 2021 work or Android/iOS claim.
+
+## Preceding checkpoint: existing AOT module and literal constant evolution
 
 See `../reports/dhe-aot-module-evolution-windows.md`. HybridCLR `8417ea0`, IL2CPP
 Unity 2022 `4d5052e`, package `6d59a27` pass real-header compile/CTest and startup,

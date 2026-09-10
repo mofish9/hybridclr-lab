@@ -17,6 +17,18 @@ Their immutable inputs are recorded in `manifests/repo-lock.json`.
 
 ## Current phase
 
+The latest candidate adds **public load outcome and process recovery**. HybridCLR
+`988a7aa` and package `2d7355f` pass 106 managed checks, real-header native
+compile/CTest, real post-commit initializer exceptions and worker reentry on two
+new immutable Unity 2022 Windows Players. Fresh processes recover with the preserved
+normal resource and all 46 cases. One unchanged business Current also passes on
+four Bases spanning the previous and current native runtime contracts. See
+`reports/dhe-public-load-recovery-windows.md` for identities, independent audits
+and remaining public pre-commit/Unity/performance gates. This is still a candidate,
+not a new formal release. Tuanjie follows Unity 2022; no new Unity 2021 work.
+
+The preceding module/literal/inline checkpoint is retained below at its exact identity.
+
 The active Unity 2022 Windows candidate passes preserved changed/removed/chained
 AOT hotfix module resources and 74 literal-reflection assertions on immutable
 Base-36/37. Each resource shares identical Current DLLs across both Bases and
@@ -25,8 +37,8 @@ AOT caller invoking its changed interpreted callee. See
 `reports/dhe-aot-module-evolution-windows.md` for exact v31 source/build identities,
 independent audits and earlier preserved failures. Actual addition to Base-38
 without a module initializer also passes: one resource serves all three Bases,
-with 20/20 workflow checks and full 46-case sequences. Public post-commit
-initialization-failure state and recovery remain the next implementation gate.
+with 20/20 workflow checks and full 46-case sequences. Its public post-commit
+failure gap is addressed by the newer candidate above.
 This is conditional Windows correctness, not a full DHE release. Tuanjie follows
 Unity 2022; no new Unity 2021 work is in scope.
 

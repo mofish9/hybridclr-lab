@@ -1,5 +1,10 @@
 # Public DHE load outcome and process recovery
 
+Current result: source-bound Windows Players pass post-commit failure state,
+rejected reset/reinitialize/retry, real worker reentry, and fresh-process recovery.
+One unchanged business Current also passes across two v31 and two v32 Bases.
+This is a conditional Windows correctness milestone, not full DHE qualification.
+
 Continue after the v31 three-Base module/literal/inline checkpoint. Target Unity
 2022 Windows first, then Tuanjie; no new Unity 2021 work. Starting identities:
 HybridCLR `8417ea0`, IL2CPP `4d5052e`, package `6d59a27`, lab `b1e3da8`.
@@ -94,8 +99,102 @@ Lab `01921b5` locks the runtime/package and builds tool-01, SHA
 `mergeReady=true`, `surrogateExternalHeadersUsed=false`. The compilation includes
 RuntimeApi.cpp; the new phase transitions require the separate Player gate.
 
-Base-39/40 are building from the exact earlier old-layout and grown-layout/inline
+Base-39/40 build from the exact earlier old-layout and grown-layout/inline
 inputs using this identity. `dhe-public-failure-current-02` adds a separately recorded
 worker-reentry variant; keep Current-01 unchanged for exact old/new replay comparison.
 All original artifacts and the baseline source worktree are retained. No C: cleanup
 was attempted this turn; new large builds are on D:.
+
+## Real Player outcome and recovery evidence
+
+Both immutable Players pass startup and generated no-op resources on lab
+`01921b56352685e82683904dbfd39bea365e8d3b`, host-03, tool-01 and runtime-01 above.
+
+| Base under `D:/hybridclr_artifacts` | Startup / no-op PIDs | Base ID | GameAssembly SHA-256 |
+| --- | --- | --- | --- |
+| `dhe-public-recovery-base-39` | 23220 / 10828 | `87db6b360a9a39b43b3c140cf275295a7759a7bd0e096dd15f1303bace71204b` | `AE55E175A94B1ACE2ED88679ED1FB7DCE57033FDD8AA3FAF0795AB8CBBE08641` |
+| `dhe-public-recovery-base-40` | 12644 / 14884 | `af3c0a8fd555d7a8b25dd09e28b4bc0a9b3f56a7c00fca134d7bdde1ca7fd208` | `B5B785D2EBFF4D86A8BE195D8A476BF8F3B81E9225DF3FD9FC41C7DAC971192F` |
+
+Snapshots: Base-39 `a40014ec57d2c27adc854dbf4a87fcff5235af3008b1bced4fe9b6e051d4c67a`,
+Base-40 `317b2f5190104d6217f337e87a4317df8258450cfcccf6f7430836adb598bb5a`.
+The source/input difference remains deliberate: Base-39 exercises new interpreter
+assemblies and frozen ordinary dependencies; Base-40 exercises existing-only DHE.
+
+Resource runs use clean lab `a841ddd34ff6570e57392d7bfa51613bbd424664`, tool-01 and
+auditor/runner host-04 built at `78d00fc`, SHA
+`E0ABCB5A09F7B9B6ACB85AADD6D71E868006D1F02D2C6BF948234DBC732158E8`.
+
+| Workflow output | Base-39 / 40 PIDs | Player checks | Workflow checks | Independent audit |
+| --- | --- | --- | --- | --- |
+| `dhe-public-failure-exact-01` | 18788 / 14944 | 14 / 15 | 8/8 | 119 checks, 108 rehashed files |
+| `dhe-public-failure-reentry-01` | 18492 / 21008 | 14 / 15 | 8/8 | 121 checks, 108 rehashed files |
+
+The exact variant retains Current-01's DLL set from the old-Player reproduction.
+Its new resource manifest SHA is
+`06149B06E288236B77A038B8BAF53885121D59EB4865CA15BBBDE817F6D98EFF`.
+Reentry variant Current set:
+`6f173ebe469fc6eedff01f2b9192914ecc1e359a7c0e8fb551e546f747b70669`; resource manifest:
+`E2DE0AD22B03F612744BFC966AD337B81BEE98F818A2260BAAD2BB25958657D4`.
+The sibling `dhe-public-failure-<variant>-audit-01.json` independently checks
+original Base/snapshot/Current identities and complete failure assertion traces.
+
+Every failure Player confirms all planned assemblies are visible natively and in
+managed bookkeeping, and the changed Factory method is registered. The native out
+phase therefore survives actual exception unwinding. First load returns
+DHE_INITIALIZATION_FAILED with the deliberate inner exception retained;
+MetadataCommitted and RestartRequired are true. Reset and reinitialization are
+rejected. Current, legacy batch, single-image and interpreter-image retry entry
+points all reject with DHE_RESTART_REQUIRED and the same error. The initializer
+count remains one, the selected plan remains intact, and no business case starts.
+Base-40 also checks its ordinary initializer remains at one. The reentry resource
+starts a real thread inside module initialization; loading, reset and configuration
+return promptly with rejection and emit `DHE public reentry pass` exactly once.
+
+After the failed processes exit, `dhe-public-recovery-valid-01` loads the preserved
+normal changed Current in fresh processes on the same two Players (initial PIDs
+17692 / 24188). It passes 16/16 workflow checks. Its 49-check independent audit
+rehashes 126 files and verifies four complete 46-case successful/restored executions
+and three pre-entry corruption/missing/snapshot rejections, with zero differential.
+Manifest SHA: `3F24F34E73C4E5949EAFACCF770AE3D375E79CADD3CCCC5D8D30983B1CFF8CAE`.
+No Player binary or failed payload was modified to recover.
+
+`dhe-public-recovery-inline-01` additionally passes on Base-40 (PID 12572): all 46
+cases, 74 literal assertions and `DHE inline hotfix pass: 18:2:1`. Its 20-check
+audit rehashes 67 files. The unchanged caller stays AOT and only its changed callee
+interprets. These are current-identity regression results, not reused v31 numbers.
+
+## One business Current across old and new runtime Bases
+
+`dhe-public-recovery-mixed-runtime-01` serves exactly the same changed Current DLL
+set, SHA `ed1d0b59e136874634c7f3ead29e93319cfb1d8df90894b563c7965808f89ce6`, to
+Base-36/37 (v31) and Base-39/40 (v32). Initial PIDs are 22820 / 3188 / 23280 / 14268.
+All 29 workflow checks pass. Independent audit
+`dhe-public-recovery-mixed-runtime-audit-01.json` passes 91 checks, rehashes 235
+files, and verifies eight complete 46-case successful/restored executions and six
+pre-entry rejections. Resource manifest SHA:
+`D826A79D59D042C0D9D9A7BE4FFB510D40E0E91BEF669C5F5CAD6B36A079E6A7`.
+The old Players retain their v31 behavior; this does not retrofit the new failure
+state API into them. The common business resource does not depend on that new API.
+
+## Remaining gates and API use
+
+Applications call LoadCurrentAssemblyImages before business entry. On failure,
+inspect its code/error and RestartRequired. Preserve diagnostics, prevent entry,
+and let the application's existing resource/version system choose a known accepted
+resource on the next process start. Reset is only for plans which have not touched
+native metadata. The package does not automatically download or select a fallback.
+The existing IDheRuntimeAssetProvider boundary continues to own resource access.
+
+Real post-commit exceptions, worker reentry and fresh-process recovery now pass on
+both native loading paths. Native preparation exceptions and corrected prepared-MV
+retry through the new public phase API are verified in the managed host; actual
+native retry evidence remains the preceding low-level mixed-transaction Player at
+its original runtime identity. Add a Player probe for those public pre-commit paths
+before claiming the entire recovery matrix complete. Ordinary ThreadStatic/RVA,
+native-only ABI boundaries, broader Unity behavior, production-equivalent performance
+and memory, and Tuanjie remain open. Android/iOS have not been run locally.
+
+All changes are committed on candidate worktrees. No formal branch/tag, remote,
+Installer-default or CAT change was made. Keep the detached preceding package
+worktree and all failure/build evidence. C: has about 11 GiB free; new artifacts
+remain on D:. This milestone does not complete the overall DHE goal.

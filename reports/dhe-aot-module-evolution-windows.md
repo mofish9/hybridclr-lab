@@ -5,8 +5,9 @@ resource variants on immutable Unity 2022 Windows Base-36/37. The unchanged AOT
 caller/changed inline callee probe also passes on Base-37. See the v31 evidence
 section at the end; earlier failures below retain their original identities.
 Actual addition to Base-38 without a module initializer also passes: both preserved
-Current variants now serve Base-36/37/38 in one resource. Public post-commit
-initialization-failure state and recovery remain the next implementation gate.
+Current variants now serve Base-36/37/38 in one resource. The subsequent public
+post-commit recovery checkpoint is in `dhe-public-load-recovery-windows.md`; its
+newer runtime does not change the historical v31 identities in this report.
 
 The preceding goal turn made verified progress in mixed retry and newly added
 interpreter module initialization (`dhe-mixed-transaction-windows.md`). Continue
