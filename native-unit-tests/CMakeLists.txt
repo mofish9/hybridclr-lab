@@ -123,6 +123,8 @@ add_library(hybridclr_engine_reflection_compile_gate OBJECT
     "${HYBRIDCLR_RUNTIME_ROOT}/vm/Runtime.cpp"
     "${HYBRIDCLR_RUNTIME_ROOT}/icalls/mscorlib/System.Reflection/FieldInfo.cpp"
     "${HYBRIDCLR_RUNTIME_ROOT}/icalls/mscorlib/System.Reflection/RuntimeFieldInfo.cpp"
+    "${HYBRIDCLR_RUNTIME_ROOT}/icalls/mscorlib/System.Reflection/RuntimePropertyInfo.cpp"
+    "${HYBRIDCLR_RUNTIME_ROOT}/icalls/mscorlib/System.Reflection/EventInfo.cpp"
     "${HYBRIDCLR_RUNTIME_ROOT}/icalls/mscorlib/System.Reflection/RuntimeMethodInfo.cpp"
     "${HYBRIDCLR_RUNTIME_ROOT}/icalls/mscorlib/System.Reflection/MonoMethodInfo.cpp"
     "${HYBRIDCLR_RUNTIME_ROOT}/icalls/mscorlib/System/RuntimeType.cpp"

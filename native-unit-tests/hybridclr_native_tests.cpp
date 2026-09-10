@@ -1481,6 +1481,27 @@ namespace
             nativeArgument.type = otherArgument.type = IL2CPP_TYPE_I4;
             CheckNativeFrame(false);
         }
+        for (auto kind : { IL2CPP_TYPE_CLASS, IL2CPP_TYPE_VALUETYPE, IL2CPP_TYPE_GENERICINST,
+                IL2CPP_TYPE_SZARRAY, IL2CPP_TYPE_ARRAY })
+        {
+            nativeArgument.type = otherArgument.type = kind;
+            nativeReturn.type = otherReturn.type = kind;
+            hybridclr::native_test::ConfigurePhysicalType(&nativeArgument, klass);
+            hybridclr::native_test::ConfigurePhysicalType(&otherArgument, klass);
+            hybridclr::native_test::ConfigurePhysicalType(&nativeReturn, klass);
+            hybridclr::native_test::ConfigurePhysicalType(&otherReturn, klass);
+            CheckNativeFrame(true);
+            nativeArgument.byref = otherArgument.byref = 1;
+            CheckNativeFrame(true);
+            nativeArgument.byref = otherArgument.byref = 0;
+            hybridclr::native_test::ConfigurePhysicalType(&otherArgument, executionClass);
+            CheckNativeFrame(false);
+            hybridclr::native_test::ConfigurePhysicalType(&otherArgument, klass);
+            hybridclr::native_test::ConfigurePhysicalType(&otherReturn, executionClass);
+            CheckNativeFrame(false);
+            hybridclr::native_test::ClearPhysicalTypes();
+        }
+        nativeArgument.type = otherArgument.type = IL2CPP_TYPE_I4;
         nativeReturn.type = otherReturn.type = IL2CPP_TYPE_I4;
         nativeArgument.byref = 1; CheckNativeFrame(false); nativeArgument.byref = 0;
         otherArgument.byref = 1; CheckNativeFrame(false); otherArgument.byref = 0;
