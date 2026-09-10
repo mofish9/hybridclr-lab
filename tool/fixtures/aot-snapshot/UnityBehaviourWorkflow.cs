@@ -16,8 +16,10 @@ internal static class UnityBehaviourWorkflow
 
     internal static int ReferenceCurrent(string[] args)
     {
-        if (args.Length < 5 || args.Length > 6 || args.Length == 6 && args[5] != "generic" && args[5] != "dispatch" && args[5] != "callbacks" && args[5] != "callbacks-control" && args[5] != "hotfix-generic-dispatch")
-            throw new ArgumentException("unity-reference-current <lab> <Base proof> <Current DLL root> <editor> <new output> [generic|dispatch|callbacks|callbacks-control|hotfix-generic-dispatch]");
+        if (args.Length < 5 || args.Length > 6 || args.Length == 6 && args[5] != "generic" && args[5] != "dispatch" && args[5] != "callbacks" && args[5] != "callbacks-control" && args[5] != "hotfix-generic-dispatch" && args[5] != "hierarchy-query")
+            throw new ArgumentException("unity-reference-current <lab> <Base proof> <Current DLL root> <editor> <new output> [generic|dispatch|callbacks|callbacks-control|hotfix-generic-dispatch|hierarchy-query]");
+        if (args.Length == 6 && args[5] == "hierarchy-query")
+            return CompileNativeProbe(args, "UnityHierarchyQueryCases", "HybridCLR.Lab.HierarchyQueries.QueryCases", false);
         if (args.Length == 6 && args[5] == "hotfix-generic-dispatch")
             return CompileNativeProbe(args, "HotfixGenericDispatchCases", "HybridCLR.Lab.GenericDispatch.ConditionalCases", false);
         if (args.Length == 6 && (args[5] == "callbacks" || args[5] == "callbacks-control"))

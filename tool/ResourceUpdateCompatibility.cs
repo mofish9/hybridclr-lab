@@ -3,6 +3,7 @@ namespace HybridCLR.DheTool;
 internal sealed class ResourceUpdateCompatibility
 {
     internal const string PhysicalInterfaceAdditionCapability = "physical-current-interface-additions-v1";
+    internal const string PhysicalInterfaceEvolutionCapability = "physical-current-interface-evolution-v1";
 	public const string Policy = "dhe-proven-safe-subset-v1";
 	public const string RuntimeProtocol = "dhe-runtime-protocol-v1";
     public const string CurrentNativeRuntimeContract = "dhe-runtime-v32";
@@ -17,6 +18,7 @@ internal sealed class ResourceUpdateCompatibility
 		"atomic-multi-assembly-registration-v1",
         "current-storage-execution-plan-array-v1",
         PhysicalInterfaceAdditionCapability,
+        PhysicalInterfaceEvolutionCapability,
         ResourceExecutionPlan.GenericContextCapability,
         "current-parameter-default-metadata-v1",
         "shared-type-initialization-v1",
@@ -245,15 +247,19 @@ internal sealed class ResourceUpdateCompatibility
             currentTypes.TryGetValue(type.StableId, out MetaVersionType? currentType) &&
             !string.Equals(type.Version, currentType.Version, StringComparison.OrdinalIgnoreCase)).ToArray();
         bool requiresPhysicalInterfaceAddition = false;
+        bool requiresPhysicalInterfaceEvolution = false;
         foreach (MetaVersionType type in changedTypes)
         {
             MetaVersionType currentType = currentTypes[type.StableId];
             bool physicalInterfaceAddition = physicalTypes.Contains(type.StableId) &&
                 HasOnlySupportedPhysicalInterfaceAddition(type, currentType);
+            bool physicalInterfaceEvolution = !physicalInterfaceAddition && physicalTypes.Contains(type.StableId) &&
+                HasOnlySupportedPhysicalInterfaceEvolution(type, currentType);
             requiresPhysicalInterfaceAddition |= physicalInterfaceAddition;
+            requiresPhysicalInterfaceEvolution |= physicalInterfaceEvolution;
             if (!string.Equals(type.LayoutVersion, currentType.LayoutVersion, StringComparison.OrdinalIgnoreCase) &&
                 ((!string.Equals(type.NonFieldLayoutVersion, currentType.NonFieldLayoutVersion,
-                     StringComparison.OrdinalIgnoreCase) && !physicalInterfaceAddition) ||
+                     StringComparison.OrdinalIgnoreCase) && !physicalInterfaceAddition && !physicalInterfaceEvolution) ||
                  (!physicalTypes.Contains(type.StableId) && !HasOnlySupportedInstanceFieldEvolution(type, baselineFields, currentFields))))
                 unsupported.Add("existing-type-layout-or-vtable-change:" + type.Identity);
 			if (!string.Equals(type.NonCustomUnsupportedDeclarativeVersion,
@@ -307,6 +313,8 @@ internal sealed class ResourceUpdateCompatibility
             requiredCapabilities.Add("existing-interface-method-slots-v1");
         if (requiresPhysicalInterfaceAddition)
             requiredCapabilities.Add(PhysicalInterfaceAdditionCapability);
+        if (requiresPhysicalInterfaceEvolution)
+            requiredCapabilities.Add(PhysicalInterfaceEvolutionCapability);
         if (physicalTypes.Count != 0 || executionTokens.Count != 0)
             requiredCapabilities.Add("current-storage-execution-plan-array-v1");
         if (conditionalTokens.Length != 0 || current.Methods.Any(method => executionTokens.Contains(method.Token) &&
@@ -531,15 +539,22 @@ internal sealed class ResourceUpdateCompatibility
             StringComparison.OrdinalIgnoreCase);
     private static bool HasOnlySupportedPhysicalInterfaceAddition(MetaVersionType baseline, MetaVersionType current)
     {
+        return HasOnlySupportedPhysicalInterfaceEvolution(baseline, current) &&
+            current.InterfaceIdentities.Length > baseline.InterfaceIdentities.Length &&
+            current.InterfaceIdentities.ToHashSet(StringComparer.Ordinal).IsSupersetOf(baseline.InterfaceIdentities);
+    }
+
+    private static bool HasOnlySupportedPhysicalInterfaceEvolution(MetaVersionType baseline, MetaVersionType current)
+    {
         if (!baseline.CanUsePhysicalInterfaceAddition || !current.CanUsePhysicalInterfaceAddition ||
             string.IsNullOrEmpty(baseline.InterfaceAdditionLayoutVersion) ||
             !string.Equals(baseline.InterfaceAdditionLayoutVersion, current.InterfaceAdditionLayoutVersion,
-                StringComparison.Ordinal) || current.InterfaceIdentities.Length <= baseline.InterfaceIdentities.Length)
+                StringComparison.Ordinal))
             return false;
         var before = baseline.InterfaceIdentities.ToHashSet(StringComparer.Ordinal);
         var after = current.InterfaceIdentities.ToHashSet(StringComparer.Ordinal);
         return before.Count == baseline.InterfaceIdentities.Length &&
-            after.Count == current.InterfaceIdentities.Length && after.IsSupersetOf(before);
+            after.Count == current.InterfaceIdentities.Length && !after.SetEquals(before);
     }
 
 	private static bool HasOnlySupportedStaticFieldEvolution(MetaVersionType type,
