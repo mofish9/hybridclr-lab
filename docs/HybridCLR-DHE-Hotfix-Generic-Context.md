@@ -124,8 +124,8 @@ definition; affected concrete arguments retain their runtime context mapping.
 Unrelated definitions remain AOT. Ordinary AOT source bytes remain immutable and
 their established admission/adapter checks are unchanged.
 
-First preserve failing planner tests for the actual state machine, unchanged
-constructor/body fingerprints, reference chains/cycles, arrays and an unaffected
+First preserve failing planner tests for the actual state machine, its unchanged
+constructor and changed MoveNext fingerprints, reference chains/cycles, arrays and an unaffected
 generic definition. Then change the planner and rerun package plan validation,
 the generic regression and actual Player suites. The existing Base-70 already
 supports physical selected owners: keep its executable and Current DLLs fixed

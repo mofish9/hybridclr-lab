@@ -29,7 +29,10 @@ internal static class ReferenceOwnerPlanTests
         foreach (string name in new[] { ".ctor", "MoveNext" })
         {
             var method = after.Methods.Single(row => row.DeclaringType == state.Identity && row.Name == name);
-            checks["real-state-" + name + "-body-unchanged"] = before.Methods.Single(row => row.StableId == method.StableId).Version == method.Version;
+            bool sameBody = before.Methods.Single(row => row.StableId == method.StableId).Version == method.Version;
+            // The captured constructor is unchanged; the captured MoveNext is
+            // changed. Both need the same selected receiver representation.
+            checks["real-state-" + name + "-captured-body-version"] = sameBody == (name == ".ctor");
             checks["real-state-" + name + "-selected"] = plan.CurrentExecutionMethodTokens.Contains(method.Token);
         }
         uint generic = after.Types.Single(type => type.Identity == "HybridCLR.Lab.ValueLayout.GenericOwner`1").Token;
