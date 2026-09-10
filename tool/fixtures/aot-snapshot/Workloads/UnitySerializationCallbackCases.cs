@@ -2,15 +2,27 @@ extern alias model;
 using System;
 using System.Threading;
 using UnityEngine;
+#if SERIALIZATION_CALLBACK_CONTROL
+using Evolving = HybridCLR.Lab.UnityReference.SerializationCallbackTemplate;
+#else
 using Evolving = model::HybridCLR.Lab.UnityCases.EvolvingBehaviour;
+#endif
 using State = model::HybridCLR.Lab.UnityCases.UnityCaseState;
 
 namespace HybridCLR.Lab.UnityReference
 {
     // The fixture compiler moves these exact managed bodies to the existing
     // EvolvingBehaviour and adds this interface to that definition in Current.
+#if SERIALIZATION_CALLBACK_CONTROL
+    public sealed class SerializationCallbackTemplate : MonoBehaviour, ISerializationCallbackReceiver
+#else
     public sealed class SerializationCallbackTemplate : ISerializationCallbackReceiver
+#endif
     {
+#if SERIALIZATION_CALLBACK_CONTROL
+        public int Value;
+        public long Extra;
+#endif
         public void OnBeforeSerialize() { SerializationCallbackCases.Before((Evolving)(object)this); }
         public void OnAfterDeserialize() { SerializationCallbackCases.After((Evolving)(object)this); }
     }

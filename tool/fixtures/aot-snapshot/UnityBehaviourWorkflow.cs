@@ -16,9 +16,9 @@ internal static class UnityBehaviourWorkflow
 
     internal static int ReferenceCurrent(string[] args)
     {
-        if (args.Length < 5 || args.Length > 6 || args.Length == 6 && args[5] != "generic" && args[5] != "dispatch" && args[5] != "callbacks")
-            throw new ArgumentException("unity-reference-current <lab> <Base proof> <Current DLL root> <editor> <new output> [generic|dispatch|callbacks]");
-        if (args.Length == 6 && args[5] == "callbacks")
+        if (args.Length < 5 || args.Length > 6 || args.Length == 6 && args[5] != "generic" && args[5] != "dispatch" && args[5] != "callbacks" && args[5] != "callbacks-control")
+            throw new ArgumentException("unity-reference-current <lab> <Base proof> <Current DLL root> <editor> <new output> [generic|dispatch|callbacks|callbacks-control]");
+        if (args.Length == 6 && (args[5] == "callbacks" || args[5] == "callbacks-control"))
             return CompileNativeProbe(args, "UnitySerializationCallbackCases", "HybridCLR.Lab.UnityReference.SerializationCallbackCases", false);
         if (args.Length == 6 && args[5] == "dispatch")
             return CompileNativeProbe(args, "UnityReferenceDispatchCases", "HybridCLR.Lab.UnityReference.DispatchCases", false);
@@ -45,14 +45,15 @@ internal static class UnityBehaviourWorkflow
         string data = Path.Combine(Path.GetDirectoryName(Path.GetFullPath(args[3]))!, "Data");
         string unityReferences = Path.Combine(data, "PlaybackEngines/WindowsStandaloneSupport/Variations/il2cpp/Managed");
         string facade = Path.Combine(data, "MonoBleedingEdge/lib/mono/unityaot-win32/Facades/netstandard.dll");
+        bool callbackControl = args.Length > 5 && args[5] == "callbacks-control";
         FrozenStaticWorkflow.CompileAndMerge(Path.GetFullPath(args[0]), args[3], fixture, merged,
             snapshot.Assemblies.Where(row => !row.Dhe && !names.Contains(row.AssemblyName) && row.AssemblyName != "netstandard").Select(row => {
                 string complete = Path.Combine(unityReferences, row.AssemblyName + ".dll");
                 return row.AssemblyName.StartsWith("UnityEngine", StringComparison.Ordinal) && File.Exists(complete) ? complete : row.Path;
             }).Append(facade).Concat(Directory.GetFiles(current, "*.dll")), Path.Combine(output, "compiled"), false,
-            readOnly ? "SERIALIZATION_READ_ONLY" : null);
+            readOnly ? "SERIALIZATION_READ_ONLY" : callbackControl ? "SERIALIZATION_CALLBACK_CONTROL" : null);
         using var module = ModuleDefMD.Load(File.ReadAllBytes(merged));
-        if (fixture == "UnitySerializationCallbackCases")
+        if (fixture == "UnitySerializationCallbackCases" && !callbackControl)
         {
             var receiver = module.Find("HybridCLR.Lab.UnityCases.EvolvingBehaviour", false)!;
             var donor = module.Find("HybridCLR.Lab.UnityReference.SerializationCallbackTemplate", false)!;
@@ -79,7 +80,7 @@ internal static class UnityBehaviourWorkflow
         module.Write(model);
         File.WriteAllText(Path.Combine(output, "entry-wiring.json"), JsonSerializer.Serialize(new {
             merged, mergedSha256 = Convert.ToHexString(SHA256.HashData(File.ReadAllBytes(merged))), current = model,
-            currentSha256 = Convert.ToHexString(SHA256.HashData(File.ReadAllBytes(model))), readOnly, fixture, probeType,
+            currentSha256 = Convert.ToHexString(SHA256.HashData(File.ReadAllBytes(model))), readOnly, callbackControl, fixture, probeType,
             scope = "Append the optional native Unity probe after existing business cases; preserve the compiler's merged output separately"
         }, new JsonSerializerOptions { WriteIndented = true }));
         Console.WriteLine(current); return 0;

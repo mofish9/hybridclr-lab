@@ -19,3 +19,15 @@ with a manual managed callback. A discovery or invocation failure remains a fail
 No production/interface/inheritance capability is inferred before these tests.
 This extends Unity 2022 Windows correctness, with no package, formal release,
 Tuanjie, Unity 2021 or performance changes.
+
+The first Current-only interface addition compiles and passes the 46-case CLR
+reference, but resource generation rejects EvolvingBehaviour with
+existing-type-layout-or-vtable-change on the original Base. Preserve
+dhe-unity-serialization-callback-current-01 and the failed
+dhe-native-callback-resource-before-01 validation. No native callback result
+has been obtained for this evolution; the admission check has not been bypassed.
+
+Add a separately labelled callbacks-control variant that creates a new interpreter
+MonoBehaviour implementing the interface. Keep identical native JSON/clone assertions
+to verify the test's engine expectations without changing an existing type's
+interfaces. That control cannot qualify the rejected existing-type evolution.

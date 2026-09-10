@@ -6,10 +6,11 @@ internal static class UnitySerializationWorkflow
 {
     internal static int Replay(string[] args)
     {
-        if (args.Length != 6 || !new[] { "read", "full", "full-unity", "reference", "full-unity-cached", "reference-cached", "reference-generic", "reference-generic-cached", "reference-dispatch", "reference-callbacks", "reference-callbacks-cached" }.Contains(args[5]))
+        if (args.Length != 6 || !new[] { "read", "full", "full-unity", "reference", "full-unity-cached", "reference-cached", "reference-generic", "reference-generic-cached", "reference-dispatch", "reference-callbacks", "reference-callbacks-cached", "reference-callbacks-control", "reference-callbacks-control-cached" }.Contains(args[5]))
             throw new ArgumentException("unity-serialization-replay <lab> <tool.dll> <Base proof> <resource workflow output> <new output> <read|full|full-unity|reference|full-unity-cached|reference-cached|reference-generic|reference-generic-cached|reference-dispatch|reference-callbacks|reference-callbacks-cached>");
         bool dispatch = args[5] == "reference-dispatch";
         bool callbacks = args[5].StartsWith("reference-callbacks", StringComparison.Ordinal);
+        bool callbackControl = args[5].StartsWith("reference-callbacks-control", StringComparison.Ordinal);
         bool reference = args[5].StartsWith("reference", StringComparison.Ordinal);
         bool generic = args[5].StartsWith("reference-generic", StringComparison.Ordinal);
         bool lifecycle = args[5].StartsWith("full-unity", StringComparison.Ordinal);
@@ -122,7 +123,7 @@ internal static class UnitySerializationWorkflow
             hostSha256 = Hash(typeof(UnitySerializationWorkflow).Assembly.Location), toolSha256 = Hash(tool),
             resourceManifestSha256 = Hash(Path.Combine(source, "resource/dhe-resource-update.json")),
             resultSha256 = Hash(reportPath), logSha256 = Hash(log), records,
-            scope = callbacks ? "Added native serialization callbacks on an evolved component interface" : dispatch ? "Diagnostic value/selection/counter logging; not an execution-counter qualification" : reference ? "Public reference type identity and native allocation on an immutable Base" : lifecycle ?
+            scope = callbackControl ? "Native serialization callback control using a new interpreter component; no existing-interface qualification" : callbacks ? "Added native serialization callbacks on an evolved component interface" : dispatch ? "Diagnostic value/selection/counter logging; not an execution-counter qualification" : reference ? "Public reference type identity and native allocation on an immutable Base" : lifecycle ?
                 "Complete native serialization and lifecycle sequences on an immutable Base" :
                 args[5] == "read" ? "Native JSON read diagnostic only; complete serialization is still required" : "Native JSON/overwrite/clone assertions on an immutable Base"
         }, new JsonSerializerOptions { WriteIndented = true }));
