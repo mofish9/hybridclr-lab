@@ -10,6 +10,8 @@ internal static class FrameworkCallbackWorkflow
         "array-sort-reference-comparison", "list-find-value-predicate", "list-convert-value-reference",
         "array-convert-value-reference", "list-foreach-value-action", "binary-search-value-comparer",
         "dictionary-value-comparer", "hashset-reference-comparer", "struct-target-comparison",
+        "array-convert-existing-virtual-value", "list-convert-existing-virtual-reference",
+        "array-convert-existing-generic-value", "task-existing-virtual-exception",
         "comparison-exception", "predicate-exception"
     };
     private const string Prefix = "DHE framework callback check: ";

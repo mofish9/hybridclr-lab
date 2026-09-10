@@ -1,8 +1,10 @@
 extern alias model;
 using System;
 using System.Collections.Generic;
+using System.Threading.Tasks;
 using Packet = model::HybridCLR.Lab.VirtualSignatures.Packet;
 using ReferenceValue = model::HybridCLR.Lab.VirtualSignatures.ReferenceValue;
+using Processor = model::HybridCLR.Lab.VirtualSignatures.Processor;
 
 namespace HybridCLR.Lab.FrameworkCallbacks
 {
@@ -118,6 +120,38 @@ namespace HybridCLR.Lab.FrameworkCallbacks
             Check("struct-target-comparison", () => {
                 var target = new StructComparer { Salt = 7 }; Comparison<Packet> call = target.Compare; target.Salt = 99;
                 var values = Values(); Array.Sort(values, call); Sorted(values); return true;
+            });
+            Check("array-convert-existing-virtual-value", () => {
+                var values = Values(); Converter<Packet, Packet> call = new Processor().CopyValue;
+                var result = Array.ConvertAll(values, call);
+                for (int i = 0; i < values.Length; ++i)
+                {
+                    Validate(values[i]);
+                    if (result[i].Count != values[i].Count + 1025 || result[i].Extra != values[i].Extra + 17 ||
+                        !ReferenceEquals(result[i].Marker, values[i].Marker) || !ReferenceEquals(result[i].Anchor, values[i].Anchor)) return false;
+                }
+                return true;
+            });
+            Check("list-convert-existing-virtual-reference", () => {
+                var value = new ReferenceValue { Value = 17, Extra = 4000000009L };
+                var values = new List<ReferenceValue> { value, value }; Converter<ReferenceValue, ReferenceValue> call = new Processor().CopyReference;
+                var result = values.ConvertAll(call); return result.Count == 2 && ReferenceEquals(result[0], value) && ReferenceEquals(result[1], value);
+            });
+            Check("array-convert-existing-generic-value", () => {
+                var values = Values(); Converter<Packet, Packet> call = new Processor().Identity<Packet>;
+                var result = Array.ConvertAll(values, call);
+                for (int i = 0; i < values.Length; ++i) { Validate(result[i]); if (!ReferenceEquals(result[i].Anchor, values[i].Anchor)) return false; }
+                return true;
+            });
+            Check("task-existing-virtual-exception", () => {
+                Action call = new Processor().Fail; var task = Task.Run(call);
+                try { if (!task.Wait(10000)) throw new TimeoutException("framework task callback"); }
+                catch (AggregateException error)
+                {
+                    return error.InnerExceptions.Count == 1 && error.InnerException is InvalidOperationException &&
+                        error.InnerException.Message == "virtual-signature-expected";
+                }
+                return false;
             });
             Check("comparison-exception", () => CallbackFailure(() => Array.Sort(Values(), (a, b) => { Validate(a); Validate(b); throw new CallbackException(); })));
             Check("predicate-exception", () => CallbackFailure(() => new List<Packet>(Values()).Find(value => { Validate(value); throw new CallbackException(); })));

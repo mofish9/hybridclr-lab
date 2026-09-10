@@ -19,6 +19,14 @@ Inspect frozen execution selection and seed additional AOT Base workloads where
 needed before making that stronger claim. A failure must preserve Current DLLs,
 the complete partial sequence and original Player identity.
 
+The initial fourteen checks pass on the three immutable Players. Their native
+manifests contain the tested framework method definitions, but actual selected
+execution still needs inspection. Extend the same workload with converters and
+Task.Run targeting Processor methods already present in the AOT Bases, including
+value/reference/generic frames and the grown receiver's exception method. This
+tests existing AOT method targets without rebuilding the Players. Preserve the
+fourteen-check Current and produce a separate eighteen-check Current copy.
+
 Correctness is the main metric. No lost fields, bad receiver access or differing
 case results are acceptable. Keep unaffected AOT execution and existing ABI
 guards; do not globally interpret unchanged assemblies. This checkpoint makes no
