@@ -27,6 +27,7 @@ namespace HybridCLR.Lab.Snapshot
             public long ordinaryAotEchoExtra;
             public int ordinaryAotStaticNeighbor;
             public string[] virtualNoopChecks;
+            public string[] virtualReceiverChecks;
             public int virtualNoopMethods, virtualNoopAotEntries, virtualNoopInterpreterEntries;
         }
         private sealed class Provider : IDheRuntimeAssetProvider
@@ -58,6 +59,8 @@ namespace HybridCLR.Lab.Snapshot
                 if (unityType != null) result.unityBaseDelta = (int)unityType.GetField("Delta", System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.Static).GetRawConstantValue();
                 UnityReferenceCachePlayer referenceCache = Array.IndexOf(args, "-unityReferenceCacheProbe") >= 0
                     ? UnityReferenceCachePlayer.Capture(unityType) : null;
+                VirtualSignatureReceiverCache virtualReceiverCache = Array.IndexOf(args, "-virtualSignatureOldReceiverProbe") >= 0
+                    ? VirtualSignatureReceiverCache.Capture(typeof(ValueLayout.Factory).Assembly) : null;
                 var moduleState = typeof(ValueLayout.Factory).Assembly.GetType("HybridCLR.Lab.ModuleEvolution.ModuleState");
                 System.Reflection.FieldInfo moduleConstant = null;
                 if (moduleState != null)
@@ -116,6 +119,8 @@ namespace HybridCLR.Lab.Snapshot
                 }
                 if (!loadedCurrent)
                     throw new InvalidDataException(code + ":" + error);
+                if (virtualReceiverCache != null)
+                    result.virtualReceiverChecks = virtualReceiverCache.Verify();
                 if (referenceCache != null)
                 {
                     result.referenceCacheChecks = referenceCache.Verify(out string cacheFailure);

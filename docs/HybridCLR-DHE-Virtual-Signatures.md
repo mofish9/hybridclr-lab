@@ -99,3 +99,10 @@ non-generic reference instance scalar frames only when the declaring class and
 every physical parent retain Base storage. Value/byref/custom-type arguments and
 changed receiver storage remain guarded. Re-run the unchanged and full update
 suites, including old-receiver rejection controls, before qualifying this rule.
+
+`virtual-signatures-cached` additionally captures an original AOT Processor and
+its MethodInfo before Current loading. It requires cached/fresh reflection to
+reject this old receiver, a newly allocated Current receiver to invoke the body,
+stable logical identity and unchanged data after rejection. This is separate
+from the previous Unity component cache suite and only applies to the old-layout
+Base. Both modes still require all 25 signature checks and all 46 business cases.

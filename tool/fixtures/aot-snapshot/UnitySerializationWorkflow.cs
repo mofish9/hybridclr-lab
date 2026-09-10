@@ -9,7 +9,8 @@ internal static class UnitySerializationWorkflow
     {
         string declarationMode = args.Length == 6 ? (args[5].EndsWith("-cached", StringComparison.Ordinal) ? args[5][..^7] : args[5]) : "";
         bool declarations = new[] { "declaration-nonvirtual-3", "declaration-virtual-7", "declaration-nonvirtual-11" }.Contains(declarationMode);
-        bool virtualSignatures = args.Length == 6 && args[5] == "virtual-signatures";
+        bool virtualReceiverCache = args.Length == 6 && args[5] == "virtual-signatures-cached";
+        bool virtualSignatures = args.Length == 6 && (args[5] == "virtual-signatures" || virtualReceiverCache);
         if (args.Length != 6 || (!virtualSignatures && !declarations && !new[] { "read", "full", "full-unity", "reference", "full-unity-cached", "reference-cached", "reference-generic", "reference-generic-cached", "reference-dispatch", "reference-callbacks", "reference-callbacks-cached", "reference-callbacks-control", "reference-callbacks-control-cached", "hierarchy-query", "hierarchy-query-cached", "interface-remove", "interface-remove-cached", "interface-remove-methods", "interface-remove-methods-cached", "interface-replace", "interface-replace-cached", "interface-remove-compiler", "interface-remove-compiler-cached" }.Contains(args[5])))
             throw new ArgumentException("unity-serialization-replay <lab> <tool.dll> <Base proof> <resource workflow output> <new output> <read|full|full-unity|reference|full-unity-cached|reference-cached|reference-generic|reference-generic-cached|reference-dispatch|reference-callbacks|reference-callbacks-cached|reference-callbacks-control|reference-callbacks-control-cached|hierarchy-query|hierarchy-query-cached|interface-remove|interface-remove-cached|interface-remove-methods|interface-remove-methods-cached|interface-replace|interface-replace-cached|interface-remove-compiler|interface-remove-compiler-cached>");
         bool hierarchy = args[5].StartsWith("hierarchy-query", StringComparison.Ordinal);
@@ -20,7 +21,7 @@ internal static class UnitySerializationWorkflow
         bool reference = args[5].StartsWith("reference", StringComparison.Ordinal);
         bool generic = args[5].StartsWith("reference-generic", StringComparison.Ordinal);
         bool lifecycle = args[5].StartsWith("full-unity", StringComparison.Ordinal);
-        bool cached = args[5].EndsWith("-cached", StringComparison.Ordinal);
+        bool cached = !virtualReceiverCache && args[5].EndsWith("-cached", StringComparison.Ordinal);
         string evolutionMode = interfaceEvolution ? (cached ? args[5].Substring(0, args[5].Length - "-cached".Length) : args[5]) : null;
         bool? currentReferenceStorageSelected = null;
         string cacheCurrentModelSha256 = null;
@@ -39,6 +40,10 @@ internal static class UnitySerializationWorkflow
             var start = new ProcessStartInfo(executable) { WorkingDirectory = lab, UseShellExecute = false, CreateNoWindow = true,
                 WindowStyle = ProcessWindowStyle.Hidden, RedirectStandardOutput = true, RedirectStandardError = true };
             foreach (string argument in arguments) start.ArgumentList.Add(argument);
+            if (virtualReceiverCache && arguments.Contains("-snapshotResult"))
+            {
+                start.ArgumentList.Add("-virtualSignatureOldReceiverProbe"); start.ArgumentList.Add("true");
+            }
             if (lifecycle && arguments.Contains("-snapshotResult"))
             {
                 start.ArgumentList.Add("-unityBehaviourProbe"); start.ArgumentList.Add("current");
@@ -171,6 +176,13 @@ internal static class UnitySerializationWorkflow
         string[] OptionalChecks(string property) => report.TryGetProperty(property, out var value) && value.ValueKind == JsonValueKind.Array
             ? value.EnumerateArray().Select(row => row.GetString()!).ToArray() : Array.Empty<string>();
         string[] unityChecks = lifecycle ? OptionalChecks("unityChecks") : Array.Empty<string>();
+        string[] virtualReceiverExpected = { "logical-method-identity", "current-receiver-storage",
+            "cached-method-rejects-old-receiver", "fresh-method-rejects-old-receiver",
+            "current-receiver-invokes-body", "rejection-preserves-receivers" };
+        string[] virtualReceiverChecks = OptionalChecks("virtualReceiverChecks");
+        bool virtualReceiverPassed = !virtualReceiverCache || virtualReceiverChecks.SequenceEqual(virtualReceiverExpected) &&
+            lines.Where(line => line.StartsWith("DHE virtual receiver check: "))
+                .Select(line => line["DHE virtual receiver check: ".Length..]).SequenceEqual(virtualReceiverExpected);
         bool lifecyclePassed = !lifecycle || unityChecks.SequenceEqual(unityExpected) &&
             lines.Count(line => line == "DHE Unity expected selection: " + lifecycleSelection) == 1 &&
             lines.Where(line => line.StartsWith("DHE Unity check: ")).Select(line => line.Substring("DHE Unity check: ".Length)).SequenceEqual(unityExpected) &&
@@ -206,14 +218,15 @@ internal static class UnitySerializationWorkflow
             (callbackControl ? "new-component-control" : "existing-interface")) == 1;
         bool evolutionFixturePassed = !interfaceEvolution || lines.Count(line => line == "DHE interface evolution mode: " + evolutionMode) == 1;
         bool declarationFixturePassed = !declarations || lines.Count(line => line == "DHE declaration mode: " + declarationMode) == 1;
-        bool passed = immutable && cachePassed && lifecyclePassed && callbackFixturePassed && evolutionFixturePassed && declarationFixturePassed && report.GetProperty("passed").GetBoolean() && checks.SequenceEqual(sequence) &&
+        bool passed = immutable && virtualReceiverPassed && cachePassed && lifecyclePassed && callbackFixturePassed && evolutionFixturePassed && declarationFixturePassed && report.GetProperty("passed").GetBoolean() && checks.SequenceEqual(sequence) &&
             lines.Count(line => line == prefix + " pass: " + sequence.Length) == 1 &&
             lines.Where(line => line.StartsWith("DHE case begin: ")).Select(line => line.Substring(16)).SequenceEqual(
                 Read(Path.Combine(source, "reference.json")).GetProperty("records").EnumerateArray().Select(row => row.GetString()));
         File.WriteAllText(Path.Combine(output, "result.json"), JsonSerializer.Serialize(new { passed, immutable, checks, expected = sequence,
             lifecycle, lifecyclePassed, lifecycleSelection, unityChecks, cached, cachePassed, cacheChecks, currentReferenceStorageSelected,
             cacheCurrentModelSha256, cachedBaseMethodCount, callbacks, callbackControl, callbackFixturePassed, hierarchy, interfaceEvolution, evolutionMode, evolutionFixturePassed,
-            virtualSignatures, declarations, declarationMode, declarationFixturePassed, declarationCacheExpectation,
+            virtualSignatures, virtualReceiverCache, virtualReceiverPassed, virtualReceiverChecks,
+            declarations, declarationMode, declarationFixturePassed, declarationCacheExpectation,
             declarationParameterObjects = lines.Where(line => line.StartsWith("DHE declaration parameter objects ")).ToArray(),
             error = report.GetProperty("error").GetString(), proof, source, labHead, playerSha256 = playerHash, gameAssemblySha256 = gameHash,
             hostSha256 = Hash(typeof(UnitySerializationWorkflow).Assembly.Location), toolSha256 = Hash(tool),
