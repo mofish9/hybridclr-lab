@@ -4,7 +4,7 @@ internal sealed class ResourceUpdateCompatibility
 {
 	public const string Policy = "dhe-proven-safe-subset-v1";
 	public const string RuntimeProtocol = "dhe-runtime-protocol-v1";
-    public const string CurrentNativeRuntimeContract = "dhe-runtime-v31";
+    public const string CurrentNativeRuntimeContract = "dhe-runtime-v32";
     public static readonly string[] KnownRuntimeCapabilities =
     {
 		"aot-guard-v1",
@@ -26,6 +26,7 @@ internal sealed class ResourceUpdateCompatibility
         "aot-module-token-resolution-v1",
         "length-preserved-constant-strings-v1",
         "aot-inline-entry-guards-v1",
+        "tracked-native-load-phase-v1",
         "frozen-generic-context-dispatch-v1",
 		"supplemental-existing-type-instance-fields-v1",
         "supplemental-existing-type-static-fields-v1",
