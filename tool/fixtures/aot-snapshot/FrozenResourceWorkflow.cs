@@ -52,6 +52,12 @@ internal static class FrozenResourceWorkflow
         var probe = model.GetType(FrozenResourceCasesCompiler.ProbeName) ?? model.GetType(ProbeName, true)!;
         int expectedCount = probe.FullName == FrozenResourceCasesCompiler.ProbeName ? FrozenResourceCasesCompiler.CaseCount : 4;
         var records = (string[])probe.GetMethod("Run")!.Invoke(null, null)!;
+        var addedCaller = model.GetType(FrozenAddedAssemblyCompiler.CallerName);
+        if (addedCaller != null)
+        {
+            expectedCount += FrozenAddedAssemblyCompiler.CaseCount;
+            records = records.Concat((string[])addedCaller.GetMethod("Run")!.Invoke(null, null)!).ToArray();
+        }
         int revision = (int)model.GetType("HybridCLR.Lab.ValueLayout.Factory", true)!.GetMethod("GetRevision")!.Invoke(null, null)!;
         File.WriteAllText(args[2], JsonSerializer.Serialize(new { passed = records.Length == expectedCount && revision == 73, records, revision }, Json));
         return records.Length == expectedCount && revision == 73 ? 0 : 1;
@@ -128,7 +134,7 @@ internal static class FrozenResourceWorkflow
 
     public static int Run(string[] args)
     {
-        if (args.Length != 4 && args.Length != 5) throw new ArgumentException("frozen-resource-workflow <lab> <comma-separated immutable proof roots> <tool.dll> <new output> [Unity editor executable for expanded suite OR existing Current directory]");
+        if (args.Length < 4 || args.Length > 6) throw new ArgumentException("frozen-resource-workflow <lab> <comma-separated immutable proof roots> <tool.dll> <new output> [Unity editor executable for expanded suite OR existing Current directory] [Current settings file]");
         string lab = Path.GetFullPath(args[0]), tool = Path.GetFullPath(args[2]), output = Path.GetFullPath(args[3]);
         string[] proofs = args[1].Split(',').Select(Path.GetFullPath).ToArray();
         if (Directory.Exists(output)) throw new IOException("Output must be new.");
@@ -150,7 +156,7 @@ internal static class FrozenResourceWorkflow
         if (Execute("git", "-C", lab, "status", "--porcelain").Length != 0) throw new InvalidDataException("Commit sources before verification.");
         string labHead = Execute("git", "-C", lab, "rev-parse", "HEAD");
         string current = Path.Combine(output, "current"); Directory.CreateDirectory(current);
-        bool reuseCurrent = args.Length == 5 && Directory.Exists(args[4]);
+        bool reuseCurrent = args.Length >= 5 && Directory.Exists(args[4]);
         string sourceCurrent = reuseCurrent ? Path.GetFullPath(args[4]) : Path.Combine(proofs[0], "frozen-entry-current");
         foreach (string source in Directory.GetFiles(sourceCurrent, "*.dll")) File.Copy(source, Path.Combine(current, Path.GetFileName(source)));
         string Join(string suffix) => string.Join(",", proofs.Select(proof => Path.Combine(proof, "base", suffix)));
@@ -161,18 +167,19 @@ internal static class FrozenResourceWorkflow
         }).ToArray();
         if (!reuseCurrent)
         {
-            if (args.Length == 5) FrozenResourceCasesCompiler.Compile(lab, current, snapshots[0], args[4], output, Execute);
+            if (args.Length >= 5) FrozenResourceCasesCompiler.Compile(lab, current, snapshots[0], args[4], output, Execute);
             else AddProbe(current);
         }
         string referenceFile = Path.Combine(output, "reference.json"), host = typeof(FrozenResourceWorkflow).Assembly.Location;
         Execute("dotnet", host, "frozen-resource-reference", current, snapshots[0].Assemblies.Single(row => row.AssemblyName == NativeName).Path, referenceFile);
         string resource = Path.Combine(output, "resource");
         Execute("dotnet", tool, "resource-update", "-CurrentRoot", current,
-            "-SettingsFile", Path.Combine(proofs[0], "project/ProjectSettings/HybridCLRSettings.asset"),
+            "-SettingsFile", args.Length == 6 ? Path.GetFullPath(args[5]) : Path.Combine(proofs[0], "project/ProjectSettings/HybridCLRSettings.asset"),
             "-BaseRoots", Join("baseline"), "-BaseNativeManifests", Join("native/dhe-native-manifest.json"), "-BaseBuildIdentities", Join("build-identity.json"),
             "-AotMetadataRoots", string.Join(",", snapshots.Select(snapshot => Path.Combine(Path.GetDirectoryName(snapshot.ManifestPath)!, "assemblies"))),
             "-Mode", "Exploratory", "-OutputRoot", resource);
         string[] expected = Read(referenceFile).GetProperty("records").EnumerateArray().Select(row => row.GetString()!).ToArray();
+        string[] currentNames = Directory.GetFiles(current, "*.dll").Select(Path.GetFileNameWithoutExtension).OrderBy(name => name, StringComparer.OrdinalIgnoreCase).ToArray()!;
         var checks = new Dictionary<string, bool>(); var players = new List<object>();
         for (int index = 0; index < proofs.Length; index++)
         {
@@ -187,14 +194,24 @@ internal static class FrozenResourceWorkflow
             Execute("dotnet", tool, "stage-resource-update", "-UpdateRoot", resource, "-AssetRoot", stage,
                 "-BaseBuildIdentity", Path.Combine(build, "build-identity.json"), "-ImmutableFiles", player + "," + game, "-Output", Path.Combine(output, "stage-" + index + ".json"));
             Execute(player, "-batchmode", "-nographics", "-snapshotResult", report, "-snapshotResourceRoot", stage,
-                "-expectedRevision", "73", "-logFile", report + ".log");
+                "-expectedRevision", "73", "-expectedAssemblies", currentNames.Length.ToString(), "-logFile", report + ".log");
             var result = Read(report);
             checks["standard-resource-player-" + index] = result.GetProperty("passed").GetBoolean() && result.GetProperty("resourceUpdate").GetBoolean() &&
                 result.GetProperty("revision").GetInt32() == Read(referenceFile).GetProperty("revision").GetInt32() &&
-                result.GetProperty("sentinel").GetInt32() == 5 && (expected.Length == FrozenResourceCasesCompiler.CaseCount || expected.Length == 4);
-            if (expected.Length == FrozenResourceCasesCompiler.CaseCount)
+                result.GetProperty("sentinel").GetInt32() == 5 && result.GetProperty("loadedAssemblies").GetInt32() == currentNames.Length &&
+                (expected.Length == FrozenResourceCasesCompiler.CaseCount || expected.Length == FrozenResourceCasesCompiler.CaseCount + FrozenAddedAssemblyCompiler.CaseCount || expected.Length == 4);
+            if (expected.Length != 4)
                 checks["complete-reference-case-sequence-" + index] = File.ReadAllLines(report + ".log")
                     .Where(line => line.StartsWith("DHE case begin: ")).Select(line => line.Substring(16)).SequenceEqual(expected);
+            string[] baseNames = snapshots[index].Assemblies.Where(row => row.Dhe).Select(row => row.AssemblyName).OrderBy(name => name, StringComparer.OrdinalIgnoreCase).ToArray();
+            string[] newNames = currentNames.Except(baseNames, StringComparer.OrdinalIgnoreCase).ToArray();
+            if (newNames.Length != 0 || result.TryGetProperty("plannedAssemblies", out _))
+            {
+                string[] PlayerNames(string key) => result.GetProperty(key).EnumerateArray().Select(row => row.GetString()!).OrderBy(name => name, StringComparer.OrdinalIgnoreCase).ToArray();
+                checks["complete-assembly-modes-" + index] = PlayerNames("plannedAssemblies").SequenceEqual(currentNames) &&
+                    PlayerNames("differentialAssemblies").SequenceEqual(baseNames) && PlayerNames("interpreterOnlyAssemblies").SequenceEqual(newNames) &&
+                    currentNames.All(name => PlayerNames("loadedAssemblyNames").Contains(name));
+            }
             string snapshotAsset = Path.Combine(stage, "payload/frozen-aot", result.GetProperty("baseId").GetString()!, "snapshot.json");
             if (File.Exists(snapshotAsset))
             {
@@ -205,7 +222,7 @@ internal static class FrozenResourceWorkflow
                 {
                     File.WriteAllBytes(snapshotAsset, original.Concat(new byte[] { 32 }).ToArray());
                     try { Execute(player, "-batchmode", "-nographics", "-snapshotResult", rejectedReport, "-snapshotResourceRoot", stage,
-                        "-expectedRevision", "73", "-logFile", rejectedReport + ".log"); }
+                        "-expectedRevision", "73", "-expectedAssemblies", currentNames.Length.ToString(), "-logFile", rejectedReport + ".log"); }
                     catch (InvalidOperationException) { failed = true; }
                 }
                 finally { File.WriteAllBytes(snapshotAsset, original); }
@@ -215,7 +232,7 @@ internal static class FrozenResourceWorkflow
                     rejected.GetProperty("error").GetString()!.Contains("not the manifest embedded in this Base identity");
                 string restoredReport = Path.Combine(output, "player-snapshot-restored-" + index + ".json");
                 Execute(player, "-batchmode", "-nographics", "-snapshotResult", restoredReport, "-snapshotResourceRoot", stage,
-                    "-expectedRevision", "73", "-logFile", restoredReport + ".log");
+                    "-expectedRevision", "73", "-expectedAssemblies", currentNames.Length.ToString(), "-logFile", restoredReport + ".log");
                 checks["original-resource-restored-" + index] = Read(restoredReport).GetProperty("passed").GetBoolean();
             }
             checks["immutable-player-" + index] = Hash(player) == playerHash && Hash(game) == gameHash;
