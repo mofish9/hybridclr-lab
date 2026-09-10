@@ -28,6 +28,10 @@ internal static class AotModulePolicyTests
         var removed = Edit("removed-cctor", module => module.GlobalType.Methods.Clear());
         var constant = Edit("changed-constant", module => module.Find("HybridCLR.Lab.ModuleEvolution.ModuleState", false)!
             .Fields.Single(field => field.Name == "ExpectedVersion").Constant = new ConstantUser(202));
+        var nul = Edit("nul-constant", module => module.Find("HybridCLR.Lab.ModuleEvolution.ModuleState", false)!
+            .Fields.Add(new FieldDefUser("EmbeddedText", new FieldSig(module.CorLibTypes.String),
+                FieldAttributes.Public | FieldAttributes.Static | FieldAttributes.Literal | FieldAttributes.HasDefault)
+                { Constant = new ConstantUser("A\0B") }));
         var values = new Dictionary<string, ResourceUpdateCompatibility>
         {
             ["no-op"] = ResourceUpdateCompatibility.Analyze(original, original),
@@ -36,6 +40,7 @@ internal static class AotModulePolicyTests
             ["removed-module-cctor"] = ResourceUpdateCompatibility.Analyze(original, removed),
             ["added-module-cctor"] = ResourceUpdateCompatibility.Analyze(removed, original),
             ["changed-constant"] = ResourceUpdateCompatibility.Analyze(original, constant),
+            ["nul-constant"] = ResourceUpdateCompatibility.Analyze(original, nul),
         };
         const string capability = "deferred-aot-module-initialization-v1";
         var checks = new Dictionary<string, bool>();
@@ -55,6 +60,11 @@ internal static class AotModulePolicyTests
                 ResourceUpdateCompatibility.KnownRuntimeCapabilities, pair.Value.RequiredRuntimeCapabilities);
         }
         const string constantCapability = "current-literal-field-values-v1";
+        checks["nul-constant:encoding-capability-required"] = values["nul-constant"].RequiredRuntimeCapabilities.Contains("length-preserved-constant-strings-v1");
+        checks["nul-constant:old-encoding-rejected"] = !ResourceUpdateCompatibility.CanExecuteUpdate(
+            ResourceUpdateCompatibility.RuntimeProtocol, "dhe-runtime-v30",
+            ResourceUpdateCompatibility.KnownRuntimeCapabilities.Where(value => value != "length-preserved-constant-strings-v1"),
+            values["nul-constant"].RequiredRuntimeCapabilities);
         checks["constant:capability-required"] = values["changed-constant"].RequiredRuntimeCapabilities.Contains(constantCapability);
         checks["constant:old-runtime-rejected"] = !ResourceUpdateCompatibility.CanExecuteUpdate(
             ResourceUpdateCompatibility.RuntimeProtocol, "dhe-runtime-v28",

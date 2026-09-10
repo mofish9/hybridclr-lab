@@ -4,7 +4,7 @@ internal sealed class ResourceUpdateCompatibility
 {
 	public const string Policy = "dhe-proven-safe-subset-v1";
 	public const string RuntimeProtocol = "dhe-runtime-protocol-v1";
-    public const string CurrentNativeRuntimeContract = "dhe-runtime-v30";
+    public const string CurrentNativeRuntimeContract = "dhe-runtime-v31";
     public static readonly string[] KnownRuntimeCapabilities =
     {
 		"aot-guard-v1",
@@ -24,6 +24,8 @@ internal sealed class ResourceUpdateCompatibility
         "deferred-aot-module-initialization-v1",
         "current-literal-field-values-v1",
         "aot-module-token-resolution-v1",
+        "length-preserved-constant-strings-v1",
+        "aot-inline-entry-guards-v1",
         "frozen-generic-context-dispatch-v1",
 		"supplemental-existing-type-instance-fields-v1",
         "supplemental-existing-type-static-fields-v1",
@@ -261,7 +263,10 @@ internal sealed class ResourceUpdateCompatibility
             "stable-method-identity-v1",
             "single-current-multibase-v1",
             "atomic-multi-assembly-registration-v1",
+            "aot-inline-entry-guards-v1",
         };
+        if (current.HasEmbeddedNullStringDefaults)
+            requiredCapabilities.Add("length-preserved-constant-strings-v1");
         if (parameterDefaultsChanged || added.Any(method => method.HasParameterDefaults))
             requiredCapabilities.Add("current-parameter-default-metadata-v1");
         if (baseline.Fields.Any(field => currentFields.TryGetValue(field.StableId, out var currentField) &&

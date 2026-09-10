@@ -1220,7 +1220,10 @@ internal static partial class Program
             {
                 "resource-update-plan-integrity-v1",
                 "resource-update-aot-metadata-set-selection-v1",
+                "aot-inline-entry-guards-v1",
             };
+            if (currentVariant.Snapshots.Values.Any(snapshot => snapshot.HasEmbeddedNullStringDefaults))
+                requiredRuntimeCapabilities.Add("length-preserved-constant-strings-v1");
             if (names.Except(identityAssemblyNames, StringComparer.OrdinalIgnoreCase).Any())
                 requiredRuntimeCapabilities.Add("mixed-interpreter-source-batch-v1");
             if (execution.Impact.StaticValueFields.Length != 0)
@@ -1402,11 +1405,15 @@ internal static partial class Program
                         !string.Equals(Sha256File(mvTarget), mvHash, StringComparison.OrdinalIgnoreCase))
                         throw new DheException("Frozen AOT source copied hash mismatch: " + baseId + "/" + sourceName);
                     using (var module = dnlib.DotNet.ModuleDefMD.Load(sourceTarget))
+                    {
                         if (module.GlobalType.HasMethods || module.GlobalType.HasFields)
                         {
                             requiredRuntimeCapabilities.Add("deferred-aot-module-initialization-v1");
                             requiredRuntimeCapabilities.Add("aot-module-token-resolution-v1");
                         }
+                        if (MetaVersionSnapshot.HasEmbeddedNullStringConstants(module))
+                            requiredRuntimeCapabilities.Add("length-preserved-constant-strings-v1");
+                    }
                     frozenAotSources.Add(new
                     {
                         assemblyName = sourceName,

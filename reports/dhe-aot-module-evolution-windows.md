@@ -158,3 +158,53 @@ initializer deferral. Its canonical tree is
 `E0560DD1615040D477BAC0BF02E7B52E920FEF41D0B0E10288362F4FACF565D7`.
 Keep Base-33 and its `.inputs`; it is not an accepted Base proof. Verify the
 combined source on new immutable Players using exact Base-30 and Base-33 inputs.
+
+## Immutable v30 Players and remaining replay failures
+
+Lab `7735660`, HybridCLR `421bb18`, IL2CPP `4d5052e`, package `eaf1ec5` pass
+`ordinary-guards-01` (four checks), `native-04` real-header compile/CTest and
+`managed-03.json` (81 package checks). Runtime tree:
+`79824B4AFC63EFEA7338F963FBA14D85AA2CE540C14C4B069D9D10F6E634EF04`; manifest:
+`AFA88F48A466CCE731E57C8319771615D8DE0DFEA090A5FF06FD99A1E4DEF0CE`.
+`resource-old-resolver-rejected-01` rejects Base-32 for its missing module-token
+capability before Player execution.
+
+Both fresh Players pass startup and no-op on this precise identity:
+
+| Base | Input | Startup / no-op PIDs | Base ID | GameAssembly SHA-256 |
+| --- | --- | --- | --- | --- |
+| 34 | Exact Base-30 inputs, old layout, module 101 | 23340 / 21404 | `ccef9f455e6ba1b449c4e55c4ed724af1a01f5d10a9918bdef03c9660285721e` | `97212B25FF4C6945C159D1CBE246E0A75269662925E2FA34AB5E1247D0F689C2` |
+| 35 | Exact Base-33 inputs, grown layout, module 202, literal suite, ordinary module | 16664 / 21268 | `5e5be504ea1aa3f4c855910a43cea755797c787afd61475e1dcff053b4bd3a90` | `4ED7E83E98CC69C7DBED4D0447D45965F07140A60F398EDE15DF15CD70955C57` |
+
+Base-35 shows the ordinary initializer at the start of its log, counter 1
+before and after loading. Hotfix initialization is deferred, counter 0 before
+load and one version-202 invocation after it. All 74 baseline literal reads
+pass. The final native manifest includes both module cctors, deferral true for
+Model and false for Native.
+
+`resource-changed-03-multibase`, `resource-removed-03-multibase` and
+`resource-chained-01-multibase` pass their initial Base-34 executions (PIDs 19972,
+16692, 22940) and all 46 cases; changed constants read 202 through retained and
+fresh handles. Restored Base-34 runs also succeed. On Base-35 they reach the last
+case, then fail `unchanged-readers-stay-aot` (PIDs 24300, 20460, 24012). Thus no
+one of these multi-Base workflows has a passing final result/audit yet.
+
+The exact archived generated C++ shows the cause: the AOT
+`FrozenStaticCases.VerifyNativeDispatch` calls `_inline` copies of
+`NativeStaticOwner.ReadNeighbor/ReadRuns`; these copies lack guards although the
+standalone functions appear in the universal guard manifest. Do not reduce the
+assertion threshold or force this test into interpretation. Cover indexed
+native symbols' ABI-identical inline copies in every caller, and additionally
+test an unchanged AOT caller invoking a changed inline hotfix getter.
+
+`resource-literals-01-multibase` fails first on Base-34 (PID 23676): the existing
+constant converter treats UTF-16 length as a maximum and truncates at embedded
+NUL. Preserve the exact `literal-current-01/current` bytes. HybridCLR `8417ea0`
+adds an exact-span UTF-16 constant writer, shared by field and parameter default
+conversion. Package `6d59a27` expands only indexed symbols to validated inline
+copies, preserving signature/owner checks. Contract v31 advertises
+`length-preserved-constant-strings-v1` and `aot-inline-entry-guards-v1`; the tool
+must reject incapable Bases, including NUL defaults in new assemblies and
+frozen ordinary sources. These newest changes still need source-bound native,
+inline-definition and new immutable Player verification. No previous passing
+v30 numbers qualify v31; no release or platform extrapolation is authorized.

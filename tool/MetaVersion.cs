@@ -28,6 +28,8 @@ internal sealed class MetaVersionSnapshot
     public MetaVersionField[] Fields { get; private init; } = Array.Empty<MetaVersionField>();
     public MetaVersionMethod[] Methods { get; private init; } = Array.Empty<MetaVersionMethod>();
     [JsonIgnore]
+    public bool HasEmbeddedNullStringDefaults { get; private init; }
+    [JsonIgnore]
     public string[] AddressTakenFieldIdentities { get; private init; } = Array.Empty<string>();
     [JsonIgnore]
     public string[] InterfaceImplementationMethodIdentities { get; private init; } = Array.Empty<string>();
@@ -82,6 +84,7 @@ internal sealed class MetaVersionSnapshot
             Types = types,
             Fields = fields,
             Methods = methods,
+            HasEmbeddedNullStringDefaults = HasEmbeddedNullStringConstants(module),
             AddressTakenFieldIdentities = addressTakenFields.OrderBy(value => value,
                 StringComparer.Ordinal).ToArray(),
             InterfaceImplementationMethodIdentities = ReadInterfaceImplementationMethods(assemblyPath),
@@ -105,6 +108,12 @@ internal sealed class MetaVersionSnapshot
             .ToDictionary(group => group.Key, group => string.Join("\n", group.Select(reference => reference.FullName)
                 .Distinct(StringComparer.Ordinal).OrderBy(value => value, StringComparer.Ordinal)), StringComparer.OrdinalIgnoreCase);
     }
+
+    internal static bool HasEmbeddedNullStringConstants(ModuleDefMD module) =>
+        module.GetTypes().Any(type => type.Fields.Any(field => field.HasConstant &&
+            field.Constant.Value is string fieldValue && fieldValue.IndexOf('\0') >= 0) ||
+            type.Methods.Any(method => method.ParamDefs.Any(parameter => parameter.HasConstant &&
+                parameter.Constant.Value is string parameterValue && parameterValue.IndexOf('\0') >= 0)));
 
     private static MetaVersionAttributeUse[] ReadAttributeUses(ModuleDefMD module)
     {

@@ -29,6 +29,7 @@ static_assert(std::is_constructible<hybridclr::dhe::MetaVersionRegistration,
     "DHE registration must support C++11 construction on mobile toolchains");
 #endif
 #include "hybridclr/metadata/BlobReader.h"
+#include "hybridclr/metadata/CustomAttributeDataWriter.h"
 #include "hybridclr/metadata/MetadataUtil.h"
 #include "hybridclr/metadata/MetadataModule.h"
 #include "hybridclr/metadata/Opcodes.h"
@@ -379,6 +380,20 @@ namespace
 
     void TestBlobReader()
     {
+#if defined(HYBRIDCLR_DHE_HAS_LENGTH_PRESERVED_CONSTANT_STRINGS)
+        hybridclr::metadata::CustomAttributeDataWriter strings(2);
+        const Il2CppChar exactSpan[] = { 'A', 0, 0x4E2D, 0xD83D, 0xDE00, 0, 'Z' };
+        strings.WriteUtf16ConstantString(exactSpan, 6);
+        const uint8_t expectedString[] = { 20, 'A', 0, 0xE4, 0xB8, 0xAD, 0xF0, 0x9F, 0x98, 0x80, 0 };
+        CHECK(strings.Size() == sizeof(expectedString));
+        CHECK(std::memcmp(strings.Data(), expectedString, sizeof(expectedString)) == 0);
+        strings.WriteUtf16ConstantString(exactSpan + 1, 1);
+        strings.WriteUtf16ConstantString(nullptr, 0);
+        CHECK(strings.Size() == sizeof(expectedString) + 3);
+        CHECK(strings.Data()[sizeof(expectedString)] == 2);
+        CHECK(strings.Data()[sizeof(expectedString) + 1] == 0);
+        CHECK(strings.Data()[sizeof(expectedString) + 2] == 0);
+#endif
         const hybridclr::byte bytes[] = {
             0x7F,
             0x80, 0x80,
