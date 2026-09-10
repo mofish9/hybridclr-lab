@@ -17,16 +17,16 @@ Their immutable inputs are recorded in `manifests/repo-lock.json`.
 
 ## Current phase
 
-The active investigation is **physical reference storage and public type identity**.
-The isolated `e403775`/`6d0f642` runtime candidate passes Unity 2022 real-header
-native compile/CTest and builds two new immutable Bases. Old-layout Base-52
-passes all eleven serialization checks and eleven lifecycle checks before
-reflection instance invocation fails; same-layout Base-53 passes all eleven
-serialization and seventeen lifecycle checks with identical Current. A separate
-fourteen-check identity probe has eight failures on Base-52 and passes on Base-53.
-Native callbacks and field access improved, but public Base/Current Type identity
-is still inconsistent. The candidate remains isolated and unqualified. See
-`reports/dhe-unity-serialization-windows.md` for exact evidence and open gates.
+The active investigation is **physical reference storage and native type queries**.
+At `8eb835a`/`4b02c37`, immutable Base-58/59 pass identical Current DLLs with
+46 business cases, 14 public identity checks, 18 generic/array checks, 11
+serialization checks and 17 lifecycle checks. Generic reflection/direct field
+incoherence is fixed and verified against the same failing-before Current bytes.
+Both pass eleven cached-handle/physical-receiver checks and public preparation
+failure/recovery. On the old-layout Base, pre-selection component creation still
+breaks subsequent native GetComponent(publicType) and clone lookup. This remains
+an incomplete research candidate. See `reports/dhe-reference-storage-windows.md`
+for the exact commits, preserved failures, evidence identities and remaining gates.
 Unity 2022 Windows comes first; Tuanjie follows; no new Unity 2021 work.
 
 The latest completed Windows checkpoint passes **public pre-commit recovery and real Unity

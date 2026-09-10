@@ -1,5 +1,16 @@
 # Public reference identity and physical receivers
 
+## Current checkpoint
+
+See `../reports/dhe-reference-storage-windows.md`: runtime 8eb835a/4b02c37,
+lab d69e11e and Base-58/59 pass all eighteen strengthened generic assertions,
+including reciprocal field writes, with identical Current04 from the 16/18
+failure reproduction on Base-56. Full cold-selection reference/serialization/
+lifecycle, eleven cached receiver checks and public failure recovery also pass.
+Pre-selection component creation still breaks native lookup on the old-layout
+Base; the physical-field correction does not resolve or waive that blocker.
+The following sections preserve the measurements and design leading here.
+
 ## Latest measured correction and remaining reproductions
 
 At runtime 02d333e/4b02c37 and lab 99e5b53, Base-56/57 pass startup,

@@ -1,6 +1,16 @@
 # Unity serialization and cloning with evolved hotfix layouts
 
-## Actual Windows results
+## Latest Windows checkpoint
+
+See `dhe-reference-storage-windows.md` for runtime 8eb835a/4b02c37, native06
+and immutable Base-58/59. Both pass eleven serialization and seventeen lifecycle
+checks with identical Current DLLs, plus public identity, generic coherence and
+public preparation/recovery. The cached old-layout case still fails native
+component lookup; diagnostic ancestor lookup finds intact cloned fields. This
+is not complete serialization/scene/Prefab qualification. Earlier evidence below
+is preserved under its original commits and must not be treated as current.
+
+## Historical Base-52/53 Windows results
 
 The latest native correction is HybridCLR
 `e4037758ad8476e87e005b6857f6b4db9bbeca48`, IL2CPP Unity 2022

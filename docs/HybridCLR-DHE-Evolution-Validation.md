@@ -1,6 +1,19 @@
 # DHE evolution implementation and validation
 
-## Active investigation: Unity serialization and physical reference storage
+## Active investigation: native type queries after version selection
+
+The current checkpoint is `../reports/dhe-reference-storage-windows.md`.
+Runtime 8eb835a/4b02c37 passes real-header native compile/CTest. At lab d69e11e,
+Base-58/59 pass identical Current with all 46 business cases, 14 public reference
+checks, 18 generic/array checks, 11 serialization checks, 17 lifecycle checks,
+11 cached receiver checks and public failure/fresh-process recovery. A generic
+sidecar/physical-field split is fixed with bidirectional field-coherence evidence.
+The old-layout Base still fails native GetComponent(publicType) after pre-selection
+component creation. Scene/Prefab evolution, broad old-object behavior, performance,
+release capability admission and the later Tuanjie port remain open. No complete
+DHE release claim is made.
+
+## Historical investigation: Unity serialization and physical reference storage
 
 See `../reports/dhe-unity-serialization-windows.md`. The unchanged full Current
 passes 46 business cases but fails added-field JSON reading on Base-47. The same

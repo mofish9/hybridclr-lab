@@ -1,6 +1,15 @@
 # Reference layout Current storage prototype
 
-## Current result and next gate
+## Current checkpoint
+
+The latest source-bound result is in `dhe-reference-storage-windows.md`.
+HybridCLR 8eb835a / IL2CPP 4b02c37 and immutable Base-58/59 pass cold-selection
+reference/generic identity, serialization/lifecycle and public failure recovery.
+The remaining reproduced failure is native type lookup after pre-selection
+component creation on the old-layout Base. This prototype remains unqualified.
+The results below preserve earlier candidates and are historical evidence.
+
+## Historical Base-52/53 result
 
 See `dhe-unity-serialization-windows.md` for all source-bound evidence. The
 current locked runtime is HybridCLR `e403775`, IL2CPP Unity 2022 `6d0f642`,
