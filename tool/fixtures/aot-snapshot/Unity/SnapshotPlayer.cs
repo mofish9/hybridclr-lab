@@ -55,7 +55,7 @@ namespace HybridCLR.Lab.Snapshot
                 var unityType = typeof(ValueLayout.Factory).Assembly.GetType("HybridCLR.Lab.UnityCases.EvolvingBehaviour");
                 if (unityType != null) result.unityBaseDelta = (int)unityType.GetField("Delta", System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.Static).GetRawConstantValue();
                 UnityReferenceCachePlayer referenceCache = Array.IndexOf(args, "-unityReferenceCacheProbe") >= 0
-                    ? UnityReferenceCachePlayer.Capture(unityType, result.unityBaseDelta) : null;
+                    ? UnityReferenceCachePlayer.Capture(unityType) : null;
                 var moduleState = typeof(ValueLayout.Factory).Assembly.GetType("HybridCLR.Lab.ModuleEvolution.ModuleState");
                 System.Reflection.FieldInfo moduleConstant = null;
                 if (moduleState != null)

@@ -1,6 +1,7 @@
 using System.Diagnostics;
 using System.Security.Cryptography;
 using System.Text.Json;
+using HybridCLR.DheTool;
 
 internal static class UnitySerializationWorkflow
 {
@@ -15,6 +16,8 @@ internal static class UnitySerializationWorkflow
         bool generic = args[5].StartsWith("reference-generic", StringComparison.Ordinal);
         bool lifecycle = args[5].StartsWith("full-unity", StringComparison.Ordinal);
         bool cached = args[5].EndsWith("-cached", StringComparison.Ordinal);
+        bool? currentReferenceStorageSelected = null;
+        string cacheCurrentModelSha256 = null;
         string lab = Path.GetFullPath(args[0]), tool = Path.GetFullPath(args[1]), proof = Path.GetFullPath(args[2]),
             source = Path.GetFullPath(args[3]), output = Path.GetFullPath(args[4]);
         if (Directory.Exists(output)) throw new IOException("Replay output must be new.");
@@ -34,6 +37,8 @@ internal static class UnitySerializationWorkflow
             if (cached && arguments.Contains("-snapshotResult"))
             {
                 start.ArgumentList.Add("-unityReferenceCacheProbe"); start.ArgumentList.Add("true");
+                start.ArgumentList.Add("-unityReferenceStorageSelected");
+                start.ArgumentList.Add(currentReferenceStorageSelected!.Value.ToString());
             }
             using var process = Process.Start(start)!;
             var stdout = process.StandardOutput.ReadToEndAsync(); var stderr = process.StandardError.ReadToEndAsync();
@@ -62,6 +67,27 @@ internal static class UnitySerializationWorkflow
             "-BaseBuildIdentity", Path.Combine(proof, "base/build-identity.json"), "-ImmutableFiles", player + "," + game, "-Output", Path.Combine(output, "stage.json"));
         var stageHashes = Directory.GetFiles(stage, "*", SearchOption.AllDirectories).ToDictionary(path => path, Hash);
         string reportPath = Path.Combine(output, "player.json"), log = reportPath + ".log";
+        if (cached)
+        {
+            string model = Path.Combine(source, "current/HybridCLR.ValueLayoutModel.dll");
+            var modelMv = MetaVersionSnapshot.Create(model);
+            uint typeToken = modelMv.Types.Single(type => type.Identity == "HybridCLR.Lab.UnityCases.EvolvingBehaviour").Token;
+            string baseId = Read(Path.Combine(proof, "base/build-identity.json")).GetProperty("baseId").GetString()!;
+            var resource = Read(Path.Combine(source, "resource/dhe-resource-update.json"));
+            cacheCurrentModelSha256 = Hash(model);
+            var declaredModel = resource.GetProperty("assemblies").EnumerateArray().Single(row =>
+                row.GetProperty("assemblyName").GetString() == modelMv.AssemblyName);
+            if (!string.Equals(cacheCurrentModelSha256, declaredModel.GetProperty("dllSha256").GetString(),
+                    StringComparison.OrdinalIgnoreCase))
+                throw new InvalidDataException("Cache expectation Model DLL is not the bound Current payload.");
+            var selection = resource.GetProperty("supportedBases").EnumerateArray().Single(row =>
+                row.GetProperty("baseId").GetString() == baseId);
+            var mode = selection.GetProperty("assemblyModes").EnumerateArray().Single(row =>
+                row.GetProperty("assemblyName").GetString() == modelMv.AssemblyName);
+            currentReferenceStorageSelected = mode.TryGetProperty("executionPlans", out var plans) &&
+                plans.ValueKind == JsonValueKind.Array && plans.EnumerateArray().Any(plan =>
+                    plan.GetProperty("currentStorageTypeTokens").EnumerateArray().Any(token => token.GetUInt32() == typeToken));
+        }
         Execute(player, true, "-batchmode", "-nographics", "-snapshotResult", reportPath, "-snapshotResourceRoot", stage,
             "-expectedRevision", "73", "-expectedAssemblies", "4", "-expectedModuleConstant", "202",
             callbacks ? "-unitySerializationCallbackProbe" : dispatch ? "-unityReferenceDispatchProbe" : generic ? "-unityReferenceGenericProbe" : reference ? "-unityReferenceProbe" : "-unitySerializationProbe", "true", "-logFile", log);
@@ -110,6 +136,7 @@ internal static class UnitySerializationWorkflow
         };
         string[] cacheChecks = cached ? OptionalChecks("referenceCacheChecks") : Array.Empty<string>();
         bool cachePassed = !cached || cacheChecks.SequenceEqual(cacheExpected) &&
+            lines.Count(line => line == "DHE reference cache selected storage: " + currentReferenceStorageSelected!.Value) == 1 &&
             lines.Where(line => line.StartsWith("DHE reference cache check: ")).Select(line => line.Substring("DHE reference cache check: ".Length)).SequenceEqual(cacheExpected) &&
             lines.Count(line => line == "DHE reference cache pass: 11") == 1;
         bool immutable = Hash(player) == playerHash && Hash(game) == gameHash && stageHashes.All(row => Hash(row.Key) == row.Value);
@@ -120,7 +147,8 @@ internal static class UnitySerializationWorkflow
             lines.Where(line => line.StartsWith("DHE case begin: ")).Select(line => line.Substring(16)).SequenceEqual(
                 Read(Path.Combine(source, "reference.json")).GetProperty("records").EnumerateArray().Select(row => row.GetString()));
         File.WriteAllText(Path.Combine(output, "result.json"), JsonSerializer.Serialize(new { passed, immutable, checks, expected = sequence,
-            lifecycle, lifecyclePassed, unityChecks, cached, cachePassed, cacheChecks, callbacks, callbackControl, callbackFixturePassed,
+            lifecycle, lifecyclePassed, unityChecks, cached, cachePassed, cacheChecks, currentReferenceStorageSelected,
+            cacheCurrentModelSha256, callbacks, callbackControl, callbackFixturePassed,
             error = report.GetProperty("error").GetString(), proof, source, labHead, playerSha256 = playerHash, gameAssemblySha256 = gameHash,
             hostSha256 = Hash(typeof(UnitySerializationWorkflow).Assembly.Location), toolSha256 = Hash(tool),
             resourceManifestSha256 = Hash(Path.Combine(source, "resource/dhe-resource-update.json")),

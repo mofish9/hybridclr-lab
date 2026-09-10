@@ -9,15 +9,22 @@ namespace HybridCLR.Lab.Snapshot
     {
         private Type cachedType;
         private FieldInfo cachedField;
-        private int cachedHash, baseDelta;
+        private int cachedHash;
+        private bool currentStorageSelected;
         private Dictionary<Type, int> keyed;
         private GameObject oldOwner;
         private Component oldObject;
 
-        internal static UnityReferenceCachePlayer Capture(Type type, int delta)
+        internal static UnityReferenceCachePlayer Capture(Type type)
         {
+            string[] arguments = Environment.GetCommandLineArgs();
+            int selection = Array.IndexOf(arguments, "-unityReferenceStorageSelected");
+            if (selection < 0 || selection + 1 >= arguments.Length ||
+                !bool.TryParse(arguments[selection + 1], out bool selected))
+                throw new InvalidOperationException("Cache fixture requires the bound execution plan's reference storage selection.");
             var state = new UnityReferenceCachePlayer { cachedType = type, cachedField = type.GetField("Value"),
-                cachedHash = type.GetHashCode(), baseDelta = delta, keyed = new Dictionary<Type, int> { [type] = 19 } };
+                cachedHash = type.GetHashCode(), currentStorageSelected = selected, keyed = new Dictionary<Type, int> { [type] = 19 } };
+            Console.WriteLine("DHE reference cache selected storage: " + selected);
             state.oldOwner = new GameObject("DHE pre-selection reference"); state.oldOwner.SetActive(false);
             state.oldObject = state.oldOwner.AddComponent(type); state.cachedField.SetValue(state.oldObject, 17);
             return state;
@@ -59,7 +66,7 @@ namespace HybridCLR.Lab.Snapshot
                 });
                 Check("cached-field-retains-old-object-storage", () => (int)cachedField.GetValue(oldObject) == 17);
                 Check("current-field-validates-physical-receiver", () => {
-                    if (baseDelta == 2) return (int)currentField.GetValue(oldObject) == 17;
+                    if (!currentStorageSelected) return (int)currentField.GetValue(oldObject) == 17;
                     try { currentField.GetValue(oldObject); return false; }
                     catch (ArgumentException error) { return error.Message.Contains("physical"); }
                 });
@@ -67,7 +74,7 @@ namespace HybridCLR.Lab.Snapshot
                     (int)cachedField.GetValue(oldObject) == 17 && (int)currentField.GetValue(fresh) == 41);
                 Check("current-code-casts-respect-physical-layout", () => {
                     var probe = typeof(ValueLayout.Factory).Assembly.GetType("HybridCLR.Lab.UnityReference.GenericReferenceCases", true);
-                    return (bool)probe.GetMethod("CheckPhysicalReceivers").Invoke(null, new object[] { oldObject, fresh, baseDelta == 2 });
+                    return (bool)probe.GetMethod("CheckPhysicalReceivers").Invoke(null, new object[] { oldObject, fresh, !currentStorageSelected });
                 });
             }
             catch (Exception error) { errors.Add(error.ToString()); }
