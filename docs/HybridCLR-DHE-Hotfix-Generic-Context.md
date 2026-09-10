@@ -104,3 +104,29 @@ as the passing selected-owner control. Separately replace the lifecycle oracle
 based on Delta with the bound resource plan; do not hide the observed coroutine
 Base-frame exception by weakening that test. Generic dispatch, native callbacks,
 reflection writes and all 46 business cases remain required regressions.
+
+## Typed reference dependency closure
+
+At e3d6604, Base-70 repairs all 18 generic reflection assertions cold and cached,
+using the exact failed Current02 bytes. The coroutine still enters a Base
+MoveNext guard and throws. The corrected lifecycle oracle passes its first five
+checks, then times out because the coroutine cannot progress. Its state machine
+retains a typed EvolvingBehaviour reference but the plan selects only the
+component's physical definition. Pointer width stayed constant; the field's
+physical type identity did not.
+
+Extend storage dependency analysis through concrete instance-field type
+references, including closed generic/array signatures and chains/cycles. Compute
+a fixed point before analyzing methods, rather than recursing through reference
+cycles as inline value layouts. Only existing hotfix definitions participate in
+this closure. An open generic field T alone must not select the entire generic
+definition; affected concrete arguments retain their runtime context mapping.
+Unrelated definitions remain AOT. Ordinary AOT source bytes remain immutable and
+their established admission/adapter checks are unchanged.
+
+First preserve failing planner tests for the actual state machine, unchanged
+constructor/body fingerprints, reference chains/cycles, arrays and an unaffected
+generic definition. Then change the planner and rerun package plan validation,
+the generic regression and actual Player suites. The existing Base-70 already
+supports physical selected owners: keep its executable and Current DLLs fixed
+and change only the generated resource plan. Do not weaken native frame guards.

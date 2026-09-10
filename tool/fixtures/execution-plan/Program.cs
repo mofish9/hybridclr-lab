@@ -9,6 +9,7 @@ using dnlib.DotNet;
 using dnlib.DotNet.Emit;
 
 if (args.Length > 0 && args[0] == "hotfix-generic") return HotfixGenericPlanTests.Run(args.Skip(1).ToArray());
+if (args.Length > 0 && args[0] == "reference-owner-plan") return ReferenceOwnerPlanTests.Run(args.Skip(1).ToArray());
 if (args.Length != 3 && args.Length != 4) throw new ArgumentException("<public-reflection artifact root> <new report.json> <DheTool.dll> [lab root]");
 string root = Path.GetFullPath(args[0]), output = Path.GetFullPath(args[1]);
 string labRoot = args.Length == 4 ? Path.GetFullPath(args[3]) : Path.GetFullPath("../../../../../..", AppContext.BaseDirectory);
