@@ -26,6 +26,23 @@ the lifecycle/identity failures. Existing ABI rejection guards remain intact.
 
 ## Original design and preceding compiler prototype
 
+The lightweight-wrapper gate also fails in native02: the isolated DheRuntime
+unit target does not include MetadataModule's implementation dependency. Move
+the wrapper definition beside the existing virtual/interface wrappers in
+MetadataModule.cpp; keep only its declaration in DheRuntime.h. Do not add a
+test-only stub or bypass the gate.
+
+The next behavioral candidate maps native `il2cpp_class_from_system_type`
+requests to selected reference execution storage before Unity caches class
+metadata. Allocation-only mapping occurs too late for those caches. For a
+reflected field physically declared by exactly that selected Current class,
+expose that physical declaring class for the managed receiver check. This does
+not make all Base/Current objects assignable, change cached field offsets, or
+relax any old call-frame guard. Extend real-header native compilation to include
+il2cpp-api.cpp. The preserved eleven serialization assertions and seventeen
+lifecycle assertions are the failing-before acceptance tests; public Type
+identity and pre-existing objects remain separate required gates.
+
 The uninstrumented runtime accepts a resource whose old-layout MonoBehaviour has
 an added long field in sidecar storage. Current reads/writes the field correctly,
 but Unity ToJson reports zero. The identical resource succeeds on a same-layout

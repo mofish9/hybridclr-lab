@@ -100,6 +100,7 @@ add_library(hybridclr_interpreter_compile_gate OBJECT
 )
 
 add_library(hybridclr_engine_reflection_compile_gate OBJECT
+    "${HYBRIDCLR_RUNTIME_ROOT}/il2cpp-api.cpp"
     "${HYBRIDCLR_RUNTIME_ROOT}/codegen/il2cpp-codegen-il2cpp.cpp"
     "${HYBRIDCLR_RUNTIME_ROOT}/metadata/CustomAttributeDataReader.cpp"
     "${HYBRIDCLR_RUNTIME_ROOT}/vm/Reflection.cpp"
