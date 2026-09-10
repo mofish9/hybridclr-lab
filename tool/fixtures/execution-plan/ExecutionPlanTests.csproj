@@ -16,6 +16,7 @@
     </AssemblyAttribute>
     <Compile Include="$(DhePackageRoot)/Runtime/DheExecutionPlan.cs" Link="Package/DheExecutionPlan.cs" />
     <Compile Include="$(DhePackageRoot)/Runtime/DheRuntime.cs" Link="Package/DheRuntime.cs" />
+    <Compile Include="$(DhePackageRoot)/Runtime/DheRuntime.Loading.cs" Link="Package/DheRuntime.Loading.cs" Condition="Exists('$(DhePackageRoot)/Runtime/DheRuntime.Loading.cs')" />
     <Compile Include="$(DhePackageRoot)/Runtime/LoadImageErrorCode.cs" Link="Package/LoadImageErrorCode.cs" />
     <Compile Include="$(DhePackageRoot)/Runtime/HomologousImageMode.cs" Link="Package/HomologousImageMode.cs" />
     <Compile Include="../../MetaVersion.cs" Link="Tool/MetaVersion.cs" />

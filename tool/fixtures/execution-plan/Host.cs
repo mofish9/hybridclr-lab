@@ -43,6 +43,30 @@ namespace HybridCLR
         public static uint[][] LastTypes, LastMethods;
         public static uint[][] LastConditional;
         public static int[] LastSourceKinds;
+        public static int NextPhase = 4;
+        public static LoadImageErrorCode NextCode = LoadImageErrorCode.OK;
+        public static bool ThrowOnCall;
+        public static Action OnCall;
+        // Existing argument-selection cases simulate separate native processes.
+        // This fixture-only reset never exists in the package or Player.
+        public static void SimulateNewProcess()
+        {
+            foreach (string field in new[] { "loadBusy", "nativeTouched", "metadataCommitted", "loadState", "nativeLoadPhase" })
+                typeof(DheRuntime).GetField(field, BindingFlags.NonPublic | BindingFlags.Static)?.SetValue(null, 0);
+            DheRuntime.Reset(); Calls = 0; LastTypes = LastMethods = null;
+            NextPhase = 4; NextCode = LoadImageErrorCode.OK; ThrowOnCall = false; OnCall = null;
+        }
+        public static LoadImageErrorCode LoadDifferentialHybridAssemblyBatchWithPhase(
+            byte[][] dlls, byte[][] before, byte[][] after, uint[][] types, uint[][] methods,
+            int[] sourceKinds, uint[][] excluded, uint[][] conditional, byte[][] interpreterDlls, out int phase)
+        {
+            Calls++; LastTypes = types.All(row => row == null) ? null : types;
+            LastMethods = methods.All(row => row == null) ? null : methods;
+            LastConditional = conditional; LastSourceKinds = sourceKinds;
+            phase = NextPhase; OnCall?.Invoke();
+            if (ThrowOnCall) throw new TypeInitializationException("<Module>", new InvalidOperationException("DHE deliberate public module failure"));
+            return NextCode;
+        }
         public static LoadImageErrorCode LoadMetadataForAOTAssembly(byte[] bytes, HomologousImageMode mode)
         { Calls++; return LoadImageErrorCode.OK; }
         public static LoadImageErrorCode LoadDifferentialHybridAssembliesWithMetaVersion(byte[][] dlls, byte[][] before, byte[][] after)

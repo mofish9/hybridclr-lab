@@ -124,7 +124,7 @@ JsonNode manifestDocument = Node(new { schemaVersion = 1, format = "hybridclr.dh
 void RunCase(string name, int baseIndex, Action<JsonNode, JsonNode, JsonNode, Provider> mutate, bool expected,
     bool reset = true, bool expectPlans = true)
 {
-    if (reset) { DheRuntime.Reset(); RuntimeApi.Calls = 0; RuntimeApi.LastTypes = RuntimeApi.LastMethods = null; }
+    if (reset) RuntimeApi.SimulateNewProcess();
     var provider = providers[baseIndex].Copy();
     var manifest = Clone(manifestDocument); var validation = Clone(validationDocument); var plan = Clone(planDocument);
     mutate?.Invoke(manifest, validation, plan, provider);

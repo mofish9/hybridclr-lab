@@ -15,6 +15,7 @@ if (args.Length > 0 && args[0] == "module-metaversion") return ModuleMetaVersion
 if (args.Length > 0 && args[0] == "module-resource-current") return ModuleResourceCompiler.Run(args.Skip(1).ToArray());
 if (args.Length > 0 && args[0] == "aot-module-new-base") return AotModuleWorkflow.NewBase(args.Skip(1).ToArray());
 if (args.Length > 0 && args[0] == "aot-module-current") return AotModuleWorkflow.Current(args.Skip(1).ToArray());
+if (args.Length > 0 && args[0] == "public-failure-workflow") return PublicFailureWorkflow.Run(args.Skip(1).ToArray());
 if (args.Length > 0 && args[0] == "aot-module-policy") return AotModulePolicyTests.Run(args.Skip(1).ToArray());
 if (args.Length > 0 && args[0] == "aot-module-next-base") return AotModuleWorkflow.NextBase(args.Skip(1).ToArray());
 if (args.Length > 0 && args[0] == "literal-current") return AotModuleWorkflow.LiteralCurrent(args.Skip(1).ToArray());
