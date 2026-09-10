@@ -16,6 +16,8 @@ internal static class UnityBehaviourWorkflow
 
     internal static int ReferenceCurrent(string[] args)
     {
+        if (args.Length == 6 && args[5] == "parent-insertion")
+            return CompileNativeProbe(args, "ParentEvolutionCases", "HybridCLR.Lab.ParentEvolution.Cases", false);
         if (args.Length == 6 && args[5] == "framework-callbacks")
             return CompileNativeProbe(args, "FrameworkCallbackCases", "HybridCLR.Lab.FrameworkCallbacks.Cases", false);
         if (args.Length == 6 && new[] { "virtual-signatures-base", "virtual-signatures-current" }.Contains(args[5]))
@@ -71,6 +73,20 @@ internal static class UnityBehaviourWorkflow
                 args.Length > 5 && args[5] == "interface-remove-methods" ? "REMOVE_INTERFACE_METHODS" :
                 args.Length > 5 && args[5] == "interface-remove-compiler" ? "INTERFACE_COMPILER_REMOVAL" : null);
         using var module = ModuleDefMD.Load(File.ReadAllBytes(merged));
+        if (fixture == "ParentEvolutionCases")
+        {
+            const string originalParent = "HybridCLR.Lab.VirtualSignatures.ProcessorRoot";
+            var receiver = module.Find("HybridCLR.Lab.VirtualSignatures.Processor", false)!;
+            var middle = module.Find("HybridCLR.Lab.ParentEvolution.ProcessorMiddle", false)!;
+            if (receiver.BaseType?.FullName != originalParent || middle.BaseType?.FullName != originalParent)
+                throw new InvalidDataException("Parent insertion requires the original root contract.");
+            var constructor = receiver.Methods.Single(method => method.IsInstanceConstructor);
+            var parentCalls = constructor.Body.Instructions.Where(instruction => instruction.OpCode == OpCodes.Call &&
+                instruction.Operand is IMethod method && method.Name == ".ctor" && method.DeclaringType.FullName == originalParent).ToArray();
+            if (parentCalls.Length != 1) throw new InvalidDataException("Expected one original direct parent constructor call.");
+            receiver.BaseType = middle;
+            parentCalls[0].Operand = middle.Methods.Single(method => method.IsInstanceConstructor);
+        }
         if (fixture == "UnityDeclarationCases")
         {
             var receiver = module.Find("HybridCLR.Lab.UnityCases.EvolvingBehaviour", false)!;

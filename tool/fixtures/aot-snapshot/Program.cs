@@ -25,6 +25,8 @@ if (args.Length > 0 && args[0] == "method-declaration-policy") return MethodDecl
 if (args.Length > 0 && args[0] == "declaration-base-inputs") return DeclarationWorkflow.BaseInputs(args.Skip(1).ToArray());
 if (args.Length > 0 && args[0] == "virtual-signature-reference") return VirtualSignatureWorkflow.Reference(args.Skip(1).ToArray());
 if (args.Length > 0 && args[0] == "framework-callback-reference") return FrameworkCallbackWorkflow.Reference(args.Skip(1).ToArray());
+if (args.Length > 0 && args[0] == "parent-evolution-reference") return ParentEvolutionWorkflow.Reference(args.Skip(1).ToArray());
+if (args.Length > 0 && args[0] == "parent-evolution-replay") return ParentEvolutionWorkflow.Replay(args.Skip(1).ToArray());
 if (args.Length > 0 && args[0] == "framework-callback-replay") return FrameworkCallbackWorkflow.Replay(args.Skip(1).ToArray());
 if (args.Length > 0 && args[0] == "virtual-signature-policy") return VirtualSignaturePolicyTests.Run(args.Skip(1).ToArray());
 if (args.Length > 0 && args[0] == "virtual-signature-noop") return VirtualSignatureWorkflow.Noop(args.Skip(1).ToArray());
