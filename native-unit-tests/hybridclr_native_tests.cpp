@@ -763,6 +763,15 @@ namespace
 		klass->method_count = 2;
 		hybridclr::native_test::ConfigureDheResolver(&assembly, &image, klass);
 
+        const uint64_t preGuardQueries = hybridclr::native_test::GetDheResolverEnumerationCount();
+        CHECK(hybridclr::dhe::ResolveAotGuardMethodByToken(assembly.aname.name, changed.token) == nullptr);
+        CHECK(hybridclr::dhe::ResolveAotGuardMethodByToken(nullptr, changed.token) == nullptr);
+        CHECK(hybridclr::dhe::ResolveAotGuardMethodByToken(assembly.aname.name, 0) == nullptr);
+        CHECK(hybridclr::native_test::GetDheResolverEnumerationCount() == preGuardQueries);
+        // Metadata preparation still needs the original resolver before publication.
+        CHECK(hybridclr::dhe::ResolveMethodByToken(assembly.aname.name, changed.token) == &changed);
+        CHECK(hybridclr::native_test::GetDheResolverEnumerationCount() > preGuardQueries);
+
 		// Exercise the production transaction entry point. It must resolve and
 		// prepare all changed methods before publishing the assembly state.
 		klass->token = 0x02000002;
@@ -805,6 +814,13 @@ namespace
         CHECK(hybridclr::dhe::ShouldDispatchToInterpreter(&changed));
         CHECK(!hybridclr::dhe::ShouldDispatchToInterpreter(&unchanged));
 
+        const uint64_t publishedGuardQueries = hybridclr::native_test::GetDheResolverEnumerationCount();
+        CHECK(hybridclr::dhe::ResolveAotGuardMethodByToken(assembly.aname.name, changed.token) == &changed);
+        CHECK(hybridclr::dhe::ResolveAotGuardMethodByToken(assembly.aname.name, unchanged.token) == nullptr);
+        CHECK(hybridclr::dhe::ResolveAotGuardMethodByToken("Unregistered", changed.token) == nullptr);
+        CHECK(hybridclr::dhe::ResolveAotGuardMethodByToken(assembly.aname.name, 0x0600ffffu) == nullptr);
+        CHECK(hybridclr::native_test::GetDheResolverEnumerationCount() == publishedGuardQueries);
+
         std::atomic<int> lookupFailures{ 0 };
         std::vector<std::thread> lookupThreads;
         for (int threadIndex = 0; threadIndex < 4; ++threadIndex)
@@ -813,7 +829,9 @@ namespace
                 for (int iteration = 0; iteration < 10000; ++iteration)
                 {
                     if (!hybridclr::dhe::IsChangedMethod(&changed) ||
-                        hybridclr::dhe::IsChangedMethod(&unchanged))
+                        hybridclr::dhe::IsChangedMethod(&unchanged) ||
+                        hybridclr::dhe::ResolveAotGuardMethodByToken("DheNativeResolver", changed.token) != &changed ||
+                        hybridclr::dhe::ResolveAotGuardMethodByToken("DheNativeResolver", unchanged.token) != nullptr)
                     {
                         lookupFailures.fetch_add(1, std::memory_order_relaxed);
                         return;
@@ -826,6 +844,7 @@ namespace
             thread.join();
         }
         CHECK(lookupFailures.load(std::memory_order_relaxed) == 0);
+        CHECK(hybridclr::native_test::GetDheResolverEnumerationCount() == publishedGuardQueries);
         CHECK(GeneratedLikeDheEntry(1, &changed) == 101);
         CHECK(GeneratedLikeDheEntry(2, &unchanged) == 4);
 
@@ -930,6 +949,7 @@ namespace
 		CHECK(!hybridclr::dhe::IsDheAssembly(&assembly));
 		CHECK(!changed.isInterpterImpl);
 		CHECK(changed.methodPointerCallByInterp == previousChangedPointer);
+        CHECK(hybridclr::dhe::ResolveAotGuardMethodByToken(assembly.aname.name, changed.token) == nullptr);
 
 		// A complete hotfix set is one dispatch transaction. An invalid method
 		// in the second assembly must leave the first assembly unpublished; a
@@ -1254,6 +1274,7 @@ namespace
 		CHECK(hybridclr::dhe::IsRemovedType(klass));
 		CHECK(hybridclr::dhe::IsChangedMethod(&changed));
 		CHECK(hybridclr::dhe::IsRemovedMethod(&changed));
+        CHECK(hybridclr::dhe::ResolveAotGuardMethodByToken(assembly.aname.name, changed.token) == &changed);
 #if defined(HYBRIDCLR_DHE_HAS_CURRENT_IMAGE_PLAN)
         CHECK(hybridclr::dhe::ResolveCurrentExecutionMethod(&changed) == &changed);
 #endif

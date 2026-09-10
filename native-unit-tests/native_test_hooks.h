@@ -38,5 +38,6 @@ namespace native_test
     // the standalone test executable uses this explicit fixture instead.
     void ConfigureDheResolver(Il2CppAssembly* assembly, Il2CppImage* image, Il2CppClass* klass);
     void ClearDheResolver();
+    uint64_t GetDheResolverEnumerationCount();
 }
 }

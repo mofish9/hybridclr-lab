@@ -49,3 +49,29 @@ The earlier host command has been removed from the workflow. Compare package
 requests with the independent MV compiler using both real script-only and final
 stripped inputs, then rebuild a new Base. Existing immutable Players are never
 patched to accommodate a changed token table.
+
+## Final-strip correction and startup finding
+
+Package `6859fb4`, lab `d791cd9`: the package inventory policy passes 13 checks
+in `artifacts/dhe-complete-ordinary-guards-20260910/policy-01/result.json`.
+Proof-14 then completes the final native build and full ordinary coverage:
+40 assemblies, 49,084 executable method requests, zero missing entries. The
+native manifest SHA is
+`280CEACF76228273BA50CC8116872A1B65F98735152457D2210678A5CF4A9BCF`.
+
+Base startup (PID 16168) spends over 211 CPU seconds before producing its
+business result. Three live stack samples in `startup-stack-01.json` under the
+same artifact root show SHA256Managed.RotateRight calling the generated guard,
+then ResolveMethodByToken -> ResolveMethodInAssembly -> Image.GetTypes during
+DheRuntime.Initialize. With no DHE publication, this metadata enumeration cannot
+select an interpreter method and is unnecessary. The sampled Player was stopped
+after preserving the diagnosis; no Player correctness pass is claimed.
+
+The next fix gives generated AOT guards a published-state-only lookup. It returns
+only changed/removed Base methods and never enumerates metadata or allocates
+classes. Keep the original resolver for pre-publication metadata preparation.
+Tests must cover empty/unregistered/unchanged states, changed and removed tokens,
+failed publication and concurrent reads, requiring zero metadata enumerations.
+The lookup uses the existing immutable release/acquire publication and introduces
+no additional mutable cache. Rebuild a new Player to qualify startup and all
+existing frozen-entry capabilities; never modify proof-14's native binaries.

@@ -341,8 +341,10 @@ namespace vm
         return inst;
     }
 
+    static std::atomic<uint64_t> s_dheResolverEnumerations{ 0 };
     void Image::GetTypes(const Il2CppImage* image, bool, TypeVector* target)
     {
+        s_dheResolverEnumerations.fetch_add(1, std::memory_order_relaxed);
         if (target)
         {
             target->clear();
@@ -514,6 +516,11 @@ namespace native_test
 		}
 		s_dheResolvers.push_back({ assembly, image, klass });
 	}
+
+    uint64_t GetDheResolverEnumerationCount()
+    {
+        return il2cpp::vm::s_dheResolverEnumerations.load(std::memory_order_relaxed);
+    }
 
 	void ClearDheResolver()
 	{
