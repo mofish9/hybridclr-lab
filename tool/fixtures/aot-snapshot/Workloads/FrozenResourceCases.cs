@@ -31,9 +31,19 @@ namespace HybridCLR.Lab.ResourceCases
 
         public static string[] Run()
         {
+            string selected = null;
+            string[] arguments = Environment.GetCommandLineArgs();
+            for (int i = 0; i < arguments.Length; i++)
+                if (arguments[i] == "-dheResourceCase")
+                {
+                    Require(selected == null && i + 1 < arguments.Length, "invalid-case-selector");
+                    selected = arguments[++i];
+                }
             var records = new List<string>(); object marker = new object(); Payload value = Make(17, marker);
             Action<string, Action> test = (name, action) => {
+                if (selected != null && name != selected) return;
                 Console.WriteLine("DHE case begin: " + name); action(); records.Add(name);
+                Console.WriteLine("DHE case pass: " + name);
             };
             test("ordinary-echo", () => Value(NativeBoundary.Echo(value), 17, marker, "ordinary-echo"));
             test("ordinary-box-copy", () => Value((Payload)NativeBoundary.FrozenCopyBox(value), 17, marker, "ordinary-box-copy"));
@@ -123,6 +133,7 @@ namespace HybridCLR.Lab.ResourceCases
                 gate.Set(); for (int i = 0; i < threads.Length; i++) Require(threads[i].Join(5000) && success[i], "concurrent-worker-" + i);
                 gate.Close(); Require(ConcurrentCounter.Runs == 1, "concurrent-cctor-once");
             });
+            Require(selected == null || records.Count == 1, "unknown-case-selector");
             return records.ToArray();
         }
 

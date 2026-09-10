@@ -68,3 +68,12 @@ call resolution, map both class and method generic arguments, re-inflate the
 same definition only when arguments change, then select any Current body. Keep
 the shared logical token/reflection cache unchanged. Re-run the exact Current
 bytes and existing core native-dispatch assertions on a new immutable Player.
+
+For diagnosis, the same C# suite can select one case using `-dheResourceCase`.
+`frozen-resource-cases` launches a fresh Player for every reference case, checks
+that exactly that case began and passed, and retains all failures with process
+IDs and result/log hashes. Player binaries and all staged resources must remain
+unchanged. This separates independent failures from a previous case's damaged
+stack or failed initializer. It does not waive the complete default run or the
+same-Current multi-Base gate, and older payloads without a selector cannot pass
+the isolated-case gate.

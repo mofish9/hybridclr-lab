@@ -14,6 +14,7 @@ if (args.Length > 0 && args[0] == "frozen-aot-policy") return FrozenAotPolicy.Ru
 if (args.Length > 0 && args[0] == "frozen-resource-binding") return FrozenResourceBinding.Run(args.Skip(1).ToArray());
 if (args.Length > 0 && args[0] == "frozen-admission-policy") return FrozenAdmissionPolicy.Run(args.Skip(1).ToArray());
 if (args.Length > 0 && args[0] == "frozen-resource-workflow") return FrozenResourceWorkflow.Run(args.Skip(1).ToArray());
+if (args.Length > 0 && args[0] == "frozen-resource-cases") return FrozenResourceDiagnostics.Run(args.Skip(1).ToArray());
 if (args.Length > 0 && args[0] == "frozen-resource-reference") return FrozenResourceWorkflow.Reference(args.Skip(1).ToArray());
 if (args.Length > 0 && args[0] == "frozen-resource-new-base") return FrozenResourceWorkflow.NewBase(args.Skip(1).ToArray());
 if (args.Length > 0 && args[0] == "ordinary-guard-policy") return OrdinaryGuardPolicy.Run(args.Skip(1).ToArray());
