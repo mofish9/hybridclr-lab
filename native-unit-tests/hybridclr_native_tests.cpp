@@ -1330,6 +1330,7 @@ namespace
             physicalCurrent.token = changed.token;
             hybridclr::native_test::SetAOTMetadataAvailable(true);
             auto CheckFrozenFrame = [&](bool mapped, bool frozen, bool expected) {
+                std::cout << "Frozen receiver frame: mapped=" << mapped << ", frozen=" << frozen << ", expected=" << expected << std::endl;
                 auto registration = frozenRegistration;
                 if (!frozen) registration.source = hybridclr::dhe::CurrentImageSource{};
                 if (mapped) CHECK(hybridclr::dhe::RegisterLogicalMethodMapping(&assembly, &physicalCurrent, &changed));
@@ -2714,6 +2715,7 @@ static void TestDheReferenceInterfaceQuery()
 
 int main()
 {
+    std::cout.setf(std::ios::unitbuf);
 #if defined(HYBRIDCLR_DHE_HAS_REFERENCE_INTERFACE_QUERY)
     TestDheReferenceInterfaceQuery();
 #endif
