@@ -192,6 +192,9 @@ internal static class FrozenResourceWorkflow
             checks["standard-resource-player-" + index] = result.GetProperty("passed").GetBoolean() && result.GetProperty("resourceUpdate").GetBoolean() &&
                 result.GetProperty("revision").GetInt32() == Read(referenceFile).GetProperty("revision").GetInt32() &&
                 result.GetProperty("sentinel").GetInt32() == 5 && (expected.Length == FrozenResourceCasesCompiler.CaseCount || expected.Length == 4);
+            if (expected.Length == FrozenResourceCasesCompiler.CaseCount)
+                checks["complete-reference-case-sequence-" + index] = File.ReadAllLines(report + ".log")
+                    .Where(line => line.StartsWith("DHE case begin: ")).Select(line => line.Substring(16)).SequenceEqual(expected);
             string snapshotAsset = Path.Combine(stage, "payload/frozen-aot", result.GetProperty("baseId").GetString()!, "snapshot.json");
             if (File.Exists(snapshotAsset))
             {
