@@ -468,7 +468,7 @@ string GitHead(string directory)
 }
 File.WriteAllText(output, JsonSerializer.Serialize(new { passed = cases.Values.All(value => value),
     scope = "Package resource validation and native argument selection on .NET host; native calls are recorded, not executed",
-    cases, errors, sourceInputs = root, labHead = GitHead(Path.GetFullPath("../../../../../..", AppContext.BaseDirectory)),
+    cases, errors, sourceInputs = root, labHead = GitHead(labRoot),
     packageHead = GitHead(packageRoot), hostSha256 = Hash(File.ReadAllBytes(Assembly.GetExecutingAssembly().Location)),
     toolSha256 = Hash(File.ReadAllBytes(args[2])), packageSources = new[] { "DheRuntime.cs", "DheExecutionPlan.cs", "LoadImageErrorCode.cs", "HomologousImageMode.cs" }
         .Select(name => new { path = name, sha256 = Hash(File.ReadAllBytes(Path.Combine(packageRoot, "Runtime", name))) }).ToArray() }, json));
