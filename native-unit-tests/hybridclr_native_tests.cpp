@@ -1358,7 +1358,9 @@ namespace
             }
             changed.flags = physicalCurrent.flags = METHOD_ATTRIBUTE_STATIC;
             physicalCurrent.token = executionCurrent.methods[0].token;
-            hybridclr::native_test::SetAOTMetadataAvailable(false);
+            // The enclosing registry suite keeps its metadata fixture enabled
+            // until all subsequent preparation/rollback checks have completed.
+            hybridclr::native_test::SetAOTMetadataAvailable(true);
         }
 #endif
 
