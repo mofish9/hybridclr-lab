@@ -13,7 +13,8 @@ internal static class FrozenEntryWorkflow
 
     public static int Run(string[] args)
     {
-        if (args.Length != 6) throw new ArgumentException("frozen-entry-workflow <lab> <package> <editor> <runtime manifest> <old fixture DLL root> <new output>");
+        if (args.Length < 6 || args.Length > 7 || (args.Length == 7 && args[6] != "all-ordinary-guards"))
+            throw new ArgumentException("frozen-entry-workflow <lab> <package> <editor> <runtime manifest> <old fixture DLL root> <new output> [all-ordinary-guards]");
         string fixtures = Path.GetFullPath(args[4]), inputs = Path.GetFullPath(args[5]) + ".inputs";
         if (Directory.Exists(inputs)) throw new IOException("Inputs must be new: " + inputs);
         Directory.CreateDirectory(inputs);
@@ -58,7 +59,8 @@ internal static class FrozenEntryWorkflow
             sentinel.Body.Instructions.Add(Instruction.Create(OpCodes.Ldc_I4, 137)); sentinel.Body.Instructions.Add(Instruction.Create(OpCodes.Ret));
             module.Write(nativeFile);
         }
-        return UnityWorkflow.Run(args.Take(4).Concat(new[] { inputs, args[5], "41", ":frozen-entry:" }).ToArray());
+        return UnityWorkflow.Run(args.Take(4).Concat(new[] { inputs, args[5], "41",
+            args.Length == 7 ? ":frozen-entry-all-guards:" : ":frozen-entry:" }).ToArray());
     }
 
     internal static void WriteGuardJson(string dll, string output, Func<MetaVersionMethod, bool> include = null)
@@ -68,6 +70,48 @@ internal static class FrozenEntryWorkflow
         File.WriteAllText(output, JsonSerializer.Serialize(new { mv.AssemblyName,
             methods = mv.Methods.Where(method => include == null || include(method)),
             mv.AssemblySha256 }, Json));
+    }
+
+    internal static void VerifyOrdinaryCoverage(AotAnalysisSnapshot snapshot, string inventoryRoot, string nativePath, string output)
+    {
+        JsonElement Read(string path) => JsonSerializer.Deserialize<JsonElement>(File.ReadAllText(path));
+        string Hash(string path) => Convert.ToHexString(SHA256.HashData(File.ReadAllBytes(path)));
+        var inventory = Read(Path.Combine(inventoryRoot, "ordinary-guard-inventory.json"));
+        var native = Read(nativePath);
+        var guarded = native.GetProperty("methods").EnumerateArray().Select(row =>
+            row.GetProperty("assemblyName").GetString() + ":" + row.GetProperty("stableMethodIdSha256").GetString()!.ToUpperInvariant()).ToHashSet();
+        var absent = native.GetProperty("interpreterOnlyMethods").EnumerateArray().Select(row =>
+            row.GetProperty("assemblyName").GetString() + ":" + row.GetProperty("stableMethodIdSha256").GetString()!.ToUpperInvariant()).ToHashSet();
+        var sources = inventory.GetProperty("sources").EnumerateArray().ToDictionary(row => row.GetProperty("assemblyName").GetString()!, StringComparer.Ordinal);
+        if (!sources.Keys.ToHashSet().SetEquals(snapshot.Assemblies.Where(source => !source.Dhe).Select(source => source.AssemblyName)))
+            throw new InvalidDataException("Ordinary guard inventory is not the complete final Base snapshot.");
+        var missing = new List<string>(); int requested = 0;
+        foreach (var source in snapshot.Assemblies.Where(source => !source.Dhe))
+        {
+            var row = sources[source.AssemblyName];
+            string file = Path.Combine(inventoryRoot, row.GetProperty("guardMvJson").GetString()!);
+            if (!Hash(file).Equals(row.GetProperty("guardMvJsonSha256").GetString(), StringComparison.OrdinalIgnoreCase))
+                throw new InvalidDataException("Ordinary guard request changed after inventory generation: " + file);
+            var mv = MetaVersionSnapshot.Create(source.Path);
+            uint[] excluded = source.ExcludedTypeTokens;
+            var typeIds = mv.Types.Where(type => excluded.Contains(type.Token)).Select(type => type.StableId).ToHashSet();
+            var expected = mv.Methods.Where(method => !typeIds.Contains(method.DeclaringTypeStableId)).ToArray();
+            var requestIds = Read(file).GetProperty("methods").EnumerateArray().Select(method =>
+                method.GetProperty("token").GetUInt32() + ":" + method.GetProperty("stableId").GetString()!.ToUpperInvariant()).OrderBy(value => value).ToArray();
+            if (!requestIds.SequenceEqual(expected.Select(method => method.Token + ":" + method.StableId.ToUpperInvariant()).OrderBy(value => value)))
+                throw new InvalidDataException("Ordinary guard request does not match final Base methods: " + source.AssemblyName);
+            foreach (var method in expected.Where(method => (method.Flags & 8u) != 0 && !method.IsAbstract && !method.IsPInvoke))
+            {
+                requested++;
+                string key = source.AssemblyName + ":" + method.StableId.ToUpperInvariant();
+                if (!guarded.Contains(key) && !absent.Contains(key)) missing.Add(key);
+            }
+        }
+        File.WriteAllText(Path.Combine(output, "ordinary-guard-coverage.json"), JsonSerializer.Serialize(new {
+            passed = missing.Count == 0, ordinaryAssemblyCount = sources.Count, requestedMethodCount = requested, missing,
+            snapshotSha256 = snapshot.Sha256, inventorySha256 = Hash(Path.Combine(inventoryRoot, "ordinary-guard-inventory.json")),
+            nativeManifestSha256 = Hash(nativePath), scope = "Final Base methods matched to complete generated guard requests and native coverage" }, Json));
+        if (missing.Count != 0) throw new InvalidDataException("Missing ordinary native guard coverage: " + string.Join(", ", missing.Take(12)));
     }
 
     internal static int Verify(string build, string output, string sourceEvidenceSha256 = null)
@@ -156,9 +200,9 @@ internal static class FrozenEntryWorkflow
 
     public static int Replay(string[] args)
     {
-        if (args.Length < 3 || args.Length > 4) throw new ArgumentException("replay-frozen-entry <existing proof root> <new output> <complete assembly order, comma separated> [core|nullable|generics|arrays-byref|old-values]");
+        if (args.Length < 3 || args.Length > 4) throw new ArgumentException("replay-frozen-entry <existing proof root> <new output> <complete assembly order, comma separated> [core|nullable|generics|collections|arrays-byref|old-values]");
         string capability = args.Length == 4 ? args[3] : "core";
-        if (!new[] { "core", "nullable", "generics", "arrays-byref", "old-values" }.Contains(capability))
+        if (!new[] { "core", "nullable", "generics", "collections", "arrays-byref", "old-values" }.Contains(capability))
             throw new ArgumentException("Unknown frozen entry capability: " + capability);
         string proof = Path.GetFullPath(args[0]), output = Path.GetFullPath(args[1]);
         if (Directory.Exists(output)) throw new IOException("Replay output must be new.");

@@ -162,6 +162,7 @@ internal static partial class Program
             return cli.Command.ToLowerInvariant() switch
             {
                 "version" => Version(cli),
+                "ordinary-guard-inventory" => GenerateOrdinaryGuardInventory(cli),
                 "mv" or "metaversion" => GenerateMetaVersion(cli),
                 "batch" => Batch(cli),
                 "base-registry" => BuildBaseRegistry(cli),
@@ -223,6 +224,14 @@ internal static partial class Program
         WriteJson(output, snapshot.ToJson(assembly));
         snapshot.WriteBinary(binary);
         Console.WriteLine("DHE MetaVersion: " + binary);
+        return 0;
+    }
+
+    private static int GenerateOrdinaryGuardInventory(Cli cli)
+    {
+        OrdinaryGuardInventory.Generate(RequireDirectory(cli.Require("aotroot"), "Stripped Base AOT root"),
+            Settings.Read(RequireFile(cli.Require("settingsfile"), "HybridCLR settings")).Dhe,
+            cli.Require("identitytype"), Path.GetFullPath(cli.Require("outputroot")));
         return 0;
     }
 
@@ -4364,10 +4373,12 @@ internal static partial class Program
         "channel-state, baseline-manifest, aot-metadata-manifest, preflight, workflow, " +
         "release-gate, regression, schema-validate, schema-gate, validate, archive, " +
         "doctor, verify-package, release-evidence, publish, install, new-adapter, " +
-        "new-config, assemble-runtime, native-tests, build-managed-cases, " +
+        "new-config, ordinary-guard-inventory, assemble-runtime, native-tests, build-managed-cases, " +
         "generate-test-manifest, generate-metadata-stress-source, reference, " +
         "compare-results, check-environment, clear-unity-project-locks, wait-editor, " +
         "prepare-engine-test-project, bootstrap-repos, tree-hash, file-hash",
+        "Ordinary guard inventory accepts -AotRoot, -SettingsFile, -IdentityType and a new -OutputRoot; " +
+        "it requests native guards for the complete stripped ordinary AOT set without changing hotfix scope.",
         "Base registry accepts -ExistingRegistry or comma-separated -BaseIdentities, " +
         "-BaselineRoots, -BaseNativeManifests, -EngineWorkflows, with optional " +
         "-PayloadVariantIds, -Labels, and -AotMetadataRoots. Retiring an online Base " +

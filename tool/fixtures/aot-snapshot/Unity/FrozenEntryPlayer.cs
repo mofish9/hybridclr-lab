@@ -156,6 +156,25 @@ namespace HybridCLR.Lab.Snapshot
                         object identity = consumer.GetMethod("OpenGenericCopy").MakeGenericMethod(current.GetType()).Invoke(null, new[] { current });
                         Check("open-generic-copy-preserves-added-fields", PreservesCurrent(identity));
                         break;
+                    case "collections":
+                        Type listType = typeof(List<>).MakeGenericType(current.GetType());
+                        var list = (System.Collections.IList)Activator.CreateInstance(listType);
+                        for (int i = 0; i < 40; i++) list.Add(current);
+                        Check("list-growth-preserves-current-values", list.Count == 40 && PreservesCurrent(list[0]) && PreservesCurrent(list[39]));
+                        list.Insert(5, current); list.RemoveAt(2);
+                        Array listArray = (Array)listType.GetMethod("ToArray").Invoke(list, null);
+                        Check("list-shift-and-to-array-preserve-current-values", listArray.Length == 40 && PreservesCurrent(listArray.GetValue(5)) && PreservesCurrent(listArray.GetValue(39)));
+                        Type dictionaryType = typeof(Dictionary<,>).MakeGenericType(typeof(int), current.GetType());
+                        var dictionary = (System.Collections.IDictionary)Activator.CreateInstance(dictionaryType);
+                        for (int i = 0; i < 40; i++) dictionary.Add(i, current);
+                        Check("dictionary-growth-preserves-current-values", dictionary.Count == 40 && PreservesCurrent(dictionary[0]) && PreservesCurrent(dictionary[39]));
+                        object[] lookup = { 37, null };
+                        bool found = (bool)dictionaryType.GetMethod("TryGetValue").Invoke(dictionary, lookup);
+                        Check("dictionary-try-get-value-preserves-current-byref", found && PreservesCurrent(lookup[1]));
+                        RuntimeApi.ResetDifferentialDispatchCounters();
+                        Check("unaffected-long-collections", UnchangedCollections() == 780L);
+                        Check("unaffected-long-collections-remain-aot", RuntimeApi.GetDifferentialAotEntryCount() > 0 && RuntimeApi.GetDifferentialInterpreterEntryCount() == 0);
+                        break;
                     case "arrays-byref":
                         Array values = Array.CreateInstance(current.GetType(), 2);
                         values.SetValue(current, 0);
@@ -206,5 +225,14 @@ namespace HybridCLR.Lab.Snapshot
         }
         [System.Runtime.CompilerServices.MethodImpl(System.Runtime.CompilerServices.MethodImplOptions.NoInlining)]
         private static long UnchangedNullable(long? value) => value.GetValueOrDefault(-1L);
+        [System.Runtime.CompilerServices.MethodImpl(System.Runtime.CompilerServices.MethodImplOptions.NoInlining)]
+        private static long UnchangedCollections()
+        {
+            var list = new List<long>(); var dictionary = new Dictionary<int, long>();
+            for (int i = 0; i < 40; i++) { list.Add(i); dictionary.Add(i, i); }
+            long sum = 0;
+            for (int i = 0; i < list.Count; i++) sum += list[i] + dictionary[i];
+            return sum / 2;
+        }
     }
 }

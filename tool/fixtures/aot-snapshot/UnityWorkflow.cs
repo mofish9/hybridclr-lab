@@ -9,7 +9,8 @@ internal static class UnityWorkflow
     {
         if (args.Length < 6 || args.Length > 8) throw new ArgumentException("unity-workflow <lab> <package> <editor> <runtime manifest> <fixture DLL root> <new output> [expected revision] [latest Current DLL root]");
         string expectedRevision = args.Length >= 7 ? int.Parse(args[6]).ToString() : "41";
-        bool frozenEntryProbe = args.Length == 8 && args[7] == ":frozen-entry:";
+        bool allOrdinaryGuards = args.Length == 8 && args[7] == ":frozen-entry-all-guards:";
+        bool frozenEntryProbe = args.Length == 8 && (args[7] == ":frozen-entry:" || allOrdinaryGuards);
         string latestCurrentRoot = args.Length == 8 && args[7] != ":evolve:" && !frozenEntryProbe ? Path.GetFullPath(args[7]) : null;
         bool synthesizeEvolution = args.Length == 8 && args[7] == ":evolve:";
         string lab = Path.GetFullPath(args[0]), package = Path.GetFullPath(args[1]), editor = Path.GetFullPath(args[2]),
@@ -18,7 +19,7 @@ internal static class UnityWorkflow
         Directory.CreateDirectory(output);
         string project = Path.Combine(output, "project"), build = Path.Combine(output, "base");
         string ordinaryGuardRoot = Path.Combine(output, "ordinary-guard-mv");
-        Directory.CreateDirectory(ordinaryGuardRoot);
+        if (!allOrdinaryGuards) Directory.CreateDirectory(ordinaryGuardRoot);
         string tool = Path.Combine(lab, "tool/bin/Release/net6.0/HybridCLR.DheTool.dll");
         string probe = Path.Combine(lab, "tool/fixtures/value-layout/bin/Release/net6.0/ValueLayoutTests.dll");
         string Execute(string exe, params string[] arguments)
@@ -70,9 +71,16 @@ internal static class UnityWorkflow
         Phase("Prepare");
         var prepared = JsonSerializer.Deserialize<JsonElement>(File.ReadAllText(Path.Combine(build, "adapter/prepare.json")));
         string stripped = prepared.GetProperty("currentSourceRoot").GetString();
-        FrozenEntryWorkflow.WriteGuardJson(Path.Combine(stripped, "HybridCLR.ValueLayoutNative.dll"),
-            Path.Combine(ordinaryGuardRoot, "HybridCLR.ValueLayoutNative.mv.json"));
-        if (frozenEntryProbe)
+        if (allOrdinaryGuards)
+        {
+            Execute("dotnet", tool, "ordinary-guard-inventory", "-AotRoot", stripped,
+                "-SettingsFile", Path.Combine(project, "ProjectSettings/HybridCLRSettings.asset"),
+                "-IdentityType", "HybridCLR.Lab.Snapshot.DheBuildIdentity", "-OutputRoot", ordinaryGuardRoot);
+        }
+        else
+            FrozenEntryWorkflow.WriteGuardJson(Path.Combine(stripped, "HybridCLR.ValueLayoutNative.dll"),
+                Path.Combine(ordinaryGuardRoot, "HybridCLR.ValueLayoutNative.mv.json"));
+        if (frozenEntryProbe && !allOrdinaryGuards)
         {
             // Diagnostic coverage for the Nullable<Payload> operations in this
             // fixture. This is not universal ordinary-AOT release coverage.
@@ -89,6 +97,7 @@ internal static class UnityWorkflow
             .Select(row => child == null ? row.GetString() : row.GetProperty(child).GetString()).ToArray();
         var snapshot = AotAnalysisSnapshot.Read(identityPath, identity.RootElement, Names("aotAssemblyNames"), Names("assemblies", "assemblyName"));
         string nativeManifest = Path.Combine(build, "native/dhe-native-manifest.json");
+        if (allOrdinaryGuards) FrozenEntryWorkflow.VerifyOrdinaryCoverage(snapshot, ordinaryGuardRoot, nativeManifest, output);
         var toolAssembly = System.Reflection.Assembly.LoadFrom(tool);
         toolAssembly.GetType("HybridCLR.DheTool.Program", true)
             .GetMethod("ValidateNativeFinalizeEvidence", System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.Static)

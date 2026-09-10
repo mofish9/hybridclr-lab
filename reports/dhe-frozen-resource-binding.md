@@ -28,3 +28,23 @@ ordinary-AOT guards and ABI obligations remain enforced during this work.
 Rollback boundary: lab generator/stager and package resource path validation.
 Runtime native code and existing Base Players are unchanged by these fixes.
 Bind every reported result to committed sources and preserve previous evidence.
+
+## Verified resource binding result (2026-09-10)
+
+Lab `471ee47`, package `f1111dc4a72454568563f40e44a1f8c405e59d67`:
+`artifacts/dhe-frozen-resource-binding-20260910/managed-01.json` passes 74 host
+checks. Native calls are recorded, not executed by this host fixture.
+
+`real-snapshot-02/result.json` in the same artifact root passes 29 checks using
+proof-12's immutable Base snapshot. This includes stale Current hashes,
+relabelled stale selections, all selection arrays, source DLL/MV substitution,
+the real resource-update CLI, frozen resource payload resolution, wrong Base
+and immutable-root rejection, no-op staging and stage-report schema validation.
+The original `real-snapshot-01` process was interrupted with no result; it is not
+passing evidence. The second run was started only after confirming no live
+process remained and used a new output directory.
+
+The valid evolved plan still produces a failed resource compatibility report
+because ordinary layout/native ABI admission is unresolved, and no publishable
+resource manifest is emitted. No-op resource staging preserves the Base MV tree
+and Player binary hashes. This does not qualify a frozen-source resource Player.
