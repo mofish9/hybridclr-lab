@@ -2327,24 +2327,29 @@ int main()
 #if HYBRIDCLR_LAB_HAS_NULLABLE_INTRINSIC_POLICY
     {
         using hybridclr::transform::CanUseNullableIntrinsic;
-        Il2CppClass underlying{}, canonical{}, fallback{};
+        // Il2CppClass has a trailing zero-length vtable in the real engine
+        // headers, so allocate its storage as other metadata fixtures do.
+        auto* underlying = static_cast<Il2CppClass*>(std::calloc(1, sizeof(Il2CppClass)));
+        auto* canonical = static_cast<Il2CppClass*>(std::calloc(1, sizeof(Il2CppClass)));
+        auto* fallback = static_cast<Il2CppClass*>(std::calloc(1, sizeof(Il2CppClass)));
         Il2CppGenericClass instance{};
-        canonical.generic_class = &instance;
-        canonical.nullabletype = true;
-        canonical.castClass = &underlying;
-        CHECK(CanUseNullableIntrinsic(&canonical));
+        canonical->generic_class = &instance;
+        canonical->nullabletype = true;
+        canonical->castClass = underlying;
+        CHECK(CanUseNullableIntrinsic(canonical));
         CHECK(!CanUseNullableIntrinsic(nullptr));
         // A same-named frozen interpreter definition is not the engine's
         // special Nullable class, even though its IL body is executable.
-        fallback.namespaze = "System"; fallback.name = "Nullable`1";
-        fallback.generic_class = &instance; fallback.castClass = &fallback;
-        CHECK(!CanUseNullableIntrinsic(&fallback));
-        fallback.castClass = &underlying;
-        CHECK(!CanUseNullableIntrinsic(&fallback));
-        canonical.castClass = &canonical;
-        CHECK(!CanUseNullableIntrinsic(&canonical));
-        canonical.castClass = nullptr;
-        CHECK(!CanUseNullableIntrinsic(&canonical));
+        fallback->namespaze = "System"; fallback->name = "Nullable`1";
+        fallback->generic_class = &instance; fallback->castClass = fallback;
+        CHECK(!CanUseNullableIntrinsic(fallback));
+        fallback->castClass = underlying;
+        CHECK(!CanUseNullableIntrinsic(fallback));
+        canonical->castClass = canonical;
+        CHECK(!CanUseNullableIntrinsic(canonical));
+        canonical->castClass = nullptr;
+        CHECK(!CanUseNullableIntrinsic(canonical));
+        std::free(fallback); std::free(canonical); std::free(underlying);
     }
 #endif
 #if HYBRIDCLR_LAB_HAS_CLASS_VIRTUAL_SLOTS
