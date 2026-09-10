@@ -16,10 +16,28 @@ internal static class InlineGuardTests
             .GroupBy(method => method.GetProperty("functionName").GetString()!).ToDictionary(group => group.Key, group => group.First());
         var guarded = methods.Select(method => Path.GetFullPath(method.GetProperty("sourceFile").GetString()!) + "\n" + method.GetProperty("functionName").GetString()).ToHashSet();
         var checks = new Dictionary<string, bool>(); var copies = new List<object>(); var missing = new List<string>();
-        string firstName = null, firstSignature = null; JsonElement firstPrimary = default;
+        string firstName = null, firstSignature = null, firstPrimaryName = null, firstPrimarySignature = null;
+        var sourceLines = new Dictionary<string, string[]>();
+        var signatures = new Dictionary<string, string>();
+        string[] Lines(string file)
+        {
+            if (!sourceLines.TryGetValue(file, out var lines)) sourceLines[file] = lines = File.ReadAllLines(file);
+            return lines;
+        }
+        string PrimarySignature(JsonElement indexed)
+        {
+            string name = indexed.GetProperty("functionName").GetString()!;
+            if (signatures.TryGetValue(name, out var signature)) return signature;
+            string[] lines = Lines(indexed.GetProperty("sourceFile").GetString()!);
+            for (int line = 0; line + 1 < lines.Length; ++line)
+                if (lines[line].Contains(name, StringComparison.Ordinal) && !lines[line].TrimEnd().EndsWith(";") &&
+                    lines[line + 1].Trim() == "{" && Regex.IsMatch(lines[line], @"\b" + Regex.Escape(name) + @"\s*\("))
+                    return signatures[name] = lines[line];
+            throw new InvalidDataException("Indexed definition missing: " + name);
+        }
         foreach (string file in Directory.GetFiles(manifest.GetProperty("generatedCppRoot").GetString()!, "*.cpp", SearchOption.AllDirectories))
         {
-            string[] lines = File.ReadAllLines(file);
+            string[] lines = Lines(file);
             for (int line = 0; line + 1 < lines.Length; ++line)
             {
                 if (!lines[line].Contains("IL2CPP_MANAGED_FORCE_INLINE") || lines[line].TrimEnd().EndsWith(";") || lines[line + 1].Trim() != "{") continue;
@@ -27,18 +45,19 @@ internal static class InlineGuardTests
                 if (!match.Success) continue;
                 string name = match.Groups["name"].Value, origin = name.Substring(0, name.Length - 7);
                 if (!primary.TryGetValue(origin, out var indexed)) continue;
-                DheInlineGuardPolicy.ValidateCopy(origin, indexed.GetProperty("nativeSignature").GetString()!, name, lines[line]);
+                string primarySignature = PrimarySignature(indexed);
+                DheInlineGuardPolicy.ValidateCopy(origin, primarySignature, name, lines[line]);
                 bool declared = guarded.Contains(Path.GetFullPath(file) + "\n" + name);
                 bool marker = lines[line + 2].Contains("HYBRIDCLR_DHE_GUARD_BEGIN_V1:" + name + ":");
                 if (!declared || !marker) missing.Add(file + ":" + (line + 1) + ":" + name);
                 copies.Add(new { file, line = line + 1, function = name, declared, marker });
-                if (firstName == null) { firstName = name; firstSignature = lines[line]; firstPrimary = indexed; }
+                if (firstName == null) { firstName = name; firstSignature = lines[line]; firstPrimaryName = origin; firstPrimarySignature = primarySignature; }
             }
         }
         checks["real-inline-copies-found"] = copies.Count >= 2;
         bool Reject(string name, string signature)
         {
-            try { DheInlineGuardPolicy.ValidateCopy(firstPrimary.GetProperty("functionName").GetString()!, firstPrimary.GetProperty("nativeSignature").GetString()!, name, signature); return false; }
+            try { DheInlineGuardPolicy.ValidateCopy(firstPrimaryName, firstPrimarySignature, name, signature); return false; }
             catch (InvalidDataException) { return true; }
         }
         checks["foreign-symbol-rejected"] = Reject(firstName + "_other", firstSignature);
