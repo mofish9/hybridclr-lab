@@ -29,6 +29,14 @@ Then rerun one identical Current on both Bases, full lifecycle/serialization,
 public preparation/recovery and unchanged AOT dispatch gates. Port to Tuanjie
 only after the Unity 2022 Windows candidate is stable.
 
+The source/report consolidation at lab `3fce4e5` builds host-04 successfully.
+`dhe-reference-identity-resource-audit-03.json` independently validates two Bases,
+46 business cases, four successful/restored runs and 126 files. Those runs have
+the optional reference probe disabled; the separately preserved eight failing
+identity assertions are not converted to a passing capability claim by this
+business/resource audit. Native03 remains bound to its original exact runtime
+commits; no native or Player rebuild is claimed for documentation/host changes.
+
 ## Allocation-only candidate result
 
 At lab `bb6f743`, HybridCLR `623e453` and IL2CPP `e9ba2a8`, both immutable
