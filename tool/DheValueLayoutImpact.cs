@@ -231,6 +231,7 @@ public static class DheValueLayoutImpact
                 foreach (TypeDef type in candidates)
                 {
                     var dependencies = new HashSet<string>(StringComparer.Ordinal);
+                    if (type.BaseType != null) CollectSelectedConcreteTypes(type.BaseType.ToTypeSig(), dependencies);
                     foreach (FieldDef field in type.Fields.Where(field => !field.IsStatic))
                         CollectSelectedConcreteTypes(field.FieldType, dependencies);
                     if (dependencies.Count == 0) continue;

@@ -109,6 +109,23 @@ internal static class ReferenceOwnerPlanTests
         }
         PackageBinding(fixturePlan, fixtureBefore, fixtureCurrent, "cycle-package-binding");
         checks["fixture-no-unsupported-changes"] = fixture.UnsupportedChanges.Length == 0;
+        string crossPath = Path.Combine(output, "ReferenceConsumers.dll");
+        using (var module = new ModuleDefUser("ReferenceConsumers.dll") { Kind = ModuleKind.Dll })
+        {
+            var assembly = new AssemblyDefUser("ReferenceConsumers", new Version(1, 0, 0, 0)); assembly.Modules.Add(module);
+            var type = new TypeDefUser("Cases", "CrossHolder", module.CorLibTypes.Object.TypeDefOrRef) { Attributes = TypeAttributes.Public };
+            module.Types.Add(type);
+            var reference = new TypeRefUser(module, "Cases", "Derived", new AssemblyRefUser(new AssemblyNameInfo("ReferenceOwners, Version=1.0.0.0, Culture=neutral, PublicKeyToken=null")));
+            type.Fields.Add(new FieldDefUser("Value", new FieldSig(new ClassSig(reference)), FieldAttributes.Public));
+            module.Write(crossPath);
+        }
+        var crossBefore = new[] { fixturePaths[0], crossPath }; var crossAfter = new[] { fixturePaths[1], crossPath };
+        var crossPlan = ResourceExecutionPlanner.Compile(crossBefore, crossAfter, Array.Empty<string>());
+        var crossType = MetaVersionSnapshot.Create(crossPath).Types.Single(type => type.Identity == "Cases.CrossHolder");
+        checks["unchanged-cross-assembly-owner-selected"] = crossPlan.Plans["ReferenceConsumers"].CurrentStorageTypeTokens.Contains(crossType.Token);
+        var reversed = ResourceExecutionPlanner.Compile(crossBefore.Reverse(), crossAfter.Reverse(), Array.Empty<string>());
+        checks["closure-independent-of-assembly-order"] = crossPlan.Plans.All(row =>
+            reversed.Plans[row.Key].CanonicalBinding() == row.Value.CanonicalBinding());
         bool passed = checks.Values.All(value => value);
         string Hash(string path) => Convert.ToHexString(SHA256.HashData(File.ReadAllBytes(path)));
         File.WriteAllText(Path.Combine(output, "result.json"), JsonSerializer.Serialize(new { passed, checks, plan, fixturePlan,
