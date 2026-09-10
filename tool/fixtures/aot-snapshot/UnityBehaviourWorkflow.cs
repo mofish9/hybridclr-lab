@@ -16,8 +16,10 @@ internal static class UnityBehaviourWorkflow
 
     internal static int ReferenceCurrent(string[] args)
     {
-        if (args.Length < 5 || args.Length > 6 || args.Length == 6 && args[5] != "generic")
-            throw new ArgumentException("unity-reference-current <lab> <Base proof> <Current DLL root> <editor> <new output> [generic]");
+        if (args.Length < 5 || args.Length > 6 || args.Length == 6 && args[5] != "generic" && args[5] != "dispatch")
+            throw new ArgumentException("unity-reference-current <lab> <Base proof> <Current DLL root> <editor> <new output> [generic|dispatch]");
+        if (args.Length == 6 && args[5] == "dispatch")
+            return CompileNativeProbe(args, "UnityReferenceDispatchCases", "HybridCLR.Lab.UnityReference.DispatchCases", false);
         if (args.Length == 6)
             return CompileNativeProbe(args, "UnityReferenceGenericCases", "HybridCLR.Lab.UnityReference.GenericReferenceCases", false);
         return CompileNativeProbe(args, "UnityReferenceCases", "HybridCLR.Lab.UnityReference.ReferenceCases", false);
