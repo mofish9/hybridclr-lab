@@ -1,5 +1,9 @@
 # Existing reference interfaces: Unity 2022 Windows
 
+The later compiler-produced method-flag removal is qualified separately in
+dhe-method-declarations-windows.md. It uses new native/package source and new
+Bases; it does not change the identities or historical limitations below.
+
 ## Result and limits
 
 Two immutable Players consume the same Current DLLs for each of three interface

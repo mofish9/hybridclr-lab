@@ -1,5 +1,12 @@
 # Method declaration evolution after implicit interface removal
 
+The compiler-removal checkpoint now passes on Unity 2022 Windows; see
+../reports/dhe-method-declarations-windows.md for exact sources, three-Base
+resources, cached MethodInfo checks, retained callback controls and recovery.
+The original design and reproduced failure below remain historical context.
+Reverse existing-method transitions, combined defaults and broader declarations
+still need explicit Player fixtures; the full DHE goal remains open.
+
 The full DHE goal includes ordinary C# edits to originally hotfix assemblies.
 Removing an implemented interface while retaining its public methods normally
 changes the compiler-emitted methods from virtual/final/newslot to nonvirtual.
