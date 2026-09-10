@@ -21,6 +21,7 @@ if (args.Length > 0 && args[0] == "unity-behaviour-current") return UnityBehavio
 if (args.Length > 0 && args[0] == "unity-serialization-current") return UnityBehaviourWorkflow.SerializationCurrent(args.Skip(1).ToArray());
 if (args.Length > 0 && args[0] == "unity-reference-current") return UnityBehaviourWorkflow.ReferenceCurrent(args.Skip(1).ToArray());
 if (args.Length > 0 && args[0] == "reference-interface-policy") return ReferenceInterfacePolicyTests.Run(args.Skip(1).ToArray());
+if (args.Length > 0 && args[0] == "method-declaration-policy") return MethodDeclarationPolicyTests.Run(args.Skip(1).ToArray());
 if (args.Length > 0 && args[0] == "hotfix-generic-body-current") return HotfixGenericBodyCurrent.Run(args.Skip(1).ToArray());
 if (args.Length > 0 && args[0] == "hotfix-generic-dispatch-replay") return HotfixGenericDispatchWorkflow.Replay(args.Skip(1).ToArray());
 if (args.Length == 3 && args[0] == "unity-behaviour-selection") { Console.WriteLine(UnityBehaviourSelection.Read(args[1], args[2])); return 0; }
