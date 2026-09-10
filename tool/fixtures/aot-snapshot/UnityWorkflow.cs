@@ -7,7 +7,9 @@ internal static class UnityWorkflow
 {
     public static int Run(string[] args)
     {
-        if (args.Length < 6 || args.Length > 8) throw new ArgumentException("unity-workflow <lab> <package> <editor> <runtime manifest> <fixture DLL root> <new output> [expected revision] [latest Current DLL root]");
+        if (args.Length < 6 || args.Length > 9) throw new ArgumentException("unity-workflow <lab> <package> <editor> <runtime manifest> <fixture DLL root> <new output> [expected revision] [latest Current DLL root] [tool.dll]");
+        string toolOverride = args.Length == 9 ? Path.GetFullPath(args[8]) : null;
+        if (args.Length == 9) args = args.Take(8).ToArray();
         string expectedRevision = args.Length >= 7 ? int.Parse(args[6]).ToString() : "41";
         bool mixedTransactionProbe = args.Length == 8 && args[7] == ":mixed-transaction:";
         bool allOrdinaryGuards = mixedTransactionProbe || args.Length == 8 && (args[7] == ":frozen-entry-all-guards:" || args[7] == ":all-ordinary-guards:");
@@ -21,7 +23,7 @@ internal static class UnityWorkflow
         string project = Path.Combine(output, "project"), build = Path.Combine(output, "base");
         string ordinaryGuardRoot = Path.Combine(output, "ordinary-guard-mv");
         if (!allOrdinaryGuards) Directory.CreateDirectory(ordinaryGuardRoot);
-        string tool = Path.Combine(lab, "tool/bin/Release/net6.0/HybridCLR.DheTool.dll");
+        string tool = toolOverride ?? Path.Combine(lab, "tool/bin/Release/net6.0/HybridCLR.DheTool.dll");
         string probe = Path.Combine(lab, "tool/fixtures/value-layout/bin/Release/net6.0/ValueLayoutTests.dll");
         string Execute(string exe, params string[] arguments)
         {
