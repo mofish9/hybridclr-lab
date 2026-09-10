@@ -1,5 +1,31 @@
 # Reference layout Current storage prototype
 
+## Allocation-only candidate result
+
+At lab `bb6f743`, HybridCLR `623e453` and IL2CPP `e9ba2a8`, both immutable
+`dhe-reference-storage-base-50` and `dhe-reference-storage-base-51` pass Base
+construction, startup and no-op resources. All artifacts are under
+`D:/hybridclr_artifacts`. The separate native gate in
+`dhe-reference-storage-native-01` fails because including MetadataModule.h from
+Object.cpp exposes the Windows max macro to the metadata parser's std::max.
+These Player builds do not override that failed gate.
+
+`dhe-reference-storage-resource-02` uses unchanged serialization Current04 on
+both supported Bases. Base-50 passes all 46 business cases and eleven native
+serialization assertions, then fails the lifecycle suite. Awake/OnDisable/
+OnDestroy still enter the old Base ABI guard, and RuntimeFieldInfo.GetValue
+rejects the object's same-named but different physical type. The constructor
+exception from the preceding prototype is absent, but allocation routing alone
+does not align Unity's cached callbacks and reflected field identities. This
+run stops on Base-50; it is not a two-Base pass.
+
+The next locked native source is HybridCLR `ca15268`, IL2CPP `b0cf8e3`: a
+lightweight DheRuntime.h wrapper fixes the include dependency only. It must
+receive a new source-bound native compile/CTest gate; it does not claim to fix
+the lifecycle/identity failures. Existing ABI rejection guards remain intact.
+
+## Original design and preceding compiler prototype
+
 The uninstrumented runtime accepts a resource whose old-layout MonoBehaviour has
 an added long field in sidecar storage. Current reads/writes the field correctly,
 but Unity ToJson reports zero. The identical resource succeeds on a same-layout
