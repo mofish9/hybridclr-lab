@@ -1,5 +1,34 @@
 # Reference layout Current storage prototype
 
+## Current result and next gate
+
+See `dhe-unity-serialization-windows.md` for all source-bound evidence. The
+current locked runtime is HybridCLR `e403775`, IL2CPP Unity 2022 `6d0f642`,
+package `2d7355f`. Native03 passes compile/CTest with real headers, including
+il2cpp-api.cpp. At lab `4b2cc49`, immutable Base-52/53 pass startup and no-op
+resources. Full Current04 passes all eleven serialization assertions on both.
+Old-layout Base-52 passes eleven lifecycle checks before reflection instance
+invocation fails; same-layout Base-53 passes all seventeen. The fourteen-check
+public reference fixture passes six on Base-52 and all fourteen on Base-53.
+
+Native type resolution now selects the physical class before Unity caches
+callbacks. Current physical field reflection works; public Type identity and
+reflection receiver compatibility are not solved. Keep the allocation/API/field
+changes together as an isolated prototype and do not merge into formal branches,
+change Installer defaults, or claim full DHE support. No performance/ARM64/Tuanjie
+qualification is present, and the experimental v32 capability contract has not
+yet qualified reference storage.
+
+Next define one public reference type identity without conflating physical
+layouts. Test Assembly.GetType/typeof/Object.GetType, reflection method calls,
+generic and inherited owners, cached Type/FieldInfo handles and objects created
+before selection. In particular, broadening logical IsInstanceOfType must not
+let Current field offsets access an old object. Preserve native ABI checks and
+add explicit physical receiver validation/adaptation before enabling such paths.
+Then rerun one identical Current on both Bases, full lifecycle/serialization,
+public preparation/recovery and unchanged AOT dispatch gates. Port to Tuanjie
+only after the Unity 2022 Windows candidate is stable.
+
 ## Allocation-only candidate result
 
 At lab `bb6f743`, HybridCLR `623e453` and IL2CPP `e9ba2a8`, both immutable
@@ -19,10 +48,10 @@ exception from the preceding prototype is absent, but allocation routing alone
 does not align Unity's cached callbacks and reflected field identities. This
 run stops on Base-50; it is not a two-Base pass.
 
-The next locked native source is HybridCLR `ca15268`, IL2CPP `b0cf8e3`: a
-lightweight DheRuntime.h wrapper fixes the include dependency only. It must
-receive a new source-bound native compile/CTest gate; it does not claim to fix
-the lifecycle/identity failures. Existing ABI rejection guards remain intact.
+The preceding intermediate native source was HybridCLR `ca15268`, IL2CPP
+`b0cf8e3`. Its lightweight wrapper addressed the include dependency only and
+failed the native02 unit compilation described below. It is superseded by the
+current source above; its failed evidence is retained.
 
 ## Original design and preceding compiler prototype
 
