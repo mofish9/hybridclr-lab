@@ -8,7 +8,7 @@ using HybridCLR.DheTool;
 internal static class FrozenStaticWorkflow
 {
     internal const string ProbeName = "HybridCLR.Lab.ResourceCases.FrozenStaticCases";
-    internal const int CaseCount = 14;
+    internal const int CaseCount = 15;
     private const string NativeName = "HybridCLR.ValueLayoutNative";
     private const string ModelName = "HybridCLR.ValueLayoutModel";
     private static string Hash(string path) => Convert.ToHexString(SHA256.HashData(File.ReadAllBytes(path)));

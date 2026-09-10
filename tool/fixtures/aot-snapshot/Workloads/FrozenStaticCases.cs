@@ -95,6 +95,19 @@ namespace HybridCLR.Lab.ResourceCases
                     Require(failed, "initializer-exception"); }
                 Require(NativeStaticCounters.FailureRuns == 1, "cached-initializer-failure");
             });
+            test("ordinary-static-unchanged-native-dispatch", () => {
+                // The reference host cannot call IL2CPP internal calls. The
+                // Player additionally proves that unaffected neighbor readers
+                // still enter AOT after frozen-source storage adaptation.
+                if (typeof(object).Assembly.GetName().Name == "mscorlib")
+                {
+                    HybridCLR.RuntimeApi.ResetDifferentialDispatchCounters();
+                    int neighbor = NativeStaticOwner.ReadNeighbor(); int runs = NativeStaticOwner.ReadRuns();
+                    int native = HybridCLR.RuntimeApi.GetDifferentialAotEntryCount();
+                    int interpreted = HybridCLR.RuntimeApi.GetDifferentialInterpreterEntryCount();
+                    Require(neighbor == 101 && runs == 1 && native >= 2 && interpreted == 0, "unchanged-readers-stay-aot");
+                }
+            });
             return records.ToArray();
         }
     }

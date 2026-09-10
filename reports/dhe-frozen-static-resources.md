@@ -65,3 +65,22 @@ Resource generation must require current-static-value-storage-v1 and shared-
 type-initialization-v1 for ordinary fields as well as hotfix fields. This is
 only an admission candidate until the same 45-case bytes execute in a real
 immutable Player. No native source has changed at this step.
+
+Lab `29f3d9d` passes all ten admission proof checks in `admission-02`, including
+rejections after removing each initializer/read/write/ref/clear selection.
+`resource-02` then passes all 45 cases on the original Base-27 (PID 18648), using
+the exact Current above. All 12 workflow checks pass: missing/corrupt Added
+rejections (8492/16704), full resource restoration (18944), snapshot substitution
+rejection (17708), restoration (13240), and immutable Player hashes. Required
+runtime capabilities include both Current static storage and shared type
+initialization. Current set is
+`272ca2a518ebb15ae99b77353b1cfe27d84ec9af022c12071400300f0f952e2f`; resource manifest
+`91B5F55DC2CFFE91E6FBFF464500BC7520F729EC96C45A2D50BB3540BA664E5D`.
+
+Add one further Current-only case to measure dispatch counters around the
+unaffected NativeStaticOwner neighbor/count readers after adaptation. The CLR
+host skips IL2CPP internal calls; the real Player must show two AOT entries and
+zero interpreted entries in that interval. This creates a separate 46-case
+Current without replacing the original 45-case evidence. The next Base has the
+grown Payload layout but the same ordinary Native definitions; both immutable
+Bases must consume the identical new Current. Runtime sources remain unchanged.
