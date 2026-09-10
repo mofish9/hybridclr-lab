@@ -26,6 +26,8 @@ internal static class AotModulePolicyTests
         var changedCctor = Edit("changed-cctor", module => module.GlobalType.Methods.Single(method => method.IsStaticConstructor)
             .Body.Instructions.Insert(0, Instruction.Create(OpCodes.Nop)));
         var removed = Edit("removed-cctor", module => module.GlobalType.Methods.Clear());
+        var constant = Edit("changed-constant", module => module.Find("HybridCLR.Lab.ModuleEvolution.ModuleState", false)!
+            .Fields.Single(field => field.Name == "ExpectedVersion").Constant = new ConstantUser(202));
         var values = new Dictionary<string, ResourceUpdateCompatibility>
         {
             ["no-op"] = ResourceUpdateCompatibility.Analyze(original, original),
@@ -33,6 +35,7 @@ internal static class AotModulePolicyTests
             ["changed-module-cctor"] = ResourceUpdateCompatibility.Analyze(original, changedCctor),
             ["removed-module-cctor"] = ResourceUpdateCompatibility.Analyze(original, removed),
             ["added-module-cctor"] = ResourceUpdateCompatibility.Analyze(removed, original),
+            ["changed-constant"] = ResourceUpdateCompatibility.Analyze(original, constant),
         };
         const string capability = "deferred-aot-module-initialization-v1";
         var checks = new Dictionary<string, bool>();
@@ -46,6 +49,29 @@ internal static class AotModulePolicyTests
             checks[pair.Key + ":candidate-runtime-accepted"] = ResourceUpdateCompatibility.CanExecuteUpdate(
                 ResourceUpdateCompatibility.RuntimeProtocol, ResourceUpdateCompatibility.CurrentNativeRuntimeContract,
                 ResourceUpdateCompatibility.KnownRuntimeCapabilities, pair.Value.RequiredRuntimeCapabilities);
+        }
+        const string constantCapability = "current-literal-field-values-v1";
+        checks["constant:capability-required"] = values["changed-constant"].RequiredRuntimeCapabilities.Contains(constantCapability);
+        checks["constant:old-runtime-rejected"] = !ResourceUpdateCompatibility.CanExecuteUpdate(
+            ResourceUpdateCompatibility.RuntimeProtocol, "dhe-runtime-v28",
+            ResourceUpdateCompatibility.KnownRuntimeCapabilities.Where(value => value != constantCapability),
+            values["changed-constant"].RequiredRuntimeCapabilities);
+        foreach (string mutation in new[] { "visibility", "literal-to-storage", "marshal", "offset", "missing-default" })
+        {
+            var invalid = Edit("constant-" + mutation, module => {
+                var field = module.Find("HybridCLR.Lab.ModuleEvolution.ModuleState", false)!
+                    .Fields.Single(field => field.Name == "ExpectedVersion");
+                field.Constant = new ConstantUser(202);
+                switch (mutation)
+                {
+                    case "visibility": field.Access = FieldAttributes.Public; break;
+                    case "literal-to-storage": field.IsLiteral = false; break;
+                    case "marshal": field.MarshalType = new RawMarshalType(new byte[] { 7 }); break;
+                    case "offset": field.FieldOffset = 4; break;
+                    case "missing-default": field.HasDefault = false; field.Constant = null; break;
+                }
+            });
+            checks["constant:" + mutation + "-rejected"] = !ResourceUpdateCompatibility.Analyze(original, invalid).Compatible;
         }
         bool passed = checks.Values.All(value => value);
         File.WriteAllText(Path.Combine(output, "result.json"), JsonSerializer.Serialize(new { passed, checks,

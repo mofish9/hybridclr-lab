@@ -86,3 +86,24 @@ Base-31 is being built from the exact Base-30 input DLLs on the new runtime and
 package, using host-02 at `1c57aee`. Its generated native manifest identifies the
 Model module cctor and records `deferModuleInitializer=true`. Do not qualify the
 timing fix until its startup/no-op and Current resource replays pass.
+
+## Constant evolution follow-up
+
+Base-31 startup (PID 9984) and no-op resource (PID 18500) now pass with
+`moduleRunsBeforeLoad=0`, followed by exactly one version-101 initializer.
+Both `resource-changed-01` and `resource-removed-01` fail resource validation:
+changing the existing `ExpectedVersion` literal from 101 to 202 changes the
+field metadata and static-field fingerprints. Preserve both outputs and the
+exact `current-changed-01/current` and `current-removed-01/current` inputs.
+
+The follow-up must admit only constant-value changes on otherwise identical
+static literal fields. Keep every existing MV fingerprint unchanged; add an
+analysis-only constant-independent fingerprint. Visibility, storage flags,
+layout, marshal and runtime-semantic attributes remain checked. IL2CPP must
+resolve existing literal defaults through the published Current token map,
+including reflection handles created before load, while ordinary AOT remains
+unchanged. Capability-gate this behavior because Base-31 has the old default
+reader. Build a new immutable Base from the exact Base-30 inputs, then replay
+the preserved resources plus explicit GetRawConstantValue/GetValue probes.
+No performance claim is made. Rollback is the preceding tool/package/IL2CPP
+combination, which rejects these updates before executing business code.
