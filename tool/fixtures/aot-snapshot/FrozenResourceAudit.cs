@@ -36,6 +36,19 @@ internal static class FrozenResourceAudit
         }
         string resultPath = Path.Combine(output, "result.json");
         var result = Read(resultPath);
+        string validationMode = result.TryGetProperty("validationMode", out var mode) ? mode.GetString()! : "";
+        string[] precommitExpected = {
+            "bad-current-hash-rejected", "hash-rejection-has-no-native-effects", "native-registration-rejected",
+            "native-metadata-prepared-before-rejection", "public-rejection-remains-retryable", "no-publication-or-initializer-effects",
+            "old-native-dispatch-preserved", "old-reflection-view-preserved", "pending-new-assemblies-hidden",
+            "prepared-native-graph-cannot-reset", "original-mv-restored", "corrected-public-retry-committed"
+        };
+        string[] unityExpected = {
+            "awake-current-value", "on-enable-current-value", "awake-diff-selection", "added-instance-field", "added-component-awake",
+            "start-current-value", "update-current-value", "late-update-current-value", "coroutine-resumed-across-frames",
+            "on-disable-current-value", "unchanged-reader-not-selected", "unchanged-reader-stays-aot", "added-reference-survives-gc",
+            "disable-not-repeated-on-destroy", "on-destroy-current-value", "real-multiple-frames"
+        };
         Require("workflow-passed", result.GetProperty("passed").GetBoolean() &&
             result.GetProperty("checks").EnumerateObject().All(check => check.Value.GetBoolean()));
         string[] expected = result.GetProperty("expected").EnumerateArray().Select(row => row.GetString()!).ToArray();
@@ -128,6 +141,26 @@ internal static class FrozenResourceAudit
                 Require(key + "-ordinary-module-eager-once", ordinaryBefore.GetInt32() == 1);
             if (report.GetProperty("passed").GetBoolean())
             {
+                void ProbeSequence(string property, string prefix, string[] sequence)
+                {
+                    Require(key + "-" + property + "-exact-sequence", report.GetProperty(property).EnumerateArray()
+                        .Select(row => row.GetString()).SequenceEqual(sequence) &&
+                        log.Where(line => line.StartsWith(prefix, StringComparison.Ordinal)).Select(line => line.Substring(prefix.Length)).SequenceEqual(sequence));
+                }
+                if (validationMode.Contains("precommit"))
+                {
+                    ProbeSequence("precommitChecks", "DHE public precommit check: ", precommitExpected);
+                    Require(key + "-retry-before-business-entry", Array.FindIndex(log, line => line == "DHE public precommit check: corrected-public-retry-committed") <
+                        Array.FindIndex(log, line => line.StartsWith("DHE case begin: ", StringComparison.Ordinal)));
+                }
+                if (validationMode.Contains("unity"))
+                {
+                    ProbeSequence("unityChecks", "DHE Unity check: ", unityExpected);
+                    Require(key + "-real-unity-completed", report.GetProperty("stage").GetString() == "unity-component-complete" &&
+                        log.Count(line => line == "DHE Unity component pass: 2:16") == 1 &&
+                        Array.FindLastIndex(log, line => line.StartsWith("DHE case begin: ", StringComparison.Ordinal)) <
+                        Array.FindIndex(log, line => line == "DHE Unity check: awake-current-value"));
+                }
                 Require(key + "-complete-sequence", begun.SequenceEqual(expected) && report.GetProperty("revision").GetInt32() == 73 &&
                     report.GetProperty("loadedAssemblies").GetInt32() == originalNames.Length);
                 if (moduleConstant.HasValue)
@@ -170,6 +203,8 @@ internal static class FrozenResourceAudit
             }
             else
             {
+                if (validationMode.Contains("unity"))
+                    Require(key + "-no-unity-entry", !log.Any(line => line.StartsWith("DHE Unity check: ", StringComparison.Ordinal)));
                 Require(key + "-no-business-entry", begun.Length == 0 && report.GetProperty("revision").GetInt32() == 0 &&
                     report.GetProperty("loadedAssemblies").GetInt32() == 0);
                 if (modules.Length != 0)
@@ -188,7 +223,7 @@ internal static class FrozenResourceAudit
         File.WriteAllText(args[2], JsonSerializer.Serialize(new { passed = true, workflowResultSha256 = Hash(resultPath),
             auditHostSha256 = Hash(typeof(FrozenResourceAudit).Assembly.Location),
             caseCount = expected.Length, baseCount = bases.Count, successfulRuns, rejectedRuns, expectedModuleInitializers = modules,
-            moduleInitializerTransitions,
+            moduleInitializerTransitions, validationMode,
             checks, rehashedFileCount = files.Count, files,
             scope = "Independent read-only original Base/Current identity and full successful/restored case-sequence audit; no performance or platform extrapolation"
         }, new JsonSerializerOptions { WriteIndented = true }));
