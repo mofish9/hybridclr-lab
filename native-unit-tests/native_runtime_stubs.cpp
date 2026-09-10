@@ -452,6 +452,7 @@ namespace hybridclr
 namespace
 {
     std::atomic<const MethodInfo*> s_supplementalMethod{nullptr};
+    std::atomic<const Il2CppType*> s_selectedBefore{nullptr}, s_selectedAfter{nullptr};
     std::atomic<const MethodInfo*> s_throwInterpreterMethodPointer{nullptr};
 }
 namespace native_test
@@ -464,6 +465,11 @@ namespace native_test
     }
 
     void ClearPhysicalTypes() { s_physicalTypes.clear(); }
+    void SetDhePhysicalSelection(const Il2CppType* before, const Il2CppType* after)
+    {
+        s_selectedAfter.store(after, std::memory_order_release);
+        s_selectedBefore.store(before, std::memory_order_release);
+    }
 
     void CaptureVmExceptions(bool enabled)
     {
@@ -574,6 +580,11 @@ namespace metadata
     class TestAotImage : public AOTHomologousImage
     {
     public:
+        const Il2CppType* GetDheExecutionType(const Il2CppType* type) override
+        {
+            return type == s_selectedBefore.load(std::memory_order_acquire)
+                ? s_selectedAfter.load(std::memory_order_acquire) : nullptr;
+        }
         const Il2CppType* ReadTypeFromResolutionScope(uint32_t, uint32_t, uint32_t) override { std::abort(); }
         const Il2CppType* GetModuleIl2CppType(uint32_t, uint32_t, uint32_t, bool) override { std::abort(); }
         const Il2CppType* GetIl2CppTypeFromRawTypeDefIndex(uint32_t) override { std::abort(); }

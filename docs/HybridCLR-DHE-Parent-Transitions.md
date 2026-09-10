@@ -60,3 +60,14 @@ custom binder execution, in addition to the original fourteen cached checks.
 Require committed native/package/tool sources, real-header compile/CTest and a
 new immutable Base before replaying the exact failing Current. No throughput or
 memory improvement is inferred from this correctness correction.
+
+Base-96 on runtime1147772 passes build/startup and its 25-check AOT no-op, but
+both original transition resources now fail at RuntimeFieldInfo.GetValue's
+native entry, before business execution, with the Current-frame ABI guard.
+The frozen image intentionally returns no public Current declaration for an
+unchanged framework owner. Native frame admission mistakenly requires that
+declaration. Use the authenticated frozen source plus its exact Current-to-Base
+method mapping as the owner identity proof, while retaining physical signature
+checks and rejecting any selected receiver/ancestor storage. Require a separate
+frozen-base-instance-frames capability; Base-96 cannot acquire the fix by changing
+its recorded inventory. Preserve both failures and build another immutable Base.

@@ -1320,6 +1320,47 @@ namespace
         physicalCurrent.token = executionCurrent.methods[0].token;
 #endif
 
+#if HYBRIDCLR_LAB_HAS_FROZEN_FIELD_VALIDATION
+        // Frozen sources deliberately expose no Current declaration for an
+        // unchanged owner. Exact Base method mapping supplies that identity;
+        // both the owner and every physical parent must remain unselected.
+        {
+            changed.flags = physicalCurrent.flags = 0;
+            changed.return_type = physicalCurrent.return_type = &scalarType;
+            physicalCurrent.token = changed.token;
+            hybridclr::native_test::SetAOTMetadataAvailable(true);
+            auto CheckFrozenFrame = [&](bool mapped, bool frozen, bool expected) {
+                auto registration = frozenRegistration;
+                if (!frozen) registration.source = hybridclr::dhe::CurrentImageSource{};
+                if (mapped) CHECK(hybridclr::dhe::RegisterLogicalMethodMapping(&assembly, &physicalCurrent, &changed));
+                CHECK(hybridclr::dhe::PrepareAndRegisterMetaVersions({ registration }));
+                CHECK(hybridclr::dhe::CanEnterWithBaseAbi(&changed) == expected);
+                CHECK(hybridclr::dhe::ResolveInterpreterMethod(&changed) == &physicalCurrent);
+                hybridclr::dhe::ResetForTests(); physicalCurrent.isInterpterImpl = false;
+            };
+            CheckFrozenFrame(false, true, false);
+            CheckFrozenFrame(true, false, false);
+            CheckFrozenFrame(true, true, true);
+            hybridclr::native_test::SetDhePhysicalSelection(&klass->byval_arg, &executionClass->byval_arg);
+            CheckFrozenFrame(true, true, false);
+            hybridclr::native_test::SetDhePhysicalSelection(nullptr, nullptr);
+            auto* parent = static_cast<Il2CppClass*>(std::calloc(1, sizeof(Il2CppClass)));
+            CHECK(parent != nullptr);
+            if (parent)
+            {
+                parent->image = klass->image; klass->parent = parent;
+                CheckFrozenFrame(true, true, true);
+                hybridclr::native_test::SetDhePhysicalSelection(&parent->byval_arg, &executionClass->byval_arg);
+                CheckFrozenFrame(true, true, false);
+                hybridclr::native_test::SetDhePhysicalSelection(nullptr, nullptr);
+                klass->parent = nullptr; std::free(parent);
+            }
+            changed.flags = physicalCurrent.flags = METHOD_ATTRIBUTE_STATIC;
+            physicalCurrent.token = executionCurrent.methods[0].token;
+            hybridclr::native_test::SetAOTMetadataAvailable(false);
+        }
+#endif
+
         // A selected body with unchanged physical array/reference/value types
         // can use the Base frame. Logical equality or equal sizes are not proof.
         // Unknown types and different physical representations remain rejected.

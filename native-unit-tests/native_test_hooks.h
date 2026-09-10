@@ -40,6 +40,7 @@ namespace native_test
     void ClearDheResolver();
     void ConfigurePhysicalType(const Il2CppType* type, Il2CppClass* klass);
     void ClearPhysicalTypes();
+    void SetDhePhysicalSelection(const Il2CppType* before, const Il2CppType* after);
     uint64_t GetDheResolverEnumerationCount();
 }
 }
