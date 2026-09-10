@@ -72,8 +72,10 @@ Installer defaults and CAT unchanged; rollback as a complete candidate set.
 ## Player conditional dispatch evidence
 
 Append an optional Current-only probe without changing Identity<T> or rebuilding
-Base-68/69. Close the existing method over Payload and Envelope<Payload>, whose
-AOT instantiations already exist in both Bases. Derive affected/unaffected from
+Base-68/69. Close the existing method over Payload and Envelope<Payload> on the
+evolved Base-69, where the method and its AOT instances already exist. Base-68
+introduces this helper as Current code, so it cannot prove retained generic AOT.
+Validate the unchanged Base method identity before measuring. Derive affected/unaffected from
 each Base's bound storage plan, never its revision number. Warm reflection first,
 then isolate one invocation between dispatch counter resets and reads. Require
 the expected selection, exact value/reference preservation and one changed DHE
