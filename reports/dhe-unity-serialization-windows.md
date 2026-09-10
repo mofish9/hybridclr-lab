@@ -60,6 +60,20 @@ Use a fresh resource with identical Current across original/evolved Bases, and
 preserve failures. This fixture does not claim to test pre-existing objects or
 Type handles cached before DHE selection; those require a separate Base fixture.
 
+The initial reference fixture at `b52ede0` compiled, but CLR reference fails
+before resource generation: JIT resolves Unity locals in RunIfRequested even
+without its command-line flag. Preserve `dhe-unity-reference-current-01` and
+`dhe-reference-identity-resource-01`. Move the native body into a separate
+non-inlined method, as in the serialization probe; do not simulate Unity APIs
+or remove the 46-case CLR reference gate.
+
+The independently audited serialization control succeeds at lab `b52ede0`:
+`dhe-unity-serialization-control-resource-01` uses unchanged Current04 on
+same-layout Base-48, and `dhe-unity-serialization-control-audit-01.json` passes
+17 checks and binds 67 files. It checks all 46 business cases and the complete
+eleven-assertion native serialization sequence. This is the unchanged-layout
+control, not evidence of the new native allocation candidate.
+
 Continue from the completed public pre-commit/Unity component checkpoint on
 HybridCLR `988a7aa`, IL2CPP Unity 2022 `4d5052e`, package `2d7355f` and lab
 `0aef01a`. The prior goal turn made concrete progress: two immutable Bases passed

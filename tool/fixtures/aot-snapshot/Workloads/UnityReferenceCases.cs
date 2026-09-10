@@ -11,7 +11,12 @@ namespace HybridCLR.Lab.UnityReference
     {
         public static void RunIfRequested()
         {
-            if (Array.IndexOf(Environment.GetCommandLineArgs(), "-unityReferenceProbe") < 0) return;
+            if (Array.IndexOf(Environment.GetCommandLineArgs(), "-unityReferenceProbe") >= 0) Run();
+        }
+
+        [System.Runtime.CompilerServices.MethodImpl(System.Runtime.CompilerServices.MethodImplOptions.NoInlining)]
+        private static void Run()
+        {
             int passed = 0, failed = 0, disabled = State.Disabled, destroyed = State.Destroyed;
             void Check(string name, Func<bool> assertion)
             {
