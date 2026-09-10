@@ -1289,6 +1289,75 @@ namespace
         hybridclr::dhe::ResetForTests();
         physicalCurrent.isInterpterImpl = false;
 
+#if defined(HYBRIDCLR_LAB_HAS_NATIVE_REFERENCE_INVOKE) && !HYBRIDCLR_UNITY_2021
+        // Native metadata adaptation must prove both the real receiver ancestry
+        // and every argument/return ABI. Public logical type equality is not
+        // sufficient to apply Current code to a pre-selection allocation.
+        Il2CppObject oldReceiver{}, currentReceiver{}, derivedReceiver{}, unrelatedReceiver{};
+        Il2CppClass derivedClass{}, unrelatedClass{};
+        oldReceiver.klass = klass;
+        currentReceiver.klass = executionClass;
+        derivedClass.parent = executionClass;
+        derivedReceiver.klass = &derivedClass;
+        unrelatedReceiver.klass = &unrelatedClass;
+        Il2CppType nativeArgument{}, nativeReturn{}, otherArgument{}, otherReturn{};
+        const Il2CppType* baseArguments[] = { &nativeArgument };
+        const Il2CppType* currentArguments[] = { &otherArgument };
+        changed.parameters = baseArguments;
+        physicalCurrent.parameters = currentArguments;
+        changed.return_type = &nativeReturn;
+        physicalCurrent.return_type = &otherReturn;
+        auto CheckNativeFrame = [&](bool supported)
+        {
+            CHECK(hybridclr::dhe::PrepareAndRegisterMetaVersions({ executionRegistration }));
+            CHECK(!hybridclr::dhe::CanEnterWithBaseAbi(&changed));
+            using hybridclr::dhe::ResolveNativeReferenceInvokeMethod;
+            CHECK(ResolveNativeReferenceInvokeMethod(&changed, &currentReceiver) ==
+                (supported ? &physicalCurrent : &changed));
+            CHECK(ResolveNativeReferenceInvokeMethod(&changed, &derivedReceiver) ==
+                (supported ? &physicalCurrent : &changed));
+            CHECK(ResolveNativeReferenceInvokeMethod(&changed, &oldReceiver) == &changed);
+            CHECK(ResolveNativeReferenceInvokeMethod(&changed, &unrelatedReceiver) == &changed);
+            CHECK(ResolveNativeReferenceInvokeMethod(&changed, nullptr) == &changed);
+            CHECK(ResolveNativeReferenceInvokeMethod(nullptr, &currentReceiver) == nullptr);
+            CHECK(ResolveNativeReferenceInvokeMethod(&physicalCurrent, &currentReceiver) == &physicalCurrent);
+            hybridclr::dhe::ResetForTests();
+            physicalCurrent.isInterpterImpl = false;
+        };
+        for (uint8_t kind : { IL2CPP_TYPE_VOID, IL2CPP_TYPE_BOOLEAN, IL2CPP_TYPE_CHAR,
+            IL2CPP_TYPE_I1, IL2CPP_TYPE_U1, IL2CPP_TYPE_I2, IL2CPP_TYPE_U2,
+            IL2CPP_TYPE_I4, IL2CPP_TYPE_U4, IL2CPP_TYPE_I8, IL2CPP_TYPE_U8,
+            IL2CPP_TYPE_R4, IL2CPP_TYPE_R8, IL2CPP_TYPE_I, IL2CPP_TYPE_U,
+            IL2CPP_TYPE_STRING, IL2CPP_TYPE_OBJECT })
+        {
+            nativeArgument.type = otherArgument.type = kind;
+            nativeReturn.type = otherReturn.type = kind;
+            changed.parameters_count = physicalCurrent.parameters_count = kind == IL2CPP_TYPE_VOID ? 0 : 1;
+            CheckNativeFrame(true);
+        }
+        for (uint8_t kind : { IL2CPP_TYPE_VALUETYPE, IL2CPP_TYPE_CLASS, IL2CPP_TYPE_GENERICINST,
+            IL2CPP_TYPE_VAR, IL2CPP_TYPE_MVAR, IL2CPP_TYPE_PTR, IL2CPP_TYPE_FNPTR, IL2CPP_TYPE_TYPEDBYREF })
+        {
+            nativeArgument.type = otherArgument.type = kind;
+            nativeReturn.type = otherReturn.type = IL2CPP_TYPE_I4;
+            CheckNativeFrame(false);
+            nativeReturn.type = otherReturn.type = kind;
+            nativeArgument.type = otherArgument.type = IL2CPP_TYPE_I4;
+            CheckNativeFrame(false);
+        }
+        nativeReturn.type = otherReturn.type = IL2CPP_TYPE_I4;
+        nativeArgument.byref = 1; CheckNativeFrame(false); nativeArgument.byref = 0;
+        otherArgument.byref = 1; CheckNativeFrame(false); otherArgument.byref = 0;
+        nativeReturn.byref = 1; CheckNativeFrame(false); nativeReturn.byref = 0;
+        otherReturn.byref = 1; CheckNativeFrame(false); otherReturn.byref = 0;
+        otherArgument.type = IL2CPP_TYPE_I8; CheckNativeFrame(false); otherArgument.type = IL2CPP_TYPE_I4;
+        otherReturn.type = IL2CPP_TYPE_I8; CheckNativeFrame(false); otherReturn.type = IL2CPP_TYPE_I4;
+        physicalCurrent.parameters_count = 0; CheckNativeFrame(false);
+        changed.parameters_count = physicalCurrent.parameters_count = 0;
+        changed.parameters = physicalCurrent.parameters = nullptr;
+        changed.return_type = physicalCurrent.return_type = &scalarType;
+#endif
+
         // Failure while preparing a later Current entry restores earlier
         // Current state, leaves Base state intact, and publishes nothing.
         auto extraBaseMethod = executionBase.methods[0];
