@@ -113,6 +113,17 @@ namespace HybridCLR.Lab.Declarations
                         catch (ArgumentException) { return true; }
                     }
                     var map = type.GetInterfaceMap(typeof(IOperation));
+                    Console.WriteLine("DHE interface map diagnostic: targetType=" + (map.TargetType == type) +
+                        "; interfaceType=" + (map.InterfaceType == typeof(IOperation)) +
+                        "; targets=" + map.TargetMethods.Length + "; methods=" + map.InterfaceMethods.Length);
+                    if (map.TargetMethods.Length == 1)
+                    {
+                        var target = map.TargetMethods[0];
+                        Console.WriteLine("DHE interface map method: same=" + (target == measure) + "; name=" + target.Name +
+                            "; declaring=" + (target.DeclaringType == type) + "; reflected=" + (target.ReflectedType == type) +
+                            "; handle=" + target.MethodHandle.Value + "; expectedHandle=" + measure.MethodHandle.Value +
+                            "; value=" + target.Invoke(component, new object[] { 31 }));
+                    }
                     return map.TargetType == type && map.InterfaceType == typeof(IOperation) && map.TargetMethods.Length == 1 &&
                         map.InterfaceMethods.Length == 1 && map.TargetMethods[0] == measure &&
                         (int)map.TargetMethods[0].Invoke(component, new object[] { 31 }) == 68;
