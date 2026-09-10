@@ -7,10 +7,11 @@ internal static class UnitySerializationWorkflow
 {
     internal static int Replay(string[] args)
     {
-        if (args.Length != 6 || !new[] { "read", "full", "full-unity", "reference", "full-unity-cached", "reference-cached", "reference-generic", "reference-generic-cached", "reference-dispatch", "reference-callbacks", "reference-callbacks-cached", "reference-callbacks-control", "reference-callbacks-control-cached", "hierarchy-query", "hierarchy-query-cached", "interface-remove", "interface-remove-cached", "interface-remove-methods", "interface-remove-methods-cached", "interface-replace", "interface-replace-cached", "interface-remove-compiler", "interface-remove-compiler-cached", "declaration-nonvirtual-3", "declaration-virtual-7", "declaration-nonvirtual-11" }.Contains(args[5]))
+        string declarationMode = args.Length == 6 ? (args[5].EndsWith("-cached", StringComparison.Ordinal) ? args[5][..^7] : args[5]) : "";
+        bool declarations = new[] { "declaration-nonvirtual-3", "declaration-virtual-7", "declaration-nonvirtual-11" }.Contains(declarationMode);
+        if (args.Length != 6 || (!declarations && !new[] { "read", "full", "full-unity", "reference", "full-unity-cached", "reference-cached", "reference-generic", "reference-generic-cached", "reference-dispatch", "reference-callbacks", "reference-callbacks-cached", "reference-callbacks-control", "reference-callbacks-control-cached", "hierarchy-query", "hierarchy-query-cached", "interface-remove", "interface-remove-cached", "interface-remove-methods", "interface-remove-methods-cached", "interface-replace", "interface-replace-cached", "interface-remove-compiler", "interface-remove-compiler-cached" }.Contains(args[5])))
             throw new ArgumentException("unity-serialization-replay <lab> <tool.dll> <Base proof> <resource workflow output> <new output> <read|full|full-unity|reference|full-unity-cached|reference-cached|reference-generic|reference-generic-cached|reference-dispatch|reference-callbacks|reference-callbacks-cached|reference-callbacks-control|reference-callbacks-control-cached|hierarchy-query|hierarchy-query-cached|interface-remove|interface-remove-cached|interface-remove-methods|interface-remove-methods-cached|interface-replace|interface-replace-cached|interface-remove-compiler|interface-remove-compiler-cached>");
         bool hierarchy = args[5].StartsWith("hierarchy-query", StringComparison.Ordinal);
-        bool declarations = args[5].StartsWith("declaration-", StringComparison.Ordinal);
         bool interfaceEvolution = args[5].StartsWith("interface-", StringComparison.Ordinal);
         bool dispatch = args[5] == "reference-dispatch";
         bool callbacks = args[5].StartsWith("reference-callbacks", StringComparison.Ordinal);
@@ -23,6 +24,7 @@ internal static class UnitySerializationWorkflow
         bool? currentReferenceStorageSelected = null;
         string cacheCurrentModelSha256 = null;
         int? cachedBaseMethodCount = null;
+        string declarationCacheExpectation = null;
         string lab = Path.GetFullPath(args[0]), tool = Path.GetFullPath(args[1]), proof = Path.GetFullPath(args[2]),
             source = Path.GetFullPath(args[3]), output = Path.GetFullPath(args[4]);
         string lifecycleSelection = lifecycle ? UnityBehaviourSelection.Read(proof, source) : null;
@@ -46,6 +48,11 @@ internal static class UnitySerializationWorkflow
                 start.ArgumentList.Add("-unityReferenceCacheProbe"); start.ArgumentList.Add("true");
                 start.ArgumentList.Add("-unityReferenceStorageSelected");
                 start.ArgumentList.Add(currentReferenceStorageSelected!.Value.ToString());
+                if (declarationCacheExpectation != null)
+                {
+                    start.ArgumentList.Add("-unityDeclarationExpectation");
+                    start.ArgumentList.Add(declarationCacheExpectation);
+                }
                 if (cachedBaseMethodCount.HasValue)
                 {
                     start.ArgumentList.Add("-unityMethodDeclarationBaseMethods");
@@ -58,7 +65,7 @@ internal static class UnitySerializationWorkflow
             if (!process.WaitForExit(120000)) { process.Kill(true); throw new TimeoutException(executable); }
             string trace = stdout.GetAwaiter().GetResult() + stderr.GetAwaiter().GetResult();
             File.WriteAllText(Path.Combine(output, "process-" + process.Id + ".log"), trace);
-            records.Add(new { executable, arguments, processId = process.Id, exitCode = process.ExitCode });
+            records.Add(new { executable, arguments = start.ArgumentList.ToArray(), processId = process.Id, exitCode = process.ExitCode });
             if (!failureAllowed && process.ExitCode != 0) throw new InvalidOperationException(trace);
             return trace.Trim();
         }
@@ -81,6 +88,7 @@ internal static class UnitySerializationWorkflow
         string reportPath = Path.Combine(output, "player.json"), log = reportPath + ".log";
         if (cached)
         {
+            if (declarations) declarationCacheExpectation = DeclarationWorkflow.CacheExpectation(proof, source);
             if (evolutionMode == "interface-remove-compiler")
             {
                 string identityPath = Path.Combine(proof, "base/build-identity.json");
@@ -173,6 +181,12 @@ internal static class UnitySerializationWorkflow
             "current-code-casts-respect-physical-layout"
         };
         string[] cacheChecks = cached ? OptionalChecks("referenceCacheChecks") : Array.Empty<string>();
+        if (declarations && cached)
+            cacheExpected = cacheExpected.Concat(new[] { "declaration-base-flags-warmed", "declaration-method-flags-current",
+                "declaration-method-identity-stable", "declaration-method-declaring-types", "declaration-method-base-definitions",
+                "declaration-base-parameters-warmed", "declaration-parameter-default-current", "declaration-fresh-parameter-default-current",
+                "declaration-interface-default-current", "declaration-parameter-member-stable", "declaration-cached-explicit-invocation",
+                "declaration-cached-default-invocation" }).ToArray();
         if (cachedBaseMethodCount.HasValue)
             cacheExpected = cacheExpected.Concat(new[] { "current-method-nonvirtual-flags", "current-method-declaring-types",
                 "current-method-base-definitions", "current-method-enumeration" }).Concat(cachedBaseMethodCount == 0
@@ -180,6 +194,7 @@ internal static class UnitySerializationWorkflow
                 : new[] { "cached-methods-were-virtual", "cached-methods-now-nonvirtual", "cached-method-identity-stable",
                     "cached-method-base-definitions", "cached-method-current-invocation" }).ToArray();
         bool cachePassed = !cached || cacheChecks.SequenceEqual(cacheExpected) &&
+            (declarationCacheExpectation == null || lines.Count(line => line == "DHE declaration cache expectation: " + declarationCacheExpectation) == 1) &&
             (!cachedBaseMethodCount.HasValue || lines.Count(line => line == "DHE method declaration Base cache: " + cachedBaseMethodCount.Value) == 1) &&
             lines.Count(line => line == "DHE reference cache selected storage: " + currentReferenceStorageSelected!.Value) == 1 &&
             lines.Where(line => line.StartsWith("DHE reference cache check: ")).Select(line => line.Substring("DHE reference cache check: ".Length)).SequenceEqual(cacheExpected) &&
@@ -188,7 +203,7 @@ internal static class UnitySerializationWorkflow
         bool callbackFixturePassed = !callbacks || lines.Count(line => line == "DHE callback fixture: " +
             (callbackControl ? "new-component-control" : "existing-interface")) == 1;
         bool evolutionFixturePassed = !interfaceEvolution || lines.Count(line => line == "DHE interface evolution mode: " + evolutionMode) == 1;
-        bool declarationFixturePassed = !declarations || lines.Count(line => line == "DHE declaration mode: " + args[5]) == 1;
+        bool declarationFixturePassed = !declarations || lines.Count(line => line == "DHE declaration mode: " + declarationMode) == 1;
         bool passed = immutable && cachePassed && lifecyclePassed && callbackFixturePassed && evolutionFixturePassed && declarationFixturePassed && report.GetProperty("passed").GetBoolean() && checks.SequenceEqual(sequence) &&
             lines.Count(line => line == prefix + " pass: " + sequence.Length) == 1 &&
             lines.Where(line => line.StartsWith("DHE case begin: ")).Select(line => line.Substring(16)).SequenceEqual(
@@ -196,7 +211,8 @@ internal static class UnitySerializationWorkflow
         File.WriteAllText(Path.Combine(output, "result.json"), JsonSerializer.Serialize(new { passed, immutable, checks, expected = sequence,
             lifecycle, lifecyclePassed, lifecycleSelection, unityChecks, cached, cachePassed, cacheChecks, currentReferenceStorageSelected,
             cacheCurrentModelSha256, cachedBaseMethodCount, callbacks, callbackControl, callbackFixturePassed, hierarchy, interfaceEvolution, evolutionMode, evolutionFixturePassed,
-            declarations, declarationFixturePassed,
+            declarations, declarationMode, declarationFixturePassed, declarationCacheExpectation,
+            declarationParameterObjects = lines.Where(line => line.StartsWith("DHE declaration parameter objects ")).ToArray(),
             error = report.GetProperty("error").GetString(), proof, source, labHead, playerSha256 = playerHash, gameAssemblySha256 = gameHash,
             hostSha256 = Hash(typeof(UnitySerializationWorkflow).Assembly.Location), toolSha256 = Hash(tool),
             resourceManifestSha256 = Hash(Path.Combine(source, "resource/dhe-resource-update.json")),

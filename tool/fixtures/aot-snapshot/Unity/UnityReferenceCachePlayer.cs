@@ -15,6 +15,7 @@ namespace HybridCLR.Lab.Snapshot
         private GameObject oldOwner;
         private Component oldObject;
         private UnityMethodDeclarationCache methodDeclarations;
+        private UnityDeclarationParameterCache parameterDeclarations;
 
         internal static UnityReferenceCachePlayer Capture(Type type)
         {
@@ -27,6 +28,7 @@ namespace HybridCLR.Lab.Snapshot
                 cachedHash = type.GetHashCode(), currentStorageSelected = selected, keyed = new Dictionary<Type, int> { [type] = 19 } };
             Console.WriteLine("DHE reference cache selected storage: " + selected);
             state.methodDeclarations = UnityMethodDeclarationCache.Capture(type);
+            state.parameterDeclarations = UnityDeclarationParameterCache.Capture(type);
             state.oldOwner = new GameObject("DHE pre-selection reference"); state.oldOwner.SetActive(false);
             state.oldObject = state.oldOwner.AddComponent(type); state.cachedField.SetValue(state.oldObject, 17);
             return state;
@@ -79,6 +81,7 @@ namespace HybridCLR.Lab.Snapshot
                     return (bool)probe.GetMethod("CheckPhysicalReceivers").Invoke(null, new object[] { oldObject, fresh, !currentStorageSelected });
                 });
                 if (methodDeclarations != null) methodDeclarations.Verify(fresh, Check);
+                if (parameterDeclarations != null) parameterDeclarations.Verify(fresh, Check);
             }
             catch (Exception error) { errors.Add(error.ToString()); }
             finally
