@@ -17,15 +17,15 @@ Their immutable inputs are recorded in `manifests/repo-lock.json`.
 
 ## Current phase
 
-The active investigation is **Unity serialization of evolved reference layouts**.
-The full eleven-check JSON/overwrite/clone suite fails on immutable old-layout
-Base-47 but passes on same-layout Base-48 with identical Current DLLs. Native
-tracing confirms Unity consumes field offsets and bypasses sidecar value APIs.
-An isolated physical Current storage prototype fixes serialization on Base-47,
-but still fails native component creation/callbacks. Allocation routing is being
-tested in separate runtime worktrees; it is not qualified or published. A new
-fourteen-assertion public type identity probe confirms ten failures on the
-old-layout allocation-only Base-50, versus fourteen passes on Base-51. See
+The active investigation is **physical reference storage and public type identity**.
+The isolated `e403775`/`6d0f642` runtime candidate passes Unity 2022 real-header
+native compile/CTest and builds two new immutable Bases. Old-layout Base-52
+passes all eleven serialization checks and eleven lifecycle checks before
+reflection instance invocation fails; same-layout Base-53 passes all eleven
+serialization and seventeen lifecycle checks with identical Current. A separate
+fourteen-check identity probe has eight failures on Base-52 and passes on Base-53.
+Native callbacks and field access improved, but public Base/Current Type identity
+is still inconsistent. The candidate remains isolated and unqualified. See
 `reports/dhe-unity-serialization-windows.md` for exact evidence and open gates.
 Unity 2022 Windows comes first; Tuanjie follows; no new Unity 2021 work.
 

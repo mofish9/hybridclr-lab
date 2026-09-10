@@ -2,6 +2,49 @@
 
 ## Actual Windows results
 
+The latest native correction is HybridCLR
+`e4037758ad8476e87e005b6857f6b4db9bbeca48`, IL2CPP Unity 2022
+`6d0f642bc99367ff07e9e0f2f248ee136d037114`, package `2d7355f`, lab
+`4b2cc49ba4dd9d8ae3a66ff4a9d1e64392a35f5e`. It maps native component class
+resolution before metadata caching and exposes exact physical field parents.
+The allocation wrapper is defined with MetadataModule's implementation.
+`dhe-reference-storage-native-03` passes real-header native compile/CTest,
+including il2cpp-api.cpp; mergeReady=true and surrogateExternalHeadersUsed=false.
+The preceding native01/02 failures are preserved, not relabelled as passes.
+
+`dhe-reference-storage-base-52` and `dhe-reference-storage-base-53` both pass
+construction, original startup and no-op resource checks. Their Base IDs are
+`f3a84bb3ba9cc54d627e3b11f260a625775ba778570c2fc89f4b87130cad2ecb` and
+`302ade15e97d03679fd93fff24489142dda34e5bce4fae6f5e00f1b498b2c40f`.
+The unchanged full Current04 is packaged by
+`dhe-reference-storage-resource-03`. Base-52 passes the 46 business cases,
+eleven serialization checks, and eleven lifecycle checks through
+layout-dependent-reader-selection. MethodInfo.Invoke then throws TargetException
+because the object does not match the reflected type. Earlier constructor/Awake/
+OnDisable frame exceptions and reflected field GetValue failures no longer occur
+on this path. No old call-frame or general assignability guard was loosened.
+
+Independent full-unity replay at lab `6077928` confirms the failure in
+`dhe-reference-storage-base-52-replay-01`, and confirms all eleven serialization
+plus seventeen lifecycle checks on Base-53 in
+`dhe-reference-storage-base-53-replay-01`. Both replays validate the complete
+46-case sequence and unchanged Player/staged-resource hashes. No full two-Base
+serialization/lifecycle pass is claimed.
+
+The unchanged fourteen-check reference Current02 is packaged separately in
+`dhe-reference-identity-resource-03`; all business/rejection/restoration workflow
+checks pass on both Bases with native probes disabled. Explicit reference replay
+in `dhe-reference-identity-base-52-01` passes six assertions and fails eight;
+`dhe-reference-identity-base-53-01` passes all fourteen. Current physical field
+reads/writes now work. Type equality, assignability, declaring type identity and
+clone type identity still fail on Base-52. Public identity and reflection
+receiver semantics are the next mandatory gate, including cached Base handles
+and safe rejection/adaptation when a field/object still has an old layout.
+This candidate is not release-qualified and retains the experimental v32
+contract; capability admission must be updated before any supported release.
+
+## Preceding candidate and diagnostic evidence
+
 The public reference identity probe now has real Player evidence. At lab
 `088f967`, `dhe-unity-reference-current-02/current` passes CLR reference with
 46 cases. The resource compiler at lab `4b2cc49` produces
