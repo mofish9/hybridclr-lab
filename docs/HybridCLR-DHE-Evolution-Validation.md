@@ -1,15 +1,16 @@
 # DHE evolution implementation and validation
 
-## Active investigation: native type queries after version selection
+## Active investigation: existing-type native callbacks after version selection
 
 The current checkpoint is `../reports/dhe-reference-storage-windows.md`.
-Runtime 8eb835a/4b02c37 passes real-header native compile/CTest. At lab d69e11e,
-Base-58/59 pass identical Current with all 46 business cases, 14 public reference
+Runtime b69128f/eaf006d passes real-header native compile/CTest. Lab b612b43 built
+Base-63/64; replay at bc79b44 passes identical Current with 46 business cases, 14 public reference
 checks, 18 generic/array checks, 11 serialization checks, 17 lifecycle checks,
 11 cached receiver checks and public failure/fresh-process recovery. A generic
 sidecar/physical-field split is fixed with bidirectional field-coherence evidence.
-The old-layout Base still fails native GetComponent(publicType) after pre-selection
-component creation. Scene/Prefab evolution, broad old-object behavior, performance,
+Cached native GetComponent(publicType), cloning and lifecycle now pass on both.
+Existing-type interface additions remain rejected. Scene/Prefab evolution,
+native parameter ABI, broad old-object behavior, performance,
 release capability admission and the later Tuanjie port remain open. No complete
 DHE release claim is made.
 

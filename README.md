@@ -17,15 +17,16 @@ Their immutable inputs are recorded in `manifests/repo-lock.json`.
 
 ## Current phase
 
-The active investigation is **physical reference storage and native type queries**.
-At `8eb835a`/`4b02c37`, immutable Base-58/59 pass identical Current DLLs with
+The active investigation is **physical reference storage and native callbacks**.
+At `b69128f`/`eaf006d`, immutable Base-63/64 pass identical Current DLLs with
 46 business cases, 14 public identity checks, 18 generic/array checks, 11
 serialization checks and 17 lifecycle checks. Generic reflection/direct field
 incoherence is fixed and verified against the same failing-before Current bytes.
 Both pass eleven cached-handle/physical-receiver checks and public preparation
-failure/recovery. On the old-layout Base, pre-selection component creation still
-breaks subsequent native GetComponent(publicType) and clone lookup. This remains
-an incomplete research candidate. See `reports/dhe-reference-storage-windows.md`
+failure/recovery. Cached native GetComponent/clone queries and lifecycle callbacks
+now pass on both Bases. Existing-type interface additions remain rejected;
+scene/Prefab evolution, wider native ABI and old-object semantics remain open.
+This is an incomplete research candidate. See `reports/dhe-reference-storage-windows.md`
 for the exact commits, preserved failures, evidence identities and remaining gates.
 Unity 2022 Windows comes first; Tuanjie follows; no new Unity 2021 work.
 

@@ -2,6 +2,16 @@
 
 ## Current checkpoint
 
+Runtime b69128f/eaf006d, native08 and immutable Base-63/64 pass the cached
+query/lifecycle correction described below. With identical Current04, both pass
+46 business cases, 11 cache + 14 reference checks, 11 cache + 18 generic checks,
+and cold/cached 11 serialization + 17 lifecycle checks. Public preparation/recovery
+and the independent resource audit pass. Full identities are in
+`../reports/dhe-reference-storage-windows.md`. Wider native parameter/receiver
+coverage and existing-type interface additions remain required.
+
+## Preserved Base-61/62 diagnosis
+
 At runtime 8eb835a/23f2f54, Base-61/62 pass the original cached native query
 and clone assertions (14/14), all 11 physical receiver checks and 18 generic
 checks. Cached serialization now passes all 11 checks on Base-61, then lifecycle

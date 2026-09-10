@@ -1,6 +1,84 @@
 # Physical reference storage: Unity 2022 Windows checkpoint
 
-## Result and release boundary
+## Current Base-63/64 checkpoint
+
+The cached native query and lifecycle failures are fixed in the tested candidate.
+Both immutable Bases pass the same four-DLL Current after pre-selection component
+creation, without replacing Base binaries. This remains a research candidate:
+existing-type interface additions are rejected by resource compatibility, and
+general scene/Prefab evolution, native parameter ABI, old-object migration,
+performance, capability admission and Tuanjie remain unqualified.
+
+All paths below are relative to `D:/hybridclr_artifacts`.
+
+| Source | Tested commit |
+| --- | --- |
+| HybridCLR, research/dhe-reference-storage-v8.13.0 | b69128f855f1704cbc3b8bc30620dc17cb996b07 |
+| IL2CPP, research/dhe-reference-storage-unity2022-v8.13.0 | eaf006d4b929226a86f53a47eacc42f63b5d017e |
+| Package, research/dhe-evolution-v8.13.0 | 2d7355fb191b0ddee957234e54a5e3feb01be16f |
+| Lab Base build | b612b43df3ddad925dc197e5956a5e0cf10beaaa |
+| Lab resource/replay | bc79b444242948cb9c334450eb8929f525c2365a |
+
+Build/replay host-08 SHA is
+`A51B47323A21D9BDB4D9482791CDCCC6DE16F7D1F78AC9EC2F1F3BF3A396883D`;
+tool SHA is `E28E69072C31B2EA32E9BEE4F52EC7E66955BB5D699E4B5ACA2C1F14FA3C5564`.
+Later lab callback host changes do not rebind host-08 to their source.
+`dhe-reference-storage-runtime-08/DHE-Unity2022/runtime-manifest.json` SHA:
+`36C3722F57DBD0E8EB953D7614A30AACA40C6D66531DDFFBEF28EA7EE195262C`.
+Native08 passes real-header compile/CTest, mergeReady=true,
+surrogateExternalHeadersUsed=false. This is a native gate, not feature release.
+The experimental contract remains dhe-runtime-v32 and MV DHEMETA1/schema 1.
+
+| Immutable Base | Base ID | GameAssembly SHA-256 |
+| --- | --- | --- |
+| dhe-reference-storage-base-63, original layout | 3b4bd5dcdcb01861c2f9e7056766b03610001b4438f135583b16527bab9da640 | D850761634D417E2A025F912AD46D7B6DDC03538E8841E198792561E4561214A |
+| dhe-reference-storage-base-64, evolved layout | 04dd0d0b33fc2bf69ac1830e2e82cc4c6f573640a87c0e5141bf99745e4aab57 | F2F996F5C7CA549F1A8889EC3C85C1C105EA4DDD1F9FABCC6DAF1CCE5585B807 |
+
+Both startup/no-op runs pass. Resource08 retains the exact four DLLs in
+`dhe-unity-reference-generic-current-04/current`, Current-set SHA
+`35cfd7a4e3ade5516244858c7ee025c4417e4e0350302ecd60e86b704a10071f`.
+Resource manifest SHA:
+`E386658AE941C52168D1D03A5F144557D0DC4A16878C84CD5B14265D7D40FC08`.
+
+| Gate | Base-63 | Base-64 | Evidence |
+| --- | --- | --- | --- |
+| Business/rejection/restoration | pass, 46 cases | pass, 46 cases | dhe-reference-storage-resource-08 |
+| Cached physical receivers + native reference queries | 11 + 14 | 11 + 14 | dhe-reference-cache-base-63/64-01 |
+| Cached physical receivers + generics/arrays | 11 + 18 | 11 + 18 | dhe-reference-generic-cache-base-63/64-01 |
+| Cold serialization + lifecycle | 11 + 17 | 11 + 17 | dhe-reference-full-base-63/64-01 |
+| Cached receivers + serialization + lifecycle | 11 + 11 + 17 | 11 + 11 + 17 | dhe-reference-full-cache-base-63/64-01 |
+| Public preparation failure and fresh-process recovery | pass | pass | dhe-reference-public-probes-08 |
+| Independent resource audit | pass | pass | dhe-reference-storage-resource-audit-08.json |
+
+The independent audit verifies 46 cases, four successful/restored runs, three
+rejections and 126 files. Public probes pass 15 checks. Lifecycle checks include
+changed layout-dependent execution and the unaffected AOT sentinel.
+
+The preserved trace Base-60 identifies class-has-parent(Base, Current)=false
+as the cached query failure. IL2CPP 23f2f54 resolves descriptors at that exported
+query boundary; internal casts and physical field ancestry remain strict.
+Base-61/62 then pass queries, but cached Base-61 lifecycle throws the old-AOT-frame
+exception in Awake, OnDisable and OnDestroy. HybridCLR b69128f / IL2CPP eaf006d
+select Current metadata in Runtime::Invoke only for a matching physical receiver
+and concrete scalar/string/object argument and return ABI. Base-63/64 validate
+that correction against unchanged failing-before Current bytes. Broader native
+invocation signatures still need explicit tests.
+
+The existing-interface target in `dhe-native-callback-resource-before-01` is
+rejected before Player execution. The distinct new-component control passes
+9 native callback checks cold and 11 cache + 9 callback checks on Base-59
+(`dhe-native-callback-control-cold-01`, `dhe-native-callback-control-cached-01`).
+That older-runtime control proves fixture expectations only; it does not qualify
+existing-type interface evolution or the current runtime.
+
+No formal branch/tag/remote, Installer default or CAT project was changed.
+Unity 2022 Windows remains first; Tuanjie follows correctness stabilization.
+No performance, mobile or general production claim is made. Preserve every
+failed artifact and roll research back as a matched source/Base/resource set;
+Base-61/62/resource07 is the preceding set with its documented callback failure.
+The following sections retain Base-58/59 identities and historical conclusions.
+
+## Historical Base-58/59 result and release boundary
 
 The current candidate passes cold-selection business, public reference identity,
 generic field coherence, serialization and lifecycle checks on two immutable

@@ -2,12 +2,13 @@
 
 ## Latest Windows checkpoint
 
-See `dhe-reference-storage-windows.md` for runtime 8eb835a/4b02c37, native06
-and immutable Base-58/59. Both pass eleven serialization and seventeen lifecycle
+See `dhe-reference-storage-windows.md` for runtime b69128f/eaf006d, native08
+and immutable Base-63/64. Both pass eleven serialization and seventeen lifecycle
 checks with identical Current DLLs, plus public identity, generic coherence and
-public preparation/recovery. The cached old-layout case still fails native
-component lookup; diagnostic ancestor lookup finds intact cloned fields. This
-is not complete serialization/scene/Prefab qualification. Earlier evidence below
+public preparation/recovery. Cached native queries and lifecycle now pass, together
+with eleven physical receiver checks. Existing-type serialization-interface
+addition is still rejected before Player execution. This is not complete
+serialization/scene/Prefab qualification. Earlier evidence below
 is preserved under its original commits and must not be treated as current.
 
 ## Historical Base-52/53 Windows results
