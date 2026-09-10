@@ -5,6 +5,16 @@ Android/iOS qualification, or a performance result.
 
 ## Current Verified State
 
+The latest standard-resource checkpoint is documented in
+[frozen resource admission](dhe-frozen-resource-admission.md). Package `187af4f`
+now authenticates frozen sources with the Base's embedded snapshot hash. Two
+immutable Windows Bases (original revisions 41 and 59, different Payload layouts)
+load one identical Current resource set through normal generation/staging/public
+loading and both execute revision 73 after field-copy assertions. Complete
+ordinary coverage and a real Player snapshot-rejection test pass. Remaining
+storage/ABI, broader resource behavior, performance and Tuanjie gates stay open.
+The following proof-15 results belong to the earlier native diagnostic checkpoint.
+
 As of 2026-09-10, runtime `b3e72d815f935fad25e3f255bf9a611264901622`,
 Unity 2022 IL2CPP `8a13baf1ec45068fbb9535beea03425b717f501b`, package
 `3c9558cab91d383b9825e4dbcd349a43b7cabaa6` and fixture lab `c034236` passed
@@ -26,13 +36,13 @@ List/Dictionary operations preserve Current fields while unchanged long
 collections retain AOT. Guard lookup no longer enumerates metadata for each
 unchanged native call. This correctness result is not a performance claim.
 
-This is still a diagnostic native-source workflow, not formal resource release
+Proof-15 is a diagnostic native-source workflow, not formal resource release
 admission. Source-plan and resource-path binding passed 29 real-snapshot/CLI
 checks and 74 managed host checks; see [resource binding](dhe-frozen-resource-binding.md).
-Remaining gates include formal frozen-source ABI admission/resource loading,
-broader startup reflection and initialization behavior,
-cyclic/concurrent publication, and distinct immutable Bases consuming one latest
-resource set on this candidate. Windows correctness precedes the Tuanjie port;
+At proof-15, frozen-source admission/resource loading and the multi-Base route
+were still unverified; the linked newer checkpoint closes those representative
+cases. Broader startup reflection, initialization and cyclic/concurrent
+publication remain subsequent gates. Windows correctness precedes the Tuanjie port;
 Unity 2021 is outside the current user scope. No performance or mobile claim.
 
 ## Earlier checkpoints (historical identities)
