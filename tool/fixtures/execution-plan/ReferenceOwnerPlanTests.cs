@@ -74,6 +74,16 @@ internal static class ReferenceOwnerPlanTests
             var open = Type("GenericOwner`1"); open.GenericParameters.Add(new GenericParamUser(0, GenericParamAttributes.NonVariant, "T"));
             Field(open, "Value", new GenericVar(0, open));
             var closed = Type("ClosedHolder"); Field(closed, "Owner", new GenericInstSig(new ClassSig(open), new ClassSig(root)));
+            void Parent(TypeDef type, ITypeDefOrRef parent)
+            {
+                type.BaseType = parent;
+                type.Methods.Single(method => method.Name == ".ctor").Body.Instructions[1].Operand =
+                    new MemberRefUser(module, ".ctor", MethodSig.CreateInstance(module.CorLibTypes.Void), parent);
+            }
+            var derived = Type("Derived"); Parent(derived, root);
+            var derivedHolder = Type("DerivedHolder"); Field(derivedHolder, "Value", new ClassSig(derived));
+            var genericDerived = Type("GenericDerived"); Parent(genericDerived, new TypeSpecUser(new GenericInstSig(new ClassSig(open), new ClassSig(root))));
+            var scalarDerived = Type("ScalarDerived"); Parent(scalarDerived, new TypeSpecUser(new GenericInstSig(new ClassSig(open), module.CorLibTypes.Int64)));
             var unrelated = Type("Unrelated"); Field(unrelated, "Value", module.CorLibTypes.Int64);
             var scalar = Type("ScalarHolder"); Field(scalar, "Owner", new GenericInstSig(new ClassSig(open), module.CorLibTypes.Int64));
             string path = Path.Combine(output, changed ? "current.dll" : "base.dll"); module.Write(path); fixturePaths.Add(path);
@@ -85,14 +95,14 @@ internal static class ReferenceOwnerPlanTests
         checks["cycle-dependencies-retain-original-root"] = fixture.Impact.Layouts.Where(row =>
                 row.DefinitionIdentity == "ReferenceOwners|Cases.CycleA" || row.DefinitionIdentity == "ReferenceOwners|Cases.CycleB")
             .Count(row => row.ChangedValueTypes.SequenceEqual(new[] { "ReferenceOwners|Cases.Root" })) == 2;
-        foreach (string name in new[] { "Root", "Leaf", "Chain", "CycleA", "CycleB", "ArrayHolder", "ClosedHolder" })
+        foreach (string name in new[] { "Root", "Leaf", "Chain", "CycleA", "CycleB", "ArrayHolder", "ClosedHolder", "Derived", "DerivedHolder", "GenericDerived" })
         {
             var type = fixtureCurrent.Types.Single(row => row.Identity == "Cases." + name);
             checks["selected-" + name] = fixturePlan.CurrentStorageTypeTokens.Contains(type.Token);
             checks["constructor-selected-" + name] = fixtureCurrent.Methods.Where(method => method.DeclaringTypeStableId == type.StableId)
                 .All(method => fixturePlan.CurrentExecutionMethodTokens.Contains(method.Token));
         }
-        foreach (string name in new[] { "GenericOwner`1", "Unrelated", "ScalarHolder" })
+        foreach (string name in new[] { "GenericOwner`1", "Unrelated", "ScalarHolder", "ScalarDerived" })
         {
             var type = fixtureCurrent.Types.Single(row => row.Identity == "Cases." + name);
             checks["unaffected-storage-" + name] = !fixturePlan.CurrentStorageTypeTokens.Contains(type.Token);

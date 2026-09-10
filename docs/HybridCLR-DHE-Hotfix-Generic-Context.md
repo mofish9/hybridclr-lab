@@ -115,8 +115,8 @@ retains a typed EvolvingBehaviour reference but the plan selects only the
 component's physical definition. Pointer width stayed constant; the field's
 physical type identity did not.
 
-Extend storage dependency analysis through concrete instance-field type
-references, including closed generic/array signatures and chains/cycles. Compute
+Extend storage dependency analysis through concrete instance-field and parent
+type references, including closed generic/array signatures and chains/cycles. Compute
 a fixed point before analyzing methods, rather than recursing through reference
 cycles as inline value layouts. Only existing hotfix definitions participate in
 this closure. An open generic field T alone must not select the entire generic
