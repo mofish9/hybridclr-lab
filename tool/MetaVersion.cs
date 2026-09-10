@@ -510,8 +510,19 @@ internal sealed class MetaVersionSnapshot
     private static string StableFieldMetadataWithoutOwnAttributes(FieldDef field, bool ignoreConstant = false) => string.Join(":",
         field.DeclaringType?.FullName ?? "", field.Name.String, field.FieldType.FullName,
         ((uint)field.Attributes).ToString("x8"), field.FieldOffset,
-        ignoreConstant ? "" : ConstantShape(field.HasConstant ? field.Constant : null), field.RVA, BytesHash(field.InitialValue),
+        ignoreConstant ? ConstantKindShape(field) : ConstantShape(field.HasConstant ? field.Constant : null), field.RVA, BytesHash(field.InitialValue),
         field.MarshalType?.ToString() ?? "", RuntimeSemanticFieldAttributes(field.CustomAttributes));
+
+    private static string ConstantKindShape(FieldDef field)
+    {
+        if (!field.HasConstant) return "";
+        // A null string uses the CLI class-null constant kind. Both forms
+        // write a managed reference; scalar kind changes remain incompatible.
+        if (field.FieldType.ElementType == ElementType.String &&
+            (field.Constant.Type == ElementType.String || field.Constant.Type == ElementType.Class && field.Constant.Value == null))
+            return "string-or-null";
+        return field.Constant.Type.ToString();
+    }
 
 	private static string FieldIdentity(FieldDef field) =>
 		(field.DeclaringType?.FullName ?? "") + "::" + field.Name + "|" + field.FieldType.FullName;

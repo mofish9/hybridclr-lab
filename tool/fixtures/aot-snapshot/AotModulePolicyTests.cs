@@ -70,7 +70,7 @@ internal static class AotModulePolicyTests
             ResourceUpdateCompatibility.RuntimeProtocol, "dhe-runtime-v28",
             ResourceUpdateCompatibility.KnownRuntimeCapabilities.Where(value => value != constantCapability),
             values["changed-constant"].RequiredRuntimeCapabilities);
-        foreach (string mutation in new[] { "visibility", "literal-to-storage", "marshal", "offset", "missing-default" })
+        foreach (string mutation in new[] { "visibility", "literal-to-storage", "marshal", "offset", "missing-default", "constant-kind" })
         {
             var invalid = Edit("constant-" + mutation, module => {
                 var field = module.Find("HybridCLR.Lab.ModuleEvolution.ModuleState", false)!
@@ -83,6 +83,7 @@ internal static class AotModulePolicyTests
                     case "marshal": field.MarshalType = new RawMarshalType(new byte[] { 7 }); break;
                     case "offset": field.FieldOffset = 4; break;
                     case "missing-default": field.HasDefault = false; field.Constant = null; break;
+                    case "constant-kind": field.Constant = new ConstantUser("invalid scalar default"); break;
                 }
             });
             checks["constant:" + mutation + "-rejected"] = !ResourceUpdateCompatibility.Analyze(original, invalid).Compatible;
