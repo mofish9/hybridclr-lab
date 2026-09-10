@@ -74,9 +74,11 @@ internal static class UnityPublicProbeWorkflow
                 Require(failure.GetProperty("revision").GetInt32() == 0 && failure.GetProperty("loadedAssemblies").GetInt32() == 0 &&
                     !failedLog.Any(line => line.StartsWith("DHE case begin: ") || line.StartsWith("DHE selected module: ")), "no-failed-process-business-effects-" + index);
                 string restored = Path.Combine(output, "fresh-process-" + index + ".json");
-                Execute(player, Common(restored, currentRun).Concat(new[] { "-snapshotResourceRoot", stage, "-unityBehaviourProbe", "current" }).ToArray());
+                Execute(player, Common(restored, currentRun).Concat(new[] { "-snapshotResourceRoot", stage, "-unityBehaviourProbe", "current",
+                    "-unityBehaviourSelection", UnityBehaviourSelection.Read(proof, resource) }).ToArray());
                 var recovered = Read(restored); string[] recoveredLog = File.ReadAllLines(restored + ".log");
                 Require(recovered.GetProperty("passed").GetBoolean() && recovered.GetProperty("unityChecks").GetArrayLength() == 17 &&
+                    recoveredLog.Count(line => line == "DHE Unity expected selection: " + UnityBehaviourSelection.Read(proof, resource)) == 1 &&
                     recoveredLog.Count(line => line == "DHE Unity component pass: 2:17") == 1 &&
                     recoveredLog.Where(line => line.StartsWith("DHE case begin: ")).Select(line => line.Substring(16)).SequenceEqual(expected), "fresh-process-current-recovery-" + index);
                 foreach (string report in new[] { baseline, rejected, restored }) { Track(report); Track(report + ".log"); }

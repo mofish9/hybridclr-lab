@@ -168,7 +168,15 @@ namespace HybridCLR.Lab.Snapshot
                     if (!result.passed) throw new InvalidOperationException("Business entry failed before Unity callback validation.");
                     result.passed = false; result.stage = "unity-component-frames";
                     int expectedDelta = args[unityProbe + 1] == "current" ? 2 : result.unityBaseDelta;
-                    UnityBehaviourPlayer.Begin(expectedDelta, result.unityBaseDelta, (checks, failure) => {
+                    bool[] expectedSelections = { false, false };
+                    if (args[unityProbe + 1] == "current")
+                    {
+                        int selections = Array.IndexOf(args, "-unityBehaviourSelection");
+                        if (selections < 0 || selections + 1 >= args.Length)
+                            throw new ArgumentException("Current lifecycle validation needs bound method selections.");
+                        expectedSelections = args[selections + 1].Split(',').Select(bool.Parse).ToArray();
+                    }
+                    UnityBehaviourPlayer.Begin(expectedDelta, expectedSelections, (checks, failure) => {
                         result.unityChecks = checks; result.error = failure; result.passed = failure == null; result.stage = "unity-component-complete";
                         File.WriteAllText(args[index + 1], JsonUtility.ToJson(result, true)); Application.Quit(result.passed ? 0 : 1);
                     });

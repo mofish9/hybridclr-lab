@@ -15,12 +15,16 @@ namespace HybridCLR.Lab.Snapshot
         private WeakReference marker;
         private int delta, phase, firstFrame;
         private float deadline;
-        private bool expectedChanged;
+        private bool expectedAwakeChanged, expectedReaderChanged;
 
-        internal static void Begin(int expectedDelta, int baseDelta, Action<string[], string> completed)
+        internal static void Begin(int expectedDelta, bool[] expectedSelections, Action<string[], string> completed)
         {
+            if (expectedSelections == null || expectedSelections.Length != 2)
+                throw new ArgumentException("Lifecycle requires two bound method selections.");
             var driver = new GameObject("DHE Unity validation driver").AddComponent<UnityBehaviourPlayer>();
-            driver.delta = expectedDelta; driver.expectedChanged = expectedDelta != baseDelta;
+            driver.delta = expectedDelta;
+            driver.expectedAwakeChanged = expectedSelections[0]; driver.expectedReaderChanged = expectedSelections[1];
+            Console.WriteLine("DHE Unity expected selection: " + expectedSelections[0] + "," + expectedSelections[1]);
             driver.completed = completed; driver.firstFrame = Time.frameCount; driver.deadline = Time.realtimeSinceStartup + 20;
         }
         private void Require(bool value, string name)
@@ -44,7 +48,7 @@ namespace HybridCLR.Lab.Snapshot
                     Require(Read("Value") == 1 + 10 * delta, "awake-current-value");
                     Require(Read("Enabled") == delta, "on-enable-current-value");
                     var awake = componentType.GetMethod("Awake", BindingFlags.NonPublic | BindingFlags.Instance);
-                    Require(RuntimeApi.IsDifferentialMethodChanged(awake) == expectedChanged, "awake-diff-selection");
+                    Require(RuntimeApi.IsDifferentialMethodChanged(awake) == expectedAwakeChanged, "awake-diff-selection");
                     if (delta == 2)
                     {
                         Require((long)componentType.GetField("Extra").GetValue(component) == 91000000019L, "added-instance-field");
@@ -65,13 +69,13 @@ namespace HybridCLR.Lab.Snapshot
                     Require(Read("CoroutineSteps") == 2 * delta, "coroutine-resumed-across-frames");
                     Require(State("Disabled") == delta, "on-disable-current-value");
                     MethodInfo reader = componentType.GetMethod("ReadUnchanged");
-                    // The IL is unchanged, but its owner layout gains fields.
-                    // That dependency legitimately selects the reader on the old Base.
-                    Require(RuntimeApi.IsDifferentialMethodChanged(reader) == expectedChanged, "layout-dependent-reader-selection");
+                    // The bound plan includes field and interface dependencies,
+                    // even when the fixture's numerical Delta did not change.
+                    Require(RuntimeApi.IsDifferentialMethodChanged(reader) == expectedReaderChanged, "layout-dependent-reader-selection");
                     reader.Invoke(component, null); RuntimeApi.ResetDifferentialDispatchCounters();
                     int actual = (int)reader.Invoke(component, null);
                     int aot = RuntimeApi.GetDifferentialAotEntryCount(), interpreted = RuntimeApi.GetDifferentialInterpreterEntryCount();
-                    Require(actual == Read("Value") + 1 && (expectedChanged ? interpreted >= 1 : aot >= 1 && interpreted == 0), "layout-dependent-reader-execution");
+                    Require(actual == Read("Value") + 1 && (expectedReaderChanged ? interpreted >= 1 : aot >= 1 && interpreted == 0), "layout-dependent-reader-execution");
                     MethodInfo unaffected = typeof(ValueLayout.Factory).GetMethod("UnchangedRevision");
                     unaffected.Invoke(null, null); RuntimeApi.ResetDifferentialDispatchCounters();
                     int sentinel = (int)unaffected.Invoke(null, null);

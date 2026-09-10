@@ -82,3 +82,25 @@ the expected selection, exact value/reference preservation and one changed DHE
 entry for affected instances versus zero for unaffected instances. AOT counters
 include reflection wrappers and cannot supply per-method timing. Bind all source,
 plan, input and binary hashes; retain failed probes without changing the oracle.
+
+## Unselected owner allocation follow-up
+
+Base-69 passes the conditional Identity<T> probe but fails four GenericOwner<
+EvolvingBehaviour> reflection/type assertions after the component gains an
+interface. The owner definition is not selected for storage. The interpreted
+constructor's MethodInfo uses the raw Current owner; newobj allocates that class,
+while typeof/MakeGenericType use the retained Base definition with Current
+arguments. The allocation mapper currently returns raw interpreter definitions
+unchanged. Reapply the owning published image's storage selection to those
+definitions before allocating, including each part of a closed generic class.
+Preserve type modifiers and the argument context. New interpreter-only types
+and selected Current definitions must remain themselves. Existing objects are
+never migrated by this operation. Publication still uses the image's completed
+DHE state and metadata interning still holds the metadata lock.
+
+Preserve the cold/cached Base-69 failures and rerun their exact Current DLLs on
+a newly built evolved Base after real-header native compilation. Retain Base-68
+as the passing selected-owner control. Separately replace the lifecycle oracle
+based on Delta with the bound resource plan; do not hide the observed coroutine
+Base-frame exception by weakening that test. Generic dispatch, native callbacks,
+reflection writes and all 46 business cases remain required regressions.

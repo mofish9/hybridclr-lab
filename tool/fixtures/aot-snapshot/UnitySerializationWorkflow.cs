@@ -20,6 +20,7 @@ internal static class UnitySerializationWorkflow
         string cacheCurrentModelSha256 = null;
         string lab = Path.GetFullPath(args[0]), tool = Path.GetFullPath(args[1]), proof = Path.GetFullPath(args[2]),
             source = Path.GetFullPath(args[3]), output = Path.GetFullPath(args[4]);
+        string lifecycleSelection = lifecycle ? UnityBehaviourSelection.Read(proof, source) : null;
         if (Directory.Exists(output)) throw new IOException("Replay output must be new.");
         Directory.CreateDirectory(output);
         JsonElement Read(string path) => JsonSerializer.Deserialize<JsonElement>(File.ReadAllBytes(path));
@@ -33,6 +34,7 @@ internal static class UnitySerializationWorkflow
             if (lifecycle && arguments.Contains("-snapshotResult"))
             {
                 start.ArgumentList.Add("-unityBehaviourProbe"); start.ArgumentList.Add("current");
+                start.ArgumentList.Add("-unityBehaviourSelection"); start.ArgumentList.Add(lifecycleSelection);
             }
             if (cached && arguments.Contains("-snapshotResult"))
             {
@@ -125,6 +127,7 @@ internal static class UnitySerializationWorkflow
             ? value.EnumerateArray().Select(row => row.GetString()!).ToArray() : Array.Empty<string>();
         string[] unityChecks = lifecycle ? OptionalChecks("unityChecks") : Array.Empty<string>();
         bool lifecyclePassed = !lifecycle || unityChecks.SequenceEqual(unityExpected) &&
+            lines.Count(line => line == "DHE Unity expected selection: " + lifecycleSelection) == 1 &&
             lines.Where(line => line.StartsWith("DHE Unity check: ")).Select(line => line.Substring("DHE Unity check: ".Length)).SequenceEqual(unityExpected) &&
             lines.Count(line => line == "DHE Unity component pass: 2:17") == 1 &&
             report.GetProperty("stage").GetString() == "unity-component-complete";
@@ -147,7 +150,7 @@ internal static class UnitySerializationWorkflow
             lines.Where(line => line.StartsWith("DHE case begin: ")).Select(line => line.Substring(16)).SequenceEqual(
                 Read(Path.Combine(source, "reference.json")).GetProperty("records").EnumerateArray().Select(row => row.GetString()));
         File.WriteAllText(Path.Combine(output, "result.json"), JsonSerializer.Serialize(new { passed, immutable, checks, expected = sequence,
-            lifecycle, lifecyclePassed, unityChecks, cached, cachePassed, cacheChecks, currentReferenceStorageSelected,
+            lifecycle, lifecyclePassed, lifecycleSelection, unityChecks, cached, cachePassed, cacheChecks, currentReferenceStorageSelected,
             cacheCurrentModelSha256, callbacks, callbackControl, callbackFixturePassed,
             error = report.GetProperty("error").GetString(), proof, source, labHead, playerSha256 = playerHash, gameAssemblySha256 = gameHash,
             hostSha256 = Hash(typeof(UnitySerializationWorkflow).Assembly.Location), toolSha256 = Hash(tool),

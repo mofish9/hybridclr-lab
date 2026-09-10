@@ -161,6 +161,7 @@ internal static class FrozenResourceWorkflow
         if (Directory.Exists(output)) throw new IOException("Output must be new.");
         Directory.CreateDirectory(output);
         int? expectedModuleConstant = null;
+        string lifecycleSelection = null;
         string Execute(string exe, params string[] arguments)
         {
             var start = new ProcessStartInfo(exe) { WorkingDirectory = lab, UseShellExecute = false, CreateNoWindow = true,
@@ -174,7 +175,11 @@ internal static class FrozenResourceWorkflow
             if (arguments.Contains("-snapshotResult"))
             {
                 if (validationMode.Contains("precommit")) { start.ArgumentList.Add("-publicPrecommitProbe"); start.ArgumentList.Add("true"); }
-                if (validationMode.Contains("unity")) { start.ArgumentList.Add("-unityBehaviourProbe"); start.ArgumentList.Add("current"); }
+                if (validationMode.Contains("unity"))
+                {
+                    start.ArgumentList.Add("-unityBehaviourProbe"); start.ArgumentList.Add("current");
+                    start.ArgumentList.Add("-unityBehaviourSelection"); start.ArgumentList.Add(lifecycleSelection);
+                }
                 if (validationMode.Contains("serialization")) { start.ArgumentList.Add("-unitySerializationProbe"); start.ArgumentList.Add("true"); }
             }
             using var process = Process.Start(start)!;
@@ -219,6 +224,7 @@ internal static class FrozenResourceWorkflow
         var checks = new Dictionary<string, bool>(); var players = new List<object>();
         for (int index = 0; index < proofs.Length; index++)
         {
+            if (validationMode.Contains("unity")) lifecycleSelection = UnityBehaviourSelection.Read(proofs[index], output);
             string build = Path.Combine(proofs[index], "base"), stage = Path.Combine(output, "stage-" + index);
             string embedded = Path.Combine(build, "player/Snapshot_Data/StreamingAssets/SnapshotDHE");
             foreach (string source in Directory.GetFiles(embedded, "*", SearchOption.AllDirectories))
