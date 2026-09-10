@@ -15,6 +15,11 @@ namespace HybridCLR.Lab.UnityReference
             if (Array.IndexOf(Environment.GetCommandLineArgs(), "-unityReferenceGenericProbe") >= 0) Run();
         }
 
+        public static bool CheckPhysicalReceivers(object oldObject, object currentObject, bool sameLayout)
+        {
+            return currentObject is Evolving && (oldObject is Evolving) == sameLayout;
+        }
+
         private static object Construct(Type type)
         {
             foreach (var constructor in type.GetConstructors())

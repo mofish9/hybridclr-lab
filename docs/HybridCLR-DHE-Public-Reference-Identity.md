@@ -1,5 +1,33 @@
 # Public reference identity and physical receivers
 
+## Observed first correction and next correction
+
+At d52de3b/6886fee, Base-54/55 both pass all fourteen public reference checks.
+All ten cached-handle/physical-receiver assertions pass, but the subsequent
+old-layout component GetComponent/clone checks fail after pre-selection creation.
+Generic/array identity improves from 4/18 to 10/18 on the old-layout Base; the
+same-layout control passes 18/18. Field handles with generic Current arguments,
+ordinary List<T> allocation, arrays and nested generic assignability remain.
+
+The real reflected dispatch diagnostic on Base-54 returns 38 as expected with
+selected=true, aot=23 and interpreter=0. Base-55 returns 38 with selected=false,
+aot=24 and interpreter=0. The unaffected sentinel returns 5, aot=20,
+interpreter=0 on both. These aggregate AOT counts include reflection wrappers;
+they do not identify the reader's execution mode. Source review confirms the
+DHE counter is in PrepareDheInterpreterMethod and misses direct interpreter
+invoker entry. Move it to actual Interpreter::Execute entry for changed DHE
+methods and remove preparation counting; preserve the full execution gate.
+
+Resolve physical generic arguments recursively through each owning published
+assembly, including reference wrappers. Permit a physical Current reference
+instance to satisfy its public Base class query, while retaining strict physical
+ancestry for field offsets and refusing the reverse old-to-Current cast. Add an
+explicit Current-code cast assertion to the cached receiver suite. Normalize
+generic declaring handles when constructing FieldInfo. Reflection array creation
+must select the physical reference element, without reinterpreting old value
+buffers or migrating existing arrays. Keep generic invariance and old-frame
+guards. These are candidate changes, not a completed capability statement.
+
 The preceding e403775/6d0f642 candidate passes native compile and actual Unity
 serialization, but old-layout Base-52 fails Type equality/assignability and the
 managed MethodInfo.Invoke receiver check. Same-layout Base-53 passes. The full

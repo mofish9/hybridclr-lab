@@ -101,12 +101,13 @@ internal static class UnitySerializationWorkflow
         string[] cacheExpected = {
             "cached-type-identity-stable", "cached-type-hash-stable", "cached-type-dictionary-lookup", "old-object-public-type-stable",
             "cached-type-allocation-has-current-storage", "cached-field-reads-current-object", "cached-field-writes-current-object",
-            "cached-field-retains-old-object-storage", "current-field-validates-physical-receiver", "rejected-access-preserves-both-objects"
+            "cached-field-retains-old-object-storage", "current-field-validates-physical-receiver", "rejected-access-preserves-both-objects",
+            "current-code-casts-respect-physical-layout"
         };
         string[] cacheChecks = cached ? OptionalChecks("referenceCacheChecks") : Array.Empty<string>();
         bool cachePassed = !cached || cacheChecks.SequenceEqual(cacheExpected) &&
             lines.Where(line => line.StartsWith("DHE reference cache check: ")).Select(line => line.Substring("DHE reference cache check: ".Length)).SequenceEqual(cacheExpected) &&
-            lines.Count(line => line == "DHE reference cache pass: 10") == 1;
+            lines.Count(line => line == "DHE reference cache pass: 11") == 1;
         bool immutable = Hash(player) == playerHash && Hash(game) == gameHash && stageHashes.All(row => Hash(row.Key) == row.Value);
         bool passed = immutable && cachePassed && lifecyclePassed && report.GetProperty("passed").GetBoolean() && checks.SequenceEqual(sequence) &&
             lines.Count(line => line == prefix + " pass: " + sequence.Length) == 1 &&

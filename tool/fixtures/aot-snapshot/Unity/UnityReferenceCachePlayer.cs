@@ -65,6 +65,10 @@ namespace HybridCLR.Lab.Snapshot
                 });
                 Check("rejected-access-preserves-both-objects", () =>
                     (int)cachedField.GetValue(oldObject) == 17 && (int)currentField.GetValue(fresh) == 41);
+                Check("current-code-casts-respect-physical-layout", () => {
+                    var probe = typeof(ValueLayout.Factory).Assembly.GetType("HybridCLR.Lab.UnityReference.GenericReferenceCases", true);
+                    return (bool)probe.GetMethod("CheckPhysicalReceivers").Invoke(null, new object[] { oldObject, fresh, baseDelta == 2 });
+                });
             }
             catch (Exception error) { errors.Add(error.ToString()); }
             finally
