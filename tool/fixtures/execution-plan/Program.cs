@@ -49,7 +49,7 @@ foreach (string version in new[] { "old", "new" })
         AotSnapshotSha256 = HashText("snapshot" + version), BaseMetaVersionSetSha256 = SetHash(beforeBytes),
         AotAnalysisSnapshotSha256 = HashText("analysis-snapshot" + version),
         NativeGuardSourceSha256 = HashText("guard" + version), NativeManifestSha256 = HashText("native" + version),
-        AotMetadataSetId = emptyHash, RuntimeProtocol = "dhe-runtime-protocol-v1", RuntimeContract = "dhe-runtime-v27",
+        AotMetadataSetId = emptyHash, RuntimeProtocol = "dhe-runtime-protocol-v1", RuntimeContract = ResourceUpdateCompatibility.CurrentNativeRuntimeContract,
         RuntimeCapabilities = (string[])typeof(DheRuntime).GetField("NativeRuntimeCapabilities", BindingFlags.Static | BindingFlags.NonPublic).GetValue(null),
         RuntimeAssetRoot = assets, BaseMetaVersionAssetRoot = baseRoot, AssemblyNames = names,
         BaseMetaVersionHashes = names.Select(name => Hash(beforeBytes[name])).ToArray(),

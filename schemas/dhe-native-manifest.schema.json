@@ -112,6 +112,7 @@
           "usesHiddenReturnBuffer": { "type": "boolean" },
           "fullySharedParameterIndexes": { "type": "array", "items": { "type": "integer", "minimum": 0 } },
           "isStatic": { "type": "boolean" },
+          "deferModuleInitializer": { "type": "boolean" },
           "hasThis": { "type": "boolean" },
           "managedParameterCount": { "type": "integer", "minimum": 0 }
         }

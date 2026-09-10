@@ -4,7 +4,7 @@ internal sealed class ResourceUpdateCompatibility
 {
 	public const string Policy = "dhe-proven-safe-subset-v1";
 	public const string RuntimeProtocol = "dhe-runtime-protocol-v1";
-    public const string CurrentNativeRuntimeContract = "dhe-runtime-v27";
+    public const string CurrentNativeRuntimeContract = "dhe-runtime-v28";
     public static readonly string[] KnownRuntimeCapabilities =
     {
 		"aot-guard-v1",
@@ -21,6 +21,7 @@ internal sealed class ResourceUpdateCompatibility
 		"frozen-aot-source-v1",
 		"frozen-aot-snapshot-source-binding-v1",
         "mixed-interpreter-source-batch-v1",
+        "deferred-aot-module-initialization-v1",
         "frozen-generic-context-dispatch-v1",
 		"supplemental-existing-type-instance-fields-v1",
         "supplemental-existing-type-static-fields-v1",
@@ -260,6 +261,8 @@ internal sealed class ResourceUpdateCompatibility
         };
         if (parameterDefaultsChanged || added.Any(method => method.HasParameterDefaults))
             requiredCapabilities.Add("current-parameter-default-metadata-v1");
+        if (baseline.Methods.Concat(current.Methods).Any(method => method.DeclaringType == "<Module>" && method.Name == ".cctor"))
+            requiredCapabilities.Add("deferred-aot-module-initialization-v1");
         if (changed.Concat(removed).Any(method => method.Name == ".cctor") ||
             added.Any(method => method.Name == ".cctor" && baselineTypes.ContainsKey(method.DeclaringTypeStableId)) ||
             current.Fields.Any(field => field.IsStatic && baselineTypes.ContainsKey(field.DeclaringTypeStableId) &&
