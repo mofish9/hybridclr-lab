@@ -13,13 +13,21 @@ internal static class ParentEvolutionWorkflow
         "independent-instances", "parent-constructor-exception"
     };
     private const string Prefix = "DHE parent evolution check: ";
+    private static readonly string[] MemberExpected = Expected.Concat(new[] {
+        "inherited-field-reflected-type", "inherited-method-owner", "declared-only-inherited-fields-absent",
+        "declared-only-inherited-methods-absent", "inherited-property-owner", "inherited-property-read-write",
+        "declared-only-inherited-properties-absent", "inherited-event-owner", "inherited-event-add-remove",
+        "declared-only-inherited-events-absent", "nonpublic-inherited-members-filtered", "inherited-static-flatten-hierarchy"
+    }).ToArray();
     private static string Hash(string path) => Convert.ToHexString(SHA256.HashData(File.ReadAllBytes(path)));
     private static string[] Observed(IEnumerable<string> lines) => lines.Where(line => line.StartsWith(Prefix))
         .Select(line => line[Prefix.Length..]).ToArray();
 
     internal static int Reference(string[] args)
     {
-        if (args.Length != 3) throw new ArgumentException("parent-evolution-reference <Current DLL root> <Base Native DLL> <new output>");
+        bool members = args.Length == 4 && args[3] == "members";
+        if (args.Length != 3 && !members) throw new ArgumentException("parent-evolution-reference <Current DLL root> <Base Native DLL> <new output> [members]");
+        string[] expected = members ? MemberExpected : Expected;
         string output = Path.GetFullPath(args[2]);
         if (Directory.Exists(output)) throw new IOException("Reference output must be new.");
         Directory.CreateDirectory(output);
@@ -37,9 +45,9 @@ internal static class ParentEvolutionWorkflow
         finally { Console.SetOut(original); }
         string log = Path.Combine(output, "parent.log"); File.WriteAllText(log, trace.ToString());
         string[] observed = Observed(trace.ToString().Split('\n').Select(line => line.TrimEnd('\r')));
-        bool passed = prior == 0 && error == null && checks.SequenceEqual(Expected) && observed.SequenceEqual(Expected);
+        bool passed = prior == 0 && error == null && checks.SequenceEqual(expected) && observed.SequenceEqual(expected);
         File.WriteAllText(Path.Combine(output, "result.json"), JsonSerializer.Serialize(new {
-            passed, checks, observed, expected = Expected, error, priorResultSha256 = Hash(Path.Combine(previous, "result.json")),
+            passed, checks, observed, expected, members, error, priorResultSha256 = Hash(Path.Combine(previous, "result.json")),
             logSha256 = Hash(log), hostSha256 = Hash(typeof(ParentEvolutionWorkflow).Assembly.Location),
             scope = "CLR parent evolution plus 18 framework, 25 virtual-signature and 46 business checks"
         }, new JsonSerializerOptions { WriteIndented = true }));
@@ -50,7 +58,9 @@ internal static class ParentEvolutionWorkflow
 
     internal static int Replay(string[] args)
     {
-        if (args.Length != 5) throw new ArgumentException("parent-evolution-replay <lab> <tool.dll> <Base proof> <shared resource> <new output>");
+        bool members = args.Length == 6 && args[5] == "members";
+        if (args.Length != 5 && !members) throw new ArgumentException("parent-evolution-replay <lab> <tool.dll> <Base proof> <shared resource> <new output> [members]");
+        string[] expected = members ? MemberExpected : Expected;
         string output = Path.GetFullPath(args[4]);
         if (Directory.Exists(output)) throw new IOException("Replay output must be new.");
         Directory.CreateDirectory(output);
@@ -61,10 +71,10 @@ internal static class ParentEvolutionWorkflow
         string log = Path.Combine(framework, "virtual-business/player.json.log"), previous = Path.Combine(framework, "result.json");
         string[] lines = File.Exists(log) ? File.ReadAllLines(log) : Array.Empty<string>();
         string[] observed = Observed(lines);
-        bool passed = prior == 0 && error == null && observed.SequenceEqual(Expected) &&
-            lines.Count(line => line == "DHE parent evolution pass: " + Expected.Length) == 1;
+        bool passed = prior == 0 && error == null && observed.SequenceEqual(expected) &&
+            lines.Count(line => line == "DHE parent evolution pass: " + expected.Length) == 1;
         File.WriteAllText(Path.Combine(output, "result.json"), JsonSerializer.Serialize(new {
-            passed, checks = observed, expected = Expected, error,
+            passed, checks = observed, expected, members, error,
             priorResultSha256 = File.Exists(previous) ? Hash(previous) : null,
             logSha256 = File.Exists(log) ? Hash(log) : null,
             hostSha256 = Hash(typeof(ParentEvolutionWorkflow).Assembly.Location),
