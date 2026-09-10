@@ -83,3 +83,14 @@ and rerun all cases. Record complete per-Base mode sets and immutable hashes.
 The old proof-22 admission check in `old-base-capability-01` rejects the preserved
 Current with `base-missing-runtime-capability:mixed-interpreter-source-batch-v1`.
 This is expected negative evidence, not a Player pass on that old runtime.
+
+Proof-23 on runtime `04a0502` passes Base startup (PID 5488) and all 35 core
+frozen-source replay checks (PID 10192). However, `resource-02` (host lab
+`5d4dfee`, PID 19452) crashes before any case executes. Its symbolized stack
+points to the new RawImage parser's loop scope exit in RuntimeApi.cpp:379.
+RawImageBase owns and frees the input passed to Load; the new caller incorrectly
+gave it the interior of a managed byte array. Runtime `9e7b601` passes CopyBytes
+instead, matching the existing assembly loader's ownership contract. Preserve
+the crash log and exact Current, compile the new source identity, and build a
+new immutable Base before replay. Proof-23 cannot be relabeled as a pass for
+new interpreter-only assemblies.
