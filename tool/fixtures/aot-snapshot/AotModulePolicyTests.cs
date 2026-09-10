@@ -43,6 +43,10 @@ internal static class AotModulePolicyTests
         {
             checks[pair.Key + ":compatible"] = pair.Value.Compatible;
             checks[pair.Key + ":module-capability-required"] = pair.Value.RequiredRuntimeCapabilities.Contains(capability);
+            checks[pair.Key + ":module-token-capability-required"] = pair.Value.RequiredRuntimeCapabilities.Contains("aot-module-token-resolution-v1");
+            checks[pair.Key + ":old-module-resolver-rejected"] = !ResourceUpdateCompatibility.CanExecuteUpdate(
+                ResourceUpdateCompatibility.RuntimeProtocol, "dhe-runtime-v29",
+                ResourceUpdateCompatibility.KnownRuntimeCapabilities.Where(value => value != "aot-module-token-resolution-v1"), pair.Value.RequiredRuntimeCapabilities);
             checks[pair.Key + ":old-runtime-rejected"] = !ResourceUpdateCompatibility.CanExecuteUpdate(
                 ResourceUpdateCompatibility.RuntimeProtocol, "dhe-runtime-v27",
                 ResourceUpdateCompatibility.KnownRuntimeCapabilities.Where(value => value != capability), pair.Value.RequiredRuntimeCapabilities);

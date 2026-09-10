@@ -8,8 +8,8 @@
       "repository": "hybridclr",
       "sourceMode": "integrated",
       "baseCommit": "9e4fc7219724a3c63ff845e0b2acaa7d10c2430b",
-      "integratedCommit": "9d778f0a84870cc7f5328ab94e255c0a5be2d911",
-      "expectedTreeSha256": "6BD27A56D7F782F85DBE280333457781C046534EAD9FCEEDAFA65C8AB7E7B8B5",
+      "integratedCommit": "421bb186743bb22efcc2a39c77e3c51f2c286093",
+      "expectedTreeSha256": "53B1C94897ABDB7C4511F2979D0652DCF80D63F25095E321474DBF2D61FB95F0",
       "path": "patches/dhe-lite/hybridclr.patch",
       "sha256": "3E16BF9C18B6F31287D73EFAEB015C7DA213B87FB7E69F7AD06FDFCBC482A24B",
       "applyRoot": "libil2cpp",
@@ -65,8 +65,8 @@
       "repository": "hybridclr_unity",
       "sourceMode": "integrated",
       "baseCommit": "623073baafd5a1d12ea46df8145de9fddc899fac",
-      "integratedCommit": "3c685631067559812d438f61286155a736feb50d",
-      "expectedTreeSha256": "5AE04C0A78E05256A290FA3EC9B416FC13120402D082B5B27B9B5F086AC25E99",
+      "integratedCommit": "831f2f6d1e4f22a43f8838f6e706fe22d9593a36",
+      "expectedTreeSha256": "841D255305AC166DBBCDF857D26DF99ED376C60DD157EBEA182F89C2AC978175",
       "treeHashIgnoredPaths": [
         "Editor/BuildProcessors/AddLil2cppSourceCodeToXcodeproj2023OrNewer.cs.meta"
       ],

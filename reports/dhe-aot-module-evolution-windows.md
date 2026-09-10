@@ -107,3 +107,42 @@ reader. Build a new immutable Base from the exact Base-30 inputs, then replay
 the preserved resources plus explicit GetRawConstantValue/GetValue probes.
 No performance claim is made. Rollback is the preceding tool/package/IL2CPP
 combination, which rejects these updates before executing business code.
+
+Lab `89d061a`, IL2CPP `4d5052e`, package `3c68563` (runtime contract v29)
+admit literal-value changes with `current-literal-field-values-v1`; the native
+reader uses the published Current metadata token map for existing literals.
+`policy-before-constant` fails three assertions on the prior tool; `policy-02`
+passes all 31. `native-02` passes real-header compile/CTest on runtime tree
+`412D7EE768CF880A585ADADB847BDD1FC9C773413A8787D220D273AF1617BF73`, manifest
+`80D7D133CB8FC4BA178A561DBD5CB1DDE2C5E24682B517048975409FE1F1432D`.
+`managed-02.json` passes the 81 package validation/argument-selection checks.
+`resource-old-reader-rejected-01` rejects Base-31 for the missing literal-value
+capability, before running the Player. The MV format/fingerprints are unchanged.
+
+Base-32 builds from the exact Base-30 input DLLs. Startup PID 16912 and no-op
+PID 5364 pass; retained/fresh raw and boxed constant reads all return 101.
+Its Base ID is `da9b905c7d0fac29e7972fd3f6b4e0463e9d4ee563c1076d59a6c67f55c134a6`,
+snapshot `5e840aa21e28376ec5a9bbbe456fbcb436516a412a4290d7c711947d87791759`,
+GameAssembly `36AC5C02E811DA113D13758FB2344D94DCAB0CCDD1AEDEF04E26A8E73594B752`.
+The exact prior Current bytes now pass resource compatibility, but real replays
+`resource-changed-02` (PID 7972) and `resource-removed-02` (PID 5168) both return
+DHE_MV_REGISTRATION_FAILED before publication or business entry. This is not a
+passing constant/reflection execution result. Preserve both complete outputs.
+
+The native Base method resolver enumerates `Image::GetTypes`, which deliberately
+hides `<Module>`. Changed/removed cctors therefore cannot resolve their old
+MethodDef. The old standalone stub incorrectly included this hidden type. Lab
+`032ae95` corrects that simulation and adds changed/removed module registration
+checks; `native-before-module-lookup` fails seven assertions on `9d778f0`.
+HybridCLR `421bb18` instead enumerates physical Base definitions, excluding
+supplemental Current reflection views. Package `831f2f6` adds capability
+`aot-module-token-resolution-v1`, contract v30; IL2CPP remains `4d5052e`.
+New source-bound native and immutable Player verification is required.
+
+Lab `2418ab5` adds 74 CLR-verified literal reflection assertions for numeric,
+string/null/Unicode, enum and generic-owner literals (`literal-base-01` and
+`literal-current-01`), alongside all 46 preceding cases. `2c2f84e` adds independent
+module/literal replay audits. `2169c5e` adds a real C# second module initializer,
+changing the compiler-generated cctor body (`current-chained-01`). Base-33 is
+being built from the newer module/literal inputs on the prior v29 runtime; it
+must retain that identity and cannot qualify the v30 resolver fix.

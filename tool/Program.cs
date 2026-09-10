@@ -1403,7 +1403,10 @@ internal static partial class Program
                         throw new DheException("Frozen AOT source copied hash mismatch: " + baseId + "/" + sourceName);
                     using (var module = dnlib.DotNet.ModuleDefMD.Load(sourceTarget))
                         if (module.GlobalType.HasMethods || module.GlobalType.HasFields)
+                        {
                             requiredRuntimeCapabilities.Add("deferred-aot-module-initialization-v1");
+                            requiredRuntimeCapabilities.Add("aot-module-token-resolution-v1");
+                        }
                     frozenAotSources.Add(new
                     {
                         assemblyName = sourceName,

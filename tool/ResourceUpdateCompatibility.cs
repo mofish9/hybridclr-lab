@@ -4,7 +4,7 @@ internal sealed class ResourceUpdateCompatibility
 {
 	public const string Policy = "dhe-proven-safe-subset-v1";
 	public const string RuntimeProtocol = "dhe-runtime-protocol-v1";
-    public const string CurrentNativeRuntimeContract = "dhe-runtime-v29";
+    public const string CurrentNativeRuntimeContract = "dhe-runtime-v30";
     public static readonly string[] KnownRuntimeCapabilities =
     {
 		"aot-guard-v1",
@@ -23,6 +23,7 @@ internal sealed class ResourceUpdateCompatibility
         "mixed-interpreter-source-batch-v1",
         "deferred-aot-module-initialization-v1",
         "current-literal-field-values-v1",
+        "aot-module-token-resolution-v1",
         "frozen-generic-context-dispatch-v1",
 		"supplemental-existing-type-instance-fields-v1",
         "supplemental-existing-type-static-fields-v1",
@@ -268,7 +269,10 @@ internal sealed class ResourceUpdateCompatibility
                 IsSupportedLiteralValueEvolution(field, currentField)))
             requiredCapabilities.Add("current-literal-field-values-v1");
         if (baseline.Methods.Concat(current.Methods).Any(method => method.DeclaringType == "<Module>" && method.Name == ".cctor"))
+        {
             requiredCapabilities.Add("deferred-aot-module-initialization-v1");
+            requiredCapabilities.Add("aot-module-token-resolution-v1");
+        }
         if (changed.Concat(removed).Any(method => method.Name == ".cctor") ||
             added.Any(method => method.Name == ".cctor" && baselineTypes.ContainsKey(method.DeclaringTypeStableId)) ||
             current.Fields.Any(field => field.IsStatic && baselineTypes.ContainsKey(field.DeclaringTypeStableId) &&
