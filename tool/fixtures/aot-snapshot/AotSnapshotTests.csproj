@@ -23,6 +23,7 @@
     <Compile Include="../../ResourceExecutionPlan.cs" Link="Tool/ResourceExecutionPlan.cs" />
     <Compile Include="../../DheValueLayoutImpact.cs" Link="Tool/DheValueLayoutImpact.cs" />
     <Compile Include="../../FrozenAotAdaptation.cs" Link="Tool/FrozenAotAdaptation.cs" />
+    <Compile Include="../../DheAotBaselineIdentity.cs" Link="Tool/DheAotBaselineIdentity.cs" />
     <Compile Include="../../FrozenAotSourcePlan.cs" Link="Tool/FrozenAotSourcePlan.cs" />
     <Compile Include="../../FrozenAotAdmission.cs" Link="Tool/FrozenAotAdmission.cs" />
     <Reference Include="dnlib"><HintPath>../../dnlib.dll</HintPath></Reference>

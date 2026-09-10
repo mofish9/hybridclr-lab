@@ -33,10 +33,14 @@ internal static class FrozenAotAdaptation
         if (baselineNames.Length != baselineNames.Distinct(StringComparer.Ordinal).Count() ||
             !baselineNames.ToHashSet(StringComparer.Ordinal).SetEquals(snapshot.Assemblies.Where(source => source.Dhe).Select(source => source.AssemblyName)))
             throw new InvalidDataException("Frozen AOT planning requires the Base's complete original hotfix set.");
-        foreach (var baseline in baselines)
-            if (!baseline.AssemblySha256.Equals(snapshot.Assemblies.Single(source => source.Dhe && source.AssemblyName == baseline.AssemblyName).Sha256,
-                StringComparison.OrdinalIgnoreCase))
+        for (int index = 0; index < baselines.Length; ++index)
+        {
+            var baseline = baselines[index];
+            var captured = snapshot.Assemblies.Single(source => source.Dhe && source.AssemblyName == baseline.AssemblyName);
+            if (!baseline.AssemblySha256.Equals(captured.Sha256, StringComparison.OrdinalIgnoreCase) &&
+                !DheAotBaselineIdentity.Matches(File.ReadAllBytes(before[index]), captured.ReadVerifiedBytes()))
                 throw new InvalidDataException("Hotfix baseline is not the captured Base source: " + baseline.AssemblyName);
+        }
         var impact = verifiedImpact ?? DheValueLayoutImpact.Analyze(before, current, snapshot.OrdinaryAssemblyPaths);
         var plans = new List<FrozenAotAssemblyPlan>();
         var obligations = new List<FrozenAotObligation>();

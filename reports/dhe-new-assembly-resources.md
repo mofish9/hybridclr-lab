@@ -94,3 +94,40 @@ instead, matching the existing assembly loader's ownership contract. Preserve
 the crash log and exact Current, compile the new source identity, and build a
 new immutable Base before replay. Proof-23 cannot be relabeled as a pass for
 new interpreter-only assemblies.
+
+## Parser fix: first complete 31-case Player pass
+
+Runtime `9e7b601` passes real-header native compile/CTest in `native-04`. Proof-25
+passes Base startup (PID 20152) and all 35 frozen core checks (PID 18984). Its
+Base ID is `963bfbc32c20ef8716de1f4d9d1755255538a756bf72af45ce686c9314011eb1`;
+snapshot `e49bdd8f3345322b09fbea76e7759a11118f3a201e90acb7c7b06e89f0f55a81`;
+GameAssembly `EB1D7AE14FC87771114120F946566948E4F53EFC5A06389C5E39AA980BF9434E`.
+`resource-03` passes all 12 workflow checks on that unchanged Player. PID 17264
+executes all 31 cases in CLR reference order, revision 73, with three DHE DLLs,
+Added interpreter-only, and original Native/mscorlib frozen sources. Missing
+and corrupt Added are rejected (PIDs 19612/13384), then the restored resource
+passes (1060). Snapshot substitution is rejected (20132) and restoration passes
+(8368). Exact Current hash is
+`6dceb3f58b95121220ad0358c20e7c2016f68a485ceb5c138df91ae792ea333b`; resource manifest
+`0751178572C97A11D94C79D5AA173F78E902130FE2B52E4E2A6EF944EFC90FC7`.
+Host-04 is from `5d4dfee`; the resource run records lab `b325d7f` and tool-01.
+
+## Base DLL identity after repeated Unity linking
+
+Base-24 includes all four hotfix DLLs as AOT and passes startup (PID 17932,
+revision 59), but its no-op resource is rejected: Model's frozen baseline hash
+differs from its captured final AOT source. Preserve this failure. In
+`base-24-source-compare-01`, all 35 type and 83 method MV records, including their
+tokens/versions, are identical. UnityLinker reordered compiler-generated
+assembly attributes and their TypeRef/MemberRef rows. Sorting just those assembly
+attributes, with the existing MVID/timestamp normalization, produces identical
+complete bytes (SHA `C44EA277068EC0E38530A0C9EFD2342DE57FB98214928A8B86E3ADE2E2615B38`).
+
+Introduce a conservative comparison only for DHE baseline versus captured DHE
+source: keep raw-hash fast acceptance; otherwise require identical definition
+tokens and complete normalized DLL bytes after ordering a fixed set of compiler
+assembly attributes. Keep business attributes in place and reject duplicate
+compiler attributes. Do not normalize ordinary frozen sources or alter their
+authenticated payload hashes. Base MV/current hashes and native coverage remain
+independent requirements. Regress method bodies, fields, compiler attribute
+values and business attribute order before replaying the original Base-24.
