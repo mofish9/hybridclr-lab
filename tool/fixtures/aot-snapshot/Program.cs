@@ -8,6 +8,9 @@ using HybridCLR.DheTool;
 using System.Text.Json.Nodes;
 
 if (args.Length > 0 && args[0] == "unity-workflow") return UnityWorkflow.Run(args.Skip(1).ToArray());
+if (args.Length > 0 && args[0] == "mixed-transaction-new-base") return MixedTransactionWorkflow.NewBase(args.Skip(1).ToArray());
+if (args.Length > 0 && args[0] == "mixed-transaction-prepare") return MixedTransactionWorkflow.Prepare(args.Skip(1).ToArray());
+if (args.Length > 0 && args[0] == "mixed-transaction-run") return MixedTransactionWorkflow.Run(args.Skip(1).ToArray());
 if (args.Length > 0 && args[0] == "baseline-linker-identity") return BaselineLinkerIdentity.Run(args.Skip(1).ToArray());
 if (args.Length > 0 && args[0] == "pe-header-identity") return PeHeaderIdentity.Run(args.Skip(1).ToArray());
 if (args.Length > 0 && args[0] == "frozen-static-new-base") return FrozenStaticWorkflow.NewBase(args.Skip(1).ToArray());

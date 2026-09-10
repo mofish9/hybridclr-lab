@@ -9,7 +9,8 @@ internal static class UnityWorkflow
     {
         if (args.Length < 6 || args.Length > 8) throw new ArgumentException("unity-workflow <lab> <package> <editor> <runtime manifest> <fixture DLL root> <new output> [expected revision] [latest Current DLL root]");
         string expectedRevision = args.Length >= 7 ? int.Parse(args[6]).ToString() : "41";
-        bool allOrdinaryGuards = args.Length == 8 && (args[7] == ":frozen-entry-all-guards:" || args[7] == ":all-ordinary-guards:");
+        bool mixedTransactionProbe = args.Length == 8 && args[7] == ":mixed-transaction:";
+        bool allOrdinaryGuards = mixedTransactionProbe || args.Length == 8 && (args[7] == ":frozen-entry-all-guards:" || args[7] == ":all-ordinary-guards:");
         bool frozenEntryProbe = args.Length == 8 && (args[7] == ":frozen-entry:" || args[7] == ":frozen-entry-all-guards:");
         string latestCurrentRoot = args.Length == 8 && args[7] != ":evolve:" && !frozenEntryProbe && !allOrdinaryGuards ? Path.GetFullPath(args[7]) : null;
         bool synthesizeEvolution = args.Length == 8 && args[7] == ":evolve:";
@@ -47,6 +48,8 @@ internal static class UnityWorkflow
         File.Delete(Path.Combine(project, "Assets/CurrentStorageRuntime.cs"));
         foreach (var pair in new[] { ("SnapshotPlayer.cs", "Assets"), ("SnapshotWorkflowBuild.cs", "Assets/Editor") })
             File.Copy(Path.Combine(lab, "tool/fixtures/aot-snapshot/Unity", pair.Item1), Path.Combine(project, pair.Item2, pair.Item1));
+        if (mixedTransactionProbe)
+            File.Copy(Path.Combine(lab, "tool/fixtures/aot-snapshot/Unity/MixedTransactionPlayer.cs"), Path.Combine(project, "Assets/MixedTransactionPlayer.cs"));
         if (frozenEntryProbe)
             File.Copy(Path.Combine(lab, "tool/fixtures/aot-snapshot/Unity/FrozenEntryPlayer.cs"), Path.Combine(project, "Assets/FrozenEntryPlayer.cs"));
         File.WriteAllText(Path.Combine(project, "Assets/SnapshotIdentity.cs"),

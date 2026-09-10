@@ -38,6 +38,7 @@ namespace HybridCLR.Lab.Snapshot
             if (Application.isEditor) return;
             string[] args = Environment.GetCommandLineArgs();
             if (Array.IndexOf(args, "-frozenEntryPlan") >= 0) return;
+            if (Array.IndexOf(args, "-mixedTransactionPlan") >= 0) return;
             int index = Array.IndexOf(args, "-snapshotResult");
             if (index < 0 || index + 1 >= args.Length) throw new ArgumentException("-snapshotResult");
             var result = new Result();
