@@ -642,8 +642,36 @@ namespace
         conditionalSource.genericContextMethodTokens = { 0x06000000 };
         rejectsFrozen(base, conditionalSource, {}, {});
         conditionalSource = CurrentImageSource{};
-        conditionalSource.genericContextMethodTokens = { base.methods[0].token };
-        rejectsFrozen(base, conditionalSource, {}, { base.methods[0].token });
+        // Mutable plans use Current tokens on input and immutable Base tokens
+        // after binding. Deliberately reverse order and collide with another
+        // Base method so the native registry cannot rely on numerical identity.
+        conditionalSource.genericContextMethodTokens = { unrelated.token, caller.token };
+        CurrentImagePlan mutablePlan;
+        bool mutableBound = BuildCurrentImagePlan(base, current, {},
+            { unrelated.token, caller.token }, mutablePlan, conditionalSource);
+        CHECK(mutableBound);
+        if (mutableBound)
+        {
+            CHECK(mutablePlan.source.kind == CurrentImageSourceKind::MutableHotfix);
+            CHECK((mutablePlan.source.genericContextMethodTokens ==
+                std::vector<uint32_t>{ base.methods[1].token, base.methods[2].token }));
+        }
+        auto rejectMutable = [&](const MetaVersionData& after, const CurrentImageSource& source,
+            std::vector<uint32_t> types, std::vector<uint32_t> methods) {
+            auto sentinel = mutablePlan;
+            CHECK(!BuildCurrentImagePlan(base, after, types, methods, sentinel, source));
+            CHECK(sentinel == mutablePlan);
+        };
+        rejectMutable(current, conditionalSource, {}, { caller.token });
+        rejectMutable(current, conditionalSource, { owner.token }, { unrelated.token, caller.token });
+        invalid = current; invalid.methods[0].version.fill(88);
+        rejectMutable(invalid, conditionalSource, {}, { unrelated.token, caller.token });
+        auto invalidConditional = conditionalSource;
+        invalidConditional.genericContextMethodTokens.push_back(caller.token);
+        rejectMutable(current, invalidConditional, {}, { unrelated.token, caller.token });
+        invalidConditional = conditionalSource;
+        invalidConditional.genericContextMethodTokens = { 0x06000000 };
+        rejectMutable(current, invalidConditional, {}, { unrelated.token, caller.token });
 #endif
         badSource.baseSourceHash.fill(0);
         rejectsFrozen(base, badSource, {}, {});
@@ -1206,6 +1234,36 @@ namespace
         CHECK(hybridclr::dhe::IsChangedMethod(&closed));
         CHECK(!hybridclr::dhe::CanEnterWithBaseAbi(&closed));
         hybridclr::dhe::ResetForTests();
+        physicalCurrent.isInterpterImpl = false;
+        auto mutableGeneric = frozenRegistration;
+        mutableGeneric.baseMetaVersion = &executionBase;
+        mutableGeneric.currentMetaVersion = &executionCurrent;
+        mutableGeneric.source = hybridclr::dhe::CurrentImageSource{};
+        mutableGeneric.source.genericContextMethodTokens = { changed.token }; // Bound Base token.
+        physicalCurrent.token = executionCurrent.methods[0].token;
+        arguments[0] = &scalarType;
+        const bool mutableRegistered = hybridclr::dhe::PrepareAndRegisterMetaVersions({ mutableGeneric });
+        CHECK(mutableRegistered);
+        if (mutableRegistered)
+        {
+            CHECK(hybridclr::dhe::IsMutableDheAssembly(&assembly));
+            CHECK(!hybridclr::dhe::IsChangedMethod(&closed));
+            CHECK(hybridclr::dhe::CanEnterWithBaseAbi(&closed));
+            CHECK(hybridclr::dhe::ResolveCurrentExecutionMethod(&closed) == &closed);
+            CHECK(hybridclr::dhe::IsChangedMethod(&physicalCurrent));
+            arguments[0] = &unresolved;
+            CHECK(hybridclr::dhe::IsChangedMethod(&closed));
+            CHECK(!hybridclr::dhe::CanEnterWithBaseAbi(&closed));
+        }
+        hybridclr::dhe::ResetForTests();
+        physicalCurrent.isInterpterImpl = false;
+        auto changedBody = executionCurrent;
+        changedBody.methods[0].version.fill(93);
+        mutableGeneric.currentMetaVersion = &changedBody;
+        CHECK(!hybridclr::dhe::PrepareAndRegisterMetaVersions({ mutableGeneric }));
+        CHECK(!hybridclr::dhe::IsDheAssembly(&assembly));
+        CHECK(!physicalCurrent.isInterpterImpl);
+        physicalCurrent.token = changed.token;
         klass->genericContainerHandle = executionClass->genericContainerHandle = nullptr;
         frozenRegistration.source.genericContextMethodTokens.clear();
         physicalCurrent.isInterpterImpl = false;
