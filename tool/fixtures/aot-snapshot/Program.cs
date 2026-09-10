@@ -24,6 +24,7 @@ if (args.Length > 0 && args[0] == "reference-interface-policy") return Reference
 if (args.Length > 0 && args[0] == "method-declaration-policy") return MethodDeclarationPolicyTests.Run(args.Skip(1).ToArray());
 if (args.Length > 0 && args[0] == "declaration-base-inputs") return DeclarationWorkflow.BaseInputs(args.Skip(1).ToArray());
 if (args.Length > 0 && args[0] == "virtual-signature-reference") return VirtualSignatureWorkflow.Reference(args.Skip(1).ToArray());
+if (args.Length > 0 && args[0] == "virtual-signature-noop") return VirtualSignatureWorkflow.Noop(args.Skip(1).ToArray());
 if (args.Length > 0 && args[0] == "virtual-signature-base-inputs") return VirtualSignatureWorkflow.BaseInputs(args.Skip(1).ToArray());
 if (args.Length > 0 && args[0] == "hotfix-generic-body-current") return HotfixGenericBodyCurrent.Run(args.Skip(1).ToArray());
 if (args.Length > 0 && args[0] == "hotfix-generic-dispatch-replay") return HotfixGenericDispatchWorkflow.Replay(args.Skip(1).ToArray());

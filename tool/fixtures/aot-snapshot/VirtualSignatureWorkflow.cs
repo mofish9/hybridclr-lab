@@ -1,4 +1,5 @@
 using System.Reflection;
+using System.Diagnostics;
 using System.Runtime.Loader;
 using System.Security.Cryptography;
 using System.Text.Json;
@@ -18,6 +19,58 @@ internal static class VirtualSignatureWorkflow
         "receiver-storage-fields"
     };
     private static string Hash(string path) => Convert.ToHexString(SHA256.HashData(File.ReadAllBytes(path)));
+
+    internal static int Noop(string[] args)
+    {
+        if (args.Length != 3) throw new ArgumentException("virtual-signature-noop <lab> <passed Base proof> <new output>");
+        string lab = Path.GetFullPath(args[0]), proof = Path.GetFullPath(args[1]), output = Path.GetFullPath(args[2]);
+        if (Directory.Exists(output)) throw new IOException("No-op output must be new.");
+        Directory.CreateDirectory(output);
+        JsonElement Read(string path) => JsonSerializer.Deserialize<JsonElement>(File.ReadAllBytes(path));
+        string Execute(string executable, out int exit, out int pid, params string[] arguments)
+        {
+            var start = new ProcessStartInfo(executable) { WorkingDirectory = lab, UseShellExecute = false,
+                CreateNoWindow = true, WindowStyle = ProcessWindowStyle.Hidden,
+                RedirectStandardOutput = true, RedirectStandardError = true };
+            foreach (string argument in arguments) start.ArgumentList.Add(argument);
+            using var process = Process.Start(start)!; pid = process.Id;
+            var stdout = process.StandardOutput.ReadToEndAsync(); var stderr = process.StandardError.ReadToEndAsync();
+            if (!process.WaitForExit(120000)) { process.Kill(true); throw new TimeoutException(executable); }
+            exit = process.ExitCode; return (stdout.GetAwaiter().GetResult() + stderr.GetAwaiter().GetResult()).Trim();
+        }
+        string dirty = Execute("git", out int gitExit, out _, "status", "--porcelain");
+        if (gitExit != 0 || dirty.Length != 0) throw new InvalidDataException("Commit sources before no-op validation.");
+        string labHead = Execute("git", out gitExit, out _, "rev-parse", "HEAD");
+        if (gitExit != 0) throw new InvalidDataException("Cannot identify lab source.");
+        var original = Read(Path.Combine(proof, "result.json"));
+        var identity = Read(Path.Combine(proof, "base/build-identity.json"));
+        string player = Path.Combine(proof, "base/player/Snapshot.exe"), game = Path.Combine(proof, "base/player/GameAssembly.dll");
+        string stage = Path.Combine(proof, "stage-noop"), playerHash = Hash(player), gameHash = Hash(game);
+        if (!original.GetProperty("passed").GetBoolean() || playerHash != original.GetProperty("playerSha256").GetString() ||
+            gameHash != original.GetProperty("gameAssemblySha256").GetString()) throw new InvalidDataException("Base proof identity mismatch.");
+        var stageHashes = Directory.GetFiles(stage, "*", SearchOption.AllDirectories).ToDictionary(path => path, Hash);
+        string report = Path.Combine(output, "player.json"), log = Path.Combine(output, "player.log");
+        string trace = Execute(player, out int exit, out int pid, "-batchmode", "-nographics", "-snapshotResult", report,
+            "-snapshotResourceRoot", stage, "-expectedRevision", "59", "-expectedAssemblies",
+            identity.GetProperty("assemblies").GetArrayLength().ToString(), "-virtualSignatureNoopProbe", "true", "-logFile", log);
+        File.WriteAllText(Path.Combine(output, "process.log"), trace);
+        var result = Read(report);
+        var observed = File.ReadAllLines(log).Where(line => line.StartsWith("DHE virtual signature check: "))
+            .Select(line => line["DHE virtual signature check: ".Length..]).ToArray();
+        bool immutable = playerHash == Hash(player) && gameHash == Hash(game) && stageHashes.All(row => Hash(row.Key) == row.Value);
+        bool passed = exit == 0 && immutable && result.GetProperty("passed").GetBoolean() &&
+            result.GetProperty("baseId").GetString() == identity.GetProperty("baseId").GetString() &&
+            result.GetProperty("virtualNoopChecks").EnumerateArray().Select(row => row.GetString()).SequenceEqual(Expected) &&
+            observed.SequenceEqual(Expected) && result.GetProperty("virtualNoopMethods").GetInt32() == 6 &&
+            result.GetProperty("virtualNoopInterpreterEntries").GetInt32() == 0 && result.GetProperty("virtualNoopAotEntries").GetInt32() > 0;
+        File.WriteAllText(Path.Combine(output, "result.json"), JsonSerializer.Serialize(new {
+            passed, immutable, proof, labHead, pid, exit, observed, playerHash, gameHash, stageHashes,
+            playerResultSha256 = Hash(report), logSha256 = Hash(log), hostSha256 = Hash(typeof(VirtualSignatureWorkflow).Assembly.Location),
+            scope = "25 unchanged virtual-signature checks on the original generated no-op resource; six implementations unchanged, positive AOT entries and zero DHE interpreter entries"
+        }, new JsonSerializerOptions { WriteIndented = true }));
+        Console.WriteLine("Virtual signature no-op: " + passed + "; checks=" + observed.Length);
+        return passed ? 0 : 1;
+    }
 
     internal static int Reference(string[] args)
     {

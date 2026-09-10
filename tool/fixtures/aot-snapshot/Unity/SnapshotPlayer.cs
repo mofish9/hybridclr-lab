@@ -26,6 +26,8 @@ namespace HybridCLR.Lab.Snapshot
             public long ordinaryAotReferenceResult;
             public long ordinaryAotEchoExtra;
             public int ordinaryAotStaticNeighbor;
+            public string[] virtualNoopChecks;
+            public int virtualNoopMethods, virtualNoopAotEntries, virtualNoopInterpreterEntries;
         }
         private sealed class Provider : IDheRuntimeAssetProvider
         {
@@ -162,6 +164,27 @@ namespace HybridCLR.Lab.Snapshot
                     result.sentinel == 5 &&
                     !RuntimeApi.IsDifferentialMethodChanged(typeof(ValueLayout.Factory).GetMethod("UnchangedRevision"));
                 result.stage = "complete";
+                if (Array.IndexOf(args, "-virtualSignatureNoopProbe") >= 0)
+                {
+                    if (!result.passed) throw new InvalidOperationException("Base business entry failed before virtual no-op validation.");
+                    result.passed = false; result.stage = "virtual-signature-noop";
+                    var assembly = typeof(ValueLayout.Factory).Assembly;
+                    var methods = assembly.GetType("HybridCLR.Lab.VirtualSignatures.Processor", true)
+                        .GetMethods(System.Reflection.BindingFlags.Instance | System.Reflection.BindingFlags.Public |
+                            System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.DeclaredOnly)
+                        .Where(method => method.IsVirtual).ToArray();
+                    result.virtualNoopMethods = methods.Length;
+                    if (methods.Any(RuntimeApi.IsDifferentialMethodChanged))
+                        throw new InvalidDataException("Unchanged virtual implementation was marked changed.");
+                    RuntimeApi.ResetDifferentialDispatchCounters();
+                    result.virtualNoopChecks = (string[])assembly.GetType("HybridCLR.Lab.VirtualSignatures.Cases", true)
+                        .GetMethod("Run").Invoke(null, null);
+                    result.virtualNoopAotEntries = RuntimeApi.GetDifferentialAotEntryCount();
+                    result.virtualNoopInterpreterEntries = RuntimeApi.GetDifferentialInterpreterEntryCount();
+                    result.passed = methods.Length == 6 && result.virtualNoopChecks.Length == 25 &&
+                        result.virtualNoopAotEntries > 0 && result.virtualNoopInterpreterEntries == 0;
+                    result.stage = "virtual-signature-noop-complete";
+                }
                 int unityProbe = Array.IndexOf(args, "-unityBehaviourProbe");
                 if (unityProbe >= 0)
                 {

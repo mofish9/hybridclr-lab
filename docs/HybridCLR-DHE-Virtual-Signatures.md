@@ -76,3 +76,11 @@ reflection selects the implementation after virtual lookup and before unboxing
 arguments. Raw native invocation retains its existing conservative ABI selector.
 Keep native virtual fallback available for abstract declarations; selecting a
 Current declaration does not imply every derived implementation interprets.
+
+The next Base also includes an opt-in no-op probe invoking the unchanged compiler
+suite directly after loading its generated no-op resource. Its Base revision
+remains 59, so this does not claim the separate 46-case Current business suite.
+Require all 25 named checks, six unchanged virtual implementations, positive AOT
+entries and zero DHE interpreter entries; verify the original Player and staged
+resource hashes. This guards against gaining update correctness by interpreting
+the entire unchanged virtual workload.
