@@ -1,6 +1,17 @@
 # DHE evolution implementation and validation
 
-## Active checkpoint: mixed registration retry and new module initializers
+## Active checkpoint: existing AOT module and literal constant evolution
+
+See `../reports/dhe-aot-module-evolution-windows.md`. Existing hotfix module
+initializers now defer until Current selection in startup/no-op Players.
+Real changed/removed-module resource replay exposed constant admission and
+hidden module MethodDef lookup gaps. The candidate fixes those gaps, with
+reproducing native/managed regressions and immutable Player replays pending.
+Ordinary module guard inventory coverage is also being corrected; ordinary
+initializers must keep eager exactly-once execution. The milestone remains
+incomplete and is not a release qualification.
+
+## Preceding checkpoint: mixed registration retry and new module initializers
 
 On unchanged HybridCLR `9e7b601`, IL2CPP `8a13baf` and package `b51473f`, the
 public resource workflow passes two real module initializers and the same 46

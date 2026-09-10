@@ -17,6 +17,15 @@ Their immutable inputs are recorded in `manifests/repo-lock.json`.
 
 ## Current phase
 
+The active candidate is extending **existing AOT hotfix module initialization
+and literal constant evolution** on Unity 2022 Windows. See
+`reports/dhe-aot-module-evolution-windows.md` for the passing startup/no-op
+results, preserved resource-registration failures, native regression fixes and
+the next immutable Player gates. This follow-up is not yet qualified for full
+Current resource replay or release. Earlier mixed-module results below retain
+their original runtime identities. Tuanjie follows Unity 2022; no new Unity
+2021 work is in scope.
+
 This research checkout extends the published DHE line below. Its current
 implementation and validation status is in
 `reports/dhe-mixed-transaction-windows.md`,

@@ -146,3 +146,15 @@ module/literal replay audits. `2169c5e` adds a real C# second module initializer
 changing the compiler-generated cctor body (`current-chained-01`). Base-33 is
 being built from the newer module/literal inputs on the prior v29 runtime; it
 must retain that identity and cannot qualify the v30 resolver fix.
+
+The seven native lookup failures pass on `421bb18` in `native-03`, including
+real-header compile/CTest. `policy-03` passes all 43 checks (including rejection
+of the old module resolver). Base-33 finishes building but its final ordinary
+guard coverage check rejects before startup: package `DheOrdinaryGuardInventory`
+also omitted `<Module>`. `ordinary-guards-before` reproduces two failed coverage
+assertions against Base-33's exact captured Native DLL. Package `eaf1ec5` includes
+module methods in ordinary guard inventories without changing primary-only
+initializer deferral. Its canonical tree is
+`E0560DD1615040D477BAC0BF02E7B52E920FEF41D0B0E10288362F4FACF565D7`.
+Keep Base-33 and its `.inputs`; it is not an accepted Base proof. Verify the
+combined source on new immutable Players using exact Base-30 and Base-33 inputs.
