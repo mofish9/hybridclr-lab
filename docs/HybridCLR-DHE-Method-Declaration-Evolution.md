@@ -30,3 +30,22 @@ Installer defaults, formal branches/tags or remote publication changes belong he
 This is one required step, not a reduced completion definition. Broader method
 declarations, reference parents, generic/value hierarchies, serialized objects,
 native boundaries and performance/memory remain part of the full goal.
+
+## Reproduced entry point
+
+Base-74 now contains the original callback interface in AOT and passes the
+explicit interface-removal/replacement variants; see
+`reports/dhe-reference-interface-evolution-windows.md` for immutable identities.
+At test source 0bd9195, `D:/hybridclr_artifacts/dhe-method-declarations-current-01`
+compiles with ordinary nonvirtual callback methods and passes the 46-case CLR
+reference. `dhe-method-declarations-admission-before-01` rejects exactly the two
+existing callback method declarations before Player execution. Preserve it.
+
+Public MonoMethodInfo resolves Current return types but still returns Base flags
+in get_method_info/get_method_attributes. MetadataModule already has
+GetDheCurrentMethodMetadata, which supplies the Current declaration without using
+the physical receiver as a public identity. Audit get_base_method and method
+enumeration alongside those attributes; internal Class receiver validation must
+remain strict. New admission facts should mask only the explicitly supported
+declaration differences, preserve unrelated metadata gates, and declare any
+required native capability before a new immutable Base is built.
