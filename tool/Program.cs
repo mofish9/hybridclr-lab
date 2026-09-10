@@ -1201,9 +1201,9 @@ internal static partial class Program
                 baselineRecords.Where(record => currentVariant.Snapshots.ContainsKey(record.name)).Select(record => record.path),
                 names.Select(name => Path.Combine(currentVariant.Root, name + ".dll")),
                 aotAnalysis?.OrdinaryAssemblyPaths ?? Array.Empty<string>());
-            // A source name alone proves neither its immutable identity nor
-            // native caller/ABI coverage. Frozen admission remains gated until
-            // the complete source-bound execution proof is implemented.
+            // Preserve every obligation here. Frozen admission below may only
+            // discharge exact entries after validating source-bound selections
+            // and the complete ordinary native guard inventory.
             unsupported.AddRange(execution.UnsupportedChanges);
             if (execution.Impact.ChangedValueTypes.Length != 0)
             {
@@ -1347,13 +1347,26 @@ internal static partial class Program
                         execution.Plans.TryGetValue(name, out var selectedExecution) ? selectedExecution : null));
             }
             var frozenAotSources = new List<object>();
-            if (frozenAotPlanPaths.Length != 0)
+            FrozenAotAdmissionProof? frozenAdmission = null;
+            if (frozenAotPlanPaths.Length != 0 || aotAnalysis != null && execution.Impact.ChangedValueTypes.Length != 0)
             {
-                JsonElement frozenPlan = ReadJson<JsonElement>(frozenAotPlanPaths[baseIndex]);
                 if (aotAnalysis == null) throw new DheException("Frozen AOT planning requires an authenticated Base snapshot: " + baseId);
-                JsonElement[] sourceRows = FrozenAotSourcePlan.Validate(frozenPlan, baseId, aotAnalysis,
-                    baselineRecords.Select(record => record.path),
-                    names.Select(name => Path.Combine(currentVariant.Root, name + ".dll")), currentVariant.CurrentSetHash);
+                string[] currentPaths = names.Select(name => Path.Combine(currentVariant.Root, name + ".dll")).ToArray();
+                if (!FrozenAotSourcePlan.CurrentSetHash(currentPaths).Equals(currentVariant.CurrentSetHash, StringComparison.OrdinalIgnoreCase))
+                    throw new DheException("Current inputs changed before frozen source compilation.");
+                var frozen = FrozenAotAdaptation.Compile(aotAnalysis, baselineRecords.Select(record => record.path), currentPaths);
+                if (!FrozenAotSourcePlan.CurrentSetHash(currentPaths).Equals(currentVariant.CurrentSetHash, StringComparison.OrdinalIgnoreCase))
+                    throw new DheException("Current inputs changed during frozen source compilation.");
+                JsonElement[] sourceRows = frozenAotPlanPaths.Length != 0
+                    ? FrozenAotSourcePlan.ValidateCompiled(ReadJson<JsonElement>(frozenAotPlanPaths[baseIndex]),
+                        baseId, aotAnalysis.Sha256, currentVariant.CurrentSetHash, frozen)
+                    : FrozenAotSourcePlan.Materialize(aotAnalysis, frozen, baseId, outputRoot);
+                if (frozen.Assemblies.Length != 0)
+                {
+                    frozenAdmission = FrozenAotAdmission.Validate(aotAnalysis, frozen, execution, nativeManifest);
+                    unsupported.RemoveAll(reason => execution.UnsupportedChanges.Contains(reason, StringComparer.Ordinal));
+                    unsupported.AddRange(frozenAdmission.UnsupportedChanges);
+                }
                 foreach (JsonElement source in sourceRows)
                 {
                     string sourceName = NormalizeName(GetString(source, "assemblyName") ?? string.Empty);
@@ -1381,7 +1394,8 @@ internal static partial class Program
                     string mvTarget = ResolveContainedPath(outputRoot, mvRelative, "frozen AOT source MV");
                     Directory.CreateDirectory(Path.GetDirectoryName(sourceTarget)!);
                     File.Copy(sourceFile, sourceTarget, true);
-                    File.Copy(baseMetaFile, mvTarget, true);
+                    if (!Path.GetFullPath(baseMetaFile).Equals(Path.GetFullPath(mvTarget), StringComparison.OrdinalIgnoreCase))
+                        File.Copy(baseMetaFile, mvTarget, true);
                     if (!string.Equals(Sha256File(sourceTarget), sourceHash, StringComparison.OrdinalIgnoreCase) ||
                         !string.Equals(Sha256File(mvTarget), mvHash, StringComparison.OrdinalIgnoreCase))
                         throw new DheException("Frozen AOT source copied hash mismatch: " + baseId + "/" + sourceName);
@@ -1455,6 +1469,7 @@ internal static partial class Program
                 assemblies = assemblyCompatibility.ToArray(),
                 assemblyModes = assemblyModes.ToArray(),
                 frozenAotSources = frozenAotSources.ToArray(),
+                frozenAotAdmission = frozenAdmission,
                 currentStorageImpact = execution.Impact,
             };
             candidateBases.Add(baseRecord);

@@ -6,6 +6,32 @@ namespace HybridCLR.DheTool;
 
 internal static class FrozenAotSourcePlan
 {
+    public static JsonElement[] Materialize(AotAnalysisSnapshot snapshot, FrozenAotCompilation compilation,
+        string baseId, string outputRoot)
+    {
+        string root = Path.Combine(outputRoot, "payload/frozen-aot", baseId.ToLowerInvariant());
+        var rows = new List<JsonElement>();
+        foreach (var plan in compilation.Assemblies)
+        {
+            var source = snapshot.Assemblies.Single(source => source.AssemblyName == plan.AssemblyName);
+            source.ReadVerifiedBytes();
+            byte[] mv = MetaVersionSnapshot.Create(source.Path).ToBinary();
+            if (!SameHash(Convert.ToHexString(SHA256.HashData(mv)), plan.SourceMetaVersionSha256))
+                throw new InvalidDataException("Frozen source MV changed during materialization: " + source.AssemblyName);
+            Directory.CreateDirectory(root);
+            string mvFile = Path.Combine(root, source.AssemblyName + ".mv.bytes");
+            File.WriteAllBytes(mvFile, mv);
+            rows.Add(JsonSerializer.SerializeToElement(new { assemblyName = source.AssemblyName,
+                sourceFile = source.Path, sourceSha256 = source.Sha256, baseMetaVersionFile = mvFile,
+                baseMetaVersionSha256 = plan.SourceMetaVersionSha256,
+                currentStorageTypeTokens = plan.ExecutionPlan.CurrentStorageTypeTokens,
+                currentExecutionMethodTokens = plan.ExecutionPlan.CurrentExecutionMethodTokens,
+                excludedBaseTypeTokens = plan.ExcludedBaseTypeTokens,
+                genericContextMethodTokens = plan.GenericContextMethodTokens, sourceKind = "frozen-base-aot" }));
+        }
+        return rows.ToArray();
+    }
+
     // Same named-byte-set encoding as the resource manifest. The input is the
     // complete selected Current payload, including newly introduced assemblies.
     public static string CurrentSetHash(IEnumerable<string> paths)
