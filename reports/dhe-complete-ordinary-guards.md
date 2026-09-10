@@ -75,3 +75,49 @@ failed publication and concurrent reads, requiring zero metadata enumerations.
 The lookup uses the existing immutable release/acquire publication and introduces
 no additional mutable cache. Rebuild a new Player to qualify startup and all
 existing frozen-entry capabilities; never modify proof-14's native binaries.
+
+## Verified complete-guard Windows checkpoint
+
+Runtime `b3e72d815f935fad25e3f255bf9a611264901622`, Unity 2022 IL2CPP
+`8a13baf1ec45068fbb9535beea03425b717f501b`, package
+`3c9558cab91d383b9825e4dbcd349a43b7cabaa6`, fixture lab
+`c034236` pass real-header native compile/CTest in `native-03/DHE-Unity2022`
+under this report's artifact root. `mergeReady=true`, no surrogate headers.
+The runtime tree SHA is
+`2442F1F93771123F79D928C31587299901991C3D4E48E862A2593BE0747EAEBC`.
+
+`artifacts/dhe-frozen-entry-proof-15` builds and starts successfully (Base PID
+2656, revision 41, sentinel 5). `ordinary-guard-coverage.json` authenticates all
+40 ordinary assemblies and 49,084 executable method requests with zero missing
+coverage against the final Base snapshot. Native manifest SHA:
+`7D457B958BDBD6F1D359BF2FE5BC41B58E58D82FC69ADD1EC41942EED1C430EA`.
+
+| Suffix after `dhe-frozen-entry-proof-15` | PID | Passed checks |
+| --- | --- | --- |
+| (core) | 19936 | 35 |
+| -old-values | 12768 | 45 |
+| -nullable | 20376 | 39 |
+| -generics | 16128 | 37 |
+| -arrays-byref | 2084 | 38 |
+| -collections | 17680 | 41 |
+| -order-swap (collections) | 16232 | 41 |
+| -order-reverse (old-values) | 16468 | 45 |
+
+Every replay retains the same Player and DLL/MV bytes; checks include the core
+35 and must not be summed as independent cases. GameAssembly SHA-256:
+`E9D167EE26C1E01B5560EDB450B9A1CF4C9303497681CFA1C0E239A358CA4574`.
+The collections probe constructs List<Current Payload> and Dictionary<int,
+Current Payload> dynamically after DHE loading. Growth, shifting, ToArray and
+TryGetValue preserve added long/reference fields. Unaffected long collections
+return the expected result with positive AOT and zero interpreter entries.
+
+`managed-01.json` in this report's artifact root also passes all 74 resource
+validation/selection checks on lab `c034236` and package `3c9558c`. Its native
+calls are recorded by the host fixture, separately from the Player evidence.
+
+This closes the reproduced complete-guard build and startup failures on Windows.
+It does not admit the formal evolved-resource pipeline, prove multiple Bases
+consume one resource set, qualify arbitrary cyclic/concurrent publication, or
+provide production performance/memory evidence. Those remain subsequent gates.
+The package switch is still a research option; formal branches/tags, remotes,
+Installer defaults and CAT were not changed.

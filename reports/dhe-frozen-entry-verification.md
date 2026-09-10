@@ -5,24 +5,32 @@ Android/iOS qualification, or a performance result.
 
 ## Current Verified State
 
-As of 2026-09-10, runtime `42ecf89981f856c0bef2373153d1d5f7f1bb3ff3`,
+As of 2026-09-10, runtime `b3e72d815f935fad25e3f255bf9a611264901622`,
 Unity 2022 IL2CPP `8a13baf1ec45068fbb9535beea03425b717f501b`, package
-`e48be87b4a0dad0375a823b6ebb548a467c32f37` and fixture lab
-`c29e3212fc6ddbeea78cfd2bbdeac6db941a4190` passed the real-header Unity 2022
-native gate and proof-12 Windows core (35 checks). The same immutable Player
-passes old-values (45), nullable (39), generics (37), and arrays-byref (38).
-Swapped old-values (45) and reversed nullable (39) also pass. All counts include
-the core checks; they are not independent case counts to add together.
+`3c9558cab91d383b9825e4dbcd349a43b7cabaa6` and fixture lab `c034236` passed
+the real-header Unity 2022 native gate and proof-15 Windows core (35 checks).
+All 40 ordinary Base assemblies and 49,084 executable method requests have
+complete final-native coverage. The same immutable Player passes old-values
+(45), nullable (39), generics (37), arrays-byref (38), and dynamic collections
+(41). Swapped collections (41) and reversed old-values (45) also pass. All counts
+include the core checks; they are not independent case counts to add together.
 
 The previously failing unaffected Nullable<long> now retains AOT. Old boxed
 Payload, nested and generic values can be copied into independent Current
 storage while preserving retained fields and defaulting added fields. See
 [generic dispatch](dhe-generic-context-dispatch.md) and
-[boxed value copy](dhe-boxed-value-copy.md) for exact evidence and limitations.
+[boxed value copy](dhe-boxed-value-copy.md) for earlier evidence;
+[complete ordinary guards](dhe-complete-ordinary-guards.md) records current
+identities, the corrected final-strip/slow-startup failures, and exact results.
+List/Dictionary operations preserve Current fields while unchanged long
+collections retain AOT. Guard lookup no longer enumerates metadata for each
+unchanged native call. This correctness result is not a performance claim.
 
 This is still a diagnostic native-source workflow, not formal resource release
-admission. Remaining gates include full ordinary-AOT guard/ABI coverage,
-authenticated resource staging, broader old-state and reflection behavior,
+admission. Source-plan and resource-path binding passed 29 real-snapshot/CLI
+checks and 74 managed host checks; see [resource binding](dhe-frozen-resource-binding.md).
+Remaining gates include formal frozen-source ABI admission/resource loading,
+broader startup reflection and initialization behavior,
 cyclic/concurrent publication, and distinct immutable Bases consuming one latest
 resource set on this candidate. Windows correctness precedes the Tuanjie port;
 Unity 2021 is outside the current user scope. No performance or mobile claim.
