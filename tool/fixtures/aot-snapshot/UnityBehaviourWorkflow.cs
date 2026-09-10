@@ -16,6 +16,8 @@ internal static class UnityBehaviourWorkflow
 
     internal static int ReferenceCurrent(string[] args)
     {
+        if (args.Length == 6 && args[5] == "framework-callbacks")
+            return CompileNativeProbe(args, "FrameworkCallbackCases", "HybridCLR.Lab.FrameworkCallbacks.Cases", false);
         if (args.Length == 6 && new[] { "virtual-signatures-base", "virtual-signatures-current" }.Contains(args[5]))
             return CompileNativeProbe(args, "VirtualSignatureCases", "HybridCLR.Lab.VirtualSignatures.Cases", false);
         if (args.Length == 6 && new[] { "declaration-nonvirtual-3", "declaration-virtual-7", "declaration-nonvirtual-11" }.Contains(args[5]))
