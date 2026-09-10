@@ -12,6 +12,15 @@ namespace HybridCLR.Lab.ModuleEvolution
     {
         public static int Runs;
         public static int Version;
+#if MODULE_CHAIN
+        public static int SecondRuns;
+        [ModuleInitializer]
+        public static void InitializeSecond()
+        {
+            SecondRuns++;
+            Console.WriteLine("DHE second AOT module initializer: " + SecondRuns);
+        }
+#endif
 #if MODULE_CURRENT
         private const int ExpectedVersion = 202;
 #else
@@ -27,6 +36,9 @@ namespace HybridCLR.Lab.ModuleEvolution
         }
         public static void Verify()
         {
+#if MODULE_CHAIN
+            if (SecondRuns != 1) throw new InvalidOperationException("Second module initializer did not execute exactly once.");
+#endif
 #if MODULE_REMOVED
             if (Runs != 0 || Version != 0) throw new InvalidOperationException("Removed module initializer executed.");
 #else

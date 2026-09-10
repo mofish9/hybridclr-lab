@@ -53,12 +53,14 @@ internal static class FrozenResourceAudit
             manifest.GetProperty("supportedBases").EnumerateArray().All(row => row.GetProperty("currentAssemblySetSha256").GetString() == currentSet));
         string[] originalNames = Directory.GetFiles(current, "*.dll").Select(Path.GetFileNameWithoutExtension).OrderBy(name => name, StringComparer.Ordinal).ToArray()!;
         int? moduleConstant = null, literalNumber = null;
-        bool selectedInitializer = false;
+        bool selectedInitializer = false, secondInitializer = false;
         using (var model = ModuleDefMD.Load(Path.Combine(current, "HybridCLR.ValueLayoutModel.dll")))
         {
             moduleConstant = model.Find("HybridCLR.Lab.ModuleEvolution.ModuleState", false)?
                 .Fields.Single(field => field.Name == "ExpectedVersion").Constant?.Value as int?;
             selectedInitializer = model.GlobalType.Methods.Any(method => method.IsStaticConstructor);
+            secondInitializer = model.Find("HybridCLR.Lab.ModuleEvolution.ModuleState", false)?
+                .Methods.Any(method => method.Name == "InitializeSecond") == true;
             literalNumber = model.Find("HybridCLR.Lab.ModuleEvolution.LiteralFieldCases", false)?
                 .Fields.Single(field => field.Name == "Number").Constant?.Value as int?;
         }
@@ -124,6 +126,8 @@ internal static class FrozenResourceAudit
                         ? starts.SequenceEqual(new[] { "DHE selected module: " + moduleConstant.Value + ":1" }) : starts.Length == 0);
                     Require(key + "-module-entry-verification", log.Count(line => line == "DHE module evolution pass: " +
                         (selectedInitializer ? moduleConstant.Value + ":1" : "0:0")) == 1);
+                    if (secondInitializer)
+                        Require(key + "-second-module-initializer-once", log.Count(line => line == "DHE second AOT module initializer: 1") == 1);
                 }
                 if (literalNumber.HasValue)
                     Require(key + "-literal-reflection-suite", log.Count(line => line == "DHE literal reflection pass: " + literalNumber.Value + ":74") == 1);
@@ -147,7 +151,8 @@ internal static class FrozenResourceAudit
                 if (modules.Length != 0)
                     Require(key + "-no-module-side-effects", !log.Any(line => line.StartsWith("DHE module begin: ", StringComparison.Ordinal)));
                 if (moduleConstant.HasValue)
-                    Require(key + "-no-hotfix-module-side-effects", !log.Any(line => line.StartsWith("DHE selected module: ", StringComparison.Ordinal)));
+                    Require(key + "-no-hotfix-module-side-effects", !log.Any(line => line.StartsWith("DHE selected module: ", StringComparison.Ordinal) ||
+                        line.StartsWith("DHE second AOT module initializer: ", StringComparison.Ordinal)));
                 rejectedRuns++;
             }
             files[Path.GetFullPath(reportPath)] = Hash(reportPath);
