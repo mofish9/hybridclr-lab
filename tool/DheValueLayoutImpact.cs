@@ -86,7 +86,10 @@ public static class DheValueLayoutImpact
             {
                 if (!baseline.TryGetValue(entry.Key, out var before)) continue;
                 var after = MetaVersionSnapshot.Create(entry.Value.Location).Types.ToDictionary(type => type.StableId);
-                foreach (var type in before.Types.Where(type => (type.Flags & 1u) != 0))
+                // A native field-offset consumer also needs physical storage for
+                // an evolved reference layout. References to such objects remain
+                // pointer-sized; Inline still propagates only embedded values.
+                foreach (var type in before.Types.Where(type => !type.IsInterface))
                     if (after.TryGetValue(type.StableId, out var next) &&
                         !string.Equals(type.LayoutVersion, next.LayoutVersion, StringComparison.Ordinal))
                         changed.Add(entry.Key + "|" + type.Identity);
