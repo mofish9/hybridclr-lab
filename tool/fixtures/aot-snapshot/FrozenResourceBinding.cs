@@ -135,7 +135,7 @@ internal static class FrozenResourceBinding
         Array resolved = Resolve(fixtureManifest, fixturePlan);
         string Property(object value, string name) => (string)value.GetType().GetProperty(name)!.GetValue(value)!;
         var resolvedFrozen = resolved.Cast<object>().Where(row => Property(row, "RelativePath").StartsWith("payload/frozen-aot/", StringComparison.Ordinal)).ToArray();
-        checks["frozen-dll-and-mv-resolve-as-resource-payload"] = resolvedFrozen.Length == compilation.Assemblies.Length * 2 &&
+        checks["frozen-dll-mv-and-snapshot-resolve-as-resource-payload"] = resolvedFrozen.Length == compilation.Assemblies.Length * 2 + 1 &&
             resolvedFrozen.All(row => Property(row, "AssetRoot") == assetRoot && File.Exists(Property(row, "SourcePath")));
         foreach (string kind in new[] { "immutable-root", "other-base", "hash" })
         {

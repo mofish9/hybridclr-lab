@@ -75,6 +75,13 @@ internal static class FrozenAotMaterialize
             obligations = compilation.Obligations,
             scope = "Materialized Base assets and source-bound execution records; Player integration remains a separate gate"
         };
+        if (records.Count != 0)
+        {
+            string snapshotTarget = Path.Combine(outputRoot, "payload/frozen-aot", identity.GetProperty("baseId").GetString()!.ToLowerInvariant(), "snapshot.json");
+            File.Copy(snapshot.ManifestPath, snapshotTarget);
+            if (!Hash(File.ReadAllBytes(snapshotTarget)).Equals(snapshot.Sha256, StringComparison.OrdinalIgnoreCase))
+                throw new InvalidDataException("Frozen AOT manifest changed during materialization.");
+        }
         if (FrozenAotSourcePlan.CurrentSetHash(current) != currentSetHash)
             throw new InvalidDataException("Current payload changed during frozen source materialization.");
         string planPath = Path.Combine(outputRoot, "frozen-aot-source-plan.json");

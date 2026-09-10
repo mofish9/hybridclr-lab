@@ -53,7 +53,19 @@ foreach (string version in new[] { "old", "new" })
         RuntimeAssetRoot = assets, BaseMetaVersionAssetRoot = baseRoot, AssemblyNames = names,
         BaseMetaVersionHashes = names.Select(name => Hash(beforeBytes[name])).ToArray(),
     };
+    // An immutable Base manifest authenticates frozen ordinary DLLs independently
+    // of the downloaded resource's self-consistent hashes.
+    byte[] snapshotBytes = Encoding.UTF8.GetBytes(Node(new {
+        schemaVersion = 1, format = "hybridclr.dhe-aot-analysis-snapshot.json",
+        normalization = "dhe-aot-analysis-normalization-v1", identityType = "Fixture.BuildIdentity",
+        identityAssembly = "HybridCLR.ValueLayoutNative",
+        assemblies = identity.AotAssemblyNames.Select(name => new { assemblyName = name,
+            file = "assemblies/" + name + ".dll", dhe = names.Contains(name),
+            sha256 = Hash(File.ReadAllBytes(Path.Combine(root, version == "old" ? "base-old-reflection" : "base-new", "baseline", name + ".dll"))),
+            normalizedSha256 = HashText(name + version) }) }).ToJsonString());
+    identity.AotAnalysisSnapshotSha256 = Hash(snapshotBytes);
     identity.BaseId = (string)SetupIdentity("ComputeBaseId", identity); identities.Add(identity);
+    provider.Bytes[assets + "payload/frozen-aot/" + identity.BaseId.ToLowerInvariant() + "/snapshot.json"] = snapshotBytes;
     var modes = new List<JsonNode>();
     foreach (var record in input.RootElement.GetProperty("assemblies").EnumerateArray())
     {
@@ -190,13 +202,60 @@ void AddFrozen(JsonNode manifest, JsonNode validation, JsonNode plan, Provider p
     foreach (var record in new[] { manifest["supportedBases"][0], validation["bases"][0], plan["baseSelections"][0] })
         record["frozenAotSources"] = new JsonArray(Clone(row));
     foreach (var record in new[] { manifest["supportedBases"][0], validation["bases"][0] })
+    {
+        record["requiredRuntimeCapabilities"].AsArray().Add(JsonValue.Create("frozen-aot-snapshot-source-binding-v1"));
         record["requiredRuntimeCapabilities"].AsArray().Add(JsonValue.Create("frozen-generic-context-dispatch-v1"));
+    }
 }
 // These host checks verify protocol transport and binding only. The native
 // registry separately rejects conditional records for non-generic methods.
 RunCase("frozen-conditional-selection-forwarded", 0, AddFrozen, true);
 cases["frozen-source-kind-and-conditions-forwarded"] = RuntimeApi.LastSourceKinds?.First() == 1 &&
     RuntimeApi.LastConditional?[0].SequenceEqual(new[] { frozenToken }) == true;
+string snapshotAsset = assets + "payload/frozen-aot/" + identities[0].BaseId.ToLowerInvariant() + "/snapshot.json";
+RunCase("frozen-snapshot-required", 0, (m, v, p, provider) =>
+{ AddFrozen(m, v, p, provider); provider.Bytes.Remove(snapshotAsset); }, false);
+RunCase("frozen-snapshot-other-base-rejected", 0, (m, v, p, provider) =>
+{
+    AddFrozen(m, v, p, provider);
+    provider.Bytes[snapshotAsset] = providers[1].Bytes[assets + "payload/frozen-aot/" + identities[1].BaseId.ToLowerInvariant() + "/snapshot.json"];
+}, false);
+RunCase("frozen-snapshot-role-rewrite-rejected", 0, (m, v, p, provider) =>
+{
+    AddFrozen(m, v, p, provider);
+    var snapshot = JsonNode.Parse(provider.Bytes[snapshotAsset]);
+    snapshot["assemblies"].AsArray().Single(row => row["assemblyName"].GetValue<string>() == frozenName)["dhe"] = true;
+    provider.Bytes[snapshotAsset] = Encoding.UTF8.GetBytes(snapshot.ToJsonString());
+}, false);
+foreach (bool replaceDll in new[] { false, true })
+    RunCase(replaceDll ? "frozen-consistent-source-substitution-rejected" : "frozen-mv-source-hash-rejected", 0, (m, v, p, provider) =>
+    {
+        AddFrozen(m, v, p, provider);
+        byte[] replacement = frozenDll.Concat(new byte[] { 7 }).ToArray();
+        byte[] mv = (byte[])frozenMv.Clone();
+        SHA256.HashData(replacement).CopyTo(mv, 28);
+        foreach (var record in new[] { m["supportedBases"][0], v["bases"][0], p["baseSelections"][0] })
+        {
+            var row = record["frozenAotSources"][0];
+            provider.Bytes[row["baseMetaVersion"].GetValue<string>()] = mv;
+            row["baseMetaVersionSha256"] = Hash(mv);
+            if (replaceDll)
+            {
+                provider.Bytes[row["source"].GetValue<string>()] = replacement;
+                row["sourceSha256"] = Hash(replacement);
+            }
+        }
+    }, false);
+RunCase("frozen-snapshot-capability-required", 0, (m, v, p, provider) =>
+{
+    AddFrozen(m, v, p, provider);
+    foreach (var record in new[] { m["supportedBases"][0], v["bases"][0] })
+    {
+        var required = record["requiredRuntimeCapabilities"].AsArray();
+        required.Remove(required.Single(value => value.GetValue<string>() == "frozen-aot-snapshot-source-binding-v1"));
+    }
+}, false);
+RunCase("frozen-valid-retry-after-source-rejection", 0, AddFrozen, true, reset: false);
 foreach (string kind in new[] { "immutable-root", "other-base", "path-traversal" })
     RunCase("frozen-mv-rejects-" + kind, 0, (m, v, p, provider) =>
     {

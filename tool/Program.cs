@@ -1400,7 +1400,15 @@ internal static partial class Program
                     });
                 }
                 if (frozenAotSources.Count != 0)
+                {
                     requiredRuntimeCapabilities.Add("frozen-aot-source-v1");
+                    requiredRuntimeCapabilities.Add("frozen-aot-snapshot-source-binding-v1");
+                    string snapshotRelative = "payload/frozen-aot/" + baseId.ToLowerInvariant() + "/snapshot.json";
+                    string snapshotTarget = ResolveContainedPath(outputRoot, snapshotRelative, "frozen AOT snapshot");
+                    File.Copy(aotAnalysis.ManifestPath, snapshotTarget, true);
+                    if (!string.Equals(Sha256File(snapshotTarget), aotAnalysis.Sha256, StringComparison.OrdinalIgnoreCase))
+                        throw new DheException("Frozen AOT snapshot changed during resource generation: " + baseId);
+                }
             }
             string[] missingRuntimeCapabilities = requiredRuntimeCapabilities
                 .Except(baseNativeRuntimeCapabilities, StringComparer.Ordinal)

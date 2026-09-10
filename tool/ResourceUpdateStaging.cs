@@ -1540,6 +1540,10 @@ internal static partial class Program
             JsonElement runtimeSources = runtimeBase.GetProperty("frozenAotSources");
             if (runtimeSources.GetArrayLength() != frozenSources.GetArrayLength())
                 throw new DheException("Resource and runtime frozen AOT source records differ.");
+            string snapshotRelative = "payload/frozen-aot/" +
+                (GetString(selectedBase, "baseId") ?? string.Empty).ToLowerInvariant() + "/snapshot.json";
+            AddResourcePayload(updateRoot, snapshotRelative, GetString(selectedBase, "aotAnalysisSnapshotSha256") ?? string.Empty,
+                runtimeAssetRoot + snapshotRelative, runtimeAssetRoot, payloads, paths);
             foreach (JsonElement source in frozenSources.EnumerateArray())
             {
                 string name = NormalizeName(GetString(source, "assemblyName") ?? string.Empty);
