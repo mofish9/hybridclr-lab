@@ -40,3 +40,22 @@ Rollback selects the matched sources/locks from
 reports/dhe-declaration-transitions-windows.md and a compatible resource for each
 immutable Player. Preserve old Players, failures and input DLLs; archive space can
 be conserved through lossless compression. No in-process Current unload is claimed.
+
+## Reproduced startup failure and first correction
+
+The preserved `artifacts/dhe-virtual-signatures/base-82-control` builds with the
+preceding declaration runtime but fails native metadata preparation before any
+update executes. `IPacketOperation<Packet>.Copy`, an explicit generic interface
+implementation present in the original AOT inputs, cannot resolve. Its
+`player-result.json` records zero loaded assemblies and `load-current-batch`.
+Do not count the successful native build as a passed Base or rewrite this proof.
+
+`ResolveMethodDefinition` selects a staged Current declaration table while
+retaining the Base generic container for signature matching. VAR ordinals must
+resolve in the selected declaration owner's container; the downstream logical
+interface type and closed instantiation remain unchanged. The first candidate
+corrects only that owner selection, without weakening generic identity or ABI
+checks. Rebuild into a fresh output with the exact `base-input-old-01` inputs;
+startup/no-op must pass before testing the unchanged `current-01/current` update.
+The existing new-type control passing all 25 checks does not establish this fix
+or the subsequent old-layout virtual call-frame behavior.
