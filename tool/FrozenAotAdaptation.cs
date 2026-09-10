@@ -20,7 +20,7 @@ internal sealed record FrozenAotCompilation(FrozenAotAssemblyPlan[] Assemblies, 
 internal static class FrozenAotAdaptation
 {
     public static FrozenAotCompilation Compile(AotAnalysisSnapshot snapshot,
-        IEnumerable<string> baselinePaths, IEnumerable<string> currentPaths)
+        IEnumerable<string> baselinePaths, IEnumerable<string> currentPaths, DheValueLayoutImpactResult? verifiedImpact = null)
     {
         // Reauthenticate the binding and full inventory, even if the caller
         // retained a snapshot object while files changed on disk.
@@ -37,7 +37,7 @@ internal static class FrozenAotAdaptation
             if (!baseline.AssemblySha256.Equals(snapshot.Assemblies.Single(source => source.Dhe && source.AssemblyName == baseline.AssemblyName).Sha256,
                 StringComparison.OrdinalIgnoreCase))
                 throw new InvalidDataException("Hotfix baseline is not the captured Base source: " + baseline.AssemblyName);
-        var impact = DheValueLayoutImpact.Analyze(before, current, snapshot.OrdinaryAssemblyPaths);
+        var impact = verifiedImpact ?? DheValueLayoutImpact.Analyze(before, current, snapshot.OrdinaryAssemblyPaths);
         var plans = new List<FrozenAotAssemblyPlan>();
         var obligations = new List<FrozenAotObligation>();
         foreach (var source in snapshot.Assemblies.Where(source => !source.Dhe))

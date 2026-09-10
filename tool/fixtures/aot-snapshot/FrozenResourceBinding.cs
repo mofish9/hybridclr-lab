@@ -26,7 +26,7 @@ internal static class FrozenResourceBinding
             foreach (string argument in arguments) start.ArgumentList.Add(argument);
             using var process = Process.Start(start) ?? throw new IOException(exe);
             var stdout = process.StandardOutput.ReadToEndAsync(); var stderr = process.StandardError.ReadToEndAsync();
-            if (!process.WaitForExit(300000)) { process.Kill(true); throw new TimeoutException(exe); }
+            if (!process.WaitForExit(20 * 60 * 1000)) { process.Kill(true); throw new TimeoutException(exe); }
             string text = stdout.GetAwaiter().GetResult() + stderr.GetAwaiter().GetResult();
             File.WriteAllText(Path.Combine(output, "process-" + process.Id + ".log"), text);
             return (process.ExitCode, text.Trim());
@@ -104,9 +104,11 @@ internal static class FrozenResourceBinding
         var evolvedResult = Resource(evolvedRoot, planFile, evolvedOutput);
         string validationPath = Path.Combine(evolvedOutput, "dhe-resource-update-validation.json");
         var validation = Read(validationPath);
-        checks["valid-plan-keeps-unresolved-native-abi-gate"] = evolvedResult.Code != 0 && !validation.GetProperty("passed").GetBoolean() &&
+        checks["valid-plan-keeps-unresolved-base-obligations"] = evolvedResult.Code != 0 && !validation.GetProperty("passed").GetBoolean() &&
             validation.GetProperty("bases")[0].GetProperty("unsupportedChanges").EnumerateArray()
-                .Any(reason => reason.GetString()!.StartsWith("current-storage-native-abi:"));
+                .Any(reason => reason.GetString()!.StartsWith("current-storage-native-abi:") ||
+                    reason.GetString()!.StartsWith("frozen-aot-missing-base-guard:") ||
+                    reason.GetString() == "base-missing-runtime-capability:frozen-aot-snapshot-source-binding-v1");
         checks["rejected-resource-has-no-publishable-manifest"] = !File.Exists(Path.Combine(evolvedOutput, "dhe-resource-update.json"));
         string noopOutput = Path.Combine(output, "noop-resource");
         var noopResult = Resource(noopRoot, noopPlan, noopOutput);

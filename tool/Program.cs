@@ -1354,7 +1354,7 @@ internal static partial class Program
                 string[] currentPaths = names.Select(name => Path.Combine(currentVariant.Root, name + ".dll")).ToArray();
                 if (!FrozenAotSourcePlan.CurrentSetHash(currentPaths).Equals(currentVariant.CurrentSetHash, StringComparison.OrdinalIgnoreCase))
                     throw new DheException("Current inputs changed before frozen source compilation.");
-                var frozen = FrozenAotAdaptation.Compile(aotAnalysis, baselineRecords.Select(record => record.path), currentPaths);
+                var frozen = FrozenAotAdaptation.Compile(aotAnalysis, baselineRecords.Select(record => record.path), currentPaths, execution.Impact);
                 if (!FrozenAotSourcePlan.CurrentSetHash(currentPaths).Equals(currentVariant.CurrentSetHash, StringComparison.OrdinalIgnoreCase))
                     throw new DheException("Current inputs changed during frozen source compilation.");
                 JsonElement[] sourceRows = frozenAotPlanPaths.Length != 0
