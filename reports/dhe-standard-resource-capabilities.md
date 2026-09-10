@@ -57,3 +57,14 @@ through the same mapping after generic inflation so copies and box tokens agree
 on physical sizes. Signature matching remains in its original logical domain;
 the mapping applies at execution use sites. Re-run the complete unchanged suite,
 including unaffected generic instantiations, native guards and snapshot rejection.
+
+Runtime `b477922` passes real-header native compile/CTest (`native-03`) and
+proof-19 core replay (PID 15080). The unchanged 23-case Current in `resource-05`
+(PID 17256) passes both Nullable cases, then fails open-generic-value-copy.
+The new Current-only Identity<T> has no selected Base method replacement, but its
+MethodSpec still supplies logical Base Payload. Local/type-token mapping alone
+does not map that method's physical parameter and return types. At interpreter
+call resolution, map both class and method generic arguments, re-inflate the
+same definition only when arguments change, then select any Current body. Keep
+the shared logical token/reflection cache unchanged. Re-run the exact Current
+bytes and existing core native-dispatch assertions on a new immutable Player.
