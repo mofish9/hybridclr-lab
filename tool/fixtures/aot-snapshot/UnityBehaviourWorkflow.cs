@@ -5,6 +5,36 @@ using HybridCLR.DheTool;
 
 internal static class UnityBehaviourWorkflow
 {
+    internal static int SerializationCurrent(string[] args)
+    {
+        if (args.Length != 5) throw new ArgumentException("unity-serialization-current <lab> <Base proof> <Current DLL root> <editor> <new output>");
+        string output = Path.GetFullPath(args[4]), current = Path.Combine(output, "current");
+        if (Directory.Exists(output)) throw new IOException("Serialization fixture output must be new.");
+        Directory.CreateDirectory(current);
+        string identityPath = Path.Combine(args[1], "base/build-identity.json");
+        var identity = JsonSerializer.Deserialize<JsonElement>(File.ReadAllBytes(identityPath));
+        var snapshot = AotAnalysisSnapshot.Read(identityPath, identity,
+            identity.GetProperty("aotAssemblyNames").EnumerateArray().Select(row => row.GetString()!),
+            identity.GetProperty("assemblies").EnumerateArray().Select(row => row.GetProperty("assemblyName").GetString()!))!;
+        foreach (string path in Directory.GetFiles(args[2], "*.dll")) File.Copy(path, Path.Combine(current, Path.GetFileName(path)));
+        string model = Path.Combine(current, "HybridCLR.ValueLayoutModel.dll");
+        var names = Directory.GetFiles(current, "*.dll").Select(Path.GetFileNameWithoutExtension).ToHashSet();
+        FrozenStaticWorkflow.CompileAndMerge(Path.GetFullPath(args[0]), args[3], "UnitySerializationCases", model,
+            snapshot.Assemblies.Where(row => !row.Dhe && !names.Contains(row.AssemblyName)).Select(row => row.Path)
+                .Concat(Directory.GetFiles(current, "*.dll")), Path.Combine(output, "compiled"), false);
+        using var module = ModuleDefMD.Load(File.ReadAllBytes(model));
+        var entry = module.Find("HybridCLR.Lab.ValueLayout.Factory", false)!.Methods.Single(method => method.Name == "GetRevision");
+        var invoke = module.Find("HybridCLR.Lab.UnitySerialization.SerializationCases", false)!.Methods.Single(method => method.Name == "RunIfRequested");
+        // Keep the initializer verification and all 46 existing business cases.
+        // The new Unity-only call executes immediately before successful return.
+        int insertion = entry.Body.Instructions.Count - 2;
+        if (insertion < 0 || entry.Body.Instructions.Last().OpCode != OpCodes.Ret || !entry.Body.Instructions[insertion].IsLdcI4())
+            throw new InvalidDataException("Unexpected Current entry shape.");
+        entry.Body.Instructions.Insert(insertion, Instruction.Create(OpCodes.Call, invoke));
+        module.Write(model);
+        Console.WriteLine(current); return 0;
+    }
+
     internal static int PreparationInput(string[] args)
     {
         if (args.Length != 2) throw new ArgumentException("public-preparation-input <valid Model DLL> <new malformed DLL>");

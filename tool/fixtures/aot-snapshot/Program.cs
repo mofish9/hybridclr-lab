@@ -18,6 +18,7 @@ if (args.Length > 0 && args[0] == "aot-module-current") return AotModuleWorkflow
 if (args.Length > 0 && args[0] == "public-failure-workflow") return PublicFailureWorkflow.Run(args.Skip(1).ToArray());
 if (args.Length > 0 && args[0] == "public-failure-audit") return PublicFailureWorkflow.Audit(args.Skip(1).ToArray());
 if (args.Length > 0 && args[0] == "unity-behaviour-current") return UnityBehaviourWorkflow.Compile(args.Skip(1).ToArray());
+if (args.Length > 0 && args[0] == "unity-serialization-current") return UnityBehaviourWorkflow.SerializationCurrent(args.Skip(1).ToArray());
 if (args.Length > 0 && args[0] == "unity-behaviour-base-inputs") return UnityBehaviourWorkflow.BaseInputs(args.Skip(1).ToArray());
 if (args.Length > 0 && args[0] == "unity-behaviour-attributes") return UnityBehaviourWorkflow.Attributes(args.Skip(1).ToArray());
 if (args.Length > 0 && args[0] == "public-preparation-input") return UnityBehaviourWorkflow.PreparationInput(args.Skip(1).ToArray());

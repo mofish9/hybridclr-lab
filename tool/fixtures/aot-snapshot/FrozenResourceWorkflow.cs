@@ -151,9 +151,10 @@ internal static class FrozenResourceWorkflow
 
     public static int Run(string[] args)
     {
-        if (args.Length < 4 || args.Length > 7) throw new ArgumentException("frozen-resource-workflow <lab> <comma-separated immutable proof roots> <tool.dll> <new output> [Unity editor executable for expanded suite OR existing Current directory] [Current settings file] [precommit|unity|precommit-unity]");
+        if (args.Length < 4 || args.Length > 7) throw new ArgumentException("frozen-resource-workflow <lab> <comma-separated immutable proof roots> <tool.dll> <new output> [Unity editor executable for expanded suite OR existing Current directory] [Current settings file] [precommit|unity|precommit-unity|serialization|serialization-unity]");
         string validationMode = args.Length == 7 ? args[6] : "";
-        if (validationMode != "" && validationMode != "precommit" && validationMode != "unity" && validationMode != "precommit-unity")
+        if (validationMode != "" && validationMode != "precommit" && validationMode != "unity" && validationMode != "precommit-unity" &&
+            validationMode != "serialization" && validationMode != "serialization-unity")
             throw new ArgumentException("Unknown Player validation mode.");
         string lab = Path.GetFullPath(args[0]), tool = Path.GetFullPath(args[2]), output = Path.GetFullPath(args[3]);
         string[] proofs = args[1].Split(',').Select(Path.GetFullPath).ToArray();
@@ -174,6 +175,7 @@ internal static class FrozenResourceWorkflow
             {
                 if (validationMode.Contains("precommit")) { start.ArgumentList.Add("-publicPrecommitProbe"); start.ArgumentList.Add("true"); }
                 if (validationMode.Contains("unity")) { start.ArgumentList.Add("-unityBehaviourProbe"); start.ArgumentList.Add("current"); }
+                if (validationMode.Contains("serialization")) { start.ArgumentList.Add("-unitySerializationProbe"); start.ArgumentList.Add("true"); }
             }
             using var process = Process.Start(start)!;
             Console.WriteLine("Frozen resource: " + Path.GetFileName(exe) + " PID " + process.Id);
