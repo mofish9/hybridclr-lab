@@ -235,6 +235,11 @@ if (args.Length == 6 && args[0] == "probe-project")
 {
     string lab = Path.GetFullPath(args[1]), package = Path.GetFullPath(args[2]),
         fixture = Path.GetFullPath(args[4]), destination = Path.GetFullPath(args[5]);
+    string[] inputAssemblies = Directory.GetFiles(fixture, "*.dll").Select(Path.GetFileNameWithoutExtension)
+        .OrderBy(name => name, StringComparer.Ordinal).ToArray()!;
+    if (inputAssemblies.Distinct(StringComparer.OrdinalIgnoreCase).Count() != inputAssemblies.Length ||
+        assemblies.Append(nativeAssembly).Any(name => !inputAssemblies.Contains(name, StringComparer.Ordinal)))
+        throw new InvalidDataException("Fixture must contain all original hotfix assemblies and the ordinary Native assembly, without duplicate names.");
     NewOutput(destination);
     string engineVersion = args[3] == "Unity2022Fgs" ? "2022.3.62f3" :
         args[3] == "Tuanjie2022Fgs" ? "2022.3.62t12" : throw new ArgumentException("Unknown engine.");
@@ -255,19 +260,19 @@ if (args.Length == 6 && args[0] == "probe-project")
     File.WriteAllText(Path.Combine(destination, "ProjectSettings/ProjectVersion.txt"), "m_EditorVersion: " + engineVersion + "\n");
     Directory.CreateDirectory(Path.Combine(destination, "Assets/Editor"));
     Directory.CreateDirectory(Path.Combine(destination, "Assets/Plugins/ValueLayout"));
-    foreach (string name in assemblies.Append(nativeAssembly))
+    foreach (string name in inputAssemblies)
         File.Copy(Path.Combine(fixture, name + ".dll"), Path.Combine(destination, "Assets/Plugins/ValueLayout", name + ".dll"));
     string templateRoot = Path.Combine(lab, "tool/fixtures/value-layout/Unity");
     File.Copy(Path.Combine(templateRoot, "CurrentStorageRuntime.cs"), Path.Combine(destination, "Assets/CurrentStorageRuntime.cs"));
     File.Copy(Path.Combine(templateRoot, "CurrentStorageProbeBuild.cs"), Path.Combine(destination, "Assets/Editor/CurrentStorageProbeBuild.cs"));
     File.WriteAllText(Path.Combine(destination, "Assets/link.xml"), "<linker>" +
-        string.Join("", assemblies.Append(nativeAssembly).Append("Assembly-CSharp").Select(name => "<assembly fullname=\"" + name + "\" preserve=\"all\"/>")) + "</linker>");
+        string.Join("", inputAssemblies.Append("Assembly-CSharp").Select(name => "<assembly fullname=\"" + System.Security.SecurityElement.Escape(name) + "\" preserve=\"all\"/>")) + "</linker>");
     File.WriteAllText(Path.Combine(destination, "probe-source.json"), JsonSerializer.Serialize(new
     {
         scope = "Current storage API fixture; build output binds native guards separately; resource workflow not qualified",
         labHead = Run("git", lab, "rev-parse", "HEAD").Trim(), labChanges = Run("git", lab, "status", "--porcelain").Trim(),
         packageHead = Run("git", package, "rev-parse", "HEAD").Trim(), engineVersion,
-        inputAssemblies = assemblies.Append(nativeAssembly).Select(name => new { name, sha256 = Hash(Path.Combine(fixture, name + ".dll")) }).ToArray(),
+        inputAssemblies = inputAssemblies.Select(name => new { name, sha256 = Hash(Path.Combine(fixture, name + ".dll")) }).ToArray(),
     }, json));
     Console.WriteLine(destination);
     return 0;

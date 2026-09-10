@@ -67,3 +67,19 @@ while a valid retry publishes it with both differential peers. This does not
 replace the real Windows Player gate. The relocated managed runner passes all
 81 existing validation/argument-selection checks in `managed-03.json`; its
 native calls are recorded, not executed.
+
+## Next qualification boundary
+
+Keep the exact 31-case Current bytes from `current-01`. First replay them on
+proof-23 with the committed mixed loader. Then build a second immutable Base
+whose hotfix AOT inventory already includes Added, with Base revision 59. The
+same resource must select Added as interpreter-only on proof-23 and differential
+on the second Base. Generalize only fixture input discovery and expected counts;
+do not modify either archived Player or its project to retrofit this capability.
+Also remove and corrupt a new DLL in disposable resource staging, require
+rejection with zero business revision, restore the exact bytes in `finally`,
+and rerun all cases. Record complete per-Base mode sets and immutable hashes.
+
+The old proof-22 admission check in `old-base-capability-01` rejects the preserved
+Current with `base-missing-runtime-capability:mixed-interpreter-source-batch-v1`.
+This is expected negative evidence, not a Player pass on that old runtime.

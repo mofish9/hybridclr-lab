@@ -18,11 +18,12 @@ internal static class FrozenResourceWorkflow
 
     public static int NewBase(string[] args)
     {
-        if (args.Length != 6) throw new ArgumentException("frozen-resource-new-base <lab> <package> <editor> <runtime manifest> <old proof> <new output>");
+        if (args.Length < 6 || args.Length > 7) throw new ArgumentException("frozen-resource-new-base <lab> <package> <editor> <runtime manifest> <old proof> <new output> [Base Current DLL root]");
         string proof = Path.GetFullPath(args[4]), inputs = Path.GetFullPath(args[5]) + ".inputs";
         if (Directory.Exists(inputs)) throw new IOException("New Base inputs must be new.");
         Directory.CreateDirectory(inputs);
-        foreach (string source in Directory.GetFiles(Path.Combine(proof, "frozen-entry-current"), "*.dll"))
+        string sourceCurrent = args.Length == 7 ? Path.GetFullPath(args[6]) : Path.Combine(proof, "frozen-entry-current");
+        foreach (string source in Directory.GetFiles(sourceCurrent, "*.dll"))
             File.Copy(source, Path.Combine(inputs, Path.GetFileName(source)));
         string identityPath = Path.Combine(proof, "base/build-identity.json"); var identity = Read(identityPath);
         var snapshot = AotAnalysisSnapshot.Read(identityPath, identity,
@@ -211,6 +212,44 @@ internal static class FrozenResourceWorkflow
                 checks["complete-assembly-modes-" + index] = PlayerNames("plannedAssemblies").SequenceEqual(currentNames) &&
                     PlayerNames("differentialAssemblies").SequenceEqual(baseNames) && PlayerNames("interpreterOnlyAssemblies").SequenceEqual(newNames) &&
                     currentNames.All(name => PlayerNames("loadedAssemblyNames").Contains(name));
+            }
+            foreach (string name in newNames)
+            {
+                const string assetPrefix = "Assets/StreamingAssets/SnapshotDHE/";
+                string assetPath = Read(Path.Combine(stage, "dhe-runtime-plan.json")).GetProperty("assemblies")
+                    .EnumerateArray().Single(row => row.GetProperty("assemblyName").GetString() == name)
+                    .GetProperty("current").GetString()!;
+                if (!assetPath.StartsWith(assetPrefix, StringComparison.Ordinal)) throw new InvalidDataException("Unexpected Current asset root.");
+                string dll = Path.GetFullPath(Path.Combine(stage, assetPath.Substring(assetPrefix.Length)));
+                if (!dll.StartsWith(Path.GetFullPath(stage) + Path.DirectorySeparatorChar, StringComparison.OrdinalIgnoreCase))
+                    throw new InvalidDataException("Current DLL escaped disposable resource staging.");
+                byte[] original = File.ReadAllBytes(dll);
+                foreach (string fault in new[] { "missing", "corrupt" })
+                {
+                    string rejectedReport = Path.Combine(output, "player-new-" + fault + "-" + index + "-" + name + ".json");
+                    bool failed = false;
+                    try
+                    {
+                        if (fault == "missing") File.Delete(dll);
+                        else File.WriteAllBytes(dll, original.Concat(new byte[] { 0 }).ToArray());
+                        try { Execute(player, "-batchmode", "-nographics", "-snapshotResult", rejectedReport, "-snapshotResourceRoot", stage,
+                            "-expectedRevision", "73", "-expectedAssemblies", currentNames.Length.ToString(), "-logFile", rejectedReport + ".log"); }
+                        catch (InvalidOperationException) { failed = true; }
+                    }
+                    finally { File.WriteAllBytes(dll, original); }
+                    var rejected = Read(rejectedReport);
+                    string error = rejected.GetProperty("error").GetString()!;
+                    checks["new-dll-" + fault + "-rejected-before-entry-" + index + "-" + name] = failed &&
+                        !rejected.GetProperty("passed").GetBoolean() && rejected.GetProperty("loadedAssemblies").GetInt32() == 0 &&
+                        rejected.GetProperty("revision").GetInt32() == 0 && error.Contains(name) &&
+                        (fault == "missing" ? error.Contains("FileNotFoundException") : error.Contains("hash mismatch", StringComparison.OrdinalIgnoreCase));
+                }
+                string restoredReport = Path.Combine(output, "player-new-restored-" + index + "-" + name + ".json");
+                Execute(player, "-batchmode", "-nographics", "-snapshotResult", restoredReport, "-snapshotResourceRoot", stage,
+                    "-expectedRevision", "73", "-expectedAssemblies", currentNames.Length.ToString(), "-logFile", restoredReport + ".log");
+                checks["new-dll-restored-complete-cases-" + index + "-" + name] = Read(restoredReport).GetProperty("passed").GetBoolean() &&
+                    File.ReadAllLines(restoredReport + ".log").Where(line => line.StartsWith("DHE case begin: "))
+                        .Select(line => line.Substring(16)).SequenceEqual(expected) && Hash(dll) == Hash(Path.Combine(current, name + ".dll"));
             }
             string snapshotAsset = Path.Combine(stage, "payload/frozen-aot", result.GetProperty("baseId").GetString()!, "snapshot.json");
             if (File.Exists(snapshotAsset))

@@ -103,7 +103,9 @@ internal static class UnityWorkflow
             "-Document", identityPath, "-Output", Path.Combine(output, "identity-schema.json"));
         string player = Path.Combine(build, "player/Snapshot.exe"), playerReport = Path.Combine(output, "player-result.json");
         string baseExpectedRevision = latestCurrentRoot == null && !synthesizeEvolution ? expectedRevision : "41";
-        Execute(player, "-batchmode", "-nographics", "-snapshotResult", playerReport, "-expectedRevision", baseExpectedRevision, "-logFile", Path.Combine(output, "player.log"));
+        string expectedAssemblies = Names("assemblies", "assemblyName").Length.ToString();
+        Execute(player, "-batchmode", "-nographics", "-snapshotResult", playerReport, "-expectedRevision", baseExpectedRevision,
+            "-expectedAssemblies", expectedAssemblies, "-logFile", Path.Combine(output, "player.log"));
         using var result = JsonDocument.Parse(File.ReadAllBytes(playerReport));
         bool passed = result.RootElement.GetProperty("passed").GetBoolean() &&
             result.RootElement.GetProperty("baseId").GetString() == identity.RootElement.GetProperty("baseId").GetString() &&
@@ -136,7 +138,7 @@ internal static class UnityWorkflow
             "-Output", Path.Combine(output, "stage-noop.json"));
         string resourceResult = Path.Combine(output, "resource-player-result.json");
         Execute(player, "-batchmode", "-nographics", "-snapshotResult", resourceResult, "-snapshotResourceRoot", staging,
-            "-expectedRevision", expectedRevision, "-logFile", Path.Combine(output, "resource-player.log"));
+            "-expectedRevision", expectedRevision, "-expectedAssemblies", expectedAssemblies, "-logFile", Path.Combine(output, "resource-player.log"));
         using var loadedResource = JsonDocument.Parse(File.ReadAllBytes(resourceResult));
         passed &= loadedResource.RootElement.GetProperty("passed").GetBoolean() &&
             loadedResource.RootElement.GetProperty("resourceUpdate").GetBoolean() &&

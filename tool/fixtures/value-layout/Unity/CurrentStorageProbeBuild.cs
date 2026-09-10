@@ -1,5 +1,6 @@
 using System;
 using System.IO;
+using System.Linq;
 using System.Security.Cryptography;
 using HybridCLR.Editor;
 using HybridCLR.Editor.Commands;
@@ -15,7 +16,11 @@ namespace HybridCLR.Lab.Editor
 {
     public static class CurrentStorageProbeBuild
     {
-        private static readonly string[] Hotfix = { "HybridCLR.ValueLayoutModel", "HybridCLR.ValueLayoutOther", "HybridCLR.ValueLayoutConsumer" };
+        // Fixture inputs contain hotfix DLLs plus this one immutable ordinary AOT DLL.
+        private static string[] Hotfix => Directory.GetFiles("Assets/Plugins/ValueLayout", "*.dll")
+            .Select(Path.GetFileNameWithoutExtension)
+            .Where(name => name != "HybridCLR.ValueLayoutNative")
+            .OrderBy(name => name, StringComparer.Ordinal).ToArray();
         private static string Argument(string name)
         {
             var args = Environment.GetCommandLineArgs(); int index = Array.IndexOf(args, name);
