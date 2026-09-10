@@ -89,3 +89,15 @@ must explicitly distinguish inspected generic contexts from actual body/metadata
 concrete dependency changes, including cross-assembly dependencies. Equality of
 method MV hashes alone cannot establish that distinction. This is a separate
 required implementation and test boundary, not fixed by native interface queries.
+
+## Verified query correction
+
+IL2CPP 6951d30 with unchanged HybridCLR b69128f/package 102cfd7 passes real-header
+native04. Base-67 builds at lab 7de7404 and consumes the exact Current02 bytes.
+Resource03 and replay at lab 7e7f0d5 pass 46 business cases, cold and cached 9/9
+callback checks, 11 receiver checks, 14 reference checks, 18 generic checks,
+11 serialization + 17 lifecycle checks and public preparation/fresh-process
+recovery. Cached clone before/after counts are now 1/1. Independent audit verifies
+one Base, three successful/restored runs and 76 files. See
+`../reports/dhe-reference-interface-windows.md` for complete identities.
+The evolved Base conditional-generic failure remains unresolved.

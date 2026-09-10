@@ -31,9 +31,10 @@ for the exact commits, preserved failures, evidence identities and remaining gat
 Unity 2022 Windows comes first; Tuanjie follows; no new Unity 2021 work.
 
 The subsequent interface-addition candidate is in
-`reports/dhe-reference-interface-windows.md`: Base-65 passes cold native callbacks,
-cached cloning fails, and Base-66 exposes unconditional hotfix generic selection.
-These failures remain separate from the passing prior Current payload.
+`reports/dhe-reference-interface-windows.md`: IL2CPP 6951d30 and Base-67 fix the
+cached clone failure with the same Current bytes; cold/cached interface callbacks
+and adjacent regressions pass. Base-66 still exposes unconditional hotfix generic
+selection, which remains separate from the passing prior Current payload.
 
 The latest completed Windows checkpoint passes **public pre-commit recovery and real Unity
 component evolution**. At lab `69b700c`, two immutable Bases consume one identical
