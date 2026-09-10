@@ -406,6 +406,56 @@ foreach (string name in assemblyNames)
 }
 var consumer = MetaVersionSnapshot.Create(currentFiles.Single(path => path.EndsWith("HybridCLR.ValueLayoutConsumer.dll")));
 var consumerTokens = compiled.Plans[consumer.AssemblyName].CurrentExecutionMethodTokens;
+var conditionalFixture = compiled.Plans.Values.FirstOrDefault(value => value.CurrentGenericContextMethodTokens.Length != 0);
+cases["host-conditional-fixture-available"] = conditionalFixture != null;
+if (conditionalFixture != null)
+{
+    string conditionalAssembly = conditionalFixture.AssemblyName;
+    uint conditionalToken = conditionalFixture.CurrentGenericContextMethodTokens[0];
+    void AddMutableConditional(JsonNode manifest, JsonNode validation, JsonNode runtimePlan, Provider provider)
+    {
+        foreach (var table in new[] { manifest["supportedBases"][0]["assemblyModes"],
+            validation["bases"][0]["assemblyModes"], runtimePlan["baseSelections"][0]["assemblyModes"] })
+        {
+            var value = table.AsArray().Single(row => row["assemblyName"].GetValue<string>() == conditionalAssembly)["executionPlans"][0];
+            uint[] methods = value["currentExecutionMethodTokens"].AsArray().Select(row => row.GetValue<uint>())
+                .Append(conditionalToken).Distinct().OrderBy(token => token).ToArray();
+            value["currentExecutionMethodTokens"] = Node(methods);
+            value["currentExecutionMethodTokenCount"] = methods.Length;
+            value["currentGenericContextMethodTokens"] = Node(new[] { conditionalToken });
+            value["currentGenericContextMethodTokenCount"] = 1;
+        }
+        foreach (var record in new[] { manifest["supportedBases"][0], validation["bases"][0] })
+            record["requiredRuntimeCapabilities"].AsArray().Add(JsonValue.Create(DheExecutionPlan.GenericContextCapability));
+    }
+    bool ConditionalForwarded(int frozenCount)
+    {
+        int index = Array.IndexOf(identities[0].AssemblyNames.Reverse().ToArray(), conditionalAssembly) + frozenCount;
+        return RuntimeApi.LastSourceKinds?[index] == 0 &&
+            RuntimeApi.LastConditional?[index].SequenceEqual(new[] { conditionalToken }) == true;
+    }
+    RunCase("mutable-conditional-public-loader", 0, AddMutableConditional, true);
+    cases["mutable-conditional-native-arguments"] = ConditionalForwarded(0);
+    RunCase("frozen-and-mutable-conditional-public-loader", 0, (m, v, p, provider) =>
+    { AddFrozen(m, v, p, provider); AddMutableConditional(m, v, p, provider); }, true);
+    cases["frozen-and-mutable-conditional-native-arguments"] = ConditionalForwarded(1) &&
+        RuntimeApi.LastConditional[0].SequenceEqual(new[] { frozenToken });
+    RunCase("mutable-conditional-runtime-plan-tamper", 0, (m, v, p, provider) => {
+        AddMutableConditional(m, v, p, provider);
+        var value = p["baseSelections"][0]["assemblyModes"].AsArray()
+            .Single(row => row["assemblyName"].GetValue<string>() == conditionalAssembly)["executionPlans"][0];
+        value["currentGenericContextMethodTokens"] = new JsonArray();
+        value["currentGenericContextMethodTokenCount"] = 0;
+    }, false);
+    RunCase("mutable-conditional-capability-cannot-be-omitted", 0, (m, v, p, provider) => {
+        AddMutableConditional(m, v, p, provider);
+        foreach (var record in new[] { m["supportedBases"][0], v["bases"][0] })
+        {
+            var required = record["requiredRuntimeCapabilities"].AsArray();
+            required.Remove(required.Single(value => value.GetValue<string>() == DheExecutionPlan.GenericContextCapability));
+        }
+    }, false);
+}
 cases["unchanged-layout-dependent-caller-selected"] = consumerTokens.Contains(consumer.Methods.Single(method => method.Name == "DirectCopy").Token);
 cases["unaffected-caller-retains-aot"] = !consumerTokens.Contains(consumer.Methods.Single(method => method.Name == "Unrelated").Token);
 var withNative = ResourceExecutionPlanner.Compile(BaseFiles("old"), currentFiles,
