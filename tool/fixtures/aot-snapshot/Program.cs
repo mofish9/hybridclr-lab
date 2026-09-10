@@ -21,6 +21,7 @@ if (args.Length > 0 && args[0] == "unity-behaviour-current") return UnityBehavio
 if (args.Length > 0 && args[0] == "unity-behaviour-base-inputs") return UnityBehaviourWorkflow.BaseInputs(args.Skip(1).ToArray());
 if (args.Length > 0 && args[0] == "unity-behaviour-attributes") return UnityBehaviourWorkflow.Attributes(args.Skip(1).ToArray());
 if (args.Length > 0 && args[0] == "public-preparation-input") return UnityBehaviourWorkflow.PreparationInput(args.Skip(1).ToArray());
+if (args.Length > 0 && args[0] == "unity-public-probes") return UnityPublicProbeWorkflow.Run(args.Skip(1).ToArray());
 if (args.Length > 0 && args[0] == "aot-module-policy") return AotModulePolicyTests.Run(args.Skip(1).ToArray());
 if (args.Length > 0 && args[0] == "aot-module-next-base") return AotModuleWorkflow.NextBase(args.Skip(1).ToArray());
 if (args.Length > 0 && args[0] == "literal-current") return AotModuleWorkflow.LiteralCurrent(args.Skip(1).ToArray());
