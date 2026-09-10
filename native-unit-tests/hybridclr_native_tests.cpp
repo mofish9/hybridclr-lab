@@ -1263,6 +1263,21 @@ namespace
         CHECK(!hybridclr::dhe::PrepareAndRegisterMetaVersions({ mutableGeneric }));
         CHECK(!hybridclr::dhe::IsDheAssembly(&assembly));
         CHECK(!physicalCurrent.isInterpterImpl);
+        // Changed bodies remain interpreter selections, while a closed scalar
+        // Base frame can use their identical Current ABI. This is not the
+        // conditional unchanged-body optimization above.
+        mutableGeneric.source.genericContextMethodTokens.clear();
+        arguments[0] = &scalarType;
+        CHECK(hybridclr::dhe::PrepareAndRegisterMetaVersions({ mutableGeneric }));
+        CHECK(hybridclr::dhe::IsChangedMethod(&closed));
+        const bool closedFrameCompatible = hybridclr::dhe::CanEnterWithBaseAbi(&closed);
+        CHECK(closedFrameCompatible);
+        if (closedFrameCompatible) CHECK(hybridclr::dhe::ShouldDispatchToInterpreter(&closed));
+        CHECK(hybridclr::dhe::ResolveInterpreterMethod(&closed) == &physicalCurrent);
+        arguments[0] = &unresolved;
+        CHECK(!hybridclr::dhe::CanEnterWithBaseAbi(&closed));
+        hybridclr::dhe::ResetForTests();
+        physicalCurrent.isInterpterImpl = false;
         physicalCurrent.token = changed.token;
         klass->genericContainerHandle = executionClass->genericContainerHandle = nullptr;
         frozenRegistration.source.genericContextMethodTokens.clear();
