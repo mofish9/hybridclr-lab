@@ -19,6 +19,7 @@ if (args.Length > 0 && args[0] == "public-failure-workflow") return PublicFailur
 if (args.Length > 0 && args[0] == "public-failure-audit") return PublicFailureWorkflow.Audit(args.Skip(1).ToArray());
 if (args.Length > 0 && args[0] == "unity-behaviour-current") return UnityBehaviourWorkflow.Compile(args.Skip(1).ToArray());
 if (args.Length > 0 && args[0] == "unity-serialization-current") return UnityBehaviourWorkflow.SerializationCurrent(args.Skip(1).ToArray());
+if (args.Length > 0 && args[0] == "unity-reference-current") return UnityBehaviourWorkflow.ReferenceCurrent(args.Skip(1).ToArray());
 if (args.Length > 0 && args[0] == "unity-serialization-replay") return UnitySerializationWorkflow.Replay(args.Skip(1).ToArray());
 if (args.Length > 0 && args[0] == "unity-behaviour-base-inputs") return UnityBehaviourWorkflow.BaseInputs(args.Skip(1).ToArray());
 if (args.Length > 0 && args[0] == "unity-behaviour-attributes") return UnityBehaviourWorkflow.Attributes(args.Skip(1).ToArray());

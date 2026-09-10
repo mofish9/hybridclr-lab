@@ -11,6 +11,18 @@ internal static class UnityBehaviourWorkflow
         if (args.Length < 5 || args.Length > 6 || args.Length == 6 && args[5] != "read")
             throw new ArgumentException("unity-serialization-current <lab> <Base proof> <Current DLL root> <editor> <new output> [read]");
         bool readOnly = args.Length == 6;
+        return CompileNativeProbe(args, "UnitySerializationCases", "HybridCLR.Lab.UnitySerialization.SerializationCases", readOnly);
+    }
+
+    internal static int ReferenceCurrent(string[] args)
+    {
+        if (args.Length != 5)
+            throw new ArgumentException("unity-reference-current <lab> <Base proof> <Current DLL root> <editor> <new output>");
+        return CompileNativeProbe(args, "UnityReferenceCases", "HybridCLR.Lab.UnityReference.ReferenceCases", false);
+    }
+
+    private static int CompileNativeProbe(string[] args, string fixture, string probeType, bool readOnly)
+    {
         string output = Path.GetFullPath(args[4]), current = Path.Combine(output, "current");
         if (Directory.Exists(output)) throw new IOException("Serialization fixture output must be new.");
         Directory.CreateDirectory(current);
@@ -27,7 +39,7 @@ internal static class UnityBehaviourWorkflow
         string data = Path.Combine(Path.GetDirectoryName(Path.GetFullPath(args[3]))!, "Data");
         string unityReferences = Path.Combine(data, "PlaybackEngines/WindowsStandaloneSupport/Variations/il2cpp/Managed");
         string facade = Path.Combine(data, "MonoBleedingEdge/lib/mono/unityaot-win32/Facades/netstandard.dll");
-        FrozenStaticWorkflow.CompileAndMerge(Path.GetFullPath(args[0]), args[3], "UnitySerializationCases", merged,
+        FrozenStaticWorkflow.CompileAndMerge(Path.GetFullPath(args[0]), args[3], fixture, merged,
             snapshot.Assemblies.Where(row => !row.Dhe && !names.Contains(row.AssemblyName) && row.AssemblyName != "netstandard").Select(row => {
                 string complete = Path.Combine(unityReferences, row.AssemblyName + ".dll");
                 return row.AssemblyName.StartsWith("UnityEngine", StringComparison.Ordinal) && File.Exists(complete) ? complete : row.Path;
@@ -35,7 +47,7 @@ internal static class UnityBehaviourWorkflow
             readOnly ? "SERIALIZATION_READ_ONLY" : null);
         using var module = ModuleDefMD.Load(File.ReadAllBytes(merged));
         var entry = module.Find("HybridCLR.Lab.ValueLayout.Factory", false)!.Methods.Single(method => method.Name == "GetRevision");
-        var invoke = module.Find("HybridCLR.Lab.UnitySerialization.SerializationCases", false)!.Methods.Single(method => method.Name == "RunIfRequested");
+        var invoke = module.Find(probeType, false)!.Methods.Single(method => method.Name == "RunIfRequested");
         // Keep the initializer verification and all 46 existing business cases.
         // The new Unity-only call executes immediately before successful return.
         int insertion = entry.Body.Instructions.Count - 2;
@@ -45,7 +57,7 @@ internal static class UnityBehaviourWorkflow
         module.Write(model);
         File.WriteAllText(Path.Combine(output, "entry-wiring.json"), JsonSerializer.Serialize(new {
             merged, mergedSha256 = Convert.ToHexString(SHA256.HashData(File.ReadAllBytes(merged))), current = model,
-            currentSha256 = Convert.ToHexString(SHA256.HashData(File.ReadAllBytes(model))), readOnly,
+            currentSha256 = Convert.ToHexString(SHA256.HashData(File.ReadAllBytes(model))), readOnly, fixture, probeType,
             scope = "Append the optional native Unity probe after existing business cases; preserve the compiler's merged output separately"
         }, new JsonSerializerOptions { WriteIndented = true }));
         Console.WriteLine(current); return 0;

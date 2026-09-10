@@ -49,6 +49,17 @@ Tuanjie or general Unity serialization claim.
 
 ## Original design and compiler diagnostics
 
+The next Current-only fixture adds fourteen independent public reference identity
+and allocation assertions: Assembly.GetType versus typeof/Object.GetType, equality,
+assignability, reflected declaring type, field reads/writes, native GetComponent
+and cloning. Each failure is logged without hiding the remaining assertions.
+`unity-reference-current` appends its optional entry to preserved Current DLLs;
+`unity-serialization-replay ... reference` runs it under `-unityReferenceProbe`
+and checks all fourteen exact records. It does not run in the CLR reference.
+Use a fresh resource with identical Current across original/evolved Bases, and
+preserve failures. This fixture does not claim to test pre-existing objects or
+Type handles cached before DHE selection; those require a separate Base fixture.
+
 Continue from the completed public pre-commit/Unity component checkpoint on
 HybridCLR `988a7aa`, IL2CPP Unity 2022 `4d5052e`, package `2d7355f` and lab
 `0aef01a`. The prior goal turn made concrete progress: two immutable Bases passed
