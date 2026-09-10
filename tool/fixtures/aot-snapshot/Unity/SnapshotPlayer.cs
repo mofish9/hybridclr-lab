@@ -16,6 +16,7 @@ namespace HybridCLR.Lab.Snapshot
             public string baseId, aotAnalysisSnapshotSha256, error, stage;
             public int loadedAssemblies, revision, sentinel;
             public int moduleRunsBeforeLoad = -1;
+            public int ordinaryModuleRunsBeforeLoad = -1, ordinaryModuleRunsAfterLoad = -1;
             public string[] plannedAssemblies, loadedAssemblyNames, differentialAssemblies, interpreterOnlyAssemblies;
             public string[] records;
             public long ordinaryAotReferenceResult;
@@ -55,6 +56,13 @@ namespace HybridCLR.Lab.Snapshot
                     if (result.moduleRunsBeforeLoad != 0)
                         throw new InvalidDataException("Hotfix AOT module initialized before the Current version was selected.");
                 }
+                var ordinaryModule = typeof(HybridCLR.Lab.ValueLayoutNative.NativeBoundary).Assembly.GetType("HybridCLR.Lab.ValueLayoutNative.OrdinaryModuleState");
+                if (ordinaryModule != null)
+                {
+                    result.ordinaryModuleRunsBeforeLoad = (int)ordinaryModule.GetField("Runs").GetValue(null);
+                    if (result.ordinaryModuleRunsBeforeLoad != 1)
+                        throw new InvalidDataException("Ordinary AOT module must retain normal startup initialization.");
+                }
                 int resourceIndex = Array.IndexOf(args, "-snapshotResourceRoot");
                 var provider = new Provider { ResourceRoot = resourceIndex < 0 ? null : args[resourceIndex + 1] };
                 result.resourceUpdate = provider.ResourceRoot != null;
@@ -80,6 +88,12 @@ namespace HybridCLR.Lab.Snapshot
                 // sources. Count only the Current payload for this assertion.
                 result.loadedAssemblyNames = DheRuntime.LoadedAssemblyNames;
                 result.loadedAssemblies = result.plannedAssemblies.Intersect(result.loadedAssemblyNames, StringComparer.OrdinalIgnoreCase).Count();
+                if (ordinaryModule != null)
+                {
+                    result.ordinaryModuleRunsAfterLoad = (int)ordinaryModule.GetField("Runs").GetValue(null);
+                    if (result.ordinaryModuleRunsAfterLoad != 1)
+                        throw new InvalidDataException("DHE load reinitialized the ordinary AOT module.");
+                }
                 result.stage = "business-entry";
                 result.revision = ValueLayout.Factory.GetRevision();
                 result.sentinel = ValueLayout.Factory.UnchangedRevision();

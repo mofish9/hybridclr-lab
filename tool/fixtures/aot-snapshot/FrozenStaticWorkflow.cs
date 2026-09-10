@@ -58,9 +58,10 @@ internal static class FrozenStaticWorkflow
                     throw new InvalidDataException("Module fixture requires an empty target global type and no global fields.");
                 foreach (var method in compiled.GlobalType.Methods.ToArray())
                 { compiled.GlobalType.Methods.Remove(method); target.GlobalType.Methods.Add(method); }
-                var entry = target.Find("HybridCLR.Lab.ValueLayout.Factory", false)!.Methods.Single(method => method.Name == "GetRevision");
-                entry.Body.Instructions.Insert(0, Instruction.Create(OpCodes.Call,
-                    target.Find("HybridCLR.Lab.ModuleEvolution.ModuleState", false)!.Methods.Single(method => method.Name == "Verify")));
+                var entry = target.Find("HybridCLR.Lab.ValueLayout.Factory", false)?.Methods.Single(method => method.Name == "GetRevision");
+                if (entry != null)
+                    entry.Body.Instructions.Insert(0, Instruction.Create(OpCodes.Call,
+                        target.Find("HybridCLR.Lab.ModuleEvolution.ModuleState", false)!.Methods.Single(method => method.Name == "Verify")));
             }
             if (setEntry)
             {

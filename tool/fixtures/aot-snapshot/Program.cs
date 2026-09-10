@@ -16,6 +16,7 @@ if (args.Length > 0 && args[0] == "module-resource-current") return ModuleResour
 if (args.Length > 0 && args[0] == "aot-module-new-base") return AotModuleWorkflow.NewBase(args.Skip(1).ToArray());
 if (args.Length > 0 && args[0] == "aot-module-current") return AotModuleWorkflow.Current(args.Skip(1).ToArray());
 if (args.Length > 0 && args[0] == "aot-module-policy") return AotModulePolicyTests.Run(args.Skip(1).ToArray());
+if (args.Length > 0 && args[0] == "aot-module-next-base") return AotModuleWorkflow.NextBase(args.Skip(1).ToArray());
 if (args.Length > 0 && args[0] == "baseline-linker-identity") return BaselineLinkerIdentity.Run(args.Skip(1).ToArray());
 if (args.Length > 0 && args[0] == "pe-header-identity") return PeHeaderIdentity.Run(args.Skip(1).ToArray());
 if (args.Length > 0 && args[0] == "frozen-static-new-base") return FrozenStaticWorkflow.NewBase(args.Skip(1).ToArray());
