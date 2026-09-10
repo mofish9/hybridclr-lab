@@ -57,7 +57,8 @@ internal static class ParentEvolutionPolicyTests
         foreach (string capability in new[] { "current-storage-execution-plan-array-v1",
             ResourceUpdateCompatibility.PhysicalInterfaceMapCapability, ResourceUpdateCompatibility.ReferenceVirtualInvocationCapability,
             ResourceUpdateCompatibility.VirtualSignatureFrameCapability,
-            ResourceUpdateCompatibility.PhysicalParentEvolutionCapability, ResourceUpdateCompatibility.IdenticalPhysicalFrameCapability })
+            ResourceUpdateCompatibility.PhysicalParentEvolutionCapability, ResourceUpdateCompatibility.IdenticalPhysicalFrameCapability,
+            ResourceUpdateCompatibility.NativeReferencePhysicalFrameCapability, ResourceUpdateCompatibility.ParentMemberHandleCapability })
         {
             checks[capability + ":required"] = inserted.RequiredRuntimeCapabilities.Contains(capability);
             checks[capability + ":missing-rejected"] = !ResourceUpdateCompatibility.CanExecuteUpdate(
