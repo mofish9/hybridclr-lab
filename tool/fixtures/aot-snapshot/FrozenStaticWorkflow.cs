@@ -20,8 +20,8 @@ internal static class FrozenStaticWorkflow
             identity.GetProperty("aotAssemblyNames").EnumerateArray().Select(row => row.GetString()!),
             identity.GetProperty("assemblies").EnumerateArray().Select(row => row.GetProperty("assemblyName").GetString()!))!;
     }
-    private static void CompileAndMerge(string lab, string editor, string workload, string targetPath,
-        IEnumerable<string> references, string output, bool setEntry)
+    internal static void CompileAndMerge(string lab, string editor, string workload, string targetPath,
+        IEnumerable<string> references, string output, bool setEntry, string defines = null, bool mergeModule = false)
     {
         Directory.CreateDirectory(output);
         string source = Path.Combine(lab, "tool/fixtures/aot-snapshot/Workloads", workload + ".cs");
@@ -32,6 +32,7 @@ internal static class FrozenStaticWorkflow
             RedirectStandardOutput = true, RedirectStandardError = true };
         foreach (string argument in new[] { compiler, "-nologo", "-noconfig", "-nostdlib+", "-target:library", "-optimize+", "-debug-",
             "-utf8output", "-deterministic+", "-langversion:9.0", "-out:" + library }
+            .Concat(string.IsNullOrEmpty(defines) ? Array.Empty<string>() : new[] { "-define:" + defines })
             .Concat(references.Select(path => "-r:" + (Path.GetFileNameWithoutExtension(path) == ModelName ? "model=" : "") + path)).Append(source))
             start.ArgumentList.Add(argument);
         using var process = Process.Start(start)!;
@@ -51,6 +52,16 @@ internal static class FrozenStaticWorkflow
                 if (target.GetTypes().Any(existing => existing.FullName == type.FullName)) throw new InvalidDataException("Duplicate fixture type: " + type.FullName);
                 compiled.Types.Remove(type); target.Types.Add(type);
             }
+            if (mergeModule)
+            {
+                if (target.GlobalType.HasMethods || target.GlobalType.HasFields || compiled.GlobalType.HasFields)
+                    throw new InvalidDataException("Module fixture requires an empty target global type and no global fields.");
+                foreach (var method in compiled.GlobalType.Methods.ToArray())
+                { compiled.GlobalType.Methods.Remove(method); target.GlobalType.Methods.Add(method); }
+                var entry = target.Find("HybridCLR.Lab.ValueLayout.Factory", false)!.Methods.Single(method => method.Name == "GetRevision");
+                entry.Body.Instructions.Insert(0, Instruction.Create(OpCodes.Call,
+                    target.Find("HybridCLR.Lab.ModuleEvolution.ModuleState", false)!.Methods.Single(method => method.Name == "Verify")));
+            }
             if (setEntry)
             {
                 var entry = target.Find("HybridCLR.Lab.ValueLayout.Factory", false)!.Methods.Single(method => method.Name == "GetRevision");
@@ -65,7 +76,7 @@ internal static class FrozenStaticWorkflow
             target.Write(targetPath);
         }
         File.WriteAllText(Path.Combine(output, "compiler-evidence.json"), JsonSerializer.Serialize(new {
-            source, sourceSha256 = Hash(source), compilerSha256 = Hash(compiler), hostSha256 = Hash(host),
+            source, sourceSha256 = Hash(source), defines, mergeModule, compilerSha256 = Hash(compiler), hostSha256 = Hash(host),
             librarySha256 = Hash(library), targetPath, targetSha256 = Hash(targetPath),
             scope = "Real Unity compiler fixture; Base ordinary types are merged only before Base construction"
         }, new JsonSerializerOptions { WriteIndented = true }));

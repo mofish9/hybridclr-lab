@@ -15,6 +15,7 @@ namespace HybridCLR.Lab.Snapshot
             public bool resourceUpdate;
             public string baseId, aotAnalysisSnapshotSha256, error, stage;
             public int loadedAssemblies, revision, sentinel;
+            public int moduleRunsBeforeLoad = -1;
             public string[] plannedAssemblies, loadedAssemblyNames, differentialAssemblies, interpreterOnlyAssemblies;
             public string[] records;
             public long ordinaryAotReferenceResult;
@@ -46,6 +47,14 @@ namespace HybridCLR.Lab.Snapshot
             {
                 var identity = DheBuildIdentity.Create();
                 result.baseId = identity.BaseId; result.aotAnalysisSnapshotSha256 = identity.AotAnalysisSnapshotSha256;
+                var moduleState = typeof(ValueLayout.Factory).Assembly.GetType("HybridCLR.Lab.ModuleEvolution.ModuleState");
+                if (moduleState != null)
+                {
+                    result.stage = "before-module-version-selection";
+                    result.moduleRunsBeforeLoad = (int)moduleState.GetField("Runs").GetValue(null);
+                    if (result.moduleRunsBeforeLoad != 0)
+                        throw new InvalidDataException("Hotfix AOT module initialized before the Current version was selected.");
+                }
                 int resourceIndex = Array.IndexOf(args, "-snapshotResourceRoot");
                 var provider = new Provider { ResourceRoot = resourceIndex < 0 ? null : args[resourceIndex + 1] };
                 result.resourceUpdate = provider.ResourceRoot != null;

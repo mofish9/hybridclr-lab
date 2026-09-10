@@ -13,6 +13,8 @@ if (args.Length > 0 && args[0] == "mixed-transaction-prepare") return MixedTrans
 if (args.Length > 0 && args[0] == "mixed-transaction-run") return MixedTransactionWorkflow.Run(args.Skip(1).ToArray());
 if (args.Length > 0 && args[0] == "module-metaversion") return ModuleMetaVersionTests.Run(args.Skip(1).ToArray());
 if (args.Length > 0 && args[0] == "module-resource-current") return ModuleResourceCompiler.Run(args.Skip(1).ToArray());
+if (args.Length > 0 && args[0] == "aot-module-new-base") return AotModuleWorkflow.NewBase(args.Skip(1).ToArray());
+if (args.Length > 0 && args[0] == "aot-module-current") return AotModuleWorkflow.Current(args.Skip(1).ToArray());
 if (args.Length > 0 && args[0] == "baseline-linker-identity") return BaselineLinkerIdentity.Run(args.Skip(1).ToArray());
 if (args.Length > 0 && args[0] == "pe-header-identity") return PeHeaderIdentity.Run(args.Skip(1).ToArray());
 if (args.Length > 0 && args[0] == "frozen-static-new-base") return FrozenStaticWorkflow.NewBase(args.Skip(1).ToArray());
