@@ -16,6 +16,10 @@ Verify the real old/grown/Current DLL sets and a Base without the new workload.
 Require negative capability checks, unchanged-plan controls, the new-type control,
 and byte-identical MV output. Preserve the existing declaration and managed plan
 gates. Package capabilities and source locks must identify the matching runtime.
+Body-only changes with compatible existing signatures do not require new physical
+frame support. A control changing one reference-valued virtual body reproduces
+the initial over-rejection; require storage/execution-plan selection for this
+capability while retaining the separate startup MethodImpl requirement.
 Rebuild Players with the new package before claiming an end-to-end admitted
 resource; the preceding Players remain runtime evidence only.
 

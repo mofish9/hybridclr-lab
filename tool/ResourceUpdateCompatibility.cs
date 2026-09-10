@@ -340,9 +340,8 @@ internal sealed class ResourceUpdateCompatibility
                         assembly.AssemblyName == declaration.AssemblyName)))
             requiredCapabilities.Add(GenericMethodImplOwnerCapability);
         if (current.Methods.Any(method => method.IsVirtual && HasNonScalarSignature(method) &&
-                baselineMethods.TryGetValue(method.StableId, out var previous) &&
-                (physicalTypes.Contains(method.DeclaringTypeStableId) || executionTokens.Contains(method.Token) ||
-                 previous.Version != method.Version)))
+                baselineMethods.ContainsKey(method.StableId) &&
+                (physicalTypes.Contains(method.DeclaringTypeStableId) || executionTokens.Contains(method.Token))))
             requiredCapabilities.Add(VirtualSignatureFrameCapability);
         // Native entry into a selected instance body is safe only when its
         // receiver storage is retained and its complete frame remains scalar.
