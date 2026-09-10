@@ -6,9 +6,10 @@ internal static class UnitySerializationWorkflow
 {
     internal static int Replay(string[] args)
     {
-        if (args.Length != 6 || args[5] != "read" && args[5] != "full" && args[5] != "full-unity" && args[5] != "reference")
-            throw new ArgumentException("unity-serialization-replay <lab> <tool.dll> <Base proof> <resource workflow output> <new output> <read|full|full-unity|reference>");
-        bool reference = args[5] == "reference";
+        if (args.Length != 6 || args[5] != "read" && args[5] != "full" && args[5] != "full-unity" && args[5] != "reference" && args[5] != "reference-generic")
+            throw new ArgumentException("unity-serialization-replay <lab> <tool.dll> <Base proof> <resource workflow output> <new output> <read|full|full-unity|reference|reference-generic>");
+        bool reference = args[5].StartsWith("reference", StringComparison.Ordinal);
+        bool generic = args[5] == "reference-generic";
         bool lifecycle = args[5] == "full-unity";
         string lab = Path.GetFullPath(args[0]), tool = Path.GetFullPath(args[1]), proof = Path.GetFullPath(args[2]),
             source = Path.GetFullPath(args[3]), output = Path.GetFullPath(args[4]);
@@ -55,7 +56,7 @@ internal static class UnitySerializationWorkflow
         string reportPath = Path.Combine(output, "player.json"), log = reportPath + ".log";
         Execute(player, true, "-batchmode", "-nographics", "-snapshotResult", reportPath, "-snapshotResourceRoot", stage,
             "-expectedRevision", "73", "-expectedAssemblies", "4", "-expectedModuleConstant", "202",
-            reference ? "-unityReferenceProbe" : "-unitySerializationProbe", "true", "-logFile", log);
+            generic ? "-unityReferenceGenericProbe" : reference ? "-unityReferenceProbe" : "-unitySerializationProbe", "true", "-logFile", log);
         var report = Read(reportPath); string[] lines = File.ReadAllLines(log);
         string[] sequence = { "inactive-source-has-no-callback-effects", "json-reads-existing-field", "json-reads-added-field",
             "json-writes-existing-field", "json-writes-added-field", "old-json-preserves-added-field", "clone-copies-existing-field",
@@ -68,7 +69,14 @@ internal static class UnitySerializationWorkflow
             "reflected-existing-field-read", "reflected-added-field-read", "reflected-fields-write-current-storage",
             "native-get-component-public-type", "clone-preserves-type-and-fields", "fixture-preserves-lifecycle-state"
         };
-        string prefix = reference ? "DHE Unity reference" : "DHE Unity serialization";
+        if (generic) sequence = new[] {
+            "owner-type-identity", "owner-public-type-accepts", "owner-reflection-field-roundtrip", "owner-reflection-construction",
+            "list-type-identity", "list-public-type-accepts", "list-direct-content", "list-reflection-construction", "list-reflection-add",
+            "array-type-identity", "array-public-type-accepts", "array-reflection-roundtrip", "nested-list-type-identity",
+            "nested-list-public-type-accepts", "invariance-remains-strict", "array-object-covariance", "concurrent-type-identity",
+            "fixture-preserves-lifecycle-state"
+        };
+        string prefix = generic ? "DHE Unity reference generic" : reference ? "DHE Unity reference" : "DHE Unity serialization";
         string[] checks = lines.Where(line => line.StartsWith(prefix + " check: ")).Select(line => line.Substring((prefix + " check: ").Length)).ToArray();
         string[] unityExpected = {
             "awake-current-value", "on-enable-current-value", "awake-diff-selection", "added-instance-field", "added-component-awake",
