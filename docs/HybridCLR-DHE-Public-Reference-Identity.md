@@ -1,5 +1,31 @@
 # Public reference identity and physical receivers
 
+## Latest measured correction and remaining reproductions
+
+At runtime 02d333e/4b02c37 and lab 99e5b53, Base-56/57 pass startup,
+no-op, identical four-DLL resources with all 46 business cases, 11 serialization
+checks and 17 lifecycle checks. Native05 uses real Unity 2022 headers and passes.
+Both pass 14 public reference checks and all 11 cached physical-receiver checks.
+Generic checks pass 17/18 on Base-56 and 18/18 on Base-57; the remaining failure
+is owner-reflection-construction. List allocation/add, array construction and
+nested generic public assignability now pass. The reflected selected reader
+records interpreter=1 on Base-56; the same-layout control and unaffected sentinel
+record interpreter=0. Full lifecycle execution assertions pass without weakening.
+
+Pre-selection component creation still changes native behavior on Base-56:
+the following GetComponent(publicType) and clone checks fail. The full cached
+serialization replay reads/writes JSON correctly but stops at clone-copies-existing-field.
+Keep this separate from the passing cold-selection path and cached field/cast
+safety checks; no pre-existing object or native cache compatibility is claimed.
+Public preparation-failure/fresh-process recovery also passes on both Bases.
+
+Add diagnostic logging to the existing failed assertions without changing their
+pass conditions. Distinguish generic construction's physical Current cast from
+its reflected/direct field value, and compare native lookup by the evolved type
+against lookup by the unchanged MonoBehaviour ancestor. Read clone fields through
+the ancestor solely for diagnosis; do not use this fallback to pass the original
+query/clone assertion. These Current-only probes reuse immutable Base-56/57.
+
 ## Observed first correction and next correction
 
 At d52de3b/6886fee, Base-54/55 both pass all fourteen public reference checks.

@@ -58,7 +58,11 @@ namespace HybridCLR.Lab.UnityReference
                 });
                 Check("owner-reflection-construction", () => {
                     object created = Construct(ownerType); ownerType.GetField("Value").SetValue(created, component);
-                    return created is model::HybridCLR.Lab.ValueLayout.GenericOwner<Evolving> typed && ReferenceEquals(typed.Value, component);
+                    var typed = created as model::HybridCLR.Lab.ValueLayout.GenericOwner<Evolving>;
+                    Console.WriteLine("DHE generic owner construction: publicType=" + (created.GetType() == ownerType) +
+                        " currentCast=" + (typed != null) + " reflectedValue=" + ReferenceEquals(ownerType.GetField("Value").GetValue(created), component) +
+                        " directValue=" + (typed != null && ReferenceEquals(typed.Value, component)));
+                    return typed != null && ReferenceEquals(typed.Value, component);
                 });
                 var list = new List<Evolving> { component };
                 Type listType = typeof(List<>).MakeGenericType(publicType);

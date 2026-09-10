@@ -57,10 +57,21 @@ namespace HybridCLR.Lab.UnityReference
                     value.SetValue(raw, 29); extra.SetValue(raw, 91000000031L);
                     return component.Value == 29 && component.Extra == 91000000031L;
                 });
-                Check("native-get-component-public-type", () => ReferenceEquals(source.GetComponent(publicType), raw));
+                Check("native-get-component-public-type", () => {
+                    Component found = source.GetComponent(publicType);
+                    Component ancestor = source.GetComponent(typeof(MonoBehaviour));
+                    Console.WriteLine("DHE component query: publicNull=" + (found == null) +
+                        " publicSame=" + ReferenceEquals(found, raw) + " ancestorSame=" + ReferenceEquals(ancestor, raw));
+                    return ReferenceEquals(found, raw);
+                });
                 clone = UnityEngine.Object.Instantiate(source);
                 Check("clone-preserves-type-and-fields", () => {
                     var copied = clone.GetComponent(publicType);
+                    var ancestor = clone.GetComponent(typeof(MonoBehaviour));
+                    Console.WriteLine("DHE component clone: publicNull=" + (copied == null) + " ancestorNull=" + (ancestor == null));
+                    if (ancestor != null)
+                        Console.WriteLine("DHE component clone storage: publicType=" + (ancestor.GetType() == publicType) +
+                            " value=" + value.GetValue(ancestor) + " extra=" + extra.GetValue(ancestor));
                     return copied != null && copied.GetType() == publicType &&
                         (int)value.GetValue(copied) == component.Value && (long)extra.GetValue(copied) == component.Extra;
                 });
