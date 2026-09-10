@@ -1251,6 +1251,14 @@ namespace
             CHECK(hybridclr::dhe::CanEnterWithBaseAbi(&closed));
             CHECK(hybridclr::dhe::ResolveCurrentExecutionMethod(&closed) == &closed);
             CHECK(hybridclr::dhe::IsChangedMethod(&physicalCurrent));
+            inst.type_argc = 0;
+            CHECK(hybridclr::dhe::IsChangedMethod(&closed));
+            CHECK(!hybridclr::dhe::CanEnterWithBaseAbi(&closed));
+            inst.type_argc = 1;
+            inst.type_argv = nullptr;
+            CHECK(hybridclr::dhe::IsChangedMethod(&closed));
+            CHECK(!hybridclr::dhe::CanEnterWithBaseAbi(&closed));
+            inst.type_argv = arguments;
             arguments[0] = &unresolved;
             CHECK(hybridclr::dhe::IsChangedMethod(&closed));
             CHECK(!hybridclr::dhe::CanEnterWithBaseAbi(&closed));
