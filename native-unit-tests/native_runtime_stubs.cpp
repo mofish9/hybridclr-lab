@@ -188,6 +188,7 @@ namespace
 		Il2CppClass* klass;
 	};
 	std::vector<DheResolverRecord> s_dheResolvers;
+    std::vector<std::pair<const Il2CppType*, Il2CppClass*>> s_physicalTypes;
     thread_local bool s_captureVmExceptions = false;
     thread_local hybridclr::native_test::VmExceptionKind s_vmExceptionKind =
         hybridclr::native_test::VmExceptionKind::ExecutionEngine;
@@ -396,8 +397,10 @@ namespace vm
     {
     }
 
-    Il2CppClass* Class::FromIl2CppType(const Il2CppType*, bool)
+    Il2CppClass* Class::FromIl2CppType(const Il2CppType* type, bool)
     {
+        for (const auto& entry : s_physicalTypes)
+            if (entry.first == type) return entry.second;
         return nullptr;
     }
 
@@ -453,6 +456,15 @@ namespace
 }
 namespace native_test
 {
+    void ConfigurePhysicalType(const Il2CppType* type, Il2CppClass* klass)
+    {
+        for (auto& entry : s_physicalTypes)
+            if (entry.first == type) { entry.second = klass; return; }
+        s_physicalTypes.emplace_back(type, klass);
+    }
+
+    void ClearPhysicalTypes() { s_physicalTypes.clear(); }
+
     void CaptureVmExceptions(bool enabled)
     {
         s_captureVmExceptions = enabled;

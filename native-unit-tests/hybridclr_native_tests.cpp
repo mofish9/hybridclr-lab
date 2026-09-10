@@ -1315,6 +1315,52 @@ namespace
         physicalCurrent.token = executionCurrent.methods[0].token;
 #endif
 
+        // A selected body with unchanged physical array/reference/value types
+        // can use the Base frame. Logical equality or equal sizes are not proof.
+        // Unknown types and different physical representations remain rejected.
+        Il2CppType beforeFrameType{}, afterFrameType{};
+        const Il2CppType* beforeFrameArguments[] = { &beforeFrameType };
+        const Il2CppType* afterFrameArguments[] = { &afterFrameType };
+        auto checkPhysicalFrame = [&](bool expected) {
+            CHECK(hybridclr::dhe::PrepareAndRegisterMetaVersions({ executionRegistration }));
+            CHECK(hybridclr::dhe::CanEnterWithBaseAbi(&changed) == expected);
+            CHECK(hybridclr::dhe::CanEnterWithBaseAbi(&physicalCurrent));
+            CHECK(hybridclr::dhe::ResolveInterpreterMethod(&changed) == &physicalCurrent);
+            hybridclr::dhe::ResetForTests();
+            physicalCurrent.isInterpterImpl = false;
+        };
+        for (Il2CppTypeEnum kind : { IL2CPP_TYPE_SZARRAY, IL2CPP_TYPE_ARRAY,
+                IL2CPP_TYPE_CLASS, IL2CPP_TYPE_VALUETYPE, IL2CPP_TYPE_GENERICINST })
+        {
+            beforeFrameType.type = afterFrameType.type = kind;
+            changed.return_type = &beforeFrameType;
+            physicalCurrent.return_type = &afterFrameType;
+            checkPhysicalFrame(false); // Unresolved types never compare equal.
+            hybridclr::native_test::ConfigurePhysicalType(&beforeFrameType, klass);
+            hybridclr::native_test::ConfigurePhysicalType(&afterFrameType, klass);
+            checkPhysicalFrame(true);
+            hybridclr::native_test::ConfigurePhysicalType(&afterFrameType, executionClass);
+            checkPhysicalFrame(false);
+#if !HYBRIDCLR_UNITY_2021
+            changed.return_type = physicalCurrent.return_type = &scalarType;
+            changed.parameters_count = physicalCurrent.parameters_count = 1;
+            changed.parameters = beforeFrameArguments;
+            physicalCurrent.parameters = afterFrameArguments;
+            checkPhysicalFrame(false);
+            hybridclr::native_test::ConfigurePhysicalType(&afterFrameType, klass);
+            checkPhysicalFrame(true);
+            beforeFrameType.byref = afterFrameType.byref = 1;
+            checkPhysicalFrame(true);
+            afterFrameType.byref = 0;
+            checkPhysicalFrame(false);
+            beforeFrameType.byref = 0;
+            changed.parameters_count = physicalCurrent.parameters_count = 0;
+            changed.parameters = physicalCurrent.parameters = nullptr;
+#endif
+            hybridclr::native_test::ClearPhysicalTypes();
+        }
+        changed.return_type = physicalCurrent.return_type = &scalarType;
+
         auto invalidExecution = executionRegistration;
         invalidExecution.currentExecutions.push_back(invalidExecution.currentExecutions[0]);
         CHECK(!hybridclr::dhe::PrepareAndRegisterMetaVersions({ invalidExecution }));
