@@ -7,7 +7,7 @@ internal static class UnitySerializationWorkflow
     internal static int Replay(string[] args)
     {
         if (args.Length != 6 || !new[] { "read", "full", "full-unity", "reference", "full-unity-cached", "reference-cached", "reference-generic", "reference-generic-cached", "reference-dispatch", "reference-callbacks", "reference-callbacks-cached", "reference-callbacks-control", "reference-callbacks-control-cached" }.Contains(args[5]))
-            throw new ArgumentException("unity-serialization-replay <lab> <tool.dll> <Base proof> <resource workflow output> <new output> <read|full|full-unity|reference|full-unity-cached|reference-cached|reference-generic|reference-generic-cached|reference-dispatch|reference-callbacks|reference-callbacks-cached>");
+            throw new ArgumentException("unity-serialization-replay <lab> <tool.dll> <Base proof> <resource workflow output> <new output> <read|full|full-unity|reference|full-unity-cached|reference-cached|reference-generic|reference-generic-cached|reference-dispatch|reference-callbacks|reference-callbacks-cached|reference-callbacks-control|reference-callbacks-control-cached>");
         bool dispatch = args[5] == "reference-dispatch";
         bool callbacks = args[5].StartsWith("reference-callbacks", StringComparison.Ordinal);
         bool callbackControl = args[5].StartsWith("reference-callbacks-control", StringComparison.Ordinal);
@@ -113,12 +113,14 @@ internal static class UnitySerializationWorkflow
             lines.Where(line => line.StartsWith("DHE reference cache check: ")).Select(line => line.Substring("DHE reference cache check: ".Length)).SequenceEqual(cacheExpected) &&
             lines.Count(line => line == "DHE reference cache pass: 11") == 1;
         bool immutable = Hash(player) == playerHash && Hash(game) == gameHash && stageHashes.All(row => Hash(row.Key) == row.Value);
-        bool passed = immutable && cachePassed && lifecyclePassed && report.GetProperty("passed").GetBoolean() && checks.SequenceEqual(sequence) &&
+        bool callbackFixturePassed = !callbacks || lines.Count(line => line == "DHE callback fixture: " +
+            (callbackControl ? "new-component-control" : "existing-interface")) == 1;
+        bool passed = immutable && cachePassed && lifecyclePassed && callbackFixturePassed && report.GetProperty("passed").GetBoolean() && checks.SequenceEqual(sequence) &&
             lines.Count(line => line == prefix + " pass: " + sequence.Length) == 1 &&
             lines.Where(line => line.StartsWith("DHE case begin: ")).Select(line => line.Substring(16)).SequenceEqual(
                 Read(Path.Combine(source, "reference.json")).GetProperty("records").EnumerateArray().Select(row => row.GetString()));
         File.WriteAllText(Path.Combine(output, "result.json"), JsonSerializer.Serialize(new { passed, immutable, checks, expected = sequence,
-            lifecycle, lifecyclePassed, unityChecks, cached, cachePassed, cacheChecks,
+            lifecycle, lifecyclePassed, unityChecks, cached, cachePassed, cacheChecks, callbacks, callbackControl, callbackFixturePassed,
             error = report.GetProperty("error").GetString(), proof, source, labHead, playerSha256 = playerHash, gameAssemblySha256 = gameHash,
             hostSha256 = Hash(typeof(UnitySerializationWorkflow).Assembly.Location), toolSha256 = Hash(tool),
             resourceManifestSha256 = Hash(Path.Combine(source, "resource/dhe-resource-update.json")),

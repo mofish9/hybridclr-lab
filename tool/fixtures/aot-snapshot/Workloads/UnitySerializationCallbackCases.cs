@@ -52,6 +52,11 @@ namespace HybridCLR.Lab.UnityReference
         }
         private static void Run()
         {
+#if SERIALIZATION_CALLBACK_CONTROL
+            Console.WriteLine("DHE callback fixture: new-component-control");
+#else
+            Console.WriteLine("DHE callback fixture: existing-interface");
+#endif
             int passed = 0, failed = 0, disabled = State.Disabled, destroyed = State.Destroyed;
             void Check(string name, Func<bool> assertion)
             {
