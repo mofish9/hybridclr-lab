@@ -7,9 +7,10 @@ internal static class UnitySerializationWorkflow
 {
     internal static int Replay(string[] args)
     {
-        if (args.Length != 6 || !new[] { "read", "full", "full-unity", "reference", "full-unity-cached", "reference-cached", "reference-generic", "reference-generic-cached", "reference-dispatch", "reference-callbacks", "reference-callbacks-cached", "reference-callbacks-control", "reference-callbacks-control-cached", "hierarchy-query" }.Contains(args[5]))
-            throw new ArgumentException("unity-serialization-replay <lab> <tool.dll> <Base proof> <resource workflow output> <new output> <read|full|full-unity|reference|full-unity-cached|reference-cached|reference-generic|reference-generic-cached|reference-dispatch|reference-callbacks|reference-callbacks-cached|reference-callbacks-control|reference-callbacks-control-cached|hierarchy-query>");
-        bool hierarchy = args[5] == "hierarchy-query";
+        if (args.Length != 6 || !new[] { "read", "full", "full-unity", "reference", "full-unity-cached", "reference-cached", "reference-generic", "reference-generic-cached", "reference-dispatch", "reference-callbacks", "reference-callbacks-cached", "reference-callbacks-control", "reference-callbacks-control-cached", "hierarchy-query", "hierarchy-query-cached", "interface-remove", "interface-remove-cached", "interface-remove-methods", "interface-remove-methods-cached", "interface-replace", "interface-replace-cached" }.Contains(args[5]))
+            throw new ArgumentException("unity-serialization-replay <lab> <tool.dll> <Base proof> <resource workflow output> <new output> <read|full|full-unity|reference|full-unity-cached|reference-cached|reference-generic|reference-generic-cached|reference-dispatch|reference-callbacks|reference-callbacks-cached|reference-callbacks-control|reference-callbacks-control-cached|hierarchy-query|hierarchy-query-cached|interface-remove|interface-remove-cached|interface-remove-methods|interface-remove-methods-cached|interface-replace|interface-replace-cached>");
+        bool hierarchy = args[5].StartsWith("hierarchy-query", StringComparison.Ordinal);
+        bool interfaceEvolution = args[5].StartsWith("interface-", StringComparison.Ordinal);
         bool dispatch = args[5] == "reference-dispatch";
         bool callbacks = args[5].StartsWith("reference-callbacks", StringComparison.Ordinal);
         bool callbackControl = args[5].StartsWith("reference-callbacks-control", StringComparison.Ordinal);
@@ -17,6 +18,7 @@ internal static class UnitySerializationWorkflow
         bool generic = args[5].StartsWith("reference-generic", StringComparison.Ordinal);
         bool lifecycle = args[5].StartsWith("full-unity", StringComparison.Ordinal);
         bool cached = args[5].EndsWith("-cached", StringComparison.Ordinal);
+        string evolutionMode = interfaceEvolution ? (cached ? args[5].Substring(0, args[5].Length - "-cached".Length) : args[5]) : null;
         bool? currentReferenceStorageSelected = null;
         string cacheCurrentModelSha256 = null;
         string lab = Path.GetFullPath(args[0]), tool = Path.GetFullPath(args[1]), proof = Path.GetFullPath(args[2]),
@@ -93,7 +95,7 @@ internal static class UnitySerializationWorkflow
         }
         Execute(player, true, "-batchmode", "-nographics", "-snapshotResult", reportPath, "-snapshotResourceRoot", stage,
             "-expectedRevision", "73", "-expectedAssemblies", "4", "-expectedModuleConstant", "202",
-            hierarchy ? "-unityHierarchyQueryProbe" : callbacks ? "-unitySerializationCallbackProbe" : dispatch ? "-unityReferenceDispatchProbe" : generic ? "-unityReferenceGenericProbe" : reference ? "-unityReferenceProbe" : "-unitySerializationProbe", "true", "-logFile", log);
+            hierarchy ? "-unityHierarchyQueryProbe" : interfaceEvolution ? "-unityInterfaceEvolutionProbe" : callbacks ? "-unitySerializationCallbackProbe" : dispatch ? "-unityReferenceDispatchProbe" : generic ? "-unityReferenceGenericProbe" : reference ? "-unityReferenceProbe" : "-unitySerializationProbe", "true", "-logFile", log);
         var report = Read(reportPath); string[] lines = File.ReadAllLines(log);
         string[] sequence = { "inactive-source-has-no-callback-effects", "json-reads-existing-field", "json-reads-added-field",
             "json-writes-existing-field", "json-writes-added-field", "old-json-preserves-added-field", "clone-copies-existing-field",
@@ -119,7 +121,12 @@ internal static class UnitySerializationWorkflow
         if (hierarchy) sequence = new[] { "public-type-interface-list", "instance-type-interface-list", "public-interface-by-name",
             "public-base-type", "public-subclass", "subclass-not-reflexive", "generic-parameter-base", "generic-parameter-not-subclass-self",
             "current-field-data", "fixture-preserves-lifecycle-state" };
-        string prefix = hierarchy ? "DHE Unity hierarchy query" : callbacks ? "DHE Unity serialization callback" : dispatch ? "DHE Unity reference dispatch" : generic ? "DHE Unity reference generic" : reference ? "DHE Unity reference" : "DHE Unity serialization";
+        if (interfaceEvolution) sequence = new[] { "current-interface-enumeration", "removed-interface-name", "removed-interface-type-query",
+            "removed-interface-instance-query", "removed-interface-managed-cast", "removed-or-retained-method-behavior", "replacement-type-query",
+            "replacement-managed-dispatch", "replacement-reflected-dispatch", "json-without-removed-before-callback",
+            "json-without-removed-after-callback", "clone-without-removed-callbacks", "native-component-lookup", "public-component-identity",
+            "current-fields-survive-gc", "fixture-preserves-lifecycle-state" };
+        string prefix = hierarchy ? "DHE Unity hierarchy query" : interfaceEvolution ? "DHE Unity interface evolution" : callbacks ? "DHE Unity serialization callback" : dispatch ? "DHE Unity reference dispatch" : generic ? "DHE Unity reference generic" : reference ? "DHE Unity reference" : "DHE Unity serialization";
         string[] checks = lines.Where(line => line.StartsWith(prefix + " check: ")).Select(line => line.Substring((prefix + " check: ").Length)).ToArray();
         string[] unityExpected = {
             "awake-current-value", "on-enable-current-value", "awake-diff-selection", "added-instance-field", "added-component-awake",
@@ -149,18 +156,19 @@ internal static class UnitySerializationWorkflow
         bool immutable = Hash(player) == playerHash && Hash(game) == gameHash && stageHashes.All(row => Hash(row.Key) == row.Value);
         bool callbackFixturePassed = !callbacks || lines.Count(line => line == "DHE callback fixture: " +
             (callbackControl ? "new-component-control" : "existing-interface")) == 1;
-        bool passed = immutable && cachePassed && lifecyclePassed && callbackFixturePassed && report.GetProperty("passed").GetBoolean() && checks.SequenceEqual(sequence) &&
+        bool evolutionFixturePassed = !interfaceEvolution || lines.Count(line => line == "DHE interface evolution mode: " + evolutionMode) == 1;
+        bool passed = immutable && cachePassed && lifecyclePassed && callbackFixturePassed && evolutionFixturePassed && report.GetProperty("passed").GetBoolean() && checks.SequenceEqual(sequence) &&
             lines.Count(line => line == prefix + " pass: " + sequence.Length) == 1 &&
             lines.Where(line => line.StartsWith("DHE case begin: ")).Select(line => line.Substring(16)).SequenceEqual(
                 Read(Path.Combine(source, "reference.json")).GetProperty("records").EnumerateArray().Select(row => row.GetString()));
         File.WriteAllText(Path.Combine(output, "result.json"), JsonSerializer.Serialize(new { passed, immutable, checks, expected = sequence,
             lifecycle, lifecyclePassed, lifecycleSelection, unityChecks, cached, cachePassed, cacheChecks, currentReferenceStorageSelected,
-            cacheCurrentModelSha256, callbacks, callbackControl, callbackFixturePassed, hierarchy,
+            cacheCurrentModelSha256, callbacks, callbackControl, callbackFixturePassed, hierarchy, interfaceEvolution, evolutionMode, evolutionFixturePassed,
             error = report.GetProperty("error").GetString(), proof, source, labHead, playerSha256 = playerHash, gameAssemblySha256 = gameHash,
             hostSha256 = Hash(typeof(UnitySerializationWorkflow).Assembly.Location), toolSha256 = Hash(tool),
             resourceManifestSha256 = Hash(Path.Combine(source, "resource/dhe-resource-update.json")),
             resultSha256 = Hash(reportPath), logSha256 = Hash(log), records,
-            scope = hierarchy ? "Public Current interface enumeration, ancestry and generic parameter controls" : callbackControl ? "Native serialization callback control using a new interpreter component; no existing-interface qualification" : callbacks ? "Added native serialization callbacks on an evolved component interface" : dispatch ? "Diagnostic value/selection/counter logging; not an execution-counter qualification" : reference ? "Public reference type identity and native allocation on an immutable Base" : lifecycle ?
+            scope = hierarchy ? "Public Current interface enumeration, ancestry and generic parameter controls" : interfaceEvolution ? "Removed or replaced existing interfaces, managed dispatch and absence of native serialization callbacks" : callbackControl ? "Native serialization callback control using a new interpreter component; no existing-interface qualification" : callbacks ? "Added native serialization callbacks on an evolved component interface" : dispatch ? "Diagnostic value/selection/counter logging; not an execution-counter qualification" : reference ? "Public reference type identity and native allocation on an immutable Base" : lifecycle ?
                 "Complete native serialization and lifecycle sequences on an immutable Base" :
                 args[5] == "read" ? "Native JSON read diagnostic only; complete serialization is still required" : "Native JSON/overwrite/clone assertions on an immutable Base"
         }, new JsonSerializerOptions { WriteIndented = true }));

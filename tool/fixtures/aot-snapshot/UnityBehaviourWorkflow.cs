@@ -16,8 +16,10 @@ internal static class UnityBehaviourWorkflow
 
     internal static int ReferenceCurrent(string[] args)
     {
-        if (args.Length < 5 || args.Length > 6 || args.Length == 6 && args[5] != "generic" && args[5] != "dispatch" && args[5] != "callbacks" && args[5] != "callbacks-control" && args[5] != "hotfix-generic-dispatch" && args[5] != "hierarchy-query")
-            throw new ArgumentException("unity-reference-current <lab> <Base proof> <Current DLL root> <editor> <new output> [generic|dispatch|callbacks|callbacks-control|hotfix-generic-dispatch|hierarchy-query]");
+        if (args.Length < 5 || args.Length > 6 || args.Length == 6 && args[5] != "generic" && args[5] != "dispatch" && args[5] != "callbacks" && args[5] != "callbacks-control" && args[5] != "hotfix-generic-dispatch" && args[5] != "hierarchy-query" && args[5] != "interface-remove" && args[5] != "interface-remove-methods" && args[5] != "interface-replace")
+            throw new ArgumentException("unity-reference-current <lab> <Base proof> <Current DLL root> <editor> <new output> [generic|dispatch|callbacks|callbacks-control|hotfix-generic-dispatch|hierarchy-query|interface-remove|interface-remove-methods|interface-replace]");
+        if (args.Length == 6 && args[5].StartsWith("interface-", StringComparison.Ordinal))
+            return CompileNativeProbe(args, "UnityInterfaceEvolutionCases", "HybridCLR.Lab.InterfaceEvolution.EvolutionCases", false);
         if (args.Length == 6 && args[5] == "hierarchy-query")
             return CompileNativeProbe(args, "UnityHierarchyQueryCases", "HybridCLR.Lab.HierarchyQueries.QueryCases", false);
         if (args.Length == 6 && args[5] == "hotfix-generic-dispatch")
@@ -55,8 +57,26 @@ internal static class UnityBehaviourWorkflow
                 string complete = Path.Combine(unityReferences, row.AssemblyName + ".dll");
                 return row.AssemblyName.StartsWith("UnityEngine", StringComparison.Ordinal) && File.Exists(complete) ? complete : row.Path;
             }).Append(facade).Concat(Directory.GetFiles(current, "*.dll")), Path.Combine(output, "compiled"), false,
-            readOnly ? "SERIALIZATION_READ_ONLY" : callbackControl ? "SERIALIZATION_CALLBACK_CONTROL" : null);
+            readOnly ? "SERIALIZATION_READ_ONLY" : callbackControl ? "SERIALIZATION_CALLBACK_CONTROL" :
+                args.Length > 5 && args[5] == "interface-replace" ? "INTERFACE_REPLACEMENT" :
+                args.Length > 5 && args[5] == "interface-remove-methods" ? "REMOVE_INTERFACE_METHODS" : null);
         using var module = ModuleDefMD.Load(File.ReadAllBytes(merged));
+        if (fixture == "UnityInterfaceEvolutionCases")
+        {
+            var receiver = module.Find("HybridCLR.Lab.UnityCases.EvolvingBehaviour", false)!;
+            var contract = receiver.Interfaces.Single(row => row.Interface.FullName == "UnityEngine.ISerializationCallbackReceiver");
+            receiver.Interfaces.Remove(contract);
+            if (args[5] != "interface-remove")
+                foreach (string name in new[] { "OnBeforeSerialize", "OnAfterDeserialize" })
+                    receiver.Methods.Remove(receiver.Methods.Single(method => method.Name == name));
+            if (args[5] == "interface-replace")
+            {
+                var donor = module.Find("HybridCLR.Lab.InterfaceEvolution.DisposalTemplate", false)!;
+                receiver.Interfaces.Add(new InterfaceImplUser(donor.Interfaces.Single().Interface));
+                var dispose = donor.Methods.Single(method => method.Name == "Dispose");
+                donor.Methods.Remove(dispose); receiver.Methods.Add(dispose); donor.Interfaces.Clear();
+            }
+        }
         if (fixture == "UnitySerializationCallbackCases" && !callbackControl)
         {
             var receiver = module.Find("HybridCLR.Lab.UnityCases.EvolvingBehaviour", false)!;
