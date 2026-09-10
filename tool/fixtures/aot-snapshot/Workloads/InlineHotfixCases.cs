@@ -26,6 +26,19 @@ namespace HybridCLR.Lab.ModuleEvolution
         {
 #if INLINE_CURRENT
             const int expected = 18;
+#else
+            const int expected = 17;
+#endif
+            if (InlineHotfixCaller.Invoke() != expected) throw new InvalidOperationException("Inline caller used stale hotfix code.");
+            if (typeof(object).Assembly.GetName().Name == "mscorlib") VerifyDispatch();
+            else Console.WriteLine("DHE inline CLR pass: " + expected);
+        }
+
+        [MethodImpl(MethodImplOptions.NoInlining)]
+        private static void VerifyDispatch()
+        {
+#if INLINE_CURRENT
+            const int expected = 18;
             const bool changed = true;
 #else
             const int expected = 17;
