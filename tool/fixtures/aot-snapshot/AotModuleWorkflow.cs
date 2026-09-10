@@ -56,8 +56,33 @@ internal static class AotModuleWorkflow
             var entry = module.Find("HybridCLR.Lab.ValueLayout.Factory", false)!.Methods.Single(method => method.Name == "GetRevision");
             entry.Body = new CilBody();
             entry.Body.Instructions.Add(Instruction.Create(OpCodes.Call, module.Find("HybridCLR.Lab.ModuleEvolution.ModuleState", false)!.Methods.Single(method => method.Name == "Verify")));
+            var literals = module.Find("HybridCLR.Lab.ModuleEvolution.LiteralFieldCases", false);
+            if (literals != null)
+                entry.Body.Instructions.Add(Instruction.Create(OpCodes.Call, literals.Methods.Single(method => method.Name == "Verify")));
             entry.Body.Instructions.Add(Instruction.Create(OpCodes.Ldc_I4, 59)); entry.Body.Instructions.Add(Instruction.Create(OpCodes.Ret)); module.Write(model);
         }
         return UnityWorkflow.Run(args.Take(4).Concat(new[] { inputs, args[6], "59", ":all-ordinary-guards:" }).ToArray());
+    }
+
+    internal static int LiteralCurrent(string[] args)
+    {
+        if (args.Length != 6 || (args[4] != "base" && args[4] != "current"))
+            throw new ArgumentException("literal-current <lab> <Base proof> <original Current> <editor> <base|current> <new output>");
+        string output = Path.GetFullPath(args[5]), current = Path.Combine(output, "current");
+        if (Directory.Exists(output)) throw new IOException("Literal output must be new.");
+        Directory.CreateDirectory(current); var snapshot = Snapshot(args[1]);
+        foreach (string path in Directory.GetFiles(args[2], "*.dll")) File.Copy(path, Path.Combine(current, Path.GetFileName(path)));
+        string model = Path.Combine(current, "HybridCLR.ValueLayoutModel.dll");
+        FrozenStaticWorkflow.CompileAndMerge(Path.GetFullPath(args[0]), args[3], "LiteralFieldCases", model,
+            snapshot.Assemblies.Where(row => !row.Dhe).Select(row => row.Path).Concat(Directory.GetFiles(current, "*.dll")),
+            Path.Combine(output, "compiled"), false, args[4] == "current" ? "LITERALS_CURRENT" : null);
+        using (var module = ModuleDefMD.Load(File.ReadAllBytes(model)))
+        {
+            module.Find("HybridCLR.Lab.ValueLayout.Factory", false)!.Methods.Single(method => method.Name == "GetRevision")
+                .Body.Instructions.Insert(0, Instruction.Create(OpCodes.Call,
+                    module.Find("HybridCLR.Lab.ModuleEvolution.LiteralFieldCases", false)!.Methods.Single(method => method.Name == "Verify")));
+            module.Write(model);
+        }
+        Console.WriteLine(current); return 0;
     }
 }
