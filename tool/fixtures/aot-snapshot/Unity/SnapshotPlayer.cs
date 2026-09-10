@@ -13,8 +13,9 @@ namespace HybridCLR.Lab.Snapshot
         {
             public bool passed;
             public bool resourceUpdate;
-            public string baseId, aotAnalysisSnapshotSha256, error;
+            public string baseId, aotAnalysisSnapshotSha256, error, stage;
             public int loadedAssemblies, revision, sentinel;
+            public string[] plannedAssemblies, loadedAssemblyNames, differentialAssemblies, interpreterOnlyAssemblies;
             public string[] records;
             public long ordinaryAotReferenceResult;
             public long ordinaryAotEchoExtra;
@@ -50,16 +51,30 @@ namespace HybridCLR.Lab.Snapshot
                 const string root = "Assets/StreamingAssets/SnapshotDHE/";
                 string planPath = root + (result.resourceUpdate ? "dhe-runtime-plan.json" : "DheRuntimePlan.json");
                 string error;
+                result.stage = "initialize";
                 bool initialized = result.resourceUpdate
                     ? DheRuntime.InitializeFromResourceUpdate(provider, identity, root + "dhe-resource-update.json", out error, root)
                     : DheRuntime.Initialize(provider, identity, out error, planPath, root);
                 if (!initialized)
                     throw new InvalidDataException(error);
                 var plan = JsonUtility.FromJson<Plan>(provider.LoadText(planPath));
-                if (!DheRuntime.LoadAssemblyImages(plan.assemblies.Select(row => row.assemblyName).ToArray(),
-                    plan.assemblies.Select(row => provider.LoadBytes(row.current)).ToArray(), out var code, out error))
+                var records = plan.assemblies.ToDictionary(row => row.assemblyName, StringComparer.OrdinalIgnoreCase);
+                result.plannedAssemblies = DheRuntime.PlannedAssemblyNames;
+                result.differentialAssemblies = DheRuntime.DifferentialAssemblyNames;
+                result.interpreterOnlyAssemblies = DheRuntime.InterpreterOnlyAssemblyNames;
+                result.stage = "load-differential";
+                if (!DheRuntime.LoadAssemblyImages(result.differentialAssemblies,
+                    result.differentialAssemblies.Select(name => provider.LoadBytes(records[name].current)).ToArray(), out var code, out error))
                     throw new InvalidDataException(code + ":" + error);
-                result.loadedAssemblies = plan.assemblies.Length;
+                result.stage = "load-interpreter-only";
+                foreach (string name in result.interpreterOnlyAssemblies)
+                    if (!DheRuntime.LoadInterpreterAssemblyImage(name, provider.LoadBytes(records[name].current), out _, out code, out error))
+                        throw new InvalidDataException(code + ":" + error);
+                // LoadedAssemblyNames also includes authenticated frozen AOT
+                // sources. Count only the Current payload for this assertion.
+                result.loadedAssemblyNames = DheRuntime.LoadedAssemblyNames;
+                result.loadedAssemblies = result.plannedAssemblies.Intersect(result.loadedAssemblyNames, StringComparer.OrdinalIgnoreCase).Count();
+                result.stage = "business-entry";
                 result.revision = ValueLayout.Factory.GetRevision();
                 result.sentinel = ValueLayout.Factory.UnchangedRevision();
                 var probe = typeof(ValueLayout.Factory).Assembly.GetType("HybridCLR.Lab.ValueLayout.ResourceEvolutionProbe");
@@ -72,9 +87,13 @@ namespace HybridCLR.Lab.Snapshot
                 }
                 int expectedIndex = Array.IndexOf(args, "-expectedRevision");
                 int expectedRevision = expectedIndex < 0 ? 41 : int.Parse(args[expectedIndex + 1]);
-                result.passed = result.loadedAssemblies == 3 && result.revision == expectedRevision &&
+                int assemblyIndex = Array.IndexOf(args, "-expectedAssemblies");
+                int expectedAssemblies = assemblyIndex < 0 ? 3 : int.Parse(args[assemblyIndex + 1]);
+                result.passed = expectedAssemblies > 0 && result.loadedAssemblies == expectedAssemblies &&
+                    result.plannedAssemblies.Length == expectedAssemblies && result.revision == expectedRevision &&
                     result.sentinel == 5 &&
                     !RuntimeApi.IsDifferentialMethodChanged(typeof(ValueLayout.Factory).GetMethod("UnchangedRevision"));
+                result.stage = "complete";
             }
             catch (Exception exception) { result.error = exception.ToString(); }
             File.WriteAllText(args[index + 1], JsonUtility.ToJson(result, true));
