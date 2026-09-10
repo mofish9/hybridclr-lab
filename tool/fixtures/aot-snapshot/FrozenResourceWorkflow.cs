@@ -128,7 +128,7 @@ internal static class FrozenResourceWorkflow
 
     public static int Run(string[] args)
     {
-        if (args.Length != 4 && args.Length != 5) throw new ArgumentException("frozen-resource-workflow <lab> <comma-separated immutable proof roots> <tool.dll> <new output> [Unity editor executable for expanded C# suite]");
+        if (args.Length != 4 && args.Length != 5) throw new ArgumentException("frozen-resource-workflow <lab> <comma-separated immutable proof roots> <tool.dll> <new output> [Unity editor executable for expanded suite OR existing Current directory]");
         string lab = Path.GetFullPath(args[0]), tool = Path.GetFullPath(args[2]), output = Path.GetFullPath(args[3]);
         string[] proofs = args[1].Split(',').Select(Path.GetFullPath).ToArray();
         if (Directory.Exists(output)) throw new IOException("Output must be new.");
@@ -150,15 +150,20 @@ internal static class FrozenResourceWorkflow
         if (Execute("git", "-C", lab, "status", "--porcelain").Length != 0) throw new InvalidDataException("Commit sources before verification.");
         string labHead = Execute("git", "-C", lab, "rev-parse", "HEAD");
         string current = Path.Combine(output, "current"); Directory.CreateDirectory(current);
-        foreach (string source in Directory.GetFiles(Path.Combine(proofs[0], "frozen-entry-current"), "*.dll")) File.Copy(source, Path.Combine(current, Path.GetFileName(source)));
+        bool reuseCurrent = args.Length == 5 && Directory.Exists(args[4]);
+        string sourceCurrent = reuseCurrent ? Path.GetFullPath(args[4]) : Path.Combine(proofs[0], "frozen-entry-current");
+        foreach (string source in Directory.GetFiles(sourceCurrent, "*.dll")) File.Copy(source, Path.Combine(current, Path.GetFileName(source)));
         string Join(string suffix) => string.Join(",", proofs.Select(proof => Path.Combine(proof, "base", suffix)));
         var snapshots = proofs.Select(proof => {
             string path = Path.Combine(proof, "base/build-identity.json"); var identity = Read(path);
             return AotAnalysisSnapshot.Read(path, identity, identity.GetProperty("aotAssemblyNames").EnumerateArray().Select(row => row.GetString()!),
                 identity.GetProperty("assemblies").EnumerateArray().Select(row => row.GetProperty("assemblyName").GetString()!))!;
         }).ToArray();
-        if (args.Length == 5) FrozenResourceCasesCompiler.Compile(lab, current, snapshots[0], args[4], output, Execute);
-        else AddProbe(current);
+        if (!reuseCurrent)
+        {
+            if (args.Length == 5) FrozenResourceCasesCompiler.Compile(lab, current, snapshots[0], args[4], output, Execute);
+            else AddProbe(current);
+        }
         string referenceFile = Path.Combine(output, "reference.json"), host = typeof(FrozenResourceWorkflow).Assembly.Location;
         Execute("dotnet", host, "frozen-resource-reference", current, snapshots[0].Assemblies.Single(row => row.AssemblyName == NativeName).Path, referenceFile);
         string resource = Path.Combine(output, "resource");
@@ -186,7 +191,7 @@ internal static class FrozenResourceWorkflow
             var result = Read(report);
             checks["standard-resource-player-" + index] = result.GetProperty("passed").GetBoolean() && result.GetProperty("resourceUpdate").GetBoolean() &&
                 result.GetProperty("revision").GetInt32() == Read(referenceFile).GetProperty("revision").GetInt32() &&
-                result.GetProperty("sentinel").GetInt32() == 5 && expected.Length == (args.Length == 5 ? FrozenResourceCasesCompiler.CaseCount : 4);
+                result.GetProperty("sentinel").GetInt32() == 5 && (expected.Length == FrozenResourceCasesCompiler.CaseCount || expected.Length == 4);
             string snapshotAsset = Path.Combine(stage, "payload/frozen-aot", result.GetProperty("baseId").GetString()!, "snapshot.json");
             if (File.Exists(snapshotAsset))
             {
@@ -217,6 +222,8 @@ internal static class FrozenResourceWorkflow
         checks["one-current-payload"] = manifest.GetProperty("payloadModel").GetString() == "single-current-payload" &&
             manifest.GetProperty("supportedBases").EnumerateArray().Select(row => row.GetProperty("currentAssemblySetSha256").GetString()).Distinct().Count() == 1;
         checks["distinct-bases"] = manifest.GetProperty("supportedBases").EnumerateArray().Select(row => row.GetProperty("baseId").GetString()).Distinct().Count() == proofs.Length;
+        if (reuseCurrent) checks["exact-existing-current-bytes-preserved"] = FrozenAotSourcePlan.CurrentSetHash(Directory.GetFiles(sourceCurrent, "*.dll")) ==
+            FrozenAotSourcePlan.CurrentSetHash(Directory.GetFiles(current, "*.dll"));
         bool passed = checks.Values.All(value => value);
         File.WriteAllText(Path.Combine(output, "result.json"), JsonSerializer.Serialize(new { passed, checks, players, labHead,
             hostSha256 = Hash(host), toolSha256 = Hash(tool), currentAssemblySetSha256 = FrozenAotSourcePlan.CurrentSetHash(Directory.GetFiles(current, "*.dll")),
