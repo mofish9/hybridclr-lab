@@ -26,6 +26,22 @@ against lookup by the unchanged MonoBehaviour ancestor. Read clone fields throug
 the ancestor solely for diagnosis; do not use this fallback to pass the original
 query/clone assertion. These Current-only probes reuse immutable Base-56/57.
 
+The diagnostic resource confirms publicType=true, currentCast=true and
+reflectedValue=true but directValue=false for generic construction on Base-56.
+GetSupplementalFields currently registers every reference generic owner in the
+sidecar map, including definitions explicitly selected for physical Current
+storage. This mixes detached cells with direct Current field offsets. For a
+selected definition, remap its closed owner to the execution arguments and expose
+the real physical fields directly, without registering sidecars or cloning the
+field type from a Base generic context. Unselected generic definitions retain
+their existing sidecar behavior. Verify reflected/direct writes in both directions
+and the adjacent field on the same object, then all prior value/reference cases.
+
+The native query diagnostic finds the source and clone through MonoBehaviour,
+with clone Value=29 and Extra=91000000031 intact, while GetComponent(publicType)
+returns null after pre-selection creation. This isolates the observed failure to
+native type lookup; it does not yet identify the engine cache or qualify migration.
+
 ## Observed first correction and next correction
 
 At d52de3b/6886fee, Base-54/55 both pass all fourteen public reference checks.

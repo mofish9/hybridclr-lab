@@ -54,7 +54,12 @@ namespace HybridCLR.Lab.UnityReference
                 Check("owner-public-type-accepts", () => ownerType.IsInstanceOfType(owner));
                 Check("owner-reflection-field-roundtrip", () => {
                     var field = ownerType.GetField("Value"); field.SetValue(owner, component);
-                    return ReferenceEquals(field.GetValue(owner), component);
+                    bool reflectedWrite = ReferenceEquals(field.GetValue(owner), component) &&
+                        ReferenceEquals(owner.Value, component) && owner.Neighbor == 7;
+                    owner.Value = null;
+                    bool directWrite = field.GetValue(owner) == null && owner.Neighbor == 7;
+                    owner.Value = component;
+                    return reflectedWrite && directWrite && ReferenceEquals(field.GetValue(owner), component);
                 });
                 Check("owner-reflection-construction", () => {
                     object created = Construct(ownerType); ownerType.GetField("Value").SetValue(created, component);
@@ -62,7 +67,10 @@ namespace HybridCLR.Lab.UnityReference
                     Console.WriteLine("DHE generic owner construction: publicType=" + (created.GetType() == ownerType) +
                         " currentCast=" + (typed != null) + " reflectedValue=" + ReferenceEquals(ownerType.GetField("Value").GetValue(created), component) +
                         " directValue=" + (typed != null && ReferenceEquals(typed.Value, component)));
-                    return typed != null && ReferenceEquals(typed.Value, component);
+                    if (typed == null || !ReferenceEquals(typed.Value, component)) return false;
+                    typed.Neighbor = 23; typed.Value = null;
+                    return ownerType.GetField("Value").GetValue(created) == null &&
+                        (int)ownerType.GetField("Neighbor").GetValue(created) == 23;
                 });
                 var list = new List<Evolving> { component };
                 Type listType = typeof(List<>).MakeGenericType(publicType);
