@@ -2,6 +2,7 @@ namespace HybridCLR.DheTool;
 
 internal sealed class ResourceUpdateCompatibility
 {
+    internal const string PhysicalInterfaceAdditionCapability = "physical-current-interface-additions-v1";
 	public const string Policy = "dhe-proven-safe-subset-v1";
 	public const string RuntimeProtocol = "dhe-runtime-protocol-v1";
     public const string CurrentNativeRuntimeContract = "dhe-runtime-v32";
@@ -228,14 +229,17 @@ internal sealed class ResourceUpdateCompatibility
         MetaVersionType[] changedTypes = baseline.Types.Where(type =>
             currentTypes.TryGetValue(type.StableId, out MetaVersionType? currentType) &&
             !string.Equals(type.Version, currentType.Version, StringComparison.OrdinalIgnoreCase)).ToArray();
+        bool requiresPhysicalInterfaceAddition = false;
         foreach (MetaVersionType type in changedTypes)
         {
             MetaVersionType currentType = currentTypes[type.StableId];
-			if (!string.Equals(type.LayoutVersion, currentType.LayoutVersion,
-					StringComparison.OrdinalIgnoreCase) &&
-				(!string.Equals(type.NonFieldLayoutVersion, currentType.NonFieldLayoutVersion,
-					 StringComparison.OrdinalIgnoreCase) ||
-				 (!physicalTypes.Contains(type.StableId) && !HasOnlySupportedInstanceFieldEvolution(type, baselineFields, currentFields))))
+            bool physicalInterfaceAddition = physicalTypes.Contains(type.StableId) &&
+                HasOnlySupportedPhysicalInterfaceAddition(type, currentType);
+            requiresPhysicalInterfaceAddition |= physicalInterfaceAddition;
+            if (!string.Equals(type.LayoutVersion, currentType.LayoutVersion, StringComparison.OrdinalIgnoreCase) &&
+                ((!string.Equals(type.NonFieldLayoutVersion, currentType.NonFieldLayoutVersion,
+                     StringComparison.OrdinalIgnoreCase) && !physicalInterfaceAddition) ||
+                 (!physicalTypes.Contains(type.StableId) && !HasOnlySupportedInstanceFieldEvolution(type, baselineFields, currentFields))))
                 unsupported.Add("existing-type-layout-or-vtable-change:" + type.Identity);
 			if (!string.Equals(type.NonCustomUnsupportedDeclarativeVersion,
 					currentType.NonCustomUnsupportedDeclarativeVersion,
@@ -286,6 +290,8 @@ internal sealed class ResourceUpdateCompatibility
             requiredCapabilities.Add("shared-type-initialization-v1");
         if (requiresInterfaceSlots)
             requiredCapabilities.Add("existing-interface-method-slots-v1");
+        if (requiresPhysicalInterfaceAddition)
+            requiredCapabilities.Add(PhysicalInterfaceAdditionCapability);
         if (physicalTypes.Count != 0 || executionTokens.Count != 0)
             requiredCapabilities.Add("current-storage-execution-plan-array-v1");
         if (requiresClassVirtualMethods)
@@ -505,6 +511,19 @@ internal sealed class ResourceUpdateCompatibility
         before.ConstantIndependentMetadataVersion.Length != 0 &&
         string.Equals(before.ConstantIndependentMetadataVersion, after.ConstantIndependentMetadataVersion,
             StringComparison.OrdinalIgnoreCase);
+    private static bool HasOnlySupportedPhysicalInterfaceAddition(MetaVersionType baseline, MetaVersionType current)
+    {
+        if (!baseline.CanUsePhysicalInterfaceAddition || !current.CanUsePhysicalInterfaceAddition ||
+            string.IsNullOrEmpty(baseline.InterfaceAdditionLayoutVersion) ||
+            !string.Equals(baseline.InterfaceAdditionLayoutVersion, current.InterfaceAdditionLayoutVersion,
+                StringComparison.Ordinal) || current.InterfaceIdentities.Length <= baseline.InterfaceIdentities.Length)
+            return false;
+        var before = baseline.InterfaceIdentities.ToHashSet(StringComparer.Ordinal);
+        var after = current.InterfaceIdentities.ToHashSet(StringComparer.Ordinal);
+        return before.Count == baseline.InterfaceIdentities.Length &&
+            after.Count == current.InterfaceIdentities.Length && after.IsSupersetOf(before);
+    }
+
 	private static bool HasOnlySupportedStaticFieldEvolution(MetaVersionType type,
         IReadOnlyDictionary<string, MetaVersionField> baselineFields,
         IReadOnlyDictionary<string, MetaVersionField> currentFields)

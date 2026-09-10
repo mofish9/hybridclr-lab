@@ -238,7 +238,24 @@ internal sealed class MetaVersionSnapshot
             Hash("dhe-type-static-fields\n" + StableStaticFieldShape(type)),
             type.IsInterface, type.DeclaringType != null,
             string.Equals(type.Name.String, "<PrivateImplementationDetails>",
-                StringComparison.Ordinal), LocalReferencedTypes(type), LocalReferencedTypes(type, false));
+                StringComparison.Ordinal), LocalReferencedTypes(type), LocalReferencedTypes(type, false))
+        {
+            // Additional admission facts only. Do not alter archived binary MV
+            // hashes when distinguishing an interface list from physical layout.
+            InterfaceAdditionLayoutVersion = Hash("dhe-interface-addition-layout\n" +
+                string.Join("|", type.FullName, type.BaseType?.FullName ?? "",
+                    type.BaseType?.DefinitionAssembly?.FullName ?? "",
+                    ((uint)type.Attributes).ToString("x8"), type.IsValueType,
+                    type.ClassLayout?.PackingSize.ToString(CultureInfo.InvariantCulture) ?? "",
+                    type.ClassLayout?.ClassSize.ToString(CultureInfo.InvariantCulture) ?? "",
+                    string.Join(",", type.GenericParameters.Select(StableGenericParameter)))),
+            CanUsePhysicalInterfaceAddition = !type.IsInterface && !type.IsValueType &&
+                !type.HasGenericParameters && type.BaseType is not TypeSpec &&
+                type.Interfaces.All(row => row.Interface is not TypeSpec &&
+                    !row.Interface.Name.String.Contains('`')),
+            InterfaceIdentities = type.Interfaces.Select(row =>
+                (row.Interface.DefinitionAssembly?.FullName ?? "") + "|" + row.Interface.FullName).ToArray(),
+        };
     }
 
     private static string[] LocalReferencedTypes(TypeDef type, bool includeBodies = true)
@@ -818,7 +835,12 @@ internal sealed record MetaVersionType(string Identity, string StableId, string 
     [property: JsonIgnore] bool IsNested,
     [property: JsonIgnore] bool IsPrivateImplementationDetails,
     [property: JsonIgnore] string[] LocalReferencedTypeNames,
-    [property: JsonIgnore] string[] LocalDeclarationReferencedTypeNames);
+    [property: JsonIgnore] string[] LocalDeclarationReferencedTypeNames)
+{
+    [JsonIgnore] public string InterfaceAdditionLayoutVersion { get; init; } = "";
+    [JsonIgnore] public bool CanUsePhysicalInterfaceAddition { get; init; }
+    [JsonIgnore] public string[] InterfaceIdentities { get; init; } = Array.Empty<string>();
+}
 
 internal sealed record MetaVersionMethod(string Identity, string StableId, string Version,
     string DeclaringTypeStableId, uint Token, uint Flags, string Name, string DeclaringType,
