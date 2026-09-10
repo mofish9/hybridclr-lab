@@ -1,5 +1,6 @@
 using System.Security.Cryptography;
 using System.Text.Json;
+using dnlib.DotNet;
 
 internal static class FrozenResourceAudit
 {
@@ -51,6 +52,16 @@ internal static class FrozenResourceAudit
             manifest.GetProperty("currentAssemblySetSha256").GetString() == currentSet &&
             manifest.GetProperty("supportedBases").EnumerateArray().All(row => row.GetProperty("currentAssemblySetSha256").GetString() == currentSet));
         string[] originalNames = Directory.GetFiles(current, "*.dll").Select(Path.GetFileNameWithoutExtension).OrderBy(name => name, StringComparer.Ordinal).ToArray()!;
+        int? moduleConstant = null, literalNumber = null;
+        bool selectedInitializer = false;
+        using (var model = ModuleDefMD.Load(Path.Combine(current, "HybridCLR.ValueLayoutModel.dll")))
+        {
+            moduleConstant = model.Find("HybridCLR.Lab.ModuleEvolution.ModuleState", false)?
+                .Fields.Single(field => field.Name == "ExpectedVersion").Constant?.Value as int?;
+            selectedInitializer = model.GlobalType.Methods.Any(method => method.IsStaticConstructor);
+            literalNumber = model.Find("HybridCLR.Lab.ModuleEvolution.LiteralFieldCases", false)?
+                .Fields.Single(field => field.Name == "Number").Constant?.Value as int?;
+        }
         var payloads = manifest.GetProperty("payloadVariants")[0].GetProperty("assemblies").EnumerateArray().ToArray();
         Require("complete-original-current", payloads.Select(row => row.GetProperty("assemblyName").GetString()).OrderBy(name => name, StringComparer.Ordinal).SequenceEqual(originalNames));
         foreach (var row in payloads)
@@ -96,10 +107,28 @@ internal static class FrozenResourceAudit
                 .Select(line => line.Substring(16)).ToArray();
             string key = Path.GetFileNameWithoutExtension(reportPath);
             Require(key + "-known-base", bases.Contains(report.GetProperty("baseId").GetString()!));
+            if (moduleConstant.HasValue)
+                Require(key + "-no-early-hotfix-module", report.GetProperty("moduleRunsBeforeLoad").GetInt32() == 0);
+            if (report.TryGetProperty("ordinaryModuleRunsBeforeLoad", out var ordinaryBefore) && ordinaryBefore.GetInt32() >= 0)
+                Require(key + "-ordinary-module-eager-once", ordinaryBefore.GetInt32() == 1);
             if (report.GetProperty("passed").GetBoolean())
             {
                 Require(key + "-complete-sequence", begun.SequenceEqual(expected) && report.GetProperty("revision").GetInt32() == 73 &&
                     report.GetProperty("loadedAssemblies").GetInt32() == originalNames.Length);
+                if (moduleConstant.HasValue)
+                {
+                    Require(key + "-current-constant-reflection", new[] { "moduleConstantAfterLoad", "moduleConstantFresh", "moduleConstantValue" }
+                        .All(name => report.GetProperty(name).GetInt32() == moduleConstant.Value));
+                    string[] starts = log.Where(line => line.StartsWith("DHE selected module: ", StringComparison.Ordinal)).ToArray();
+                    Require(key + "-selected-initializer-once", selectedInitializer
+                        ? starts.SequenceEqual(new[] { "DHE selected module: " + moduleConstant.Value + ":1" }) : starts.Length == 0);
+                    Require(key + "-module-entry-verification", log.Count(line => line == "DHE module evolution pass: " +
+                        (selectedInitializer ? moduleConstant.Value + ":1" : "0:0")) == 1);
+                }
+                if (literalNumber.HasValue)
+                    Require(key + "-literal-reflection-suite", log.Count(line => line == "DHE literal reflection pass: " + literalNumber.Value + ":74") == 1);
+                if (report.TryGetProperty("ordinaryModuleRunsAfterLoad", out var ordinaryAfter) && ordinaryBefore.ValueKind != JsonValueKind.Undefined && ordinaryBefore.GetInt32() >= 0)
+                    Require(key + "-ordinary-module-not-reinitialized", ordinaryAfter.GetInt32() == 1);
                 if (modules.Length != 0)
                 {
                     string[] moduleBegins = log.Where(line => line.StartsWith("DHE module begin: ", StringComparison.Ordinal)).Select(line => line.Substring(18)).ToArray();
@@ -117,6 +146,8 @@ internal static class FrozenResourceAudit
                     report.GetProperty("loadedAssemblies").GetInt32() == 0);
                 if (modules.Length != 0)
                     Require(key + "-no-module-side-effects", !log.Any(line => line.StartsWith("DHE module begin: ", StringComparison.Ordinal)));
+                if (moduleConstant.HasValue)
+                    Require(key + "-no-hotfix-module-side-effects", !log.Any(line => line.StartsWith("DHE selected module: ", StringComparison.Ordinal)));
                 rejectedRuns++;
             }
             files[Path.GetFullPath(reportPath)] = Hash(reportPath);
