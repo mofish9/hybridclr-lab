@@ -52,3 +52,9 @@ will accept the complete Current set, authenticate it, and pass differential,
 frozen and new interpreter images through the native batch. Existing APIs remain
 available; MV schema stays 1. Add a capability so older Bases reject resources
 that need this new mixed transaction rather than reaching an unresolved parent.
+
+The initial `1d564ec` native gate (`native-01`) found an access modifier error in
+the new prepared-reference helper. `236ce15` exposes that loader operation and
+is the next candidate. The first managed-host run from an artifact directory
+also found a fixture-only schema path assumption; the runner now accepts an
+explicit lab root. Neither failed attempt is passing runtime evidence.

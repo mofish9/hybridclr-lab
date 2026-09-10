@@ -8,8 +8,9 @@ using HybridCLR.DheTool;
 using dnlib.DotNet;
 using dnlib.DotNet.Emit;
 
-if (args.Length != 3) throw new ArgumentException("<public-reflection artifact root> <new report.json> <DheTool.dll>");
+if (args.Length != 3 && args.Length != 4) throw new ArgumentException("<public-reflection artifact root> <new report.json> <DheTool.dll> [lab root]");
 string root = Path.GetFullPath(args[0]), output = Path.GetFullPath(args[1]);
+string labRoot = args.Length == 4 ? Path.GetFullPath(args[3]) : Path.GetFullPath("../../../../../..", AppContext.BaseDirectory);
 if (File.Exists(output)) throw new IOException("Report must be new.");
 var json = new JsonSerializerOptions { IncludeFields = true, WriteIndented = true };
 string Hash(byte[] bytes) => Convert.ToHexString(SHA256.HashData(bytes));
@@ -331,7 +332,7 @@ bool UniqueProperties(JsonElement value)
 }
 foreach (string file in new[] { "dhe-resource-update.schema.json", "dhe-resource-update-validation.schema.json", "dhe-runtime-plan.schema.json" })
 {
-    using var schema = JsonDocument.Parse(File.ReadAllText(Path.Combine(Path.GetFullPath("../../../../../..", AppContext.BaseDirectory), "schemas", file)));
+    using var schema = JsonDocument.Parse(File.ReadAllText(Path.Combine(labRoot, "schemas", file)));
     cases["schema-unique-keys-" + file] = UniqueProperties(schema.RootElement);
     bool SchemaAccepts(JsonNode value, string definition = "executionPlan")
     {
