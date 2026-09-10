@@ -1,6 +1,26 @@
 # DHE evolution implementation and validation
 
-## Active checkpoint: ordinary AOT descendants across ten Windows Bases
+## Active checkpoint: standard resources with evolved value layouts
+
+Unity 2022 Windows proof-20, on HybridCLR `cdb2a5f`, IL2CPP `8a13baf` and package
+`187af4f`, passes all 23 Current-only C# behavior cases through automatic resource
+generation, staging and public loading. The exact original failing Current DLL
+bytes are preserved. Native compile/CTest uses real Unity headers; core replay
+retains unchanged AOT paths and failed-registration rollback/retry. Snapshot
+substitution is rejected before loading, and restoring the original passes.
+See `../reports/dhe-standard-resource-capabilities.md` for exact identities,
+reproductions, per-case diagnostics and remaining gates. The second immutable
+Base replay of these 23 cases is pending.
+
+The preceding four-case standard-resource checkpoint already passed one shared
+Current on two distinct Bases, with Base-authenticated ordinary frozen sources;
+see `../reports/dhe-frozen-resource-admission.md`. Keep that earlier evidence
+separate from the current 23-case source and Player identities. Existing ordinary
+static-value storage, new interpreter-only assembly references, performance and
+release qualification remain open. Tuanjie follows Unity 2022 Windows; new Unity
+2021 work is outside the current user scope. The full DHE goal is not complete.
+
+## Historical checkpoint: ordinary AOT descendants across ten Windows Bases
 
 Clean 5efbb2c passes 30 unique Windows processes across eight unchanged archived
 Bases and two new native-descendant Bases on Unity 2022 and Tuanjie 2022. Every

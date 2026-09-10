@@ -19,11 +19,15 @@ Their immutable inputs are recorded in `manifests/repo-lock.json`.
 
 This research checkout extends the published DHE line below. Its current
 implementation and validation status is in
-`reports/dhe-current-state-review-20260908.md` and
-`docs/HybridCLR-DHE-Evolution-Validation.md`. The existing-generic-interface
-checkpoint passes on one Unity 2021 Base; the complete evolution objective and
-current Release qualification remain incomplete. Historical 0.1.35 release
-evidence below does not qualify this research snapshot.
+`reports/dhe-standard-resource-capabilities.md`,
+`reports/dhe-frozen-resource-admission.md` and
+`docs/HybridCLR-DHE-Evolution-Validation.md`. Unity 2022 Windows is the active
+qualification target; Tuanjie follows it, and Unity 2021 is outside new work.
+The current candidate passes all 23 standard-resource value/generic/reflection/
+initialization cases on one immutable Base, plus native compile/CTest and core
+AOT dispatch/rollback checks. The second Base replay, remaining storage/assembly
+capabilities and Release qualification are still pending. Historical 0.1.35
+release evidence below does not qualify this research snapshot.
 
 The DHE workflow is maintained as a separate, explicit validation lane. Its
 integrated opt4.1 source line is documented in
