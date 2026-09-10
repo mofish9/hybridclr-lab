@@ -16,6 +16,29 @@ internal static class FrozenResourceWorkflow
     private static string Hash(string path) => Convert.ToHexString(SHA256.HashData(File.ReadAllBytes(path)));
     private static JsonElement Read(string path) => JsonSerializer.Deserialize<JsonElement>(File.ReadAllText(path));
 
+    public static int NewBase(string[] args)
+    {
+        if (args.Length != 6) throw new ArgumentException("frozen-resource-new-base <lab> <package> <editor> <runtime manifest> <old proof> <new output>");
+        string proof = Path.GetFullPath(args[4]), inputs = Path.GetFullPath(args[5]) + ".inputs";
+        if (Directory.Exists(inputs)) throw new IOException("New Base inputs must be new.");
+        Directory.CreateDirectory(inputs);
+        foreach (string source in Directory.GetFiles(Path.Combine(proof, "frozen-entry-current"), "*.dll"))
+            File.Copy(source, Path.Combine(inputs, Path.GetFileName(source)));
+        string identityPath = Path.Combine(proof, "base/build-identity.json"); var identity = Read(identityPath);
+        var snapshot = AotAnalysisSnapshot.Read(identityPath, identity,
+            identity.GetProperty("aotAssemblyNames").EnumerateArray().Select(row => row.GetString()!),
+            identity.GetProperty("assemblies").EnumerateArray().Select(row => row.GetProperty("assemblyName").GetString()!))!;
+        File.Copy(snapshot.Assemblies.Single(row => row.AssemblyName == NativeName).Path, Path.Combine(inputs, NativeName + ".dll"));
+        string modelPath = Path.Combine(inputs, ModelName + ".dll");
+        using (var module = ModuleDefMD.Load(File.ReadAllBytes(modelPath)))
+        {
+            var revision = module.Find("HybridCLR.Lab.ValueLayout.Factory", false)!.Methods.Single(method => method.Name == "GetRevision");
+            revision.Body = new CilBody(); revision.Body.Instructions.Add(Instruction.Create(OpCodes.Ldc_I4, 59));
+            revision.Body.Instructions.Add(Instruction.Create(OpCodes.Ret)); module.Write(modelPath);
+        }
+        return UnityWorkflow.Run(args.Take(4).Concat(new[] { inputs, args[5], "59", ":all-ordinary-guards:" }).ToArray());
+    }
+
     public static int Reference(string[] args)
     {
         if (args.Length != 3) throw new ArgumentException("frozen-resource-reference <Current root> <Base ordinary Native DLL> <new result>");

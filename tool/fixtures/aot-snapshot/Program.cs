@@ -15,6 +15,7 @@ if (args.Length > 0 && args[0] == "frozen-resource-binding") return FrozenResour
 if (args.Length > 0 && args[0] == "frozen-admission-policy") return FrozenAdmissionPolicy.Run(args.Skip(1).ToArray());
 if (args.Length > 0 && args[0] == "frozen-resource-workflow") return FrozenResourceWorkflow.Run(args.Skip(1).ToArray());
 if (args.Length > 0 && args[0] == "frozen-resource-reference") return FrozenResourceWorkflow.Reference(args.Skip(1).ToArray());
+if (args.Length > 0 && args[0] == "frozen-resource-new-base") return FrozenResourceWorkflow.NewBase(args.Skip(1).ToArray());
 if (args.Length > 0 && args[0] == "ordinary-guard-policy") return OrdinaryGuardPolicy.Run(args.Skip(1).ToArray());
 if (args.Length > 0 && args[0] == "materialize-frozen-aot") return FrozenAotMaterialize.Run(args.Skip(1).ToArray());
 if (args.Length > 0 && args[0] == "merge-frozen-aot") return FrozenAotMaterialize.Merge(args.Skip(1).ToArray());

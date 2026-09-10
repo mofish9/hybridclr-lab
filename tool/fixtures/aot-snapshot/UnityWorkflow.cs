@@ -9,9 +9,9 @@ internal static class UnityWorkflow
     {
         if (args.Length < 6 || args.Length > 8) throw new ArgumentException("unity-workflow <lab> <package> <editor> <runtime manifest> <fixture DLL root> <new output> [expected revision] [latest Current DLL root]");
         string expectedRevision = args.Length >= 7 ? int.Parse(args[6]).ToString() : "41";
-        bool allOrdinaryGuards = args.Length == 8 && args[7] == ":frozen-entry-all-guards:";
-        bool frozenEntryProbe = args.Length == 8 && (args[7] == ":frozen-entry:" || allOrdinaryGuards);
-        string latestCurrentRoot = args.Length == 8 && args[7] != ":evolve:" && !frozenEntryProbe ? Path.GetFullPath(args[7]) : null;
+        bool allOrdinaryGuards = args.Length == 8 && (args[7] == ":frozen-entry-all-guards:" || args[7] == ":all-ordinary-guards:");
+        bool frozenEntryProbe = args.Length == 8 && (args[7] == ":frozen-entry:" || args[7] == ":frozen-entry-all-guards:");
+        string latestCurrentRoot = args.Length == 8 && args[7] != ":evolve:" && !frozenEntryProbe && !allOrdinaryGuards ? Path.GetFullPath(args[7]) : null;
         bool synthesizeEvolution = args.Length == 8 && args[7] == ":evolve:";
         string lab = Path.GetFullPath(args[0]), package = Path.GetFullPath(args[1]), editor = Path.GetFullPath(args[2]),
             runtimeManifest = Path.GetFullPath(args[3]), fixtures = Path.GetFullPath(args[4]), output = Path.GetFullPath(args[5]);
