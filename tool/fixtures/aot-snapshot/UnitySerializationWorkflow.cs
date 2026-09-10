@@ -9,7 +9,8 @@ internal static class UnitySerializationWorkflow
     {
         string declarationMode = args.Length == 6 ? (args[5].EndsWith("-cached", StringComparison.Ordinal) ? args[5][..^7] : args[5]) : "";
         bool declarations = new[] { "declaration-nonvirtual-3", "declaration-virtual-7", "declaration-nonvirtual-11" }.Contains(declarationMode);
-        bool virtualReceiverCache = args.Length == 6 && args[5] == "virtual-signatures-cached";
+        bool parentMemberReceiverCache = args.Length == 6 && args[5] == "parent-members-cached";
+        bool virtualReceiverCache = parentMemberReceiverCache || args.Length == 6 && args[5] == "virtual-signatures-cached";
         bool virtualSignatures = args.Length == 6 && (args[5] == "virtual-signatures" || virtualReceiverCache);
         if (args.Length != 6 || (!virtualSignatures && !declarations && !new[] { "read", "full", "full-unity", "reference", "full-unity-cached", "reference-cached", "reference-generic", "reference-generic-cached", "reference-dispatch", "reference-callbacks", "reference-callbacks-cached", "reference-callbacks-control", "reference-callbacks-control-cached", "hierarchy-query", "hierarchy-query-cached", "interface-remove", "interface-remove-cached", "interface-remove-methods", "interface-remove-methods-cached", "interface-replace", "interface-replace-cached", "interface-remove-compiler", "interface-remove-compiler-cached" }.Contains(args[5])))
             throw new ArgumentException("unity-serialization-replay <lab> <tool.dll> <Base proof> <resource workflow output> <new output> <read|full|full-unity|reference|full-unity-cached|reference-cached|reference-generic|reference-generic-cached|reference-dispatch|reference-callbacks|reference-callbacks-cached|reference-callbacks-control|reference-callbacks-control-cached|hierarchy-query|hierarchy-query-cached|interface-remove|interface-remove-cached|interface-remove-methods|interface-remove-methods-cached|interface-replace|interface-replace-cached|interface-remove-compiler|interface-remove-compiler-cached>");
@@ -43,6 +44,10 @@ internal static class UnitySerializationWorkflow
             if (virtualReceiverCache && arguments.Contains("-snapshotResult"))
             {
                 start.ArgumentList.Add("-virtualSignatureOldReceiverProbe"); start.ArgumentList.Add("true");
+                if (parentMemberReceiverCache)
+                {
+                    start.ArgumentList.Add("-parentMemberOldReceiverProbe"); start.ArgumentList.Add("true");
+                }
             }
             if (lifecycle && arguments.Contains("-snapshotResult"))
             {
@@ -180,6 +185,12 @@ internal static class UnitySerializationWorkflow
             "cached-method-rejects-old-receiver", "fresh-method-rejects-old-receiver",
             "current-receiver-invokes-body", "rejection-preserves-receivers" };
         string[] virtualReceiverChecks = OptionalChecks("virtualReceiverChecks");
+        if (parentMemberReceiverCache)
+            virtualReceiverExpected = virtualReceiverExpected.Concat(new[] {
+                "parent-field-rejects-old-receiver", "parent-method-rejects-old-receiver",
+                "parent-property-get-rejects-old-receiver", "parent-property-set-rejects-old-receiver",
+                "parent-event-rejects-old-receiver", "parent-rejection-preserves-data"
+            }).ToArray();
         string[] virtualReceiverRejections = lines.Where(line => line.StartsWith("DHE virtual receiver rejection: "))
             .Select(line => line["DHE virtual receiver rejection: ".Length..]).ToArray();
         bool virtualReceiverPassed = !virtualReceiverCache || virtualReceiverChecks.SequenceEqual(virtualReceiverExpected) &&

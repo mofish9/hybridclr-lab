@@ -73,6 +73,35 @@ namespace HybridCLR.Lab.Snapshot
             // Current field query is correctly forbidden on this old object.
             Check("rejection-preserves-receivers", (int)oldBiasField.GetValue(oldReceiver) == oldBias &&
                 (long)extra.GetValue(currentReceiver) == 1000L);
+            if (Array.IndexOf(Environment.GetCommandLineArgs(), "-parentMemberOldReceiverProbe") >= 0)
+            {
+                if (cachedType.BaseType.FullName != "HybridCLR.Lab.ParentEvolution.ProcessorMiddle")
+                    throw new InvalidOperationException("Parent receiver probe requires the inserted Current parent.");
+                // Resolve every handle outside the rejection actions: a failed
+                // member lookup must not count as rejection of an old object.
+                var field = cachedType.GetField("ParentExtra");
+                var method = cachedType.GetMethod("ReadParentExtra");
+                var property = cachedType.GetProperty("ParentProperty");
+                var ev = cachedType.GetEvent("ParentEvent");
+                if (field == null || method == null || property == null || ev == null)
+                    throw new InvalidOperationException("Missing Current parent member handles.");
+                bool RejectParent(Action action)
+                {
+                    try { action(); }
+                    catch (TargetException) { return true; }
+                    catch (ArgumentException) { return true; }
+                    catch (InvalidCastException) { return true; }
+                    return false;
+                }
+                Check("parent-field-rejects-old-receiver", RejectParent(() => field.GetValue(oldReceiver)));
+                Check("parent-method-rejects-old-receiver", RejectParent(() => method.Invoke(oldReceiver, null)));
+                Check("parent-property-get-rejects-old-receiver", RejectParent(() => property.GetValue(oldReceiver, null)));
+                Check("parent-property-set-rejects-old-receiver", RejectParent(() => property.SetValue(oldReceiver, 912L, null)));
+                Action handler = () => { throw new InvalidOperationException("Old parent handler must not execute."); };
+                Check("parent-event-rejects-old-receiver", RejectParent(() => ev.AddEventHandler(oldReceiver, handler)));
+                Check("parent-rejection-preserves-data", (int)oldBiasField.GetValue(oldReceiver) == oldBias &&
+                    (long)extra.GetValue(currentReceiver) == 1000L && (long)field.GetValue(currentReceiver) == 60000000001L);
+            }
             return checks.ToArray();
         }
     }
