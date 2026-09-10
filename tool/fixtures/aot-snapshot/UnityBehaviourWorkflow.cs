@@ -21,12 +21,14 @@ internal static class UnityBehaviourWorkflow
         foreach (string path in Directory.GetFiles(args[2], "*.dll")) File.Copy(path, Path.Combine(current, Path.GetFileName(path)));
         string model = Path.Combine(current, "HybridCLR.ValueLayoutModel.dll");
         var names = Directory.GetFiles(current, "*.dll").Select(Path.GetFileNameWithoutExtension).ToHashSet();
-        string unityReferences = Path.Combine(Path.GetDirectoryName(Path.GetFullPath(args[3]))!, "Data/Managed/UnityEngine");
+        string data = Path.Combine(Path.GetDirectoryName(Path.GetFullPath(args[3]))!, "Data");
+        string unityReferences = Path.Combine(data, "PlaybackEngines/WindowsStandaloneSupport/Variations/il2cpp/Managed");
+        string facade = Path.Combine(data, "MonoBleedingEdge/lib/mono/unityaot-win32/Facades/netstandard.dll");
         FrozenStaticWorkflow.CompileAndMerge(Path.GetFullPath(args[0]), args[3], "UnitySerializationCases", model,
-            snapshot.Assemblies.Where(row => !row.Dhe && !names.Contains(row.AssemblyName)).Select(row => {
+            snapshot.Assemblies.Where(row => !row.Dhe && !names.Contains(row.AssemblyName) && row.AssemblyName != "netstandard").Select(row => {
                 string complete = Path.Combine(unityReferences, row.AssemblyName + ".dll");
                 return row.AssemblyName.StartsWith("UnityEngine", StringComparison.Ordinal) && File.Exists(complete) ? complete : row.Path;
-            }).Concat(Directory.GetFiles(current, "*.dll")), Path.Combine(output, "compiled"), false,
+            }).Append(facade).Concat(Directory.GetFiles(current, "*.dll")), Path.Combine(output, "compiled"), false,
             readOnly ? "SERIALIZATION_READ_ONLY" : null);
         using var module = ModuleDefMD.Load(File.ReadAllBytes(model));
         var entry = module.Find("HybridCLR.Lab.ValueLayout.Factory", false)!.Methods.Single(method => method.Name == "GetRevision");
