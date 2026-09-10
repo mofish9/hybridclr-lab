@@ -5,6 +5,9 @@ internal sealed class ResourceUpdateCompatibility
     internal const string PhysicalInterfaceAdditionCapability = "physical-current-interface-additions-v1";
     internal const string PhysicalInterfaceEvolutionCapability = "physical-current-interface-evolution-v1";
     internal const string ImplicitInterfaceDeclarationCapability = "current-implicit-interface-method-declarations-v1";
+    internal const string PhysicalInterfaceMapCapability = "physical-current-interface-map-v1";
+    internal const string ParameterCacheSelectionCapability = "current-parameter-cache-selection-v1";
+    internal const string ReferenceVirtualInvocationCapability = "physical-current-reference-virtual-invocation-v1";
 	public const string Policy = "dhe-proven-safe-subset-v1";
 	public const string RuntimeProtocol = "dhe-runtime-protocol-v1";
     public const string CurrentNativeRuntimeContract = "dhe-runtime-v32";
@@ -21,6 +24,9 @@ internal sealed class ResourceUpdateCompatibility
         PhysicalInterfaceAdditionCapability,
         PhysicalInterfaceEvolutionCapability,
         ImplicitInterfaceDeclarationCapability,
+        PhysicalInterfaceMapCapability,
+        ParameterCacheSelectionCapability,
+        ReferenceVirtualInvocationCapability,
         ResourceExecutionPlan.GenericContextCapability,
         "current-parameter-default-metadata-v1",
         "shared-type-initialization-v1",
@@ -308,6 +314,13 @@ internal sealed class ResourceUpdateCompatibility
             requiredCapabilities.Add("length-preserved-constant-strings-v1");
         if (parameterDefaultsChanged || added.Any(method => method.HasParameterDefaults))
             requiredCapabilities.Add("current-parameter-default-metadata-v1");
+        if (parameterDefaultsChanged || physicalTypes.Count != 0 || conditionalTokens.Length != 0)
+            requiredCapabilities.Add(ParameterCacheSelectionCapability);
+        if (current.Types.Any(type => physicalTypes.Contains(type.StableId) && !type.IsValueType && !type.IsInterface))
+        {
+            requiredCapabilities.Add(PhysicalInterfaceMapCapability);
+            requiredCapabilities.Add(ReferenceVirtualInvocationCapability);
+        }
         if (implicitInterfaceDeclarationsChanged)
             requiredCapabilities.Add(ImplicitInterfaceDeclarationCapability);
         if (baseline.Fields.Any(field => currentFields.TryGetValue(field.StableId, out var currentField) &&

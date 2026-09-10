@@ -34,3 +34,35 @@ production-equivalent performance claim.
 
 Broader method declarations, virtual hierarchies, parents, generic/value layouts,
 serialized objects, native boundaries and performance/memory remain required.
+
+## Reproduced failures and correction boundary
+
+Base-78-control retains the previous tested runtime and passes build/startup/no-op.
+The unchanged virtual-7 Current02 reproduces four warmed parameter failures:
+cached and fresh method queries, interface query, and omitted-argument invocation
+all retain default 3 instead of 7. The cold replay separately fails both interface
+calls through old AOT entries; its interface map succeeds because the interface
+type exists in this Base. Preserve both replays and the preceding Base-75 failure
+where the new interface map contains a null target. Nonvirtual-11 also reproduces
+missing rejection for an unimplemented interface on Base-75.
+
+Parameter cache entries must include original method, selected metadata method,
+execution method and reflected class. Acquire both selected handles and retry if
+either changes during the lookup; publication is immutable and one-way per Base
+assembly. Construct an immutable new parameter array outside cache locks, then
+publish via the existing GC-aware append-only map. Already returned parameter
+objects remain snapshots; requery through stable MethodInfo obtains Current data.
+Do not mutate a shared old parameter object or claim it refreshes in place.
+
+Interface maps use actual selected dispatch storage while retaining logical
+reflection identity, and reject nonimplemented interfaces. Interpreter virtual
+lookup, including warmed cache hits, uses the existing native-reference invocation
+selector for compatible scalar/reference signatures and actual Current receivers.
+It must not relax old-object or changed-value-ABI guards. Broader virtual argument
+shapes still require explicit implementation and testing.
+
+The package and resource admission record separate capabilities for selected
+parameter caching, physical interface maps and reference virtual invocation.
+An older Base cannot acquire these native corrections from resource DLLs. Qualify
+new fixed immutable Bases against the exact failing Current bytes, and reject
+unsupported old Bases rather than editing their capabilities or binaries.

@@ -92,6 +92,15 @@ internal static class MethodDeclarationPolicyTests
         var optionalAfter = Edit(afterPath, "optional-after", (module, type, method) => Optional(module, type, method, 7));
         Accepted("declaration-and-default", optionalBefore, optionalAfter);
         checks["default-capability-retained"] = analyses["declaration-and-default"].RequiredRuntimeCapabilities.Contains("current-parameter-default-metadata-v1");
+        foreach (string capability in new[] { ResourceUpdateCompatibility.PhysicalInterfaceMapCapability,
+            ResourceUpdateCompatibility.ParameterCacheSelectionCapability, ResourceUpdateCompatibility.ReferenceVirtualInvocationCapability })
+        {
+            var required = analyses["declaration-and-default"].RequiredRuntimeCapabilities;
+            checks[capability + ":required"] = required.Contains(capability);
+            checks[capability + ":old-runtime-rejected"] = !ResourceUpdateCompatibility.CanExecuteUpdate(
+                ResourceUpdateCompatibility.RuntimeProtocol, ResourceUpdateCompatibility.CurrentNativeRuntimeContract,
+                ResourceUpdateCompatibility.KnownRuntimeCapabilities.Where(value => value != capability), required);
+        }
         bool passed = checks.Values.All(value => value);
         File.WriteAllText(Path.Combine(output, "result.json"), JsonSerializer.Serialize(new
         {
