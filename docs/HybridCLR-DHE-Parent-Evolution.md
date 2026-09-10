@@ -1,5 +1,12 @@
 # Existing hotfix parent evolution on immutable AOT Bases
 
+Latest evidence: [Windows parent evolution report](../reports/dhe-parent-evolution-windows.md).
+Both original and extended insertion suites now pass on old/grown/new-type
+Bases94/93/81, including inherited properties/events, twelve old-receiver checks,
+shared-resource auditing and preparation-failure recovery. Preserve the original
+Current sets when moving to removal/replacement; insertion does not prove those
+transitions or complete the full DHE goal.
+
 Continue after the framework callback checkpoint. Insert a Current-only managed
 intermediate parent between the existing Processor and ProcessorRoot types.
 The intermediate parent owns new reference/value fields and constructor logic;
