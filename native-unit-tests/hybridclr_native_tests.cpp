@@ -526,6 +526,32 @@ namespace
         CHECK(BuildCurrentImagePlan(base, base, {}, {}, plan));
         CHECK(plan.types.empty() && plan.methods.empty());
 
+        // The compiler's global module is a method owner, never instance
+        // storage. It may be added/removed while other types keep their plans.
+        MetaVersionType module;
+        const char moduleIdentity[] = "dhe-type-id\n<Module>";
+        CHECK(ComputeSha256(moduleIdentity, sizeof(moduleIdentity) - 1, module.stableId));
+        module.token = 0x02000001;
+        MetaVersionMethod initializer;
+        initializer.stableId.fill(77); initializer.declaringTypeStableId = module.stableId;
+        initializer.token = 0x06000020; initializer.flags = 1u | 8u;
+        auto moduleBase = base, moduleCurrent = current;
+        moduleBase.types.push_back(module); moduleCurrent.types.push_back(module);
+        moduleBase.methods.push_back(initializer);
+        initializer.token = 0x06000021; initializer.version.fill(78);
+        moduleCurrent.methods.push_back(initializer);
+        CHECK(BuildCurrentImagePlan(moduleBase, moduleCurrent, {}, { initializer.token }, plan));
+        CHECK(plan.types.empty() && plan.methods.size() == 1 && plan.methods[0].baseToken == 0x06000020 &&
+            plan.methods[0].currentToken == initializer.token);
+        CHECK(BuildCurrentImagePlan(base, moduleCurrent, {}, {}, plan));
+        CHECK(BuildCurrentImagePlan(moduleBase, current, {}, {}, plan));
+        CHECK(!BuildCurrentImagePlan(moduleBase, moduleCurrent, { module.token }, {}, plan));
+        auto invalidModule = moduleCurrent;
+        invalidModule.types.back().flags = 1;
+        CHECK(!BuildCurrentImagePlan(moduleBase, invalidModule, {}, {}, plan));
+        invalidModule = moduleCurrent; invalidModule.types.back().stableId.fill(79);
+        CHECK(!BuildCurrentImagePlan(moduleBase, invalidModule, {}, {}, plan));
+
         auto rejects = [&](const MetaVersionData& oldMv, const MetaVersionData& newMv,
             std::vector<uint32_t> types, std::vector<uint32_t> methods) {
             CurrentImagePlan sentinel;
