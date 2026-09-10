@@ -40,6 +40,10 @@ internal sealed class MetaVersionSnapshot
     [JsonIgnore]
     public IReadOnlyDictionary<string, MetaVersionTypeReference> TypeParents { get; private init; } =
         new Dictionary<string, MetaVersionTypeReference>();
+    // Build-time admission facts only; these do not participate in MV encoding.
+    [JsonIgnore]
+    public MetaVersionTypeReference[] GenericMethodImplDeclarations { get; private init; } =
+        Array.Empty<MetaVersionTypeReference>();
 
     public static MetaVersionSnapshot Create(string assemblyPath)
     {
@@ -90,6 +94,11 @@ internal sealed class MetaVersionSnapshot
             InterfaceImplementationMethodIdentities = ReadInterfaceImplementationMethods(assemblyPath),
             LocalAttributeConstructorTypeNames = ReadLocalAttributeConstructorTypes(module),
             AttributeUses = ReadAttributeUses(module),
+            GenericMethodImplDeclarations = module.GetTypes().SelectMany(type => type.Methods)
+                .SelectMany(method => method.Overrides).Select(item => item.MethodDeclaration.DeclaringType)
+                .OfType<TypeSpec>().Select(type => type.TypeSig).OfType<GenericInstSig>()
+                .Select(type => new MetaVersionTypeReference(type.GenericType.TypeDefOrRef.DefinitionAssembly?.Name.String ?? "",
+                    type.GenericType.FullName, type.GenericType.FullName)).Distinct().ToArray(),
             TypeParents = module.GetTypes().Where(type => type.BaseType != null).ToDictionary(type => type.FullName,
                 type => new MetaVersionTypeReference(type.BaseType.DefinitionAssembly?.Name.String ?? "", type.BaseType.FullName,
                     type.BaseType is TypeSpec specification && specification.TypeSig is GenericInstSig generic

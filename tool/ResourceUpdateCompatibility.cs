@@ -8,6 +8,9 @@ internal sealed class ResourceUpdateCompatibility
     internal const string PhysicalInterfaceMapCapability = "physical-current-interface-map-v1";
     internal const string ParameterCacheSelectionCapability = "current-parameter-cache-selection-v1";
     internal const string ReferenceVirtualInvocationCapability = "physical-current-reference-virtual-invocation-v1";
+    internal const string GenericMethodImplOwnerCapability = "current-generic-methodimpl-owners-v1";
+    internal const string VirtualSignatureFrameCapability = "current-virtual-signature-frames-v1";
+    internal const string ScalarInstanceFrameCapability = "current-scalar-instance-frames-v1";
 	public const string Policy = "dhe-proven-safe-subset-v1";
 	public const string RuntimeProtocol = "dhe-runtime-protocol-v1";
     public const string CurrentNativeRuntimeContract = "dhe-runtime-v32";
@@ -27,6 +30,9 @@ internal sealed class ResourceUpdateCompatibility
         PhysicalInterfaceMapCapability,
         ParameterCacheSelectionCapability,
         ReferenceVirtualInvocationCapability,
+        GenericMethodImplOwnerCapability,
+        VirtualSignatureFrameCapability,
+        ScalarInstanceFrameCapability,
         ResourceExecutionPlan.GenericContextCapability,
         "current-parameter-default-metadata-v1",
         "shared-type-initialization-v1",
@@ -323,6 +329,29 @@ internal sealed class ResourceUpdateCompatibility
         }
         if (implicitInterfaceDeclarationsChanged)
             requiredCapabilities.Add(ImplicitInterfaceDeclarationCapability);
+        // MethodImpl resolution runs during preparation even for a no-op update.
+        // A generic declaration introduced wholly in Current does not reuse a
+        // Base generic container. Other DHE assemblies are conservatively treated
+        // as having a Base declaration because this analysis is per assembly.
+        if (current.GenericMethodImplDeclarations.Any(declaration =>
+                declaration.AssemblyName == baseline.AssemblyName
+                    ? baseline.Types.Any(type => type.Identity == declaration.TypeName)
+                    : currentAssemblySet == null || currentAssemblySet.Any(assembly =>
+                        assembly.AssemblyName == declaration.AssemblyName)))
+            requiredCapabilities.Add(GenericMethodImplOwnerCapability);
+        if (current.Methods.Any(method => method.IsVirtual && HasNonScalarSignature(method) &&
+                baselineMethods.TryGetValue(method.StableId, out var previous) &&
+                (physicalTypes.Contains(method.DeclaringTypeStableId) || executionTokens.Contains(method.Token) ||
+                 previous.Version != method.Version)))
+            requiredCapabilities.Add(VirtualSignatureFrameCapability);
+        // Native entry into a selected instance body is safe only when its
+        // receiver storage is retained and its complete frame remains scalar.
+        // The runtime still proves exact owner mapping and all physical parents.
+        if (current.Methods.Any(method => executionTokens.Contains(method.Token) && !method.IsStatic &&
+                !method.DeclaringTypeIsValueType && !method.IsAbstract && !method.IsPInvoke &&
+                !physicalTypes.Contains(method.DeclaringTypeStableId) && !HasNonScalarSignature(method) &&
+                baselineMethods.ContainsKey(method.StableId)))
+            requiredCapabilities.Add(ScalarInstanceFrameCapability);
         if (baseline.Fields.Any(field => currentFields.TryGetValue(field.StableId, out var currentField) &&
                 !string.Equals(field.NonCustomMetadataVersion, currentField.NonCustomMetadataVersion, StringComparison.OrdinalIgnoreCase) &&
                 IsSupportedLiteralValueEvolution(field, currentField)))
@@ -487,6 +516,16 @@ internal sealed class ResourceUpdateCompatibility
                 StringComparer.Ordinal).ToArray(),
         };
     }
+
+    private static bool HasNonScalarSignature(MetaVersionMethod method)
+        => method.GenericParameterCount != 0 || method.DeclaringTypeGenericParameterCount != 0 ||
+            !IsScalarFrameType(method.ReturnType) || method.ParameterTypes.Any(type => !IsScalarFrameType(type));
+
+    private static bool IsScalarFrameType(string type) => type is
+        "System.Void" or "System.Boolean" or "System.Char" or "System.SByte" or "System.Byte" or
+        "System.Int16" or "System.UInt16" or "System.Int32" or "System.UInt32" or "System.Int64" or
+        "System.UInt64" or "System.Single" or "System.Double" or "System.IntPtr" or "System.UIntPtr" or
+        "System.String" or "System.Object";
 
     private static bool RequiresClosedCurrentParentVtables(IEnumerable<MetaVersionType> addedTypes,
         MetaVersionSnapshot baseline, MetaVersionSnapshot current,
