@@ -63,6 +63,10 @@ internal static class FrozenFieldValidationPolicy
             ResourceUpdateCompatibility.RuntimeProtocol, ResourceUpdateCompatibility.CurrentNativeRuntimeContract,
             ResourceUpdateCompatibility.KnownRuntimeCapabilities.Where(value => value != FrozenFieldValidation.Capability),
             new[] { FrozenFieldValidation.Capability });
+        checks["frozen-instance-frame-capability-rejected"] = !ResourceUpdateCompatibility.CanExecuteUpdate(
+            ResourceUpdateCompatibility.RuntimeProtocol, ResourceUpdateCompatibility.CurrentNativeRuntimeContract,
+            ResourceUpdateCompatibility.KnownRuntimeCapabilities.Where(value => value != ResourceUpdateCompatibility.FrozenBaseInstanceFrameCapability),
+            new[] { ResourceUpdateCompatibility.FrozenBaseInstanceFrameCapability });
         checks["inputs-unchanged"] = files.All(row => Hash(row.Key) == row.Value);
         bool passed = checks.Values.All(value => value);
         File.WriteAllText(Path.Combine(output, "result.json"), JsonSerializer.Serialize(new { passed, checks, files, plan,

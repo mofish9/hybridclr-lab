@@ -16,6 +16,7 @@ internal sealed class ResourceUpdateCompatibility
     internal const string NativeReferencePhysicalFrameCapability = "current-native-reference-physical-frames-v1";
     internal const string ParentMemberHandleCapability = "current-parent-member-handles-v1";
     internal const string FrozenFieldObjectValidationCapability = "frozen-field-object-validation-v1";
+    internal const string FrozenBaseInstanceFrameCapability = "frozen-base-instance-frames-v1";
 	public const string Policy = "dhe-proven-safe-subset-v1";
 	public const string RuntimeProtocol = "dhe-runtime-protocol-v1";
     public const string CurrentNativeRuntimeContract = "dhe-runtime-v32";
@@ -43,6 +44,7 @@ internal sealed class ResourceUpdateCompatibility
         NativeReferencePhysicalFrameCapability,
         ParentMemberHandleCapability,
         FrozenFieldObjectValidationCapability,
+        FrozenBaseInstanceFrameCapability,
         ResourceExecutionPlan.GenericContextCapability,
         "current-parameter-default-metadata-v1",
         "shared-type-initialization-v1",
@@ -339,6 +341,7 @@ internal sealed class ResourceUpdateCompatibility
             requiredCapabilities.Add(NativeReferencePhysicalFrameCapability);
             requiredCapabilities.Add(ParentMemberHandleCapability);
             requiredCapabilities.Add(FrozenFieldObjectValidationCapability);
+            requiredCapabilities.Add(FrozenBaseInstanceFrameCapability);
         }
         if (parameterDefaultsChanged || added.Any(method => method.HasParameterDefaults))
             requiredCapabilities.Add("current-parameter-default-metadata-v1");

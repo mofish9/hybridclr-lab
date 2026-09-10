@@ -59,7 +59,7 @@ internal static class ParentEvolutionPolicyTests
             ResourceUpdateCompatibility.VirtualSignatureFrameCapability,
             ResourceUpdateCompatibility.PhysicalParentEvolutionCapability, ResourceUpdateCompatibility.IdenticalPhysicalFrameCapability,
             ResourceUpdateCompatibility.NativeReferencePhysicalFrameCapability, ResourceUpdateCompatibility.ParentMemberHandleCapability,
-            ResourceUpdateCompatibility.FrozenFieldObjectValidationCapability })
+            ResourceUpdateCompatibility.FrozenFieldObjectValidationCapability, ResourceUpdateCompatibility.FrozenBaseInstanceFrameCapability })
         {
             checks[capability + ":required"] = inserted.RequiredRuntimeCapabilities.Contains(capability);
             checks[capability + ":missing-rejected"] = !ResourceUpdateCompatibility.CanExecuteUpdate(
