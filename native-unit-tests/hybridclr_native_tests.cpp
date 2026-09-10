@@ -2568,8 +2568,42 @@ static void TestDheInterfaceSlots()
 }
 #endif
 
+#if defined(HYBRIDCLR_DHE_HAS_REFERENCE_INTERFACE_QUERY)
+static void TestDheReferenceInterfaceQuery()
+{
+    using hybridclr::dhe::SelectReferenceInterfaceIterationClass;
+    auto* base = static_cast<Il2CppClass*>(std::calloc(1, sizeof(Il2CppClass)));
+    auto* current = static_cast<Il2CppClass*>(std::calloc(1, sizeof(Il2CppClass)));
+    auto* removed = static_cast<Il2CppClass*>(std::calloc(1, sizeof(Il2CppClass)));
+    Il2CppClass* baseInterfaces[] = { base, current, removed };
+    Il2CppClass* currentInterfaces[] = { removed };
+    base->implementedInterfaces = baseInterfaces; base->interfaces_count = 3;
+    current->implementedInterfaces = currentInterfaces; current->interfaces_count = 1;
+    // A new enumeration observes the selected declaration. An existing cursor
+    // must finish its immutable table even if publication removes interfaces.
+    CHECK(SelectReferenceInterfaceIterationClass(base, base, nullptr) == base);
+    CHECK(SelectReferenceInterfaceIterationClass(base, current, nullptr) == current);
+    CHECK(SelectReferenceInterfaceIterationClass(base, removed, nullptr) == removed);
+    for (unsigned index = 0; index != 3; ++index)
+    {
+        CHECK(SelectReferenceInterfaceIterationClass(base, current, baseInterfaces + index) == base);
+        CHECK(SelectReferenceInterfaceIterationClass(base, removed, baseInterfaces + index) == base);
+    }
+    // Class::GetInterfaces retains the last pointer after exhaustion; repeated
+    // end calls must keep that same owner, including a one-element Current table.
+    CHECK(SelectReferenceInterfaceIterationClass(base, current, currentInterfaces) == current);
+    CHECK(SelectReferenceInterfaceIterationClass(base, current, currentInterfaces) == current);
+    CHECK(SelectReferenceInterfaceIterationClass(removed, current, currentInterfaces) == current);
+    CHECK(SelectReferenceInterfaceIterationClass(current, current, currentInterfaces) == current);
+    std::free(removed); std::free(current); std::free(base);
+}
+#endif
+
 int main()
 {
+#if defined(HYBRIDCLR_DHE_HAS_REFERENCE_INTERFACE_QUERY)
+    TestDheReferenceInterfaceQuery();
+#endif
 #if HYBRIDCLR_LAB_HAS_NULLABLE_INTRINSIC_POLICY
     {
         using hybridclr::transform::CanUseNullableIntrinsic;
