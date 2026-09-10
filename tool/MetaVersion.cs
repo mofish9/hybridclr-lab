@@ -718,8 +718,15 @@ internal sealed class MetaVersionSnapshot
             type.FullName, ((uint)type.Attributes).ToString("x8"), type.TypeDefId,
             type.Implementation?.ToString() ?? "", Attributes(type.CustomAttributes)))
             .OrderBy(value => value, StringComparer.Ordinal));
+        // Roslyn and UnityLinker use different native PE hints for AnyCPU IL.
+        // DHE consumes IL, not a Windows native DLL. CLR architecture flags and
+        // the target machine remain part of the shape below.
+        var characteristics = module.Characteristics;
+        if (module.IsILOnly && module.Machine == dnlib.PE.Machine.I386 &&
+            !module.Is32BitRequired && !module.Is32BitPreferred)
+            characteristics &= ~(dnlib.PE.Characteristics.Bit32Machine | dnlib.PE.Characteristics.LargeAddressAware);
         return string.Join("|", assemblyShape, references, module.Name.String, module.Kind,
-            module.Characteristics, module.DllCharacteristics, module.RuntimeVersion, module.Machine,
+            characteristics, module.DllCharacteristics, module.RuntimeVersion, module.Machine,
             module.Cor20HeaderFlags, module.Cor20HeaderRuntimeVersion, module.TablesHeaderVersion,
             module.ManagedEntryPoint?.MDToken.Raw.ToString("x8") ?? "",
             Attributes(module.CustomAttributes), resources, exportedTypes);

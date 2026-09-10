@@ -9,6 +9,7 @@ using System.Text.Json.Nodes;
 
 if (args.Length > 0 && args[0] == "unity-workflow") return UnityWorkflow.Run(args.Skip(1).ToArray());
 if (args.Length > 0 && args[0] == "baseline-linker-identity") return BaselineLinkerIdentity.Run(args.Skip(1).ToArray());
+if (args.Length > 0 && args[0] == "pe-header-identity") return PeHeaderIdentity.Run(args.Skip(1).ToArray());
 if (args.Length > 0 && args[0] == "evolution-workflow") return ResourceEvolutionWorkflow.Run(args.Skip(1).ToArray());
 if (args.Length > 0 && args[0] == "evolution-reference") return ResourceEvolutionWorkflow.Reference(args.Skip(1).ToArray());
 if (args.Length > 0 && args[0] == "frozen-aot-policy") return FrozenAotPolicy.Run(args.Skip(1).ToArray());

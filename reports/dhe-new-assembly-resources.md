@@ -131,3 +131,14 @@ compiler attributes. Do not normalize ordinary frozen sources or alter their
 authenticated payload hashes. Base MV/current hashes and native coverage remain
 independent requirements. Regress method bodies, fields, compiler attribute
 values and business attribute order before replaying the original Base-24.
+
+Lab `61304b3` passes all 11 `baseline-linker-identity-01.json` checks. The original
+Base-24 now accepts its generated no-op resource (`base24-noop-01/player.json`),
+without rebuilding the Player or changing captured files. `resource-04-multibase`
+gets past that binding, then rejects Added's assembly metadata: the Unity C#
+compiler emits AnyCPU IL with PE `LargeAddressAware`, while UnityLinker emits
+`Bit32Machine`. Both retain I386, ILOnly, and neither requests/prefers 32-bit CLR
+execution. Ignore only those two native PE hints when forming an AnyCPU IL
+assembly's compatibility shape. Preserve the CLR architecture flags, machine,
+module/assembly identity, attributes and resources. Test that boundary before
+retrying the identical Current on the existing Bases.
