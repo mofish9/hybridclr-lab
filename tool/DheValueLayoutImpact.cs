@@ -86,9 +86,9 @@ public static class DheValueLayoutImpact
             {
                 if (!baseline.TryGetValue(entry.Key, out var before)) continue;
                 var after = MetaVersionSnapshot.Create(entry.Value.Location).Types.ToDictionary(type => type.StableId);
-                // A native field-offset consumer also needs physical storage for
-                // an evolved reference layout. References to such objects remain
-                // pointer-sized; Inline still propagates only embedded values.
+                // Storage includes the physical types of reference fields, even
+                // when their pointer width remains unchanged. Inline below still
+                // traverses only embedded values; reference cycles use a fixed point.
                 foreach (var type in before.Types.Where(type => !type.IsInterface))
                     if (after.TryGetValue(type.StableId, out var next) &&
                         !string.Equals(type.LayoutVersion, next.LayoutVersion, StringComparison.Ordinal))
@@ -97,6 +97,8 @@ public static class DheValueLayoutImpact
             if (changed.Count == 0)
                 return new(Array.Empty<string>(), Array.Empty<DheValueLayoutTypeImpact>(),
                     Array.Empty<DheValueLayoutMethodImpact>());
+
+            ExpandExistingFieldTypeDependencies(baseline);
 
             var methods = new List<DheValueLayoutMethodImpact>();
             var staticFields = new SortedSet<string>(StringComparer.Ordinal);
@@ -209,6 +211,38 @@ public static class DheValueLayoutImpact
             if (signature.ParamsAfterSentinel != null)
                 foreach (TypeSig parameter in signature.ParamsAfterSentinel)
                     Signature(parameter, context, dependencies, ref open);
+        }
+
+        private void ExpandExistingFieldTypeDependencies(Dictionary<string, MetaVersionSnapshot> baseline)
+        {
+            var candidates = new List<TypeDef>();
+            foreach (var entry in modules)
+            {
+                if (!hotfixAssemblies.Contains(entry.Key) || !baseline.TryGetValue(entry.Key, out var before)) continue;
+                var existing = before.Types.Select(type => type.Identity).ToHashSet(StringComparer.Ordinal);
+                candidates.AddRange(entry.Value.GetTypes().Where(type => !type.IsInterface && existing.Contains(type.FullName)));
+            }
+            bool added;
+            do
+            {
+                added = false;
+                foreach (TypeDef type in candidates)
+                    if (!changed.Contains(TypeKey(type)) && type.Fields.Any(field =>
+                        !field.IsStatic && HasSelectedConcreteType(field.FieldType)))
+                        added |= changed.Add(TypeKey(type));
+            } while (added);
+        }
+
+        private bool HasSelectedConcreteType(TypeSig signature)
+        {
+            // T alone is not a declaration-wide dependency. Closed arguments are
+            // mapped by the existing context-sensitive generic execution path.
+            if (signature == null || signature is CorLibTypeSig || signature is GenericSig) return false;
+            if (signature is GenericInstSig generic)
+                return changed.Contains(TypeKey(generic.GenericType.TypeDefOrRef)) ||
+                    generic.GenericArguments.Any(HasSelectedConcreteType);
+            if (signature is TypeDefOrRefSig named && changed.Contains(TypeKey(named.TypeDefOrRef))) return true;
+            return signature.Next != null && HasSelectedConcreteType(signature.Next);
         }
 
         private void Signature(TypeSig? signature, Context context, HashSet<string> dependencies, ref bool open)
