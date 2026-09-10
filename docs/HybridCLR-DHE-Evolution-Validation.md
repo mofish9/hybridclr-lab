@@ -2,15 +2,16 @@
 
 ## Active checkpoint: standard resources with evolved value layouts
 
-Unity 2022 Windows proof-20, on HybridCLR `cdb2a5f`, IL2CPP `8a13baf` and package
-`187af4f`, passes all 23 Current-only C# behavior cases through automatic resource
-generation, staging and public loading. The exact original failing Current DLL
+Unity 2022 Windows proof-20 and Base-21, on HybridCLR `cdb2a5f`, IL2CPP `8a13baf`
+and package `187af4f`, pass all 23 Current-only C# behavior cases through automatic
+resource generation, staging and public loading. The two different Base layouts
+consume one shared resource set. The exact original failing Current DLL
 bytes are preserved. Native compile/CTest uses real Unity headers; core replay
 retains unchanged AOT paths and failed-registration rollback/retry. Snapshot
 substitution is rejected before loading, and restoring the original passes.
 See `../reports/dhe-standard-resource-capabilities.md` for exact identities,
-reproductions, per-case diagnostics and remaining gates. The second immutable
-Base replay of these 23 cases is pending.
+reproductions, per-case diagnostics and remaining gates. All 11 shared-resource
+workflow checks pass; both immutable Player binaries remain unchanged.
 
 The preceding four-case standard-resource checkpoint already passed one shared
 Current on two distinct Bases, with Base-authenticated ordinary frozen sources;
