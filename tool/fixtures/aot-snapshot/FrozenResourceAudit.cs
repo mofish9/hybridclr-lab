@@ -77,6 +77,7 @@ internal static class FrozenResourceAudit
             Verify(Path.Combine(resource, row.GetProperty("currentMetaVersion").GetString()!), row.GetProperty("currentMetaVersionSha256").GetString()!);
         }
         var bases = new HashSet<string>(StringComparer.Ordinal);
+        var moduleInitializerTransitions = new List<object>();
         int index = 0;
         foreach (var player in result.GetProperty("players").EnumerateArray())
         {
@@ -97,10 +98,21 @@ internal static class FrozenResourceAudit
             Verify(snapshotPath, original.GetProperty("snapshotManifestSha256").GetString()!);
             Verify(snapshotPath, identity.GetProperty("aotAnalysisSnapshotSha256").GetString()!);
             foreach (var source in Read(snapshotPath).GetProperty("assemblies").EnumerateArray())
-                Verify(Path.Combine(Path.GetDirectoryName(snapshotPath)!, source.GetProperty("file").GetString()!), source.GetProperty("sha256").GetString()!);
+            {
+                string sourcePath = Path.Combine(Path.GetDirectoryName(snapshotPath)!, source.GetProperty("file").GetString()!);
+                Verify(sourcePath, source.GetProperty("sha256").GetString()!);
+                if (source.GetProperty("assemblyName").GetString() == "HybridCLR.ValueLayoutModel")
+                {
+                    using var baseModule = ModuleDefMD.Load(sourcePath);
+                    bool baseInitializer = baseModule.GlobalType.Methods.Any(method => method.IsStaticConstructor);
+                    moduleInitializerTransitions.Add(new { baseId, baseModuleInitializer = baseInitializer,
+                        currentModuleInitializer = selectedInitializer });
+                }
+            }
             index++;
         }
         Require("exact-base-set", bases.SetEquals(manifest.GetProperty("supportedBases").EnumerateArray().Select(row => row.GetProperty("baseId").GetString()!)));
+        Require("module-transition-per-base", moduleInitializerTransitions.Count == bases.Count);
         int successfulRuns = 0, rejectedRuns = 0;
         foreach (string reportPath in Directory.GetFiles(output, "player-*.json").OrderBy(path => path, StringComparer.Ordinal))
         {
@@ -176,6 +188,7 @@ internal static class FrozenResourceAudit
         File.WriteAllText(args[2], JsonSerializer.Serialize(new { passed = true, workflowResultSha256 = Hash(resultPath),
             auditHostSha256 = Hash(typeof(FrozenResourceAudit).Assembly.Location),
             caseCount = expected.Length, baseCount = bases.Count, successfulRuns, rejectedRuns, expectedModuleInitializers = modules,
+            moduleInitializerTransitions,
             checks, rehashedFileCount = files.Count, files,
             scope = "Independent read-only original Base/Current identity and full successful/restored case-sequence audit; no performance or platform extrapolation"
         }, new JsonSerializerOptions { WriteIndented = true }));
