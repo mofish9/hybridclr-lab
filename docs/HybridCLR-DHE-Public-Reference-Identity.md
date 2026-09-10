@@ -2,6 +2,16 @@
 
 ## Current checkpoint
 
+The isolated native trace (IL2CPP e20b8d7, lab 2db7b49, Base-60) reproduces
+the cached failure at exported il2cpp_class_has_parent(Base descriptor, Current
+descriptor), while class-from-system-type already selects Current correctly.
+Cold lookup has no such mismatched descriptor comparison and succeeds. Resolve
+both reference descriptors at this exported native hierarchy-query boundary.
+Keep internal Class::HasParent, casts and field checks physical; this change
+must not let old object memory satisfy a Current code receiver. Validate the
+unchanged cached reference/serialization failures and all 11 safety assertions
+on new uninstrumented Bases, then full previous business/generic/recovery gates.
+
 See `../reports/dhe-reference-storage-windows.md`: runtime 8eb835a/4b02c37,
 lab d69e11e and Base-58/59 pass all eighteen strengthened generic assertions,
 including reciprocal field writes, with identical Current04 from the 16/18
