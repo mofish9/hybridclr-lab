@@ -184,6 +184,29 @@ internal static class FrozenResourceWorkflow
             checks["standard-resource-player-" + index] = result.GetProperty("passed").GetBoolean() && result.GetProperty("resourceUpdate").GetBoolean() &&
                 result.GetProperty("revision").GetInt32() == Read(referenceFile).GetProperty("revision").GetInt32() &&
                 result.GetProperty("sentinel").GetInt32() == 5 && expected.Length == 4;
+            string snapshotAsset = Path.Combine(stage, "payload/frozen-aot", result.GetProperty("baseId").GetString()!, "snapshot.json");
+            if (File.Exists(snapshotAsset))
+            {
+                byte[] original = File.ReadAllBytes(snapshotAsset);
+                string rejectedReport = Path.Combine(output, "player-snapshot-rejected-" + index + ".json");
+                bool failed = false;
+                try
+                {
+                    File.WriteAllBytes(snapshotAsset, original.Concat(new byte[] { 32 }).ToArray());
+                    try { Execute(player, "-batchmode", "-nographics", "-snapshotResult", rejectedReport, "-snapshotResourceRoot", stage,
+                        "-expectedRevision", "73", "-logFile", rejectedReport + ".log"); }
+                    catch (InvalidOperationException) { failed = true; }
+                }
+                finally { File.WriteAllBytes(snapshotAsset, original); }
+                var rejected = Read(rejectedReport);
+                checks["snapshot-rejected-before-business-entry-" + index] = failed && !rejected.GetProperty("passed").GetBoolean() &&
+                    rejected.GetProperty("loadedAssemblies").GetInt32() == 0 && rejected.GetProperty("revision").GetInt32() == 0 &&
+                    rejected.GetProperty("error").GetString()!.Contains("not the manifest embedded in this Base identity");
+                string restoredReport = Path.Combine(output, "player-snapshot-restored-" + index + ".json");
+                Execute(player, "-batchmode", "-nographics", "-snapshotResult", restoredReport, "-snapshotResourceRoot", stage,
+                    "-expectedRevision", "73", "-logFile", restoredReport + ".log");
+                checks["original-resource-restored-" + index] = Read(restoredReport).GetProperty("passed").GetBoolean();
+            }
             checks["immutable-player-" + index] = Hash(player) == playerHash && Hash(game) == gameHash;
             players.Add(new { proof = proofs[index], playerSha256 = playerHash, gameAssemblySha256 = gameHash, resultSha256 = Hash(report) });
         }
