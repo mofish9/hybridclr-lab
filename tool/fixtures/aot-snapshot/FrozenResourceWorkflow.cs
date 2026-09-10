@@ -52,14 +52,30 @@ internal static class FrozenResourceWorkflow
         var model = AssemblyLoadContext.Default.LoadFromAssemblyPath(Path.Combine(current, ModelName + ".dll"));
         var probe = model.GetType(FrozenResourceCasesCompiler.ProbeName) ?? model.GetType(ProbeName, true)!;
         int expectedCount = probe.FullName == FrozenResourceCasesCompiler.ProbeName ? FrozenResourceCasesCompiler.CaseCount : 4;
-        var records = (string[])probe.GetMethod("Run")!.Invoke(null, null)!;
         var addedCaller = model.GetType(FrozenAddedAssemblyCompiler.CallerName);
-        if (addedCaller != null)
+        if (addedCaller != null) expectedCount += FrozenAddedAssemblyCompiler.CaseCount;
+        if (model.GetType(FrozenStaticWorkflow.ProbeName) != null) expectedCount += FrozenStaticWorkflow.CaseCount;
+        string[] records;
+        int revision;
+        if (probe.FullName == FrozenResourceCasesCompiler.ProbeName)
         {
-            expectedCount += FrozenAddedAssemblyCompiler.CaseCount;
-            records = records.Concat((string[])addedCaller.GetMethod("Run")!.Invoke(null, null)!).ToArray();
+            // Initializer-sensitive suites must run the business entry exactly
+            // once, as the Player does. Collect its complete case sequence.
+            using var trace = new StringWriter(); var originalOutput = Console.Out;
+            try
+            {
+                Console.SetOut(trace);
+                revision = (int)model.GetType("HybridCLR.Lab.ValueLayout.Factory", true)!.GetMethod("GetRevision")!.Invoke(null, null)!;
+            }
+            finally { Console.SetOut(originalOutput); Console.Write(trace.ToString()); }
+            records = trace.ToString().Split('\n').Select(line => line.TrimEnd('\r'))
+                .Where(line => line.StartsWith("DHE case begin: ")).Select(line => line.Substring(16)).ToArray();
         }
-        int revision = (int)model.GetType("HybridCLR.Lab.ValueLayout.Factory", true)!.GetMethod("GetRevision")!.Invoke(null, null)!;
+        else
+        {
+            records = (string[])probe.GetMethod("Run")!.Invoke(null, null)!;
+            revision = (int)model.GetType("HybridCLR.Lab.ValueLayout.Factory", true)!.GetMethod("GetRevision")!.Invoke(null, null)!;
+        }
         File.WriteAllText(args[2], JsonSerializer.Serialize(new { passed = records.Length == expectedCount && revision == 73, records, revision }, Json));
         return records.Length == expectedCount && revision == 73 ? 0 : 1;
     }
@@ -200,7 +216,8 @@ internal static class FrozenResourceWorkflow
             checks["standard-resource-player-" + index] = result.GetProperty("passed").GetBoolean() && result.GetProperty("resourceUpdate").GetBoolean() &&
                 result.GetProperty("revision").GetInt32() == Read(referenceFile).GetProperty("revision").GetInt32() &&
                 result.GetProperty("sentinel").GetInt32() == 5 && result.GetProperty("loadedAssemblies").GetInt32() == currentNames.Length &&
-                (expected.Length == FrozenResourceCasesCompiler.CaseCount || expected.Length == FrozenResourceCasesCompiler.CaseCount + FrozenAddedAssemblyCompiler.CaseCount || expected.Length == 4);
+                (expected.Length == FrozenResourceCasesCompiler.CaseCount || expected.Length == FrozenResourceCasesCompiler.CaseCount + FrozenAddedAssemblyCompiler.CaseCount ||
+                 expected.Length == FrozenResourceCasesCompiler.CaseCount + FrozenAddedAssemblyCompiler.CaseCount + FrozenStaticWorkflow.CaseCount || expected.Length == 4);
             if (expected.Length != 4)
                 checks["complete-reference-case-sequence-" + index] = File.ReadAllLines(report + ".log")
                     .Where(line => line.StartsWith("DHE case begin: ")).Select(line => line.Substring(16)).SequenceEqual(expected);
