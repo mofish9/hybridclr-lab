@@ -381,6 +381,11 @@ internal sealed class MetaVersionSnapshot
         {
             ParameterDefaultIndependentMetadataVersion = Hash("dhe-method-parameter-default-independent\n" +
                 StableMethodMetadataWithoutOwnAttributes(method, true)),
+            DeclarationAttributes = (uint)method.Attributes,
+            InterfaceDeclarationIndependentMetadataVersion = Hash("dhe-method-interface-declaration-independent\n" +
+                StableMethodMetadataWithoutOwnAttributes(method, false, true)),
+            InterfaceDeclarationAndDefaultIndependentMetadataVersion = Hash("dhe-method-interface-declaration-default-independent\n" +
+                StableMethodMetadataWithoutOwnAttributes(method, true, true)),
             HasParameterDefaults = method.ParamDefs.Any(parameter => parameter.Sequence > 0 && parameter.HasConstant),
         };
     }
@@ -662,7 +667,8 @@ internal sealed class MetaVersionSnapshot
                 StringComparer.Ordinal)), DeclSecurities(method.DeclSecurities));
     }
 
-    private static string StableMethodMetadataWithoutOwnAttributes(MethodDef method, bool ignoreParameterDefaults = false)
+    private static string StableMethodMetadataWithoutOwnAttributes(MethodDef method, bool ignoreParameterDefaults = false,
+        bool ignoreInterfaceDeclarationFlags = false)
     {
         var parameters = method.ParamDefs.OrderBy(parameter => parameter.Sequence).Select(parameter => string.Join("/",
             parameter.Sequence, parameter.Name.String,
@@ -671,7 +677,9 @@ internal sealed class MetaVersionSnapshot
             ignoreParameterDefaults && parameter.Sequence > 0 ? "" : ConstantShape(parameter.HasConstant ? parameter.Constant : null),
             parameter.MarshalType?.ToString() ?? "", Attributes(parameter.CustomAttributes)));
         return string.Join("|", MethodIdentity(method), method.MethodSig,
-            ((uint)method.Attributes).ToString("x8"), ((uint)method.ImplAttributes).ToString("x8"),
+            ((uint)(ignoreInterfaceDeclarationFlags ? method.Attributes &
+                ~(MethodAttributes.Virtual | MethodAttributes.Final | MethodAttributes.NewSlot) : method.Attributes)).ToString("x8"),
+            ((uint)method.ImplAttributes).ToString("x8"),
             string.Join(",", method.GenericParameters.Select(StableGenericParameter)),
             string.Join(",", parameters), method.ImplMap?.ToString() ?? "",
             string.Join(",", method.Overrides.Select(item => item.ToString()).OrderBy(value => value,
@@ -858,6 +866,10 @@ internal sealed record MetaVersionMethod(string Identity, string StableId, strin
     [property: JsonIgnore] bool DeclaringTypeIsInterface)
 {
     [JsonIgnore] public string ParameterDefaultIndependentMetadataVersion { get; init; } = "";
+    // Admission facts only: binary MV identities and the DHE Flags bitset stay unchanged.
+    [JsonIgnore] public uint DeclarationAttributes { get; init; }
+    [JsonIgnore] public string InterfaceDeclarationIndependentMetadataVersion { get; init; } = "";
+    [JsonIgnore] public string InterfaceDeclarationAndDefaultIndependentMetadataVersion { get; init; } = "";
     [JsonIgnore] public bool HasParameterDefaults { get; init; }
 }
 

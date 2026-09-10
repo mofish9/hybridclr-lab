@@ -49,3 +49,30 @@ enumeration alongside those attributes; internal Class receiver validation must
 remain strict. New admission facts should mask only the explicitly supported
 declaration differences, preserve unrelated metadata gates, and declare any
 required native capability before a new immutable Base is built.
+
+## First declaration candidate
+
+The first implementation admits public, concrete, nongeneric instance methods
+changing between nonvirtual and virtual/final/newslot during a supported physical
+reference-interface evolution. These are the implicit-interface compiler flags;
+override, abstract, access, generic, parent, ABI and unrelated metadata changes
+keep their existing gates. Other declarations remain required future work.
+Admission-only hashes mask those three flags and, separately, already-supported
+parameter defaults; the original MV bytes and DHE Flags field do not change.
+Resources require current-implicit-interface-method-declarations-v1, so an older
+Player cannot accidentally accept a declaration its reflection hooks cannot serve.
+
+Unity 2022 public method attributes use the existing published Current metadata
+lookup. GetBaseDefinition checks Current flags before virtual-parent resolution;
+method enumeration uses Current flags and slots but returns stable logical method
+handles. No Base MethodInfo is mutated, no physical receiver check is relaxed and
+no extra publication/cache mechanism is introduced. The existing registration
+acquire and immutable metadata maps remain responsible for visibility.
+
+Policy fixture d44237a reproduces ten failing acceptance/capability checks before
+implementation, while sixteen compiler/negative/no-op checks pass. Its bound
+before/after MV hashes are retained in dhe-method-declarations-policy-before-01
+on C. The new candidate must preserve both hashes and pass the full policy suite,
+real-header native gates and two immutable-Base Player replays, including method
+handles and attributes touched before publication. Performance/memory and the
+full DHE goal remain unqualified.

@@ -21,6 +21,7 @@ internal static class UnitySerializationWorkflow
         string evolutionMode = interfaceEvolution ? (cached ? args[5].Substring(0, args[5].Length - "-cached".Length) : args[5]) : null;
         bool? currentReferenceStorageSelected = null;
         string cacheCurrentModelSha256 = null;
+        int? cachedBaseMethodCount = null;
         string lab = Path.GetFullPath(args[0]), tool = Path.GetFullPath(args[1]), proof = Path.GetFullPath(args[2]),
             source = Path.GetFullPath(args[3]), output = Path.GetFullPath(args[4]);
         string lifecycleSelection = lifecycle ? UnityBehaviourSelection.Read(proof, source) : null;
@@ -44,6 +45,11 @@ internal static class UnitySerializationWorkflow
                 start.ArgumentList.Add("-unityReferenceCacheProbe"); start.ArgumentList.Add("true");
                 start.ArgumentList.Add("-unityReferenceStorageSelected");
                 start.ArgumentList.Add(currentReferenceStorageSelected!.Value.ToString());
+                if (cachedBaseMethodCount.HasValue)
+                {
+                    start.ArgumentList.Add("-unityMethodDeclarationBaseMethods");
+                    start.ArgumentList.Add(cachedBaseMethodCount.Value.ToString());
+                }
             }
             using var process = Process.Start(start)!;
             var stdout = process.StandardOutput.ReadToEndAsync(); var stderr = process.StandardError.ReadToEndAsync();
@@ -74,6 +80,18 @@ internal static class UnitySerializationWorkflow
         string reportPath = Path.Combine(output, "player.json"), log = reportPath + ".log";
         if (cached)
         {
+            if (evolutionMode == "interface-remove-compiler")
+            {
+                string identityPath = Path.Combine(proof, "base/build-identity.json");
+                var identity = Read(identityPath);
+                var snapshot = AotAnalysisSnapshot.Read(identityPath, identity,
+                    identity.GetProperty("aotAssemblyNames").EnumerateArray().Select(row => row.GetString()!),
+                    identity.GetProperty("assemblies").EnumerateArray().Select(row => row.GetProperty("assemblyName").GetString()!))!;
+                var baseModel = MetaVersionSnapshot.Create(snapshot.Assemblies.Single(row => row.AssemblyName == "HybridCLR.ValueLayoutModel").Path);
+                cachedBaseMethodCount = baseModel.Methods.Count(method => method.DeclaringType == "HybridCLR.Lab.UnityCases.EvolvingBehaviour" &&
+                    (method.Name == "OnBeforeSerialize" || method.Name == "OnAfterDeserialize"));
+                if (cachedBaseMethodCount != 0 && cachedBaseMethodCount != 2) throw new InvalidDataException("Expected zero or two Base callback methods.");
+            }
             string model = Path.Combine(source, "current/HybridCLR.ValueLayoutModel.dll");
             var modelMv = MetaVersionSnapshot.Create(model);
             uint typeToken = modelMv.Types.Single(type => type.Identity == "HybridCLR.Lab.UnityCases.EvolvingBehaviour").Token;
@@ -149,10 +167,17 @@ internal static class UnitySerializationWorkflow
             "current-code-casts-respect-physical-layout"
         };
         string[] cacheChecks = cached ? OptionalChecks("referenceCacheChecks") : Array.Empty<string>();
+        if (cachedBaseMethodCount.HasValue)
+            cacheExpected = cacheExpected.Concat(new[] { "current-method-nonvirtual-flags", "current-method-declaring-types",
+                "current-method-base-definitions", "current-method-enumeration" }).Concat(cachedBaseMethodCount == 0
+                ? new[] { "base-had-no-callback-methods" }
+                : new[] { "cached-methods-were-virtual", "cached-methods-now-nonvirtual", "cached-method-identity-stable",
+                    "cached-method-base-definitions", "cached-method-current-invocation" }).ToArray();
         bool cachePassed = !cached || cacheChecks.SequenceEqual(cacheExpected) &&
+            (!cachedBaseMethodCount.HasValue || lines.Count(line => line == "DHE method declaration Base cache: " + cachedBaseMethodCount.Value) == 1) &&
             lines.Count(line => line == "DHE reference cache selected storage: " + currentReferenceStorageSelected!.Value) == 1 &&
             lines.Where(line => line.StartsWith("DHE reference cache check: ")).Select(line => line.Substring("DHE reference cache check: ".Length)).SequenceEqual(cacheExpected) &&
-            lines.Count(line => line == "DHE reference cache pass: 11") == 1;
+            lines.Count(line => line == "DHE reference cache pass: " + cacheExpected.Length) == 1;
         bool immutable = Hash(player) == playerHash && Hash(game) == gameHash && stageHashes.All(row => Hash(row.Key) == row.Value);
         bool callbackFixturePassed = !callbacks || lines.Count(line => line == "DHE callback fixture: " +
             (callbackControl ? "new-component-control" : "existing-interface")) == 1;
@@ -163,7 +188,7 @@ internal static class UnitySerializationWorkflow
                 Read(Path.Combine(source, "reference.json")).GetProperty("records").EnumerateArray().Select(row => row.GetString()));
         File.WriteAllText(Path.Combine(output, "result.json"), JsonSerializer.Serialize(new { passed, immutable, checks, expected = sequence,
             lifecycle, lifecyclePassed, lifecycleSelection, unityChecks, cached, cachePassed, cacheChecks, currentReferenceStorageSelected,
-            cacheCurrentModelSha256, callbacks, callbackControl, callbackFixturePassed, hierarchy, interfaceEvolution, evolutionMode, evolutionFixturePassed,
+            cacheCurrentModelSha256, cachedBaseMethodCount, callbacks, callbackControl, callbackFixturePassed, hierarchy, interfaceEvolution, evolutionMode, evolutionFixturePassed,
             error = report.GetProperty("error").GetString(), proof, source, labHead, playerSha256 = playerHash, gameAssemblySha256 = gameHash,
             hostSha256 = Hash(typeof(UnitySerializationWorkflow).Assembly.Location), toolSha256 = Hash(tool),
             resourceManifestSha256 = Hash(Path.Combine(source, "resource/dhe-resource-update.json")),

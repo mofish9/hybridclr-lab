@@ -4,6 +4,7 @@ internal sealed class ResourceUpdateCompatibility
 {
     internal const string PhysicalInterfaceAdditionCapability = "physical-current-interface-additions-v1";
     internal const string PhysicalInterfaceEvolutionCapability = "physical-current-interface-evolution-v1";
+    internal const string ImplicitInterfaceDeclarationCapability = "current-implicit-interface-method-declarations-v1";
 	public const string Policy = "dhe-proven-safe-subset-v1";
 	public const string RuntimeProtocol = "dhe-runtime-protocol-v1";
     public const string CurrentNativeRuntimeContract = "dhe-runtime-v32";
@@ -19,6 +20,7 @@ internal sealed class ResourceUpdateCompatibility
         "current-storage-execution-plan-array-v1",
         PhysicalInterfaceAdditionCapability,
         PhysicalInterfaceEvolutionCapability,
+        ImplicitInterfaceDeclarationCapability,
         ResourceExecutionPlan.GenericContextCapability,
         "current-parameter-default-metadata-v1",
         "shared-type-initialization-v1",
@@ -164,6 +166,7 @@ internal sealed class ResourceUpdateCompatibility
             !baselineMethods.ContainsKey(method.StableId)).ToArray();
 
         bool parameterDefaultsChanged = false;
+        bool implicitInterfaceDeclarationsChanged = false;
         foreach (MetaVersionMethod method in changed)
         {
             MetaVersionMethod currentMethod = currentMethods[method.StableId];
@@ -175,6 +178,16 @@ internal sealed class ResourceUpdateCompatibility
                     string.Equals(method.ParameterDefaultIndependentMetadataVersion,
                         currentMethod.ParameterDefaultIndependentMetadataVersion, StringComparison.OrdinalIgnoreCase))
                     parameterDefaultsChanged = true;
+                else if (physicalTypes.Contains(method.DeclaringTypeStableId) &&
+                    baselineTypes.TryGetValue(method.DeclaringTypeStableId, out var ownerBefore) &&
+                    currentTypes.TryGetValue(method.DeclaringTypeStableId, out var ownerAfter) &&
+                    HasOnlySupportedPhysicalInterfaceEvolution(ownerBefore, ownerAfter) &&
+                    HasOnlySupportedImplicitInterfaceDeclarationChange(method, currentMethod))
+                {
+                    implicitInterfaceDeclarationsChanged = true;
+                    parameterDefaultsChanged |= !string.Equals(method.InterfaceDeclarationIndependentMetadataVersion,
+                        currentMethod.InterfaceDeclarationIndependentMetadataVersion, StringComparison.OrdinalIgnoreCase);
+                }
                 else
                     unsupported.Add("existing-method-metadata-change:" + method.Identity);
             }
@@ -295,6 +308,8 @@ internal sealed class ResourceUpdateCompatibility
             requiredCapabilities.Add("length-preserved-constant-strings-v1");
         if (parameterDefaultsChanged || added.Any(method => method.HasParameterDefaults))
             requiredCapabilities.Add("current-parameter-default-metadata-v1");
+        if (implicitInterfaceDeclarationsChanged)
+            requiredCapabilities.Add(ImplicitInterfaceDeclarationCapability);
         if (baseline.Fields.Any(field => currentFields.TryGetValue(field.StableId, out var currentField) &&
                 !string.Equals(field.NonCustomMetadataVersion, currentField.NonCustomMetadataVersion, StringComparison.OrdinalIgnoreCase) &&
                 IsSupportedLiteralValueEvolution(field, currentField)))
@@ -537,6 +552,23 @@ internal sealed class ResourceUpdateCompatibility
         before.ConstantIndependentMetadataVersion.Length != 0 &&
         string.Equals(before.ConstantIndependentMetadataVersion, after.ConstantIndependentMetadataVersion,
             StringComparison.OrdinalIgnoreCase);
+    private static bool HasOnlySupportedImplicitInterfaceDeclarationChange(MetaVersionMethod baseline, MetaVersionMethod current)
+    {
+        const uint slots = 0x40u | 0x20u | 0x100u; // ECMA MethodAttributes: Virtual, Final, NewSlot.
+        uint before = baseline.DeclarationAttributes & slots, after = current.DeclarationAttributes & slots;
+        // This transition creates/removes the compiler's own sealed interface slot.
+        // Override/finality edits, generic methods and ABI/access changes need separate qualification.
+        return ((before == slots && after == 0) || (before == 0 && after == slots)) &&
+            (baseline.DeclarationAttributes & 7u) == 6u && (current.DeclarationAttributes & 7u) == 6u &&
+            !baseline.IsStatic && !current.IsStatic && !baseline.IsAbstract && !current.IsAbstract &&
+            !baseline.IsPInvoke && !current.IsPInvoke && !baseline.IsConstructor && !current.IsConstructor &&
+            baseline.GenericParameterCount == 0 && current.GenericParameterCount == 0 &&
+            (baseline.Flags & 8u) != 0 && (current.Flags & 8u) != 0 &&
+            baseline.InterfaceDeclarationAndDefaultIndependentMetadataVersion.Length != 0 &&
+            string.Equals(baseline.InterfaceDeclarationAndDefaultIndependentMetadataVersion,
+                current.InterfaceDeclarationAndDefaultIndependentMetadataVersion, StringComparison.OrdinalIgnoreCase);
+    }
+
     private static bool HasOnlySupportedPhysicalInterfaceAddition(MetaVersionType baseline, MetaVersionType current)
     {
         return HasOnlySupportedPhysicalInterfaceEvolution(baseline, current) &&

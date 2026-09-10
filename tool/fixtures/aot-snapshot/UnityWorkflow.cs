@@ -50,7 +50,7 @@ internal static class UnityWorkflow
         File.Delete(Path.Combine(project, "Assets/CurrentStorageRuntime.cs"));
         foreach (var pair in new[] { ("SnapshotPlayer.cs", "Assets"), ("PublicLoadFailurePlayer.cs", "Assets"),
             ("PublicPrecommitPlayer.cs", "Assets"), ("PublicPreparationPlayer.cs", "Assets"),
-            ("UnitySerializationRoots.cs", "Assets"), ("UnityReferenceCachePlayer.cs", "Assets"),
+            ("UnitySerializationRoots.cs", "Assets"), ("UnityReferenceCachePlayer.cs", "Assets"), ("UnityMethodDeclarationCache.cs", "Assets"),
             ("UnityBehaviourPlayer.cs", "Assets"), ("SnapshotWorkflowBuild.cs", "Assets/Editor") })
             File.Copy(Path.Combine(lab, "tool/fixtures/aot-snapshot/Unity", pair.Item1), Path.Combine(project, pair.Item2, pair.Item1));
         if (mixedTransactionProbe)
