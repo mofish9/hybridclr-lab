@@ -21,7 +21,7 @@ namespace HybridCLR.Lab.Snapshot
             public string[] plannedAssemblies, loadedAssemblyNames, differentialAssemblies, interpreterOnlyAssemblies;
             public string[] records;
             public string[] recoveryChecks;
-            public string[] precommitChecks, unityChecks, preparationChecks;
+            public string[] precommitChecks, unityChecks, preparationChecks, referenceCacheChecks;
             public int unityBaseDelta;
             public long ordinaryAotReferenceResult;
             public long ordinaryAotEchoExtra;
@@ -54,6 +54,8 @@ namespace HybridCLR.Lab.Snapshot
                 result.baseId = identity.BaseId; result.aotAnalysisSnapshotSha256 = identity.AotAnalysisSnapshotSha256;
                 var unityType = typeof(ValueLayout.Factory).Assembly.GetType("HybridCLR.Lab.UnityCases.EvolvingBehaviour");
                 if (unityType != null) result.unityBaseDelta = (int)unityType.GetField("Delta", System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.Static).GetRawConstantValue();
+                UnityReferenceCachePlayer referenceCache = Array.IndexOf(args, "-unityReferenceCacheProbe") >= 0
+                    ? UnityReferenceCachePlayer.Capture(unityType, result.unityBaseDelta) : null;
                 var moduleState = typeof(ValueLayout.Factory).Assembly.GetType("HybridCLR.Lab.ModuleEvolution.ModuleState");
                 System.Reflection.FieldInfo moduleConstant = null;
                 if (moduleState != null)
@@ -112,6 +114,11 @@ namespace HybridCLR.Lab.Snapshot
                 }
                 if (!loadedCurrent)
                     throw new InvalidDataException(code + ":" + error);
+                if (referenceCache != null)
+                {
+                    result.referenceCacheChecks = referenceCache.Verify(out string cacheFailure);
+                    if (cacheFailure != null) throw new InvalidOperationException(cacheFailure);
+                }
                 result.precommitChecks = PublicPrecommitPlayer.VerifyRetry(result.precommitChecks);
                 // LoadedAssemblyNames also includes authenticated frozen AOT
                 // sources. Count only the Current payload for this assertion.

@@ -117,6 +117,7 @@ add_library(hybridclr_engine_reflection_compile_gate OBJECT
     "${HYBRIDCLR_RUNTIME_ROOT}/icalls/mscorlib/System.Reflection/RuntimeFieldInfo.cpp"
     "${HYBRIDCLR_RUNTIME_ROOT}/icalls/mscorlib/System.Reflection/RuntimeMethodInfo.cpp"
     "${HYBRIDCLR_RUNTIME_ROOT}/icalls/mscorlib/System/RuntimeType.cpp"
+    "${HYBRIDCLR_RUNTIME_ROOT}/icalls/mscorlib/System/RuntimeTypeHandle.cpp"
 )
 
 function(configure_hybridclr_target target)
