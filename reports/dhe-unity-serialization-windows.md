@@ -2,6 +2,20 @@
 
 ## Actual Windows results
 
+The public reference identity probe now has real Player evidence. At lab
+`088f967`, `dhe-unity-reference-current-02/current` passes CLR reference with
+46 cases. The resource compiler at lab `4b2cc49` produces
+`dhe-reference-identity-resource-02`; its ordinary business workflow succeeds
+on both Base-50/51 with the reference probe disabled. Explicit native replay
+in `dhe-reference-identity-base-50-01` fails ten of fourteen identity assertions;
+`dhe-reference-identity-base-51-01` passes all fourteen with the same Current.
+Base-50 uses the allocation-only `623e453`/`e9ba2a8` candidate, not the later
+native API correction. The failures cover Type equality, assignability, field
+GetValue/SetValue and clone type identity. Both replay reports rehash and verify
+unchanged Player and staged resource bytes; all 46 business cases precede the
+native probe. This is a confirmed remaining type identity gap, not a fixture
+failure. No Base-52/53 result is inferred from this preceding candidate.
+
 The full suite exposes a real runtime gap. Base-47 (old component layout) passes
 all 46 business cases, then fails `json-reads-added-field`: JsonUtility emits
 `Extra=0` after Current wrote `91000000019`. Base-48 (evolved layout) consumes the

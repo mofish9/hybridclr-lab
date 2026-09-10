@@ -23,7 +23,9 @@ Base-47 but passes on same-layout Base-48 with identical Current DLLs. Native
 tracing confirms Unity consumes field offsets and bypasses sidecar value APIs.
 An isolated physical Current storage prototype fixes serialization on Base-47,
 but still fails native component creation/callbacks. Allocation routing is being
-tested in separate runtime worktrees; it is not qualified or published. See
+tested in separate runtime worktrees; it is not qualified or published. A new
+fourteen-assertion public type identity probe confirms ten failures on the
+old-layout allocation-only Base-50, versus fourteen passes on Base-51. See
 `reports/dhe-unity-serialization-windows.md` for exact evidence and open gates.
 Unity 2022 Windows comes first; Tuanjie follows; no new Unity 2021 work.
 
