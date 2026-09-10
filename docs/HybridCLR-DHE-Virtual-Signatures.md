@@ -124,3 +124,11 @@ expectation accepts the exact two documented rejection routes and records which
 one occurs, while still rejecting the body's own InvalidOperationException and
 requiring new-receiver execution and preserved object data. A fresh Player is
 required to complete the corrected six-check probe; no Base-85 result is rewritten.
+
+The shared resource for Bases 86/87/81 passes the 46 business cases and all 25
+signature checks on each Player. Base-86's cached probe passes both old-receiver
+rejections and new-receiver invocation, then rejects the harness's fresh Current
+field query on the old object. Preserve that 5/6 partial result. Check old data
+through a FieldInfo captured before selection, as in the existing reference-cache
+contract; keep the Current-field receiver validation unchanged. This needs a new
+old-layout Player to finish all six checks and the subsequent full sequence.

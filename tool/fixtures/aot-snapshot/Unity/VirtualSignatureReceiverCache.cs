@@ -9,15 +9,20 @@ namespace HybridCLR.Lab.Snapshot
         private object oldReceiver;
         private MethodInfo cachedMethod;
         private Type cachedType;
+        private FieldInfo oldBiasField;
+        private int oldBias;
 
         internal static VirtualSignatureReceiverCache Capture(Assembly assembly)
         {
             var type = assembly.GetType("HybridCLR.Lab.VirtualSignatures.Processor", true);
             var value = new VirtualSignatureReceiverCache {
-                cachedType = type, cachedMethod = type.GetMethod("Fail"), oldReceiver = Activator.CreateInstance(type)
+                cachedType = type, cachedMethod = type.GetMethod("Fail"), oldReceiver = Activator.CreateInstance(type),
+                oldBiasField = type.GetField("Bias")
             };
             if (value.cachedMethod == null || type.GetField("Extra") != null)
                 throw new InvalidOperationException("Old receiver probe requires the original AOT layout.");
+            value.oldBias = (int)value.oldBiasField.GetValue(value.oldReceiver);
+            if (value.oldBias != 25) throw new InvalidOperationException("Unexpected original receiver state.");
             return value;
         }
 
@@ -64,7 +69,9 @@ namespace HybridCLR.Lab.Snapshot
                     error.InnerException.Message == "virtual-signature-expected";
             }
             Check("current-receiver-invokes-body", currentBody);
-            Check("rejection-preserves-receivers", (int)cachedType.GetField("Bias").GetValue(oldReceiver) == 25 &&
+            // The original FieldInfo retains its Base storage view. A fresh
+            // Current field query is correctly forbidden on this old object.
+            Check("rejection-preserves-receivers", (int)oldBiasField.GetValue(oldReceiver) == oldBias &&
                 (long)extra.GetValue(currentReceiver) == 1000L);
             return checks.ToArray();
         }
