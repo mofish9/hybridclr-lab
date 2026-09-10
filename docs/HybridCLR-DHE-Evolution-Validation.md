@@ -1,6 +1,30 @@
 # DHE evolution implementation and validation
 
-## Active checkpoint: ordinary static storage across two Base layouts
+## Active checkpoint: mixed registration retry and new module initializers
+
+On unchanged HybridCLR `9e7b601`, IL2CPP `8a13baf` and package `b51473f`, the
+public resource workflow passes two real module initializers and the same 46
+cases on both Base-27 and Base-28. One six-DLL Current serves both immutable
+Bases. All 31 workflow checks pass; independent audit `5a7c756` rehashes 163
+files, checks nine full successful/restored sequences and 13 pre-entry rejections,
+and requires both initializers to finish once before every business entry.
+
+Base-29 separately passes 56 native transaction checks and 46 cases for both
+normal and reversed retry order, plus 50 checks for a deliberate post-commit
+module exception. Failed registration preserves old AOT dispatch/fields and
+unpublished peers; changed/missing pending peers are rejected. Module callbacks
+see the full graph and permit cross-thread native reentry without deadlocking.
+The corrected process-output capture is recorded separately from the unchanged
+Player/workload. MV generator `c1eef47` fixes the real module-owner crash and
+passes nine compiler/archived-MV compatibility checks.
+
+See `../reports/dhe-mixed-transaction-windows.md` for precise identities and
+reproductions. Existing AOT module initializer evolution, public post-commit
+failure reporting/recovery, ordinary ThreadStatic/RVA, native-only ABI, Unity
+behavior and performance/memory qualification remain open. Unity 2022 Windows
+comes first; Tuanjie follows, with no new Unity 2021 work. The goal is incomplete.
+
+## Preceding checkpoint: ordinary static storage across two Base layouts
 
 HybridCLR `9e7b601`, IL2CPP `8a13baf` and package `b51473f` pass the same 46-case
 Current on immutable Unity 2022 Windows Base-27 and Base-28. Lab admission

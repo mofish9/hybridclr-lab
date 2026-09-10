@@ -19,22 +19,24 @@ Their immutable inputs are recorded in `manifests/repo-lock.json`.
 
 This research checkout extends the published DHE line below. Its current
 implementation and validation status is in
+`reports/dhe-mixed-transaction-windows.md`,
 `reports/dhe-frozen-static-resources.md`,
 `reports/dhe-new-assembly-resources.md`,
 `reports/dhe-standard-resource-capabilities.md`,
 `reports/dhe-frozen-resource-admission.md` and
 `docs/HybridCLR-DHE-Evolution-Validation.md`. Unity 2022 Windows is the active
 qualification target; Tuanjie follows it, and Unity 2021 is outside new work.
-The active ordinary-static-storage candidate passes all 46 cases on two immutable
-Bases with old/grown value layouts using one identical Current payload. All 19
-shared-resource checks pass, including unchanged static readers retaining AOT.
-An independent audit rehashes 131 files and checks all five complete successful
-or restored runs. The preceding 31-case mixed-assembly milestone on three Bases
-also covers Added as differential when already AOT in one Base. Native code is
-unchanged by this static admission milestone; its real-header native compile/CTest,
-core rollback and 22 focused linker-identity checks retain their exact prior
-identities. Ordinary ThreadStatic/RVA, further mixed transaction/initializer
-behavior and performance/Release qualification remain pending. Historical 0.1.35
+The active mixed-module candidate passes two real module initializers and all
+46 cases on two immutable Bases with one identical six-DLL Current. All 31
+shared-resource checks pass; independent audit rehashes 163 files and verifies
+nine complete successful/restored runs plus 13 pre-entry rejections. A separate
+immutable Base passes native registration failure/retry, reversed input order,
+pending-peer rejection and module reentry/exception tests. The MV generator now
+retains nonempty module owners; nine checks confirm initializer fingerprints and
+exact prior-MV compatibility. Native code is unchanged, so its real-header
+compile/CTest and earlier core/linker checks retain their exact prior identities.
+Existing AOT module initialization, public post-commit failure recovery, ordinary
+ThreadStatic/RVA and performance/Release qualification remain pending. Historical 0.1.35
 release evidence below does not qualify this research snapshot.
 
 The DHE workflow is maintained as a separate, explicit validation lane. Its
