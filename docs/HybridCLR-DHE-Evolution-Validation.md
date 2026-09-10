@@ -1,6 +1,19 @@
 # DHE evolution implementation and validation
 
-## Active checkpoint: standard resources with evolved value layouts
+## Active checkpoint: new assemblies and mixed metadata batches
+
+The active Unity 2022 candidate is HybridCLR `9e7b601`, IL2CPP `8a13baf`, package
+`b51473f`. The retained 31-case Current adds an interpreter-only assembly with
+parent/interface/field dependencies back into evolved DHE types. Runtime
+`04a0502` passes Base startup and 35 core checks but crashes while pre-parsing
+the new DLL. The fix gives the owning RawImage parser a native copy instead of
+a managed byte-array interior. Real-header native compile/CTest passes on the
+fix; the new immutable Player replay is pending. A second Base is also being
+built with Added already in its AOT inventory. See
+`../reports/dhe-new-assembly-resources.md` for exact failing evidence and gates.
+The following 23-case milestone remains historical evidence on its own identity.
+
+## Preceding checkpoint: standard resources with evolved value layouts
 
 Unity 2022 Windows proof-20 and Base-21, on HybridCLR `cdb2a5f`, IL2CPP `8a13baf`
 and package `187af4f`, pass all 23 Current-only C# behavior cases through automatic
