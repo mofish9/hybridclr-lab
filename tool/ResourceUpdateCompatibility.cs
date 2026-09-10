@@ -280,11 +280,13 @@ internal sealed class ResourceUpdateCompatibility
                 HasOnlySupportedPhysicalInterfaceAddition(type, currentType);
             bool physicalInterfaceEvolution = !physicalInterfaceAddition && physicalTypes.Contains(type.StableId) &&
                 HasOnlySupportedPhysicalInterfaceEvolution(type, currentType);
+            bool physicalParentEvolution = physicalTypes.Contains(type.StableId) &&
+                HasOnlySupportedPhysicalParentEvolution(type, currentType, baseline, current, currentAssemblySet);
             requiresPhysicalInterfaceAddition |= physicalInterfaceAddition;
             requiresPhysicalInterfaceEvolution |= physicalInterfaceEvolution;
             if (!string.Equals(type.LayoutVersion, currentType.LayoutVersion, StringComparison.OrdinalIgnoreCase) &&
                 ((!string.Equals(type.NonFieldLayoutVersion, currentType.NonFieldLayoutVersion,
-                     StringComparison.OrdinalIgnoreCase) && !physicalInterfaceAddition && !physicalInterfaceEvolution) ||
+                     StringComparison.OrdinalIgnoreCase) && !physicalInterfaceAddition && !physicalInterfaceEvolution && !physicalParentEvolution) ||
                  (!physicalTypes.Contains(type.StableId) && !HasOnlySupportedInstanceFieldEvolution(type, baselineFields, currentFields))))
                 unsupported.Add("existing-type-layout-or-vtable-change:" + type.Identity);
 			if (!string.Equals(type.NonCustomUnsupportedDeclarativeVersion,
@@ -625,6 +627,42 @@ internal sealed class ResourceUpdateCompatibility
         return HasOnlySupportedPhysicalInterfaceEvolution(baseline, current) &&
             current.InterfaceIdentities.Length > baseline.InterfaceIdentities.Length &&
             current.InterfaceIdentities.ToHashSet(StringComparer.Ordinal).IsSupersetOf(baseline.InterfaceIdentities);
+    }
+
+    private static bool HasOnlySupportedPhysicalParentEvolution(MetaVersionType before, MetaVersionType after,
+        MetaVersionSnapshot baseline, MetaVersionSnapshot current, IEnumerable<MetaVersionSnapshot>? currentAssemblySet)
+    {
+        if (!before.CanUsePhysicalParentEvolution || !after.CanUsePhysicalParentEvolution ||
+            before.ParentIndependentLayoutVersion.Length == 0 ||
+            before.ParentIndependentLayoutVersion != after.ParentIndependentLayoutVersion ||
+            !baseline.TypeParents.TryGetValue(before.Identity, out var oldParent) ||
+            !current.TypeParents.TryGetValue(after.Identity, out var newParent) || oldParent == newParent)
+            return false;
+        var mutableAssemblies = (currentAssemblySet ?? new[] { current }).Select(assembly => assembly.AssemblyName)
+            .ToHashSet(StringComparer.Ordinal);
+        mutableAssemblies.Add(current.AssemblyName);
+        MetaVersionTypeReference? Boundary(MetaVersionSnapshot snapshot, MetaVersionTypeReference parent)
+        {
+            var visited = new HashSet<string>(StringComparer.Ordinal) { before.Identity };
+            var definitions = snapshot.Types.ToDictionary(type => type.Identity, StringComparer.Ordinal);
+            while (parent.AssemblyName == snapshot.AssemblyName)
+            {
+                if (parent.DefinitionName != null && parent.DefinitionName != parent.TypeName ||
+                    !visited.Add(parent.TypeName) || !definitions.TryGetValue(parent.TypeName, out var definition) ||
+                    !definition.CanBePhysicalReferenceParent || !snapshot.TypeParents.TryGetValue(parent.TypeName, out var next))
+                    return null;
+                parent = next;
+            }
+            // Cross-assembly hotfix changes need both original ancestry maps;
+            // this per-assembly comparison must not treat Current as its Base.
+            return mutableAssemblies.Contains(parent.AssemblyName) ||
+                parent.DefinitionName != null && parent.DefinitionName != parent.TypeName ? null : parent;
+        }
+        // Native/ordinary-AOT parent layout remains an immutable boundary.
+        // New physical storage is already required by the caller; constructors
+        // and affected methods enter through the existing Current execution plan.
+        var oldBoundary = Boundary(baseline, oldParent);
+        return oldBoundary != null && oldBoundary == Boundary(current, newParent);
     }
 
     private static bool HasOnlySupportedPhysicalInterfaceEvolution(MetaVersionType baseline, MetaVersionType current)

@@ -264,6 +264,17 @@ internal sealed class MetaVersionSnapshot
                     !row.Interface.Name.String.Contains('`')),
             InterfaceIdentities = type.Interfaces.Select(row =>
                 (row.Interface.DefinitionAssembly?.FullName ?? "") + "|" + row.Interface.FullName).ToArray(),
+            ParentIndependentLayoutVersion = Hash("dhe-parent-independent-layout\n" + string.Join("|",
+                type.FullName, ((uint)type.Attributes).ToString("x8"), type.IsValueType,
+                type.ClassLayout?.PackingSize.ToString(CultureInfo.InvariantCulture) ?? "",
+                type.ClassLayout?.ClassSize.ToString(CultureInfo.InvariantCulture) ?? "",
+                string.Join(",", type.GenericParameters.Select(StableGenericParameter)),
+                string.Join(",", type.Interfaces.Select(row => (row.Interface.DefinitionAssembly?.FullName ?? "") +
+                    "|" + row.Interface.FullName).OrderBy(value => value, StringComparer.Ordinal)))),
+            CanUsePhysicalParentEvolution = !type.IsInterface && !type.IsValueType &&
+                !type.HasGenericParameters && type.BaseType is not TypeSpec,
+            CanBePhysicalReferenceParent = !type.IsInterface && !type.IsValueType && !type.IsSealed &&
+                !type.HasGenericParameters && type.BaseType is not TypeSpec,
         };
     }
 
@@ -857,6 +868,9 @@ internal sealed record MetaVersionType(string Identity, string StableId, string 
     [JsonIgnore] public string InterfaceAdditionLayoutVersion { get; init; } = "";
     [JsonIgnore] public bool CanUsePhysicalInterfaceAddition { get; init; }
     [JsonIgnore] public string[] InterfaceIdentities { get; init; } = Array.Empty<string>();
+    [JsonIgnore] public string ParentIndependentLayoutVersion { get; init; } = "";
+    [JsonIgnore] public bool CanUsePhysicalParentEvolution { get; init; }
+    [JsonIgnore] public bool CanBePhysicalReferenceParent { get; init; }
 }
 
 internal sealed record MetaVersionMethod(string Identity, string StableId, string Version,

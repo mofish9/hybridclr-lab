@@ -28,6 +28,15 @@ This checkpoint targets Unity 2022.3.62f3 Windows and makes no Android/iOS,
 production, memory or throughput claim. No CAT, formal publication, Installer
 default or ordinary AOT source change is authorized by this experiment.
 
+The original compiler rejects both existing-type Bases at
+existing-type-layout-or-vtable-change:Processor, while CLR passes all suites.
+The first candidate permits physical reference-parent changes only when the
+owner's other declaration/layout properties remain unchanged and both local,
+nongeneric parent chains terminate at the same immutable AOT boundary. Missing,
+cyclic, sealed and unresolved/generic parents are rejected. Existing Current
+storage, reference dispatch and virtual-frame capabilities remain required;
+no claim of runtime support is made until the same Current passes the Players.
+
 Rollback selects the preceding matching source locks and a compatible archived
 resource, then restarts the Player. Do not rewrite Base identities/capabilities
 or unload a committed Current set in process.
