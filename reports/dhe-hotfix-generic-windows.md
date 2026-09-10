@@ -1,5 +1,9 @@
 # Hotfix generic execution: Unity 2022 Windows
 
+The allocation and typed-reference follow-up is recorded separately in
+`dhe-reference-owner-windows.md`. Its Base-70 results do not change the historical
+Base-68/69 identities or preserved failures below.
+
 ## Result and remaining failures
 
 The generic dispatch candidate repairs the preserved Base-66 failure. At runtime

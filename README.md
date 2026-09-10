@@ -17,7 +17,19 @@ Their immutable inputs are recorded in `manifests/repo-lock.json`.
 
 ## Current phase
 
-The newest checkpoint is conditional hotfix generic execution; see
+The active checkpoint is physical reference owners; see
+`reports/dhe-reference-owner-windows.md`. Immutable Base-70 passes the exact
+previously failing Current DLLs, all 46 business cases, generic reflection,
+cached receivers, native interface callbacks, serialization, complete lifecycle
+and public preparation/recovery. An allocation correction and typed reference
+dependency closure repair the generic-owner and coroutine failures. The final
+planner passes 29 focused checks, 17 generic regressions and 113 managed checks.
+Another Base at the same runtime identity is being built for the shared-resource
+rerun. Broader evolution and performance gates remain; this is not a release.
+
+## Earlier research checkpoints
+
+The preceding checkpoint is conditional hotfix generic execution; see
 `reports/dhe-hotfix-generic-windows.md`. Two immutable Unity 2022 Windows Bases
 pass the exact previously failing Current DLLs and all 46 business cases. A
 changed generic body executes through direct/reflection/delegate calls, while
@@ -27,7 +39,7 @@ Base-69 generic-owner reflection and lifecycle/coroutine boundaries. The next
 allocation fix is a separate candidate awaiting its own Player evidence.
 This is not a full Windows or production qualification.
 
-The active investigation is **physical reference storage and native callbacks**.
+An earlier investigation covered **physical reference storage and native callbacks**.
 At `b69128f`/`eaf006d`, immutable Base-63/64 pass identical Current DLLs with
 46 business cases, 14 public identity checks, 18 generic/array checks, 11
 serialization checks and 17 lifecycle checks. Generic reflection/direct field
