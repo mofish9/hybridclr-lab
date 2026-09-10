@@ -12,6 +12,7 @@ if (args.Length > 0 && args[0] == "baseline-linker-identity") return BaselineLin
 if (args.Length > 0 && args[0] == "pe-header-identity") return PeHeaderIdentity.Run(args.Skip(1).ToArray());
 if (args.Length > 0 && args[0] == "frozen-static-new-base") return FrozenStaticWorkflow.NewBase(args.Skip(1).ToArray());
 if (args.Length > 0 && args[0] == "compile-frozen-static-current") return FrozenStaticWorkflow.Current(args.Skip(1).ToArray());
+if (args.Length > 0 && args[0] == "frozen-static-admission") return FrozenStaticAdmission.Run(args.Skip(1).ToArray());
 if (args.Length > 0 && args[0] == "evolution-workflow") return ResourceEvolutionWorkflow.Run(args.Skip(1).ToArray());
 if (args.Length > 0 && args[0] == "evolution-reference") return ResourceEvolutionWorkflow.Reference(args.Skip(1).ToArray());
 if (args.Length > 0 && args[0] == "frozen-aot-policy") return FrozenAotPolicy.Run(args.Skip(1).ToArray());
