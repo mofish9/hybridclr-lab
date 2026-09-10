@@ -16,8 +16,8 @@ internal static class UnityBehaviourWorkflow
 
     internal static int ReferenceCurrent(string[] args)
     {
-        if (args.Length < 5 || args.Length > 6 || args.Length == 6 && args[5] != "generic" && args[5] != "dispatch" && args[5] != "callbacks" && args[5] != "callbacks-control" && args[5] != "hotfix-generic-dispatch" && args[5] != "hierarchy-query" && args[5] != "interface-remove" && args[5] != "interface-remove-methods" && args[5] != "interface-replace")
-            throw new ArgumentException("unity-reference-current <lab> <Base proof> <Current DLL root> <editor> <new output> [generic|dispatch|callbacks|callbacks-control|hotfix-generic-dispatch|hierarchy-query|interface-remove|interface-remove-methods|interface-replace]");
+        if (args.Length < 5 || args.Length > 6 || args.Length == 6 && args[5] != "generic" && args[5] != "dispatch" && args[5] != "callbacks" && args[5] != "callbacks-control" && args[5] != "hotfix-generic-dispatch" && args[5] != "hierarchy-query" && args[5] != "interface-remove" && args[5] != "interface-remove-methods" && args[5] != "interface-replace" && args[5] != "interface-remove-compiler")
+            throw new ArgumentException("unity-reference-current <lab> <Base proof> <Current DLL root> <editor> <new output> [generic|dispatch|callbacks|callbacks-control|hotfix-generic-dispatch|hierarchy-query|interface-remove|interface-remove-methods|interface-replace|interface-remove-compiler]");
         if (args.Length == 6 && args[5].StartsWith("interface-", StringComparison.Ordinal))
             return CompileNativeProbe(args, "UnityInterfaceEvolutionCases", "HybridCLR.Lab.InterfaceEvolution.EvolutionCases", false);
         if (args.Length == 6 && args[5] == "hierarchy-query")
@@ -59,7 +59,8 @@ internal static class UnityBehaviourWorkflow
             }).Append(facade).Concat(Directory.GetFiles(current, "*.dll")), Path.Combine(output, "compiled"), false,
             readOnly ? "SERIALIZATION_READ_ONLY" : callbackControl ? "SERIALIZATION_CALLBACK_CONTROL" :
                 args.Length > 5 && args[5] == "interface-replace" ? "INTERFACE_REPLACEMENT" :
-                args.Length > 5 && args[5] == "interface-remove-methods" ? "REMOVE_INTERFACE_METHODS" : null);
+                args.Length > 5 && args[5] == "interface-remove-methods" ? "REMOVE_INTERFACE_METHODS" :
+                args.Length > 5 && args[5] == "interface-remove-compiler" ? "INTERFACE_COMPILER_REMOVAL" : null);
         using var module = ModuleDefMD.Load(File.ReadAllBytes(merged));
         if (fixture == "UnityInterfaceEvolutionCases")
         {
@@ -69,6 +70,17 @@ internal static class UnityBehaviourWorkflow
             if (args[5] != "interface-remove")
                 foreach (string name in new[] { "OnBeforeSerialize", "OnAfterDeserialize" })
                     receiver.Methods.Remove(receiver.Methods.Single(method => method.Name == name));
+            if (args[5] == "interface-remove-compiler")
+            {
+                var donor = module.Find("HybridCLR.Lab.InterfaceEvolution.RemovedInterfaceTemplate", false)!;
+                foreach (string name in new[] { "OnBeforeSerialize", "OnAfterDeserialize" })
+                {
+                    var method = donor.Methods.Single(row => row.Name == name);
+                    if (method.IsVirtual || method.IsFinal || method.IsNewSlot)
+                        throw new InvalidDataException("The compiler donor must contain nonvirtual methods.");
+                    donor.Methods.Remove(method); receiver.Methods.Add(method);
+                }
+            }
             if (args[5] == "interface-replace")
             {
                 var donor = module.Find("HybridCLR.Lab.InterfaceEvolution.DisposalTemplate", false)!;

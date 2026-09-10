@@ -13,6 +13,12 @@ namespace HybridCLR.Lab.InterfaceEvolution
         public void Dispose() { EvolutionCases.Disposed(); }
     }
 
+    public sealed class RemovedInterfaceTemplate
+    {
+        public void OnBeforeSerialize() { model::HybridCLR.Lab.UnityReference.SerializationCallbackCases.Before((Evolving)(object)this); }
+        public void OnAfterDeserialize() { model::HybridCLR.Lab.UnityReference.SerializationCallbackCases.After((Evolving)(object)this); }
+    }
+
     public static class EvolutionCases
     {
         private static int disposed;
@@ -28,7 +34,10 @@ namespace HybridCLR.Lab.InterfaceEvolution
         [System.Runtime.CompilerServices.MethodImpl(System.Runtime.CompilerServices.MethodImplOptions.NoInlining)]
         private static void Run()
         {
-#if INTERFACE_REPLACEMENT
+#if INTERFACE_COMPILER_REMOVAL
+            const bool replacement = false, removedMethods = false;
+            const string mode = "interface-remove-compiler";
+#elif INTERFACE_REPLACEMENT
             const bool replacement = true, removedMethods = true;
             const string mode = "interface-replace";
 #elif REMOVE_INTERFACE_METHODS
@@ -75,6 +84,10 @@ namespace HybridCLR.Lab.InterfaceEvolution
                 Check("removed-or-retained-method-behavior", () => {
                     var before = type.GetMethod("OnBeforeSerialize"); var after = type.GetMethod("OnAfterDeserialize");
                     if (removedMethods) return before == null && after == null;
+#if INTERFACE_COMPILER_REMOVAL
+                    if (before == null || after == null || before.IsVirtual || after.IsVirtual || before.IsFinal || after.IsFinal)
+                        return false;
+#endif
                     before.Invoke(component, null); after.Invoke(component, null);
                     return (int)beforeCount.GetValue(null) == 1 && (int)afterCount.GetValue(null) == 1;
                 });
