@@ -106,3 +106,11 @@ reject this old receiver, a newly allocated Current receiver to invoke the body,
 stable logical identity and unchanged data after rejection. This is separate
 from the previous Unity component cache suite and only applies to the old-layout
 Base. Both modes still require all 25 signature checks and all 46 business cases.
+
+Native05 caught 52 failures in the existing receiver/ABI rejection matrix: an
+image without a matching Current declaration was insufficient evidence for the
+new scalar allowance. The refined rule requires the exact staged Current owner
+definition of the selected method, rejects generic parents, and checks physical
+storage selection along the parent chain. Keep those original assertions intact.
+Native02 (exception-helper namespace) and native04 (test-link dependency) are
+preserved failed compile attempts; neither has a passing Player claim.
