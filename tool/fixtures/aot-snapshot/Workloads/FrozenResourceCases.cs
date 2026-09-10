@@ -5,7 +5,7 @@ using System.Reflection;
 using System.Threading;
 using HybridCLR.Lab.ValueLayoutNative;
 
-namespace HybridCLR.Lab.ValueLayout
+namespace HybridCLR.Lab.ResourceCases
 {
     using Payload = model::HybridCLR.Lab.ValueLayout.Payload;
     // Compiled against the actual captured Unity inputs and merged into Current.

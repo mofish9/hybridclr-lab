@@ -6,7 +6,7 @@ using HybridCLR.DheTool;
 
 internal static class FrozenResourceCasesCompiler
 {
-    public const string ProbeName = "HybridCLR.Lab.ValueLayout.FrozenResourceCases";
+    public const string ProbeName = "HybridCLR.Lab.ResourceCases.FrozenResourceCases";
     public const int CaseCount = 23;
 
     public static void Compile(string lab, string current, AotAnalysisSnapshot snapshot, string editor,
