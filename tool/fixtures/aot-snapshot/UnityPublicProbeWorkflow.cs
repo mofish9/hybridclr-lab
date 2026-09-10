@@ -1,13 +1,17 @@
 using System.Diagnostics;
 using System.Security.Cryptography;
 using System.Text.Json;
+using dnlib.DotNet;
+using HybridCLR.DheTool;
 
 internal static class UnityPublicProbeWorkflow
 {
     internal static int Run(string[] args)
     {
-        if (args.Length != 5) throw new ArgumentException("unity-public-probes <lab> <comma-separated Base proofs> <passed shared-resource output> <malformed Model DLL> <new output>");
-        string lab = Path.GetFullPath(args[0]), resource = Path.GetFullPath(args[2]), malformed = Path.GetFullPath(args[3]), output = Path.GetFullPath(args[4]);
+        if (args.Length != 5) throw new ArgumentException("unity-public-probes <lab> <comma-separated Base proofs> <passed shared-resource output> <malformed Model DLL|:current:> <new output>");
+        string lab = Path.GetFullPath(args[0]), resource = Path.GetFullPath(args[2]), output = Path.GetFullPath(args[4]);
+        bool deriveFault = args[3] == ":current:";
+        string malformed = deriveFault ? Path.Combine(output, "malformed-current.dll") : Path.GetFullPath(args[3]);
         string[] proofs = args[1].Split(',').Select(Path.GetFullPath).ToArray();
         if (Directory.Exists(output)) throw new IOException("Probe output must be new.");
         Directory.CreateDirectory(output);
@@ -39,6 +43,10 @@ internal static class UnityPublicProbeWorkflow
             labHead = Execute("git", "-C", lab, "rev-parse", "HEAD");
             var shared = Read(Path.Combine(resource, "result.json"));
             Require(shared.GetProperty("passed").GetBoolean(), "shared-resource-already-passed");
+            string currentModel = Path.Combine(resource, "current/HybridCLR.ValueLayoutModel.dll");
+            if (deriveFault) UnityBehaviourWorkflow.PreparationInput(new[] { currentModel, malformed });
+            Track(currentModel);
+            Require(IsMatchingPreparationFault(currentModel, malformed), "fault-preserves-bound-current-tokens-and-metadata");
             Track(Path.Combine(resource, "result.json")); Track(malformed);
             string[] expected = shared.GetProperty("expected").EnumerateArray().Select(row => row.GetString()!).ToArray();
             for (int index = 0; index < proofs.Length; ++index)
@@ -90,5 +98,30 @@ internal static class UnityPublicProbeWorkflow
         File.WriteAllText(Path.Combine(output, "result.json"), JsonSerializer.Serialize(new { passed, error, checks, runs, files, labHead,
             hostSha256 = Hash(typeof(UnityPublicProbeWorkflow).Assembly.Location), scope = "Immutable Base Unity controls, deliberate native preparation fault, and valid Current fresh-process recovery; no performance or device claims" }, new JsonSerializerOptions { WriteIndented = true }));
         Console.WriteLine("Unity public probes: " + passed + (error == null ? "" : "\n" + error)); return passed ? 0 : 1;
+    }
+
+    private static bool IsMatchingPreparationFault(string currentPath, string malformedPath)
+    {
+        // Execution-plan tokens refer to this exact Current definition set.
+        // An unrelated old faulty DLL can fail preparation for another reason
+        // before the intended self-parent is reached.
+        var current = MetaVersionSnapshot.Create(currentPath);
+        var malformed = MetaVersionSnapshot.Create(malformedPath);
+        if (current.AssemblyName != malformed.AssemblyName ||
+            current.AssemblyMetadataVersion != malformed.AssemblyMetadataVersion ||
+            malformed.Types.Length != current.Types.Length + 1 ||
+            malformed.Methods.Length != current.Methods.Length || malformed.Fields.Length != current.Fields.Length)
+            return false;
+        var types = malformed.Types.ToDictionary(row => row.StableId);
+        var methods = malformed.Methods.ToDictionary(row => row.StableId);
+        var fields = malformed.Fields.ToDictionary(row => row.StableId);
+        if (!current.Types.All(row => types.TryGetValue(row.StableId, out var other) && row.Token == other.Token && row.Version == other.Version) ||
+            !current.Methods.All(row => methods.TryGetValue(row.StableId, out var other) && row.Token == other.Token && row.Version == other.Version) ||
+            !current.Fields.All(row => fields.TryGetValue(row.StableId, out var other) && row.Token == other.Token && row.Version == other.Version))
+            return false;
+        using var module = ModuleDefMD.Load(malformedPath);
+        var cycle = module.Find("HybridCLR.Lab.FaultInjection.PreparationCycle", false);
+        return cycle != null && !current.Types.Any(row => row.Identity == cycle.FullName) &&
+            cycle.BaseType?.MDToken == cycle.MDToken && cycle.Methods.Count == 0 && cycle.Fields.Count == 0;
     }
 }
