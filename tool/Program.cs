@@ -1401,6 +1401,9 @@ internal static partial class Program
                     if (!string.Equals(Sha256File(sourceTarget), sourceHash, StringComparison.OrdinalIgnoreCase) ||
                         !string.Equals(Sha256File(mvTarget), mvHash, StringComparison.OrdinalIgnoreCase))
                         throw new DheException("Frozen AOT source copied hash mismatch: " + baseId + "/" + sourceName);
+                    using (var module = dnlib.DotNet.ModuleDefMD.Load(sourceTarget))
+                        if (module.GlobalType.HasMethods || module.GlobalType.HasFields)
+                            requiredRuntimeCapabilities.Add("deferred-aot-module-initialization-v1");
                     frozenAotSources.Add(new
                     {
                         assemblyName = sourceName,
