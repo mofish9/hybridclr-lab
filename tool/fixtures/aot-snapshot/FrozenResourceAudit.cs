@@ -7,9 +7,12 @@ internal static class FrozenResourceAudit
     // by the update runner. This command never starts or modifies a Player.
     internal static int Run(string[] args)
     {
-        if (args.Length != 3)
-            throw new ArgumentException("frozen-resource-audit <workflow output> <original Current root> <new audit file>");
+        if (args.Length < 3 || args.Length > 4)
+            throw new ArgumentException("frozen-resource-audit <workflow output> <original Current root> <new audit file> [comma-separated module initializer assembly names]");
         string output = Path.GetFullPath(args[0]), current = Path.GetFullPath(args[1]);
+        string[] modules = args.Length == 4 ? args[3].Split(',') : Array.Empty<string>();
+        if (modules.Any(string.IsNullOrWhiteSpace) || modules.Distinct(StringComparer.Ordinal).Count() != modules.Length)
+            throw new ArgumentException("Expected module initializer names must be distinct and nonempty.");
         if (File.Exists(args[2])) throw new IOException("Audit output must be new.");
         JsonElement Read(string path) => JsonSerializer.Deserialize<JsonElement>(File.ReadAllBytes(path));
         string Hash(string path) => Convert.ToHexString(SHA256.HashData(File.ReadAllBytes(path)));
@@ -88,7 +91,8 @@ internal static class FrozenResourceAudit
         foreach (string reportPath in Directory.GetFiles(output, "player-*.json").OrderBy(path => path, StringComparer.Ordinal))
         {
             var report = Read(reportPath);
-            string[] begun = File.ReadLines(reportPath + ".log").Where(line => line.StartsWith("DHE case begin: ", StringComparison.Ordinal))
+            string[] log = File.ReadAllLines(reportPath + ".log");
+            string[] begun = log.Where(line => line.StartsWith("DHE case begin: ", StringComparison.Ordinal))
                 .Select(line => line.Substring(16)).ToArray();
             string key = Path.GetFileNameWithoutExtension(reportPath);
             Require(key + "-known-base", bases.Contains(report.GetProperty("baseId").GetString()!));
@@ -96,12 +100,23 @@ internal static class FrozenResourceAudit
             {
                 Require(key + "-complete-sequence", begun.SequenceEqual(expected) && report.GetProperty("revision").GetInt32() == 73 &&
                     report.GetProperty("loadedAssemblies").GetInt32() == originalNames.Length);
+                if (modules.Length != 0)
+                {
+                    string[] moduleBegins = log.Where(line => line.StartsWith("DHE module begin: ", StringComparison.Ordinal)).Select(line => line.Substring(18)).ToArray();
+                    string[] modulePasses = log.Where(line => line.StartsWith("DHE module pass: ", StringComparison.Ordinal)).Select(line => line.Substring(17)).ToArray();
+                    Require(key + "-complete-module-initialization", moduleBegins.SequenceEqual(modulePasses) &&
+                        modulePasses.OrderBy(name => name, StringComparer.Ordinal).SequenceEqual(modules.OrderBy(name => name, StringComparer.Ordinal)) &&
+                        Array.FindLastIndex(log, line => line.StartsWith("DHE module pass: ", StringComparison.Ordinal)) <
+                        Array.FindIndex(log, line => line.StartsWith("DHE case begin: ", StringComparison.Ordinal)));
+                }
                 successfulRuns++;
             }
             else
             {
                 Require(key + "-no-business-entry", begun.Length == 0 && report.GetProperty("revision").GetInt32() == 0 &&
                     report.GetProperty("loadedAssemblies").GetInt32() == 0);
+                if (modules.Length != 0)
+                    Require(key + "-no-module-side-effects", !log.Any(line => line.StartsWith("DHE module begin: ", StringComparison.Ordinal)));
                 rejectedRuns++;
             }
             files[Path.GetFullPath(reportPath)] = Hash(reportPath);
@@ -109,7 +124,8 @@ internal static class FrozenResourceAudit
         }
         Require("successful-run-per-base", successfulRuns >= bases.Count);
         File.WriteAllText(args[2], JsonSerializer.Serialize(new { passed = true, workflowResultSha256 = Hash(resultPath),
-            caseCount = expected.Length, baseCount = bases.Count, successfulRuns, rejectedRuns, checks, rehashedFileCount = files.Count, files,
+            caseCount = expected.Length, baseCount = bases.Count, successfulRuns, rejectedRuns, expectedModuleInitializers = modules,
+            checks, rehashedFileCount = files.Count, files,
             scope = "Independent read-only original Base/Current identity and full successful/restored case-sequence audit; no performance or platform extrapolation"
         }, new JsonSerializerOptions { WriteIndented = true }));
         Console.WriteLine($"Frozen resource audit passed: {bases.Count} Bases, {expected.Length} cases, {successfulRuns} successful runs, {files.Count} files.");
