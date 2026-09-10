@@ -42,19 +42,24 @@ internal sealed class MetaVersionSnapshot
     public static MetaVersionSnapshot Create(string assemblyPath)
     {
         using var module = ModuleDefMD.Load(assemblyPath);
-        var types = module.Types.SelectMany(AllTypes).Where(type => type.Name != "<Module>")
+        // A compiler-generated module initializer is a real method owned by
+        // TypeDef row 1. Keep that owner when it has members; omitting an empty
+        // module preserves the MV bytes of already archived ordinary DLLs.
+        var definitions = module.Types.SelectMany(AllTypes)
+            .Where(type => !type.IsGlobalModuleType || type.HasMethods || type.HasFields).ToArray();
+        var types = definitions
             .Select(CreateType).OrderBy(type => type.StableId, StringComparer.Ordinal).ToArray();
         var typeIds = types.ToDictionary(type => type.Identity, type => type.StableId, StringComparer.Ordinal);
 		var typeVersions = types.ToDictionary(type => type.Identity, type => type.Version,
 			StringComparer.Ordinal);
 		HashSet<string> addressTakenFields = FindAddressTakenFields(assemblyPath);
-        var fields = module.Types.SelectMany(AllTypes).Where(type => type.Name != "<Module>")
+        var fields = definitions
 			.SelectMany(type => type.Fields.Select((field, index) => CreateField(field,
                 typeIds[type.FullName], index, addressTakenFields.Contains(FieldIdentity(field)))))
             .OrderBy(field => field.StableId, StringComparer.Ordinal).ToArray();
 		var fieldVersions = fields.ToDictionary(field => field.Identity, field => field.Version,
 			StringComparer.Ordinal);
-        var methods = module.Types.SelectMany(AllTypes).SelectMany(type => type.Methods)
+        var methods = definitions.SelectMany(type => type.Methods)
 			.Select(method => CreateMethod(method, typeIds[method.DeclaringType.FullName],
 				typeVersions, fieldVersions))
             .OrderBy(method => method.StableId, StringComparer.Ordinal).ToArray();

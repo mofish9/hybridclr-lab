@@ -31,3 +31,19 @@ Run on committed candidate source, preserve any failing Current, and change
 native code only after reproduction. New native changes require real-header
 compile/CTest and a new immutable Player before replay. Test-only rollback is
 lab `b768c91`; this does not revert the preceding static admission.
+
+## Initial reproduction
+
+Fixture `a94c365` compiles its host and begins Base-29 on unchanged runtime
+`9e7b601`. While that build runs, `preflight-base27` compiles the two real C#
+module initializers and passes the unchanged 46-case CLR reference. Execution
+planning then crashes in `MetaVersionSnapshot.Create`: it enumerates the module
+`.cctor` but omits its `<Module>` declaring type, causing a KeyNotFoundException.
+Preserve these compiler outputs. This is a tool defect before native loading.
+
+The fix includes global types which actually contain methods or fields while
+keeping empty global types omitted, so earlier MV bytes remain unchanged. Verify
+real compiler initializer inventory/body fingerprints and byte-for-byte archived
+MV compatibility. This enables the new interpreter-only peers' analysis; it is
+not evidence for changing an already AOT module initializer. Native explicit
+execution-plan handling of TypeDef row 1 remains a separate boundary to verify.
