@@ -1,6 +1,33 @@
 # DHE evolution implementation and validation
 
-## Active checkpoint: public load outcome and process recovery
+## Active checkpoint: public pre-commit recovery and Unity components
+
+See `../reports/dhe-public-precommit-unity-windows.md`. At lab `69b700c`, immutable
+Base-45/46 pass one identical four-DLL Current with all 46 reference cases,
+12 real public prepared-MV rejection/corrected-retry assertions and 17 Unity
+component assertions. The suite exercises lifecycle callbacks, coroutine frames,
+new component types, added fields/GC roots, interpreted layout-dependent readers
+and a measured unaffected AOT method. The shared workflow passes 16 checks; its
+independent audit passes 66 checks and re-hashes 126 files across four successful
+or restored runs and three pre-entry rejections.
+
+Both Bases also pass actual native metadata-preparation exceptions at phase 1,
+all 11 public restart/no-publication assertions, embedded Base controls, and
+fresh-process recovery with 46 business cases plus 17 Unity assertions. That
+workflow passes 15 checks and binds 93 files. All source-bound final builds use
+host-08 at the exact lab commit above. Earlier Linker and fixture-expectation
+failures remain preserved and are explicitly distinguished in the report.
+
+Runtime/package remain `988a7aa`/`4d5052e`/`2d7355f`, so their 106 managed checks
+and real-header native compile/CTest retain their previous exact identities.
+The selected public failure matrix is now covered by real Player evidence.
+Serialized scene/Prefab evolution, components existing before selection, ordinary
+AOT dependencies involving ThreadStatic/RVA or native-only ABI, and production
+performance/memory remain open. Ordinary AOT source itself remains immutable.
+Continue Unity 2022 Windows before Tuanjie; no new Unity 2021 or Android/iOS claim.
+This is conditional correctness, not full DHE or a formal optimization release.
+
+## Preceding checkpoint: public load outcome and process recovery
 
 See `../reports/dhe-public-load-recovery-windows.md`. HybridCLR `988a7aa`, IL2CPP
 Unity 2022 `4d5052e`, package `2d7355f` add a tracked native load phase and a public

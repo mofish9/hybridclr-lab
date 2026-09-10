@@ -17,7 +17,22 @@ Their immutable inputs are recorded in `manifests/repo-lock.json`.
 
 ## Current phase
 
-The latest candidate adds **public load outcome and process recovery**. HybridCLR
+The latest Windows checkpoint passes **public pre-commit recovery and real Unity
+component evolution**. At lab `69b700c`, two immutable Bases consume one identical
+four-DLL Current and pass all 46 reference cases, 12 public rejection/retry checks
+and 17 Unity checks. Two actual native preparation exceptions require restart;
+fresh processes recover with the same valid resource. Independent shared-resource
+audit passes 66 checks and re-hashes 126 files; the preparation/control workflow
+passes 15 checks and binds 93 files. Changed layout dependencies interpret, while
+a separately measured unaffected method remains AOT. See
+`reports/dhe-public-precommit-unity-windows.md` for exact identities, preserved
+fixture failures and remaining serialization/native-boundary/performance gates.
+Runtime/package commits remain `988a7aa`/`4d5052e`/`2d7355f`; this is a candidate,
+not a new formal release. Unity 2022 Windows first, Tuanjie afterward; no new U21.
+
+The preceding public-load checkpoint retains its original evidence below.
+
+The preceding candidate added **public load outcome and process recovery**. HybridCLR
 `988a7aa` and package `2d7355f` pass 106 managed checks, real-header native
 compile/CTest, real post-commit initializer exceptions and worker reentry on two
 new immutable Unity 2022 Windows Players. Fresh processes recover with the preserved
