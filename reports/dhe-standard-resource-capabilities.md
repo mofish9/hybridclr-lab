@@ -41,3 +41,19 @@ before any Nullable intrinsic. Other definitions execute their IL normally.
 Test canonical/alias/invalid class eligibility with real engine headers and
 rerun the unchanged resource suite on a newly built immutable Player. Keep the
 old failure and Players; no patching of generated code or existing binaries.
+
+Runtime `4ced83d` passes real-header native compile/CTest (`native-02`) and
+builds proof-18. Replaying the exact same Current bytes in `resource-04` (PID
+17872) passes direct Nullable.Value, then fails nullable boxing with an intact
+diagnostic string. The first correction removes the stack-size disagreement;
+it does not close the complete nullable case.
+
+Runtime type-token/field resolution currently asks only the outer type's image
+to map storage. For Nullable<Payload>, corlib owns the definition while Model
+owns the grown argument. Traverse generic arguments, arrays and pointer wrappers
+and ask each definition's own image for its execution type. Preserve the generic
+definition and all qualifiers when no change is required. Resolve local storage
+through the same mapping after generic inflation so copies and box tokens agree
+on physical sizes. Signature matching remains in its original logical domain;
+the mapping applies at execution use sites. Re-run the complete unchanged suite,
+including unaffected generic instantiations, native guards and snapshot rejection.
