@@ -1,5 +1,7 @@
 using System.Security.Cryptography;
 using System.Text.Json;
+using dnlib.DotNet;
+using dnlib.DotNet.Emit;
 using HybridCLR.DheTool;
 
 internal static class VirtualSignaturePolicyTests
@@ -62,6 +64,21 @@ internal static class VirtualSignaturePolicyTests
         var noOp = Analyze("old-no-op", roots[0], roots[0]);
         checks["no-op-startup-requires-owner-fix"] = noOp.RequiredRuntimeCapabilities.Contains(capabilities[0]);
         checks["no-op-keeps-aot"] = noOp.ChangedMethodCount == 0 && !noOp.RequiredRuntimeCapabilities.Intersect(capabilities.Skip(1)).Any();
+        string bodyOnlyRoot = Path.Combine(output, "body-only-current");
+        Directory.CreateDirectory(bodyOnlyRoot);
+        foreach (string file in Dlls(roots[0])) File.Copy(file, Path.Combine(bodyOnlyRoot, Path.GetFileName(file)));
+        string bodyOnlyModel = Path.Combine(bodyOnlyRoot, Model + ".dll");
+        using (var module = ModuleDefMD.Load(File.ReadAllBytes(bodyOnlyModel)))
+        {
+            var method = module.Find("HybridCLR.Lab.VirtualSignatures.Processor", false)!.Methods
+                .Single(method => method.Name == "CopyReference");
+            var literal = method.Body.Instructions.First(instruction => instruction.OpCode == OpCodes.Ldstr);
+            literal.Operand = (string)literal.Operand + "-body-only";
+            module.Write(bodyOnlyModel);
+        }
+        var bodyOnly = Analyze("body-only", roots[0], bodyOnlyRoot);
+        checks["body-only-changes-one-implementation"] = bodyOnly.ChangedMethodCount == 1;
+        checks["body-only-keeps-compatible-frames"] = !bodyOnly.RequiredRuntimeCapabilities.Intersect(capabilities.Skip(1)).Any();
         var added = Analyze("new-type-control", roots[2], roots[3]);
         checks["new-type-control-keeps-older-runtime"] = !added.RequiredRuntimeCapabilities.Intersect(capabilities).Any();
         foreach (string dll in Dlls(roots[3]))
