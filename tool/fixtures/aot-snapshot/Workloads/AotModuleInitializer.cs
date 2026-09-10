@@ -33,6 +33,9 @@ namespace HybridCLR.Lab.ModuleEvolution
         {
             Runs++; Version = ExpectedVersion;
             Console.WriteLine("DHE selected module: " + Version + ":" + Runs);
+#if MODULE_FAILURE
+            throw new InvalidOperationException("DHE deliberate public module failure");
+#endif
         }
         public static void Verify()
         {
