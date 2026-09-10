@@ -1354,13 +1354,17 @@ internal static partial class Program
             }
             var frozenAotSources = new List<object>();
             FrozenAotAdmissionProof? frozenAdmission = null;
-            if (frozenAotPlanPaths.Length != 0 || aotAnalysis != null && execution.Impact.ChangedValueTypes.Length != 0)
+            if (aotAnalysis == null && requiredRuntimeCapabilities.Contains(FrozenFieldValidation.Capability))
+                unsupported.Add("parent-evolution-requires-frozen-base-field-validation:" + baseId);
+            if (frozenAotPlanPaths.Length != 0 || aotAnalysis != null)
             {
                 if (aotAnalysis == null) throw new DheException("Frozen AOT planning requires an authenticated Base snapshot: " + baseId);
                 string[] currentPaths = names.Select(name => Path.Combine(currentVariant.Root, name + ".dll")).ToArray();
                 if (!FrozenAotSourcePlan.CurrentSetHash(currentPaths).Equals(currentVariant.CurrentSetHash, StringComparison.OrdinalIgnoreCase))
                     throw new DheException("Current inputs changed before frozen source compilation.");
                 var frozen = FrozenAotAdaptation.Compile(aotAnalysis, baselineRecords.Select(record => record.path), currentPaths, execution.Impact);
+                if (frozen.Assemblies.Any(source => source.Methods.Any(method => method.Reasons.Contains(FrozenFieldValidation.Reason))))
+                    requiredRuntimeCapabilities.Add(FrozenFieldValidation.Capability);
                 if (!FrozenAotSourcePlan.CurrentSetHash(currentPaths).Equals(currentVariant.CurrentSetHash, StringComparison.OrdinalIgnoreCase))
                     throw new DheException("Current inputs changed during frozen source compilation.");
                 JsonElement[] sourceRows = frozenAotPlanPaths.Length != 0

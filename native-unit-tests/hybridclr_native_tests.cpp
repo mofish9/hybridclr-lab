@@ -38,6 +38,11 @@ static_assert(std::is_constructible<hybridclr::dhe::MetaVersionRegistration,
 #include "hybridclr/interpreter/MemoryUtil.h"
 #include "native_test_hooks.h"
 
+#if __has_include("hybridclr/transform/FrozenFieldValidation.h")
+#include "hybridclr/transform/FrozenFieldValidation.h"
+#define HYBRIDCLR_LAB_HAS_FROZEN_FIELD_VALIDATION 1
+#endif
+
 #if __has_include("hybridclr/transform/NullableIntrinsic.h")
 #include "hybridclr/transform/NullableIntrinsic.h"
 #define HYBRIDCLR_LAB_HAS_NULLABLE_INTRINSIC_POLICY 1
@@ -2733,6 +2738,30 @@ int main()
     TestManagedToNativeCallSelection();
 #endif
     TestBlobReader();
+#if HYBRIDCLR_LAB_HAS_FROZEN_FIELD_VALIDATION
+    {
+        using hybridclr::transform::HasFrozenFieldValidationPrefix;
+        std::array<uint8_t, 102> il{};
+        const uint8_t positions[] = { 0, 1, 6, 7, 8, 9, 10, 11, 16, 21, 22, 23, 28, 29, 34, 39, 40 };
+        const uint8_t values[] = { 2, 0x28, 0x2d, 72, 3, 0x2d, 11, 0x72, 0x73, 0x7a, 2, 0x6f, 3, 0x6f, 0x6f, 0x2d, 39 };
+        for (size_t index = 0; index < sizeof(positions); ++index) il[positions[index]] = values[index];
+        const uint8_t operands[] = { 2, 17, 24, 30, 35 };
+        for (size_t index = 0; index < sizeof(operands); ++index) { il[operands[index]] = static_cast<uint8_t>(index + 1); il[operands[index] + 3] = 6; }
+        hybridclr::metadata::MethodBody body{}; body.ilcodes = il.data(); body.codeSize = static_cast<uint32_t>(il.size());
+        auto match = [](size_t index, uint32_t token) { return token == 0x06000001 + index; };
+        const auto original = il;
+        CHECK(HasFrozenFieldValidationPrefix(body, { 0, 8, 11, 22, 41, 80, 102 }, match));
+        for (uint32_t offset : { 23u, 28u, 29u, 34u, 38u })
+            CHECK(!HasFrozenFieldValidationPrefix(body, { offset }, match));
+        for (uint8_t position : positions) { il[position] ^= 1; CHECK(!HasFrozenFieldValidationPrefix(body, {}, match)); il[position] ^= 1; }
+        for (uint8_t operand : operands) { il[operand] ^= 1; CHECK(!HasFrozenFieldValidationPrefix(body, {}, match)); il[operand] ^= 1; }
+        body.codeSize = 80; CHECK(!HasFrozenFieldValidationPrefix(body, {}, match)); body.codeSize = 102;
+        body.exceptionClauses.emplace_back(); CHECK(!HasFrozenFieldValidationPrefix(body, {}, match)); body.exceptionClauses.clear();
+        body.ilcodes = nullptr; CHECK(!HasFrozenFieldValidationPrefix(body, {}, match)); body.ilcodes = il.data();
+        CHECK(il == original);
+        std::cout << "Frozen field validation prefix and negative controls passed\n";
+    }
+#endif
     TestMetadataUtilities();
 #if HYBRIDCLR_LAB_DHE_ENABLED
     TestDheCurrentImagePlan();

@@ -30,6 +30,7 @@ if (args.Length > 0 && args[0] == "parent-evolution-policy") return ParentEvolut
 if (args.Length > 0 && args[0] == "parent-evolution-replay") return ParentEvolutionWorkflow.Replay(args.Skip(1).ToArray());
 if (args.Length > 0 && args[0] == "parent-transition-reference") return ParentTransitionWorkflow.Reference(args.Skip(1).ToArray());
 if (args.Length > 0 && args[0] == "parent-transition-replay") return ParentTransitionWorkflow.Replay(args.Skip(1).ToArray());
+if (args.Length > 0 && args[0] == "frozen-field-policy") return FrozenFieldValidationPolicy.Run(args.Skip(1).ToArray());
 if (args.Length > 0 && args[0] == "framework-callback-replay") return FrameworkCallbackWorkflow.Replay(args.Skip(1).ToArray());
 if (args.Length > 0 && args[0] == "virtual-signature-policy") return VirtualSignaturePolicyTests.Run(args.Skip(1).ToArray());
 if (args.Length > 0 && args[0] == "virtual-signature-noop") return VirtualSignatureWorkflow.Noop(args.Skip(1).ToArray());

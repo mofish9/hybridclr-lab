@@ -42,6 +42,9 @@ internal static class FrozenAotAdaptation
                 throw new InvalidDataException("Hotfix baseline is not the captured Base source: " + baseline.AssemblyName);
         }
         var impact = verifiedImpact ?? DheValueLayoutImpact.Analyze(before, current, snapshot.OrdinaryAssemblyPaths);
+        bool parentChanged = FrozenFieldValidation.HasParentChange(baselines, current.Select(MetaVersionSnapshot.Create));
+        if (parentChanged && !snapshot.Assemblies.Any(source => !source.Dhe && source.AssemblyName == "mscorlib"))
+            throw new InvalidDataException("Parent evolution requires authenticated Base mscorlib field accessors.");
         var plans = new List<FrozenAotAssemblyPlan>();
         var obligations = new List<FrozenAotObligation>();
         foreach (var source in snapshot.Assemblies.Where(source => !source.Dhe))
@@ -79,6 +82,8 @@ internal static class FrozenAotAdaptation
                     selected.Add(method.MDToken.Raw, reasons = new(StringComparer.Ordinal));
                 reasons.Add(reason);
             }
+            if (parentChanged && source.AssemblyName == "mscorlib")
+                foreach (var method in FrozenFieldValidation.Select(module)) Select(method, FrozenFieldValidation.Reason);
             foreach (var method in affected)
             {
                 if (method.ChangedValueTypes.Length != 0) Select(methods[method.CurrentMethodToken], "changed-value-dependency");

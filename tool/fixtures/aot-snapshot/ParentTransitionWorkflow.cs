@@ -17,7 +17,11 @@ internal static class ParentTransitionWorkflow
         "logical-type-stable", "parent-selection-changed", "current-own-fields", "cached-field-retains-old-storage",
         "cached-method-retains-old-storage", "cached-property-retains-old-storage", "cached-event-retains-old-storage",
         "cached-field-rejects-current", "cached-method-rejects-current", "cached-property-rejects-current", "cached-event-rejects-current",
-        "selected-body-rejects-old-receiver", "selected-body-accepts-current", "rejection-preserves-both-objects"
+        "selected-body-rejects-old-receiver", "selected-body-accepts-current", "rejection-preserves-both-objects",
+        "cached-field-write-retains-old-storage", "cached-field-write-rejects-current", "field-read-rejects-unrelated",
+        "field-write-rejects-unrelated", "field-read-null-target", "field-write-null-target", "field-write-invalid-value",
+        "field-custom-binder-preserved", "binder-logical-ancestry-unchanged", "static-field-ignores-target", "literal-field-read",
+        "literal-field-write-rejected", "open-generic-field-read-rejected", "open-generic-field-write-rejected", "validation-preserves-data"
     };
     private static string[] Expected(string mode) => mode == "removal" ? Common : mode == "replacement" ? Common.Concat(new[] {
         "replacement-constructor-count", "replacement-fields", "replacement-field-owner", "replacement-field-roundtrip",

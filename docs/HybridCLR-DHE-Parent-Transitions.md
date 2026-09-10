@@ -32,3 +32,31 @@ resource and restarting; changing embedded runtime requires a new Player.
 Removal/replacement is not full DHE: cross-assembly/generic parents, Scene/Prefab,
 startup objects, publication stress, performance and memory remain open. No CAT,
 formal publication, Installer defaults, Unity2021, Tuanjie or mobile testing here.
+
+## Cached reflected fields: confirmed failure and correction boundary
+
+Base-95 passes the unchanged removal Current's 21 checks and replacement
+Current's 31 checks, each with 18 framework, 25 virtual and 46 business checks.
+Both pre-load cache runs fail at RuntimeFieldInfo.GetValue on the old object.
+The exact captured mscorlib checks DeclaringType.IsAssignableFrom(obj.GetType()).
+The selected logical ancestry no longer contains ProcessorMiddle, although the
+old physical object still contains its fields. Keep these failures and both
+Current sets unchanged.
+
+Select the original frozen mscorlib RuntimeFieldInfo.GetValue and SetValue when
+an existing hotfix type changes parent. Authenticate the original DLL/MV, require
+complete Base entry guards and an explicit runtime capability. Verify the actual
+method signatures and Unity 2022 validation IL before admitting this adaptation.
+The interpreter transform skips only the validated Object.GetType instruction
+and dispatches its adjacent Type.IsAssignableFrom as Type.IsInstanceOfType,
+preserving the actual receiver. Do not modify shared MethodBody or original IL.
+All null, static, literal, generic, binder and field-storage checks remain.
+Malformed or unfamiliar validation bodies must fail admission/transform.
+
+Keep Type.IsAssignableFrom unchanged globally. New receivers must still reject
+the former parent; old receivers retain physical storage. Add negative controls
+for unrelated/null receivers, wrong values, literals, open generic fields and
+custom binder execution, in addition to the original fourteen cached checks.
+Require committed native/package/tool sources, real-header compile/CTest and a
+new immutable Base before replaying the exact failing Current. No throughput or
+memory improvement is inferred from this correctness correction.
