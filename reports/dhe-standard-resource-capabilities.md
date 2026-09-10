@@ -91,3 +91,41 @@ failures are value assertions. Nullable, both reflection cases, exception/finall
 Current static/generic static/cyclic initialization, constructor defaults,
 ThreadStatic and concurrent first static touch pass individually on this identity.
 This is diagnostic evidence, not a passing complete suite.
+
+## Complete 23-case resource checkpoint
+
+Runtime `cdb2a5f5ec757326057dae8ae89e056730fe6228`, IL2CPP 2022 `8a13baf`,
+and package `187af4f` pass real-header compile/CTest in `native-04`, with
+`mergeReady=true` and `surrogateExternalHeadersUsed=false`. Runtime assembly
+`runtime-04` is locked by lab `937d834`; its canonical HybridCLR source subtree
+hash is `93DC86EA98AD2B4F03FDFD9434991142633E8CD22C94015360FB51E5DA4F4A6E`.
+The earlier `runtime-03` assembly attempt failed because the lock incorrectly
+hashed the repository root instead of its runtime source subtree; it is not a
+passing source identity.
+
+Proof-20 passes Base startup (PID 17844) and the 35-check core replay (PID 19508).
+Its Base ID is `b4f0f62a378645fc66729596cc2ceba157d3534f7c277d00aef37d2a15103c6f`,
+snapshot `e0ab800349df8b206ccbf36ecc0306788f53b85090ec06153308a0463afe175e`, and
+GameAssembly `50B9DA5C111C078A679E424D04F97A1630E7D86900BB4F5E5AA7244ABF55CE31`.
+The core replay retains unchanged native/hotfix AOT dispatch and the failed-load
+rollback/retry assertions.
+
+`resource-07` reuses the exact original failing `resource-03/current` DLL bytes,
+without selecting or removing cases. All 23 cases pass sequentially in the
+immutable proof-20 Player (PID 14148), with the exact CLR reference case sequence.
+Snapshot substitution is rejected before any load/business entry (PID 11188),
+and restoring the original resource passes again (PID 20296). All 8 workflow
+checks pass. Current assembly-set SHA is
+`4b949bb5679363be96346ea1ef9164bbea442230503f3b81d8897fafb314cedf`, resource
+manifest `229B4E2E648D36FF0227F5E0FCB69A946899F1756BD0CC86D0A29688D3117636`.
+Host-07 and the full-sequence gate are built from lab `68255f6`; the resource
+tool remains tool-03 from lab `a5ab3ad`. The original Current suite source is lab
+`d7c8ee6` (Model SHA `790E94EDF7BEA24D7109D69F8A10D3DAA14AB34B7A0625B2591059770AC9FF02`).
+
+This closes these 23 behaviors for one Unity 2022 Windows Base on this exact
+candidate identity. The next gate is a second Base with the grown value layout,
+consuming the same Current bytes. Ordinary existing static-value storage and
+new interpreter-only assembly references remain separate gates. The reusable
+SnapshotPlayer fixture currently requires exactly 3 loaded assemblies; a future
+new-assembly Base fixture must remove that test-only fixed count before building
+its immutable Player. Do not patch an existing Player to bypass that assertion.
