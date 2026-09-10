@@ -20,9 +20,9 @@ internal static class FrozenResourceCasesCompiler
         string library = Path.Combine(directory, "FrozenResourceCases.dll");
         string[] references = snapshot.Assemblies.Where(image => !image.Dhe).Select(image => image.Path)
             .Concat(Directory.GetFiles(current, "*.dll")).ToArray();
-        string[] arguments = new[] { compiler, "-nologo", "-noconfig", "-nostdlib+", "-target:library", "-optimize+", "-debug-",
+        string[] arguments = new[] { compiler, "-nologo", "-noconfig", "-nostdlib+", "-target:library", "-optimize+", "-debug-", "-utf8output",
             "-deterministic+", "-langversion:9.0", "-out:" + library }
-            .Concat(references.Select(path => "-r:" + path)).Append(source).ToArray();
+            .Concat(references.Select(path => "-r:" + (Path.GetFileNameWithoutExtension(path) == "HybridCLR.ValueLayoutModel" ? "model=" : "") + path)).Append(source).ToArray();
         execute(host, arguments);
         string model = Path.Combine(current, "HybridCLR.ValueLayoutModel.dll");
         using (var target = ModuleDefMD.Load(File.ReadAllBytes(model)))

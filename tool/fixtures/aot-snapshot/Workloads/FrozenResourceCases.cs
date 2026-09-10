@@ -1,3 +1,4 @@
+extern alias model;
 using System;
 using System.Collections.Generic;
 using System.Reflection;
@@ -6,6 +7,7 @@ using HybridCLR.Lab.ValueLayoutNative;
 
 namespace HybridCLR.Lab.ValueLayout
 {
+    using Payload = model::HybridCLR.Lab.ValueLayout.Payload;
     // Compiled against the actual captured Unity inputs and merged into Current.
     // Every case runs from the business entry, with the Base binaries unchanged.
     public static class FrozenResourceCases
