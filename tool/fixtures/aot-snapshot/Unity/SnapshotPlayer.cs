@@ -21,7 +21,7 @@ namespace HybridCLR.Lab.Snapshot
             public string[] plannedAssemblies, loadedAssemblyNames, differentialAssemblies, interpreterOnlyAssemblies;
             public string[] records;
             public string[] recoveryChecks;
-            public string[] precommitChecks, unityChecks;
+            public string[] precommitChecks, unityChecks, preparationChecks;
             public int unityBaseDelta;
             public long ordinaryAotReferenceResult;
             public long ordinaryAotEchoExtra;
@@ -91,6 +91,13 @@ namespace HybridCLR.Lab.Snapshot
                 result.interpreterOnlyAssemblies = DheRuntime.InterpreterOnlyAssemblyNames;
                 result.stage = "load-current-batch";
                 byte[][] currentDlls = result.plannedAssemblies.Select(name => provider.LoadBytes(records[name].current)).ToArray();
+                int preparationProbe = Array.IndexOf(args, "-publicPreparationProbe");
+                if (preparationProbe >= 0)
+                {
+                    result.preparationChecks = PublicPreparationPlayer.Verify(result.plannedAssemblies, currentDlls, args[preparationProbe + 1]);
+                    result.error = DheRuntime.LastLoadError; result.stage = "expected-preparation-failure"; result.passed = true;
+                    File.WriteAllText(args[index + 1], JsonUtility.ToJson(result, true)); Application.Quit(0); return;
+                }
                 if (Array.IndexOf(args, "-publicPrecommitProbe") >= 0)
                     result.precommitChecks = PublicPrecommitPlayer.RejectThenRestore(result.plannedAssemblies, currentDlls);
                 bool loadedCurrent = DheRuntime.LoadCurrentAssemblyImages(result.plannedAssemblies, currentDlls, out var code, out error);

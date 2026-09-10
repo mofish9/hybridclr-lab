@@ -32,3 +32,20 @@ source/build identities; do not extrapolate Windows to ARM64 or Unity to Tuanjie
 These are correctness gates, not performance results. All outputs go to new D:
 directories and all failure evidence is retained. No CAT, formal branch/tag,
 Installer default or remote change is authorized by this work.
+
+## Fixture repair and next inputs
+
+Base attempts 41 and 42 failed during Unity Linker preparation, before any Player
+was accepted. Their real coroutine's IteratorStateMachineAttribute referred to the
+temporary compiler assembly. Lab `22acf6b` rebinds embedded attribute type references
+before merging. The old input fails the ownership verifier; both input-base-03 and
+input-current-03 pass. Failed directories remain unchanged on D:.
+
+The next Player bootstrap includes a preparation fault probe. A dedicated dnlib
+fixture adds a self-parenting type to a copy of Current Model. After normal resource
+initialization, the fixture temporarily substitutes that DLL's in-memory expected
+hash and MV assembly hash, restoring records in finally. It requires an actual
+native hierarchy-cycle exception at phase 1, no metadata publication, and restart
+required even after restoring the valid inputs. This bypasses resource admission
+solely for fault injection. A successful fresh-process valid-resource run remains
+required. No Player evidence for these new probes has passed yet.

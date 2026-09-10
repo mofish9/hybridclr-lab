@@ -5,6 +5,22 @@ using HybridCLR.DheTool;
 
 internal static class UnityBehaviourWorkflow
 {
+    internal static int PreparationInput(string[] args)
+    {
+        if (args.Length != 2) throw new ArgumentException("public-preparation-input <valid Model DLL> <new malformed DLL>");
+        if (File.Exists(args[1])) throw new IOException("Malformed fixture must be new.");
+        using var module = ModuleDefMD.Load(args[0]);
+        var cycle = new TypeDefUser("HybridCLR.Lab.FaultInjection", "PreparationCycle")
+            { Attributes = dnlib.DotNet.TypeAttributes.Public };
+        module.Types.Add(cycle); cycle.BaseType = cycle;
+        module.Write(args[1]);
+        using var verified = ModuleDefMD.Load(args[1]);
+        var definition = verified.Find(cycle.FullName, false)!;
+        if (definition.BaseType.MDToken != definition.MDToken) throw new InvalidDataException("Fault injection lost its self-parent.");
+        Console.WriteLine("Deliberate malformed metadata: self-parent verified; normal artifact admission is bypassed only by the Player fixture.");
+        return 0;
+    }
+
     internal static int Attributes(string[] args)
     {
         if (args.Length != 2) throw new ArgumentException("unity-behaviour-attributes <merged Model DLL> <new report>");
