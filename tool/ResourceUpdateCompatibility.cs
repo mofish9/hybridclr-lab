@@ -316,7 +316,7 @@ internal sealed class ResourceUpdateCompatibility
             requiredCapabilities.Add("current-parameter-default-metadata-v1");
         if (parameterDefaultsChanged || physicalTypes.Count != 0 || conditionalTokens.Length != 0)
             requiredCapabilities.Add(ParameterCacheSelectionCapability);
-        if (current.Types.Any(type => physicalTypes.Contains(type.StableId) && !type.IsValueType && !type.IsInterface))
+        if (current.Types.Any(type => physicalTypes.Contains(type.StableId) && (type.Flags & 1u) == 0 && !type.IsInterface))
         {
             requiredCapabilities.Add(PhysicalInterfaceMapCapability);
             requiredCapabilities.Add(ReferenceVirtualInvocationCapability);
