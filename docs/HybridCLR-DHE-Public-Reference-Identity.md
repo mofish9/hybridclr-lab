@@ -2,6 +2,22 @@
 
 ## Current checkpoint
 
+At runtime 8eb835a/23f2f54, Base-61/62 pass the original cached native query
+and clone assertions (14/14), all 11 physical receiver checks and 18 generic
+checks. Cached serialization now passes all 11 checks on Base-61, then lifecycle
+fails Awake with the old-AOT-frame guard; OnDisable and OnDestroy are also
+rejected. Cold lifecycle still passes, and Base-62 passes the cached full suite.
+
+Native invocation currently forwards cached Base MethodInfo directly into
+Runtime::Invoke, unlike managed reflection's prior Current selection. Add a
+receiver-aware Current selection there for an incompatible Base instance frame
+only when its concrete non-byref scalar/string/object ABI matches Current and
+the actual receiver has the Current physical parent. Keep open generics, value
+receivers, changed value buffers, byrefs and old physical receivers on their
+existing guarded paths. Do not change generated AOT guards or mark all Base
+instance frames compatible. Reuse the preserved cached lifecycle failure and
+full regression; explicit broader native parameter/receiver gates remain required.
+
 The isolated native trace (IL2CPP e20b8d7, lab 2db7b49, Base-60) reproduces
 the cached failure at exported il2cpp_class_has_parent(Base descriptor, Current
 descriptor), while class-from-system-type already selects Current correctly.
