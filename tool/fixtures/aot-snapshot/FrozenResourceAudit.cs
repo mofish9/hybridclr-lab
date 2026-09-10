@@ -49,6 +49,12 @@ internal static class FrozenResourceAudit
             "on-disable-current-value", "layout-dependent-reader-selection", "layout-dependent-reader-execution", "unaffected-method-stays-aot", "added-reference-survives-gc",
             "disable-not-repeated-on-destroy", "on-destroy-current-value", "real-multiple-frames"
         };
+        string[] serializationExpected = {
+            "inactive-source-has-no-callback-effects", "json-reads-existing-field", "json-reads-added-field",
+            "json-writes-existing-field", "json-writes-added-field", "old-json-preserves-added-field",
+            "clone-copies-existing-field", "clone-copies-added-field", "cloned-storage-is-independent",
+            "cloned-storage-survives-gc", "fixture-preserves-lifecycle-state"
+        };
         Require("workflow-passed", result.GetProperty("passed").GetBoolean() &&
             result.GetProperty("checks").EnumerateObject().All(check => check.Value.GetBoolean()));
         string[] expected = result.GetProperty("expected").EnumerateArray().Select(row => row.GetString()!).ToArray();
@@ -160,6 +166,16 @@ internal static class FrozenResourceAudit
                         log.Count(line => line == "DHE Unity component pass: 2:17") == 1 &&
                         Array.FindLastIndex(log, line => line.StartsWith("DHE case begin: ", StringComparison.Ordinal)) <
                         Array.FindIndex(log, line => line == "DHE Unity check: awake-current-value"));
+                }
+                if (validationMode.Contains("serialization"))
+                {
+                    const string prefix = "DHE Unity serialization check: ";
+                    Require(key + "-serialization-exact-sequence", log.Where(line => line.StartsWith(prefix, StringComparison.Ordinal))
+                        .Select(line => line.Substring(prefix.Length)).SequenceEqual(serializationExpected) &&
+                        log.Count(line => line == "DHE Unity serialization pass: 11") == 1);
+                    Require(key + "-serialization-after-business-cases", Array.FindLastIndex(log,
+                        line => line.StartsWith("DHE case begin: ", StringComparison.Ordinal)) <
+                        Array.FindIndex(log, line => line == prefix + serializationExpected[0]));
                 }
                 Require(key + "-complete-sequence", begun.SequenceEqual(expected) && report.GetProperty("revision").GetInt32() == 73 &&
                     report.GetProperty("loadedAssemblies").GetInt32() == originalNames.Length);

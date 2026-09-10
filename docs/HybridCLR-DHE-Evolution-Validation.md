@@ -1,6 +1,26 @@
 # DHE evolution implementation and validation
 
-## Active checkpoint: public pre-commit recovery and Unity components
+## Active investigation: Unity serialization and physical reference storage
+
+See `../reports/dhe-unity-serialization-windows.md`. The unchanged full Current
+passes 46 business cases but fails added-field JSON reading on Base-47. The same
+Current passes all eleven JSON/overwrite/clone assertions on Base-48. The separate
+native trace observes offset access without GetValue/SetValue, explaining why
+sidecar storage is insufficient for this Unity consumer.
+
+The latest isolated native candidate, HybridCLR `e403775` and IL2CPP `6d0f642`,
+passes native compile/CTest including il2cpp-api.cpp. At lab `4b2cc49`, Base-52/53
+pass construction and no-op updates. The same Current04 passes eleven native
+serialization checks on both. Base-52 now passes eleven lifecycle checks before
+MethodInfo.Invoke rejects its receiver; Base-53 passes all seventeen. Independent
+full replays at lab `6077928` preserve both outcomes. The separate fourteen-check
+public type fixture passes six checks on Base-52 and all fourteen on Base-53.
+This remains an incomplete correctness candidate. Existing objects, cached type
+and field handles, public identity, reflection invocation and serialized assets
+remain open; no broad assignability or old call-frame guard was relaxed.
+Continue Unity 2022 Windows first, then port and verify Tuanjie independently.
+
+## Completed checkpoint: public pre-commit recovery and Unity components
 
 See `../reports/dhe-public-precommit-unity-windows.md`. At lab `69b700c`, immutable
 Base-45/46 pass one identical four-DLL Current with all 46 reference cases,
