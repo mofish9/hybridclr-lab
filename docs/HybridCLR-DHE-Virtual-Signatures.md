@@ -59,3 +59,20 @@ checks. Rebuild into a fresh output with the exact `base-input-old-01` inputs;
 startup/no-op must pass before testing the unchanged `current-01/current` update.
 The existing new-type control passing all 25 checks does not establish this fix
 or the subsequent old-layout virtual call-frame behavior.
+
+Base-83 at HybridCLR `60b78c3` passes startup/no-op. Its four processed Base
+assemblies must remain byte-identical to Base-82's. The fixed Current resource
+passes all 46 business cases and a 67-file independent audit. The explicit
+virtual-signature replay passes six checks and fails nineteen, all invocation
+paths reaching the old AOT frame guard (the concurrent check aggregates the same
+worker exceptions). Preserve `probe-base83-01` and its exact Current payload.
+
+The next correction separates call-site signature selection from logical
+virtual slot lookup. Abstract declarations also need Current parameter/return
+metadata before the interpreter sizes its stack. Dispatch must continue to use
+the logical method/slot, then select an implementation compatible with the actual
+physical receiver. Interpreter calls validate the selected frame signature;
+reflection selects the implementation after virtual lookup and before unboxing
+arguments. Raw native invocation retains its existing conservative ABI selector.
+Keep native virtual fallback available for abstract declarations; selecting a
+Current declaration does not imply every derived implementation interprets.
