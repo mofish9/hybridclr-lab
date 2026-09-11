@@ -886,14 +886,20 @@ internal sealed class MetaVersionParentSignature
     private uint Index { get; }
     internal MetaVersionParentSignature[] Arguments { get; }
     internal bool IsReferenceParent => Kind == ElementType.Class || Kind == ElementType.GenericInst;
-    internal string Key => ((int)Kind).ToString(CultureInfo.InvariantCulture) + ":" + Piece(AssemblyName) +
-        Piece(DefinitionName) + Index.ToString(CultureInfo.InvariantCulture) + ":" +
-        Arguments.Length.ToString(CultureInfo.InvariantCulture) + ":" + string.Concat(Arguments.Select(value => Piece(value.Key)));
+    internal string Key { get; }
     private static string Piece(string value) => value.Length.ToString(CultureInfo.InvariantCulture) + ":" + value;
 
     private MetaVersionParentSignature(ElementType kind, string assembly, string name,
         uint index, MetaVersionParentSignature[] arguments)
-    { Kind = kind; AssemblyName = assembly; DefinitionName = name; Index = index; Arguments = arguments; }
+    {
+        Kind = kind; AssemblyName = assembly; DefinitionName = name; Index = index; Arguments = arguments;
+        // Hash child identities once so repeated substitutions such as
+        // Layer<Pair<T,T>> do not expand exponentially into display strings.
+        string identity = ((int)Kind).ToString(CultureInfo.InvariantCulture) + ":" + Piece(AssemblyName) +
+            Piece(DefinitionName) + Index.ToString(CultureInfo.InvariantCulture) + ":" +
+            Arguments.Length.ToString(CultureInfo.InvariantCulture) + ":" + string.Concat(Arguments.Select(value => Piece(value.Key)));
+        Key = Convert.ToHexString(SHA256.HashData(Encoding.UTF8.GetBytes(identity)));
+    }
 
     internal static MetaVersionParentSignature? Create(TypeSig? signature, int depth = 0)
     {
