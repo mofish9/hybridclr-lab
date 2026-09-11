@@ -8,7 +8,7 @@ Base identities on Unity 2022.3.62f3 Windows x64.
 - Package branch `research/dhe-asset-provenance-v8.13.0`, commit
   `c3d61a9d9c2997753685b5f3cb14a235614f46cb`.
 - Lab branch `research/dhe-asset-provenance-v8.13.0`, commit
-  `8737a3ce4e4b9185a1346a8c045b5d2f0f130513`.
+  `208d96cdba502e3c262222455160ab45288500a1`.
 - Native runtime candidates remain HybridCLR `b0fe826f071332d109d2bde87c0aa2cc18b9f3c7`
   and Unity 2022 IL2CPP `ecad8a09d1eb9b91a57c59fcdc69b268377bad59`.
 

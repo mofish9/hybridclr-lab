@@ -46,7 +46,12 @@ internal static class DeliveryTimingWorkflow
             ArgumentList = { "-batchmode", "-nographics", "-snapshotResult", report,
                 "-dheDeliveryRoot", delivery, "-dheDeliveryHash", hash, "-logFile", log }
         }) ?? throw new IOException("Could not start Player.");
-        int pid = process.Id; DateTime start = process.StartTime.ToUniversalTime(); process.WaitForExit(); timer.Stop();
+        int pid = process.Id; DateTime start = process.StartTime.ToUniversalTime();
+        Task<string> stdout = process.StandardOutput.ReadToEndAsync();
+        Task<string> stderr = process.StandardError.ReadToEndAsync();
+        if (!process.WaitForExit(120000)) { process.Kill(true); throw new TimeoutException("Player timing run timed out."); }
+        Task.WaitAll(stdout, stderr); timer.Stop();
+        File.WriteAllText(log, stdout.Result + stderr.Result);
         File.WriteAllText(Path.Combine(output, $"pid-{index:D3}.txt"), $"{pid}\n{start:O}\n");
         using var document = JsonDocument.Parse(File.ReadAllBytes(report));
         var root = document.RootElement;
