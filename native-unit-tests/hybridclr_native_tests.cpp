@@ -819,6 +819,15 @@ namespace
 		assembly.image = &image;
 		klass->name = "DheNativeType";
 		klass->namespaze = "";
+#if defined(HYBRIDCLR_DHE_HAS_PUBLIC_ASSEMBLY_IMAGE)
+        Il2CppImage hiddenCurrentImage{};
+        hiddenCurrentImage.assembly = &assembly;
+        Il2CppImage unattachedImage{};
+        CHECK(hybridclr::dhe::ResolvePublicAssemblyImage(nullptr) == nullptr);
+        CHECK(hybridclr::dhe::ResolvePublicAssemblyImage(&unattachedImage) == &unattachedImage);
+        CHECK(hybridclr::dhe::ResolvePublicAssemblyImage(&image) == &image);
+        CHECK(hybridclr::dhe::ResolvePublicAssemblyImage(&hiddenCurrentImage) == &hiddenCurrentImage);
+#endif
 
         MethodInfo changed{};
         changed.klass = klass;
@@ -902,6 +911,12 @@ namespace
             baseMetaVersion, currentMetaVersion));
 		CHECK(changed.isInterpterImpl);
 		CHECK(hybridclr::dhe::IsDheAssembly(&assembly));
+#if defined(HYBRIDCLR_DHE_HAS_PUBLIC_ASSEMBLY_IMAGE)
+        CHECK(hybridclr::dhe::ResolvePublicAssemblyImage(&hiddenCurrentImage) == &image);
+        CHECK(hybridclr::dhe::ResolvePublicAssemblyImage(&image) == &image);
+        CHECK(hiddenCurrentImage.assembly == &assembly && assembly.image == &image);
+        CHECK(klass->image == &image);
+#endif
         CHECK(hybridclr::dhe::IsMutableDheAssembly(&assembly));
         CHECK(!hybridclr::dhe::IsFrozenAotExecutionSource(&assembly));
         CHECK(hybridclr::dhe::IsChangedMethod(&changed));

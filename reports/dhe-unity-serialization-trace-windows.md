@@ -37,3 +37,20 @@ The native and managed logs establish:
 The next diagnostic pass observes serialization eligibility predicates, class
 attributes, generic/byref flags and type equality. Preserve this first trace;
 do not claim a stale-offset or clone-only fix from it. No assertion was relaxed.
+
+## Eligibility diagnostic Base116
+
+IL2CPP `e82b67b`, lab `30f0461`, and `runtime-03` / `native-gate-03` passed
+real-header compile/CTest and Base build checks. `noop-base116-trace-01` passes
+36 asset checks. `shared-two-base-02` passes the unchanged Current on both Bases.
+`current-base116-bundle112-trace-01` still fails after 6/42 checks.
+
+AssetState's Serializable flags, generic=0, inflated=0, kind=18, byref=0 and
+negative Delegate/AssetBehaviour/UnityEngine.Object inheritance tests match the
+no-op control. Native field SerializeReference is false in both. No-op continues
+from class_get_image into callback discovery and field traversal; Current stops
+after class_get_image. That returns a hidden metadata image with the same name
+but a different pointer from the registered Base image. Assembly.cpp already
+assigns the hidden image's assembly to the public Base assembly. This motivates
+the separate public-image candidate; it is not yet proof that the candidate fixes
+serialization. The diagnostic runtime will not be shipped.
