@@ -94,7 +94,8 @@ namespace HybridCLR.Lab.Editor
                 var bundle = new UnityFS.BundleFileReader();
                 using (var stream = File.OpenRead(path))
                 using (var reader = new UnityFS.EndianBinaryReader(stream)) bundle.Load(reader);
-                var serialized = bundle.CreateBundleFileInfo().files.Where(file => file.file.StartsWith("CAB-", StringComparison.Ordinal) &&
+                var serialized = bundle.CreateBundleFileInfo().files.Where(file =>
+                    (file.file.StartsWith("CAB-", StringComparison.Ordinal) || file.file.StartsWith("BuildPlayer-", StringComparison.Ordinal)) &&
                     !file.file.EndsWith(".resS", StringComparison.Ordinal) && !file.file.EndsWith(".resource", StringComparison.Ordinal)).Select(file => {
                     var bytes = file.data;
                     if (bytes.Length < 64 || bytes[8] != 0 || bytes[9] != 0 || bytes[10] != 0 || bytes[11] != 22 || bytes[16] != 0)
