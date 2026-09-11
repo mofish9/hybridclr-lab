@@ -768,12 +768,30 @@ internal sealed class ResourceUpdateCompatibility
             if (!definitions.TryGetValue((ownerAssembly, ownerType), out var owner)) return null;
             var parent = owner.PhysicalParent?.Close(Array.Empty<MetaVersionParentSignature>());
             var visited = new HashSet<(string Assembly, string Type)> { (ownerAssembly, ownerType) };
+            var validatedArguments = new HashSet<MetaVersionParentSignature>();
+            bool ValidSignature(MetaVersionParentSignature value)
+            {
+                if (!validatedArguments.Add(value)) return true;
+                if (value.Kind == dnlib.DotNet.ElementType.Var) return false;
+                if (value.AssemblyName.Length != 0)
+                {
+                    if (assemblies.ContainsKey(value.AssemblyName))
+                    {
+                        if (!definitions.TryGetValue((value.AssemblyName, value.DefinitionName), out var argument) ||
+                            argument.ParentGenericParameterCount != value.Arguments.Length ||
+                            ((argument.Flags & 1u) != 0) != value.IsValueType)
+                            return false;
+                    }
+                    else if (mutableAssemblies.Contains(value.AssemblyName)) return false;
+                }
+                return value.Arguments.All(ValidSignature);
+            }
             while (parent != null && parent.IsReferenceParent)
             {
                 // Repeat definitions are illegal even when each trip changes
                 // arguments (for example A<T> : A<List<T>>).
                 var key = (parent.AssemblyName, parent.DefinitionName);
-                if (!visited.Add(key) || string.IsNullOrEmpty(parent.AssemblyName)) return null;
+                if (!visited.Add(key) || string.IsNullOrEmpty(parent.AssemblyName) || !ValidSignature(parent)) return null;
                 if (!assemblies.ContainsKey(parent.AssemblyName))
                     return mutableAssemblies.Contains(parent.AssemblyName) ? null : parent.Key;
                 if (!definitions.TryGetValue(key, out var definition) || !definition.CanBePhysicalReferenceParent ||

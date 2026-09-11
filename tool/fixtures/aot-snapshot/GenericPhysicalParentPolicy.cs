@@ -43,9 +43,9 @@ internal static class GenericPhysicalParentPolicy
             !noop.RequiredRuntimeCapabilities.Contains(ResourceUpdateCompatibility.PhysicalParentEvolutionCapability);
         checks["parent-capability-required"] = insertion.RequiredRuntimeCapabilities.Contains(ResourceUpdateCompatibility.PhysicalParentEvolutionCapability);
 
-        foreach (string mutation in new[] { "arity", "open-variable", "generic-owner", "sealed-parent", "cycle", "external-root" })
+        foreach (string mutation in new[] { "arity", "bad-nested-arity", "open-variable", "generic-owner", "sealed-parent", "cycle", "external-root", "non-generic-inst" })
         {
-            string name = mutation is "arity" or "open-variable" or "generic-owner" ? Model : Other;
+            string name = mutation is "arity" or "bad-nested-arity" or "open-variable" or "generic-owner" ? Model : Other;
             string path = Path.Combine(output, mutation + ".dll");
             using (var module = ModuleDefMD.Load(File.ReadAllBytes(Path.Combine(args[1], name + ".dll"))))
             {
@@ -54,6 +54,8 @@ internal static class GenericPhysicalParentPolicy
                     var owner = module.Find(Owner, false)!;
                     var signature = (GenericInstSig)((TypeSpec)owner.BaseType).TypeSig;
                     if (mutation == "arity") signature.GenericArguments.Clear();
+                    else if (mutation == "bad-nested-arity") signature.GenericArguments[0] =
+                        new GenericInstSig(signature.GenericType, module.CorLibTypes.Int32, module.CorLibTypes.Int64);
                     else if (mutation == "open-variable") signature.GenericArguments[0] = new GenericVar(0);
                     else owner.GenericParameters.Add(new GenericParamUser(0, GenericParamAttributes.NonVariant, "T"));
                 }
@@ -62,6 +64,7 @@ internal static class GenericPhysicalParentPolicy
                     var parent = module.Find(Parent, false)!;
                     if (mutation == "sealed-parent") parent.IsSealed = true;
                     else if (mutation == "cycle") parent.BaseType = new TypeSpecUser(new GenericInstSig(new ClassSig(parent), new GenericVar(0)));
+                    else if (mutation == "non-generic-inst") parent.BaseType = new TypeSpecUser(new GenericInstSig(new ClassSig(parent.BaseType)));
                     else parent.BaseType = new TypeRefUser(module, "System", "Exception", module.CorLibTypes.AssemblyRef);
                 }
                 module.Write(path);
@@ -78,8 +81,9 @@ internal static class GenericPhysicalParentPolicy
             string path = Path.Combine(output, name + ".dll");
             using var module = new ModuleDefUser("GenericBoundary.dll") { Kind = ModuleKind.Dll };
             new AssemblyDefUser("GenericBoundary", new Version(1, 0, 0, 0)).Modules.Add(module);
-            var external = new TypeRefUser(module, "Frozen", "Root`2", new AssemblyRefUser("FrozenRoots"));
-            var argument = new ClassSig(new TypeRefUser(module, "Same", "Argument", new AssemblyRefUser(argumentAssembly)));
+            bool variableParent = shape == "variable";
+            var external = new TypeRefUser(module, "Frozen", variableParent ? "Root" : "Root`2", new AssemblyRefUser("FrozenRoots"));
+            var argument = new ClassSig(variableParent ? external : new TypeRefUser(module, "Same", "Argument", new AssemblyRefUser(argumentAssembly)));
             var owner = new TypeDefUser("Fixture", "Owner", module.CorLibTypes.Object.TypeDefOrRef)
                 { Attributes = dnlib.DotNet.TypeAttributes.Public | dnlib.DotNet.TypeAttributes.Abstract };
             module.Types.Add(owner);
@@ -90,25 +94,25 @@ internal static class GenericPhysicalParentPolicy
                     { Attributes = dnlib.DotNet.TypeAttributes.Public | dnlib.DotNet.TypeAttributes.Abstract };
                 middle.GenericParameters.Add(new GenericParamUser(0, GenericParamAttributes.NonVariant, "T"));
                 middle.GenericParameters.Add(new GenericParamUser(1, GenericParamAttributes.NonVariant, "U"));
-                middle.BaseType = new TypeSpecUser(new GenericInstSig(new ClassSig(external),
+                middle.BaseType = variableParent ? new TypeSpecUser(new GenericVar(0)) : new TypeSpecUser(new GenericInstSig(new ClassSig(external),
                     First(new GenericVar(swap ? 1u : 0u)), new GenericVar(swap ? 0u : 1u)));
                 module.Types.Add(middle);
                 owner.BaseType = new TypeSpecUser(new GenericInstSig(new ClassSig(middle), argument, module.CorLibTypes.Int64));
             }
-            else owner.BaseType = new TypeSpecUser(new GenericInstSig(new ClassSig(external), First(argument), module.CorLibTypes.Int64));
+            else owner.BaseType = variableParent ? external : new TypeSpecUser(new GenericInstSig(new ClassSig(external), First(argument), module.CorLibTypes.Int64));
             module.Write(path); files[path] = Hash(path); return MetaVersionSnapshot.Create(path);
         }
-        foreach (string shape in new[] { "named", "array" })
+        foreach (string shape in new[] { "named", "array", "variable" })
         {
             var original = Boundary(shape + "-base", false, "ArgumentsA", shape, false);
-            foreach (string change in new[] { "same", "different-scope", "swapped" })
+            foreach (string change in shape == "variable" ? new[] { "same" } : new[] { "same", "different-scope", "swapped" })
             {
                 var updated = Boundary(shape + "-" + change, true, change == "different-scope" ? "ArgumentsB" : "ArgumentsA", shape, change == "swapped");
                 var result = ResourceUpdateCompatibility.Analyze(original, updated,
                     baselineAssemblySet: new[] { original }, currentAssemblySet: new[] { updated },
                     currentStorageTypes: new[] { updated.Types.Single(type => type.Identity == "Fixture.Owner").StableId });
                 string test = "external-substitution-" + shape + "-" + change;
-                checks[test] = change == "same" ? result.Compatible : !result.Compatible &&
+                checks[test] = change == "same" && shape != "variable" ? result.Compatible : !result.Compatible &&
                     result.UnsupportedChanges.Contains("existing-type-layout-or-vtable-change:Fixture.Owner");
                 analyses[test] = new { result.Compatible, result.UnsupportedChanges };
             }

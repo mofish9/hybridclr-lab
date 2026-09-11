@@ -886,6 +886,7 @@ internal sealed class MetaVersionParentSignature
     private uint Index { get; }
     internal MetaVersionParentSignature[] Arguments { get; }
     internal bool IsReferenceParent => Kind == ElementType.Class || Kind == ElementType.GenericInst;
+    internal bool IsValueType => Kind == ElementType.ValueType || Kind == ElementType.GenericInst && Index == 1;
     internal string Key { get; }
     private static string Piece(string value) => value.Length.ToString(CultureInfo.InvariantCulture) + ":" + value;
 
@@ -904,11 +905,11 @@ internal sealed class MetaVersionParentSignature
     internal static MetaVersionParentSignature? Create(TypeSig? signature, int depth = 0)
     {
         if (signature == null || depth > 128) return null;
-        if (signature is GenericVar variable)
-            return new(ElementType.Var, "", "", variable.Number, Array.Empty<MetaVersionParentSignature>());
+        // A class can use T inside Base<T>, but cannot extend T itself.
+        if (signature is GenericSig) return null;
         if (signature is GenericInstSig generic)
         {
-            if (generic.GenericType == null || generic.GenericType.IsValueType) return null;
+            if (generic.GenericType == null || generic.GenericType.IsValueType || generic.GenericArguments.Count == 0) return null;
             var definition = generic.GenericType.TypeDefOrRef;
             var arguments = generic.GenericArguments.Select(value => CreateArgument(value, depth + 1)).ToArray();
             if (arguments.Any(value => value == null)) return null;
@@ -927,7 +928,7 @@ internal sealed class MetaVersionParentSignature
         {
             var definition = generic.GenericType?.TypeDefOrRef;
             var arguments = generic.GenericArguments.Select(value => CreateArgument(value, depth + 1)).ToArray();
-            if (definition == null || arguments.Any(value => value == null)) return null;
+            if (definition == null || arguments.Length == 0 || arguments.Any(value => value == null)) return null;
             // Value-type arguments are valid even though value-type parents are not.
             return new(ElementType.GenericInst, definition.DefinitionAssembly?.Name.String ?? "", definition.FullName,
                 generic.GenericType!.IsValueType ? 1u : 0u, arguments.Select(value => value!).ToArray());
