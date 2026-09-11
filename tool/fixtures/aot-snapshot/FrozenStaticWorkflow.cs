@@ -46,7 +46,8 @@ internal static class FrozenStaticWorkflow
         {
             RebindAttributeTypes(compiled, target);
             foreach (TypeRef reference in compiled.GetTypeRefs())
-                if (reference.ResolutionScope == compiled || reference.DefinitionAssembly?.Name == compiled.Assembly.Name)
+                if (reference.ResolutionScope == compiled || reference.DefinitionAssembly?.Name == compiled.Assembly.Name ||
+                    reference.ResolutionScope is AssemblyRef self && self.FullName == target.Assembly.FullName)
                     reference.ResolutionScope = target;
             foreach (var type in compiled.Types.Where(type => type.Name != "<Module>").ToArray())
             {
@@ -82,6 +83,22 @@ internal static class FrozenStaticWorkflow
             librarySha256 = Hash(library), targetPath, targetSha256 = Hash(targetPath),
             scope = "Real Unity compiler fixture; Base ordinary types are merged only before Base construction"
         }, new JsonSerializerOptions { WriteIndented = true }));
+    }
+
+    // Merging a fixture compiled against its destination DLL can leave an
+    // AssemblyRef to that same DLL. CLR accepts it, but Unity's plugin importer
+    // rejects it. Rewrite only exact self identities in copied fixture inputs.
+    internal static void NormalizeSelfReferences(string path)
+    {
+        using var module = ModuleDefMD.Load(File.ReadAllBytes(path));
+        bool changed = false;
+        foreach (var reference in module.GetTypeRefs())
+            if (reference.ResolutionScope is AssemblyRef self && self.FullName == module.Assembly.FullName)
+            { reference.ResolutionScope = module; changed = true; }
+        if (changed) module.Write(path);
+        using var verified = ModuleDefMD.Load(File.ReadAllBytes(path));
+        if (verified.GetAssemblyRefs().Any(reference => reference.FullName == verified.Assembly.FullName))
+            throw new InvalidDataException("Fixture still contains an assembly self reference: " + path);
     }
 
     private static void RebindAttributeTypes(ModuleDef source, ModuleDef target)

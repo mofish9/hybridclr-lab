@@ -18,6 +18,7 @@ internal static class UnityAssetWorkflow
         string current = Path.Combine(output, "current"); Directory.CreateDirectory(current);
         var inputs = Directory.GetFiles(args[2], "*.dll").ToDictionary(Path.GetFullPath, Hash);
         foreach (string path in inputs.Keys) File.Copy(path, Path.Combine(current, Path.GetFileName(path)));
+        foreach (string path in Directory.GetFiles(current, "*.dll")) FrozenStaticWorkflow.NormalizeSelfReferences(path);
         string identityPath = Path.Combine(args[1], "base/build-identity.json"); var identity = Read(identityPath);
         var snapshot = AotAnalysisSnapshot.Read(identityPath, identity,
             identity.GetProperty("aotAssemblyNames").EnumerateArray().Select(row => row.GetString()!),
@@ -31,6 +32,7 @@ internal static class UnityAssetWorkflow
             .Concat(Directory.GetFiles(current, "*.dll"));
         FrozenStaticWorkflow.CompileAndMerge(args[0], args[3], "UnityAssetDefinitions", Path.Combine(current, "HybridCLR.ValueLayoutModel.dll"),
             references, Path.Combine(output, "compiled"), false, args[5] == "current" ? "UNITY_ASSET_CURRENT" : null);
+        foreach (string path in Directory.GetFiles(current, "*.dll")) FrozenStaticWorkflow.NormalizeSelfReferences(path);
         if (inputs.Any(row => Hash(row.Key) != row.Value)) throw new InvalidDataException("Input DLL changed.");
         Write(Path.Combine(output, "input-evidence.json"), new { inputs, schema = args[5],
             current = Directory.GetFiles(current, "*.dll").ToDictionary(Path.GetFileName, Hash), snapshotSha256 = snapshot.Sha256,
