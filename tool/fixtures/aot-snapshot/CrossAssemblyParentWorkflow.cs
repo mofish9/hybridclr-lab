@@ -144,6 +144,8 @@ internal static class CrossAssemblyParentWorkflow
                 throw new InvalidDataException("Unexpected cross-parent entry shape.");
             entry.Body.Instructions.Insert(insertion, Instruction.Create(OpCodes.Call,
                 model.Find("HybridCLR.Lab.CrossAssemblyParentRemoval.Cases", false)!.Methods.Single(method => method.Name == "RunIfRequested")));
+            foreach (var type in model.GetTypes().Where(type => type.Namespace == "HybridCLR.Lab.CrossAssemblyParents").ToArray())
+                model.Types.Remove(type);
             model.Write(modelPath);
             foreach (var type in other.GetTypes().Where(type => type.Namespace == "HybridCLR.Lab.CrossAssemblyParents").ToArray()) other.Types.Remove(type);
             other.Write(otherPath);
