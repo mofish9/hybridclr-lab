@@ -271,10 +271,10 @@ internal sealed class MetaVersionSnapshot
                 string.Join(",", type.GenericParameters.Select(StableGenericParameter)),
                 string.Join(",", type.Interfaces.Select(row => (row.Interface.DefinitionAssembly?.FullName ?? "") +
                     "|" + row.Interface.FullName).OrderBy(value => value, StringComparer.Ordinal)))),
-            CanUsePhysicalParentEvolution = !type.IsInterface && !type.IsValueType &&
-                !type.HasGenericParameters && type.BaseType is not TypeSpec,
-            CanBePhysicalReferenceParent = !type.IsInterface && !type.IsValueType && !type.IsSealed &&
-                !type.HasGenericParameters && type.BaseType is not TypeSpec,
+            CanUsePhysicalParentEvolution = !type.IsInterface && !type.IsValueType && !type.HasGenericParameters,
+            CanBePhysicalReferenceParent = !type.IsInterface && !type.IsValueType && !type.IsSealed,
+            PhysicalParent = MetaVersionParentSignature.Create(type.BaseType?.ToTypeSig()),
+            ParentGenericParameterCount = type.GenericParameters.Count,
         };
     }
 
@@ -871,6 +871,86 @@ internal sealed record MetaVersionType(string Identity, string StableId, string 
     [JsonIgnore] public string ParentIndependentLayoutVersion { get; init; } = "";
     [JsonIgnore] public bool CanUsePhysicalParentEvolution { get; init; }
     [JsonIgnore] public bool CanBePhysicalReferenceParent { get; init; }
+    [JsonIgnore] public MetaVersionParentSignature? PhysicalParent { get; init; }
+    [JsonIgnore] public int ParentGenericParameterCount { get; init; }
+}
+
+// Admission-only structure. Display names cannot substitute class variables
+// or distinguish equally named arguments in different assemblies. This data
+// does not change the existing binary MV records or their hashes.
+internal sealed class MetaVersionParentSignature
+{
+    internal ElementType Kind { get; }
+    internal string AssemblyName { get; }
+    internal string DefinitionName { get; }
+    private uint Index { get; }
+    internal MetaVersionParentSignature[] Arguments { get; }
+    internal bool IsReferenceParent => Kind == ElementType.Class || Kind == ElementType.GenericInst;
+    internal string Key => ((int)Kind).ToString(CultureInfo.InvariantCulture) + ":" + Piece(AssemblyName) +
+        Piece(DefinitionName) + Index.ToString(CultureInfo.InvariantCulture) + ":" +
+        Arguments.Length.ToString(CultureInfo.InvariantCulture) + ":" + string.Concat(Arguments.Select(value => Piece(value.Key)));
+    private static string Piece(string value) => value.Length.ToString(CultureInfo.InvariantCulture) + ":" + value;
+
+    private MetaVersionParentSignature(ElementType kind, string assembly, string name,
+        uint index, MetaVersionParentSignature[] arguments)
+    { Kind = kind; AssemblyName = assembly; DefinitionName = name; Index = index; Arguments = arguments; }
+
+    internal static MetaVersionParentSignature? Create(TypeSig? signature, int depth = 0)
+    {
+        if (signature == null || depth > 128) return null;
+        if (signature is GenericVar variable)
+            return new(ElementType.Var, "", "", variable.Number, Array.Empty<MetaVersionParentSignature>());
+        if (signature is GenericInstSig generic)
+        {
+            if (generic.GenericType == null || generic.GenericType.IsValueType) return null;
+            var definition = generic.GenericType.TypeDefOrRef;
+            var arguments = generic.GenericArguments.Select(value => CreateArgument(value, depth + 1)).ToArray();
+            if (arguments.Any(value => value == null)) return null;
+            return new(ElementType.GenericInst, definition.DefinitionAssembly?.Name.String ?? "", definition.FullName,
+                0, arguments.Select(value => value!).ToArray());
+        }
+        return CreateArgument(signature, depth);
+    }
+
+    private static MetaVersionParentSignature? CreateArgument(TypeSig signature, int depth)
+    {
+        if (depth > 128) return null;
+        if (signature is GenericVar variable)
+            return new(ElementType.Var, "", "", variable.Number, Array.Empty<MetaVersionParentSignature>());
+        if (signature is GenericInstSig generic)
+        {
+            var definition = generic.GenericType?.TypeDefOrRef;
+            var arguments = generic.GenericArguments.Select(value => CreateArgument(value, depth + 1)).ToArray();
+            if (definition == null || arguments.Any(value => value == null)) return null;
+            // Value-type arguments are valid even though value-type parents are not.
+            return new(ElementType.GenericInst, definition.DefinitionAssembly?.Name.String ?? "", definition.FullName,
+                generic.GenericType!.IsValueType ? 1u : 0u, arguments.Select(value => value!).ToArray());
+        }
+        if (signature is TypeDefOrRefSig named && signature.ElementType != ElementType.Void &&
+            signature.ElementType != ElementType.TypedByRef)
+            return new(signature.IsValueType ? ElementType.ValueType : ElementType.Class,
+                named.TypeDefOrRef.DefinitionAssembly?.Name.String ?? "", named.TypeDefOrRef.FullName,
+                0, Array.Empty<MetaVersionParentSignature>());
+        if (signature is SZArraySig || signature is ArraySig)
+        {
+            var element = CreateArgument(signature.Next, depth + 1);
+            if (element == null) return null;
+            string dimensions = signature is ArraySig array
+                ? string.Join(",", array.Sizes) + ";" + string.Join(",", array.LowerBounds) : "";
+            return new(signature.ElementType, "", dimensions, signature is ArraySig rank ? rank.Rank : 1,
+                new[] { element });
+        }
+        // Method variables, pointers and byrefs cannot be generic base arguments.
+        return null;
+    }
+
+    internal MetaVersionParentSignature? Close(IReadOnlyList<MetaVersionParentSignature> context)
+    {
+        if (Kind == ElementType.Var) return Index < context.Count ? context[(int)Index] : null;
+        var arguments = Arguments.Select(value => value.Close(context)).ToArray();
+        if (arguments.Any(value => value == null)) return null;
+        return new(Kind, AssemblyName, DefinitionName, Index, arguments.Select(value => value!).ToArray());
+    }
 }
 
 internal sealed record MetaVersionMethod(string Identity, string StableId, string Version,

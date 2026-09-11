@@ -722,8 +722,8 @@ internal sealed class ResourceUpdateCompatibility
             !baseline.TypeParents.TryGetValue(before.Identity, out var oldParent) ||
             !current.TypeParents.TryGetValue(after.Identity, out var newParent) || oldParent == newParent)
             return false;
-        var oldBoundary = graphs.Boundary(baseline.AssemblyName, before.Identity, oldParent, true);
-        return oldBoundary != null && oldBoundary == graphs.Boundary(current.AssemblyName, after.Identity, newParent, false);
+        var oldBoundary = graphs.Boundary(baseline.AssemblyName, before.Identity, true);
+        return oldBoundary != null && oldBoundary == graphs.Boundary(current.AssemblyName, after.Identity, false);
     }
 
     // Both sides use their own original/current assembly set. The producer binds
@@ -760,23 +760,28 @@ internal sealed class ResourceUpdateCompatibility
             => assemblies == null ? new() : assemblies.Values.SelectMany(assembly => assembly.Types
                 .Select(type => (Key: (assembly.AssemblyName, type.Identity), Type: type))).ToDictionary(row => row.Key, row => row.Type);
 
-        internal MetaVersionTypeReference? Boundary(string ownerAssembly, string ownerType, MetaVersionTypeReference parent, bool original)
+        internal string? Boundary(string ownerAssembly, string ownerType, bool original)
         {
             if (before == null || after == null) return null;
             var assemblies = original ? before : after;
             var definitions = original ? beforeTypes : afterTypes;
+            if (!definitions.TryGetValue((ownerAssembly, ownerType), out var owner)) return null;
+            var parent = owner.PhysicalParent?.Close(Array.Empty<MetaVersionParentSignature>());
             var visited = new HashSet<(string Assembly, string Type)> { (ownerAssembly, ownerType) };
-            while (true)
+            while (parent != null && parent.IsReferenceParent)
             {
-                var key = (parent.AssemblyName, parent.TypeName);
-                if (parent.DefinitionName != null && parent.DefinitionName != parent.TypeName || !visited.Add(key)) return null;
-                if (!assemblies.TryGetValue(parent.AssemblyName, out var assembly))
-                    return mutableAssemblies.Contains(parent.AssemblyName) ? null : parent;
+                // Repeat definitions are illegal even when each trip changes
+                // arguments (for example A<T> : A<List<T>>).
+                var key = (parent.AssemblyName, parent.DefinitionName);
+                if (!visited.Add(key) || string.IsNullOrEmpty(parent.AssemblyName)) return null;
+                if (!assemblies.ContainsKey(parent.AssemblyName))
+                    return mutableAssemblies.Contains(parent.AssemblyName) ? null : parent.Key;
                 if (!definitions.TryGetValue(key, out var definition) || !definition.CanBePhysicalReferenceParent ||
-                    !assembly.TypeParents.TryGetValue(parent.TypeName, out var next))
+                    definition.ParentGenericParameterCount != parent.Arguments.Length)
                     return null;
-                parent = next;
+                parent = definition.PhysicalParent?.Close(parent.Arguments);
             }
+            return null;
         }
     }
 
