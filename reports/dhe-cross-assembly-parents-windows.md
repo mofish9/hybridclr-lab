@@ -2,19 +2,21 @@
 
 ## Current result
 
-The current candidate accepts and executes a changed parent whose definition is
-in another hotfix assembly. The same Current DLL set is loaded by immutable
-Base-101 (the original parent is present) and Base-100 (root-only, smaller layout).
-Both real Unity 2022.3.62f3 Windows Players pass 33 cross-parent checks, plus 18
-framework, 25 virtual-signature and 46 business checks. A shared resource audit
-and deliberate native-preparation failure/fresh-process recovery also pass.
+The current candidate accepts and executes cross-assembly parent addition and
+removal on immutable Unity 2022.3.62f3 Windows Bases. One Current DLL set is
+loaded by Base-102 (whose AOT image already contains the cross-assembly parent)
+and Base-101 (the existing-parent/type-deletion Base); both Players pass 15
+cross-parent-removal checks, plus 18 framework, 25 virtual-signature and 46
+business checks. The same resource is selected for both Base identities, and
+the shared resource validation reports two compatible Bases with zero
+unsupported changes. Native-preparation failure/fresh-process recovery and
+resource identity checks remain covered by the preceding cross-parent evidence.
 
-This is conditional correctness evidence for a cross-assembly parent addition on
-the tested Base layouts. It is not a release, Android/iOS, performance, memory,
-Scene/Prefab, startup-object or full DHE qualification. Type deletion and cached
-old-object behavior are qualified separately in the type-deletion report. A Base
-whose original parent was already cross-assembly is being built as a follow-up;
-its success is not inferred from this new-parent result.
+This is conditional correctness evidence for the tested cross-assembly parent
+transitions. It is not a release, Android/iOS, performance, memory,
+Scene/Prefab, startup-object or full DHE qualification. Generic parent
+evolution, broader Unity object lifetime behavior and production gates remain
+open.
 
 ## Source identity and changes
 
@@ -38,11 +40,13 @@ The lab source evolution is isolated and committed:
 | 5c92149 | duplicate peer handling in closed-parent scan |
 | f76685e | duplicate peer handling in logical metadata scan |
 | b2b81e2 | complete Base/Current graph binding, invalid-peer rejection and full layout-plan selection |
+| fbaf2b5 | regenerate removal probe without stale fixture definitions and remove the CLR-only AOT assertion |
+| f6c0de7 | align removal reference/replay gates with the 15-check contract |
 
 Final cross-parent tool SHA-256 is
-8FF8F90564CAFB043A80ED01EAA23F30803986730E43B0265055C58B8EF24A0E.
+40D3B0B73BB4F308FABDB01028CEF11F228ADCEF4D8D8F90EC662A26D5839686.
 Final Player host SHA-256 is
-AB705F5E8AF2B3F270797C9ADF345A4E85A6CE06275D36F8C8A1339662FAC5AA.
+0A1831458F4CE5C1CF2DEA5D48E0AEDED8724A0F2A732A95F40EBC98F95573BE.
 The tool change is currently in the lab candidate; no formal package branch,
 runtime tag, Installer default or CAT project was changed.
 
@@ -96,6 +100,17 @@ E91E320B63B236F0421579F785338C709B1AAF4C13EBD1A51B1ACC50B31DDF5D.
 The existing parent-evolution policy regression passes 48 checks using the
 previous local-parent fixtures.
 
+The reverse workflow now has a complete current-identity evidence set:
+`removal-reference-09/result.json` passes the 15-check CLR removal sequence;
+`shared-removal-08/resource/dhe-resource-update-validation.json` reports
+`candidateBaseCount=2`, `compatibleBaseCount=2` and `unsupportedChangeCount=0`;
+the Base-102 and Base-101 Player replays pass at
+`replay-removal-base102-05/result.json` and
+`replay-removal-base101-01/result.json`. The resource manifest SHA-256 is
+`3BDDEB59E1E200EEA2BFE6D93B67C7C8E22B6E626D3046F6984DB2F97694769E`, and the
+validation SHA-256 is
+`D9F43EDBEE01BE478B94263340E89A1FA9FAA7C58D4F2FD6783F6F05F1927C91`.
+
 ## Implementation boundary
 
 `ResourceUpdateCompatibility.Analyze` now accepts an optional immutable
@@ -112,30 +127,28 @@ No runtime ABI guard was weakened. Required physical parent, frame, reference,
 reflection and snapshot capabilities remain in each selected plan. Unchanged
 methods keep their AOT path; no-op proofs are separate from performance claims.
 
-## Cross-parent removal boundary
+## Cross-parent removal qualification
 
-The reverse workflow was attempted on Base-102, whose AOT image already contains
-CrossParent in ValueLayoutOther. The compiler-produced Current removes CrossParent
-and retargets Processor to ProcessorRoot; its managed cold reference validates the
-16 retained-child/root checks. The standard resource producer currently fails
-closed before Player execution with:
+Base-102 already contains `CrossParent` in the AOT image. The compiler-produced
+Current removes `CrossParent` and `CrossMarker` from `ValueLayoutOther` and
+retargets `Processor` to `ProcessorRoot`. The planner now distinguishes deleted
+peer declarations from live retained references, while still rejecting a live
+missing type. It produces one resource for Base-102 and Base-101; Base-102
+records two removed types/ten methods in `ValueLayoutOther` and Base-101 records
+six removed types/47 methods in `ValueLayoutModel`, with both plans compatible.
 
-`Missing current hotfix type: HybridCLR.ValueLayoutOther|HybridCLR.Lab.CrossAssemblyParents.CrossParent`.
-
-This is a real unresolved-reference boundary: the existing impact walk encounters
-the deleted peer type while processing the changed Model graph. It must not be
-silently mapped to Current or ignored. The exact Current, partial resource
-validation and failure log remain under `current-removal-04` and `shared-removal-01`;
-no Player pass is claimed. The next fix should teach the impact/planner graph to
-distinguish references owned by removed types/methods from live retained references,
-then rebuild a fresh Base/resource and re-run the full 18/25/46 gates.
+The CLR oracle passes 15 retained-child/root, reflection, virtual/interface,
+construction, independent-object and GC checks. Both immutable Unity Players
+then pass the same Current resource and the complete framework/virtual/business
+sequence. The old failed producer and host outputs remain archived under the
+earlier `shared-removal-*` and `removal-reference-*` directories.
 
 ## Remaining gates
 
-The reverse case—an immutable Base that already contains a cross-assembly parent—
-is still in progress. After that, test cross-assembly parent removal/replacement
-and cached old objects. Generic parents remain explicitly outside the accepted
-physical-parent subset. Unity Scene/Prefab and startup/live-object behavior,
+Cross-assembly parent removal is now qualified only for the tested cold-start
+Player path. Cached old cross-assembly parent objects have not been qualified.
+Generic parents remain explicitly outside the accepted physical-parent subset.
+Unity Scene/Prefab and startup/live-object behavior,
 concurrent publication stress, production-equivalent throughput/tails/memory,
 final source-bound regression, formal branch/tag publication and Android testing
 remain open. Windows Player correctness cannot establish ARM64 correctness or
