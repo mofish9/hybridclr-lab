@@ -559,6 +559,49 @@ internal sealed class ResourceUpdateCompatibility
         };
     }
 
+    // The producer must fail closed when malformed or internally inconsistent
+    // snapshots reach analysis.  Keep the strict Analyze API for policy tests,
+    // while giving batch/resource workflows a deterministic, auditable result
+    // instead of an unstructured process exception.
+    public static ResourceUpdateCompatibility AnalyzeFailClosed(MetaVersionSnapshot baseline,
+        MetaVersionSnapshot current, IEnumerable<string>? addressTakenFields = null,
+        bool usesUnresolvedCallStubs = true, IEnumerable<MetaVersionSnapshot>? currentAssemblySet = null,
+        IEnumerable<string>? currentStorageTypes = null, IEnumerable<uint>? currentExecutionMethodTokens = null,
+        IEnumerable<uint>? currentGenericContextMethodTokens = null,
+        IEnumerable<MetaVersionSnapshot>? baselineAssemblySet = null)
+    {
+        try
+        {
+            return Analyze(baseline, current, addressTakenFields, usesUnresolvedCallStubs,
+                currentAssemblySet, currentStorageTypes, currentExecutionMethodTokens,
+                currentGenericContextMethodTokens, baselineAssemblySet);
+        }
+        catch (Exception exception) when (IsNonFatalAnalysisFailure(exception))
+        {
+            string detail = NormalizeAnalysisFailure(exception.Message);
+            string reason = "analysis-failed:" + exception.GetType().Name +
+                (detail.Length == 0 ? string.Empty : ":" + detail);
+            return new ResourceUpdateCompatibility
+            {
+                UnsupportedChanges = new[] { reason },
+            };
+        }
+    }
+
+    private static bool IsNonFatalAnalysisFailure(Exception exception) =>
+        exception is not OutOfMemoryException &&
+        exception is not StackOverflowException &&
+        exception is not AccessViolationException;
+
+    private static string NormalizeAnalysisFailure(string? message)
+    {
+        if (string.IsNullOrWhiteSpace(message)) return string.Empty;
+        string value = string.Join(" ", message.Split((char[]?)null,
+            StringSplitOptions.RemoveEmptyEntries));
+        value = value.Replace('\r', ' ').Replace('\n', ' ').Trim();
+        return value.Length <= 240 ? value : value[..240];
+    }
+
     private static bool HasNonScalarSignature(MetaVersionMethod method)
         => method.GenericParameterCount != 0 || method.DeclaringTypeGenericParameterCount != 0 ||
             !IsScalarFrameType(method.ReturnType) || method.ParameterTypes.Any(type => !IsScalarFrameType(type));

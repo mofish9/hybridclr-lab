@@ -70,6 +70,10 @@ internal static class AotModulePolicyTests
             ResourceUpdateCompatibility.RuntimeProtocol, "dhe-runtime-v28",
             ResourceUpdateCompatibility.KnownRuntimeCapabilities.Where(value => value != constantCapability),
             values["changed-constant"].RequiredRuntimeCapabilities);
+        var malformed = ResourceUpdateCompatibility.AnalyzeFailClosed(original, null!);
+        checks["malformed-analysis-fails-closed"] = !malformed.Compatible &&
+            malformed.UnsupportedChanges.Length == 1 &&
+            malformed.UnsupportedChanges[0].StartsWith("analysis-failed:", StringComparison.Ordinal);
         foreach (string mutation in new[] { "visibility", "literal-to-storage", "marshal", "offset", "missing-default", "constant-kind" })
         {
             var invalid = Edit("constant-" + mutation, module => {

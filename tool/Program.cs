@@ -331,7 +331,7 @@ internal static partial class Program
                     Array.Empty<string>(), candidate.Error));
                 continue;
             }
-            ResourceUpdateCompatibility compatibility = ResourceUpdateCompatibility.Analyze(
+            ResourceUpdateCompatibility compatibility = ResourceUpdateCompatibility.AnalyzeFailClosed(
                 candidate.BaseMetaVersion, candidate.CurrentMetaVersion, addressTakenFields,
                 currentAssemblySet: candidates.Where(item => item.CurrentMetaVersion != null)
                     .Select(item => item.CurrentMetaVersion!),
@@ -1256,7 +1256,7 @@ internal static partial class Program
                 {
                     continue;
                 }
-                var compatibility = ResourceUpdateCompatibility.Analyze(baselineSnapshot,
+                var compatibility = ResourceUpdateCompatibility.AnalyzeFailClosed(baselineSnapshot,
                     currentSnapshot, currentVariant.AddressTakenFields,
                     usesUnresolvedCallStubs: baseEngineWorkflow != "Unity2021Standard",
                     currentAssemblySet: currentVariant.Snapshots.Values,
