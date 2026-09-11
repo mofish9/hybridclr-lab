@@ -10,7 +10,7 @@ internal static class CrossAssemblyParentPolicy
     private const string Parent = "HybridCLR.Lab.CrossAssemblyParents.CrossParent";
     internal static int Run(string[] args)
     {
-        if (args.Length != 4) throw new ArgumentException("cross-parent-policy <Base101 baseline> <Base100 baseline> <Current root> <new output>");
+        if (args.Length != 5) throw new ArgumentException("cross-parent-policy <Base101 baseline> <Base100 baseline> <Current root> <new output> <original Native DLL>");
         string output = Path.GetFullPath(args[3]);
         if (Directory.Exists(output)) throw new IOException("Output must be new.");
         Directory.CreateDirectory(output);
@@ -23,19 +23,27 @@ internal static class CrossAssemblyParentPolicy
         var before = Read(args[0]); var small = Read(args[1]); var current = Read(args[2]);
         ResourceUpdateCompatibility Analyze(string name, Dictionary<string, MetaVersionSnapshot> oldSet,
             Dictionary<string, MetaVersionSnapshot> newSet, IEnumerable<MetaVersionSnapshot>? oldPeers = null,
-            IEnumerable<MetaVersionSnapshot>? newPeers = null, bool select = true)
+            IEnumerable<MetaVersionSnapshot>? newPeers = null, bool select = true, ResourceExecutionPlan? plan = null)
         {
             string selected = newSet[Model].Types.Single(type => type.Identity == Owner).StableId;
             var result = ResourceUpdateCompatibility.Analyze(oldSet[Model], newSet[Model],
-                currentStorageTypes: select ? new[] { selected } : Array.Empty<string>(),
+                currentStorageTypes: !select ? Array.Empty<string>() : plan == null ? new[] { selected } :
+                    newSet[Model].Types.Where(type => plan.CurrentStorageTypeTokens.Contains(type.Token)).Select(type => type.StableId),
+                currentExecutionMethodTokens: plan?.CurrentExecutionMethodTokens,
+                currentGenericContextMethodTokens: plan?.CurrentGenericContextMethodTokens,
                 currentAssemblySet: newPeers ?? newSet.Values, baselineAssemblySet: oldPeers ?? oldSet.Values);
             analyses[name] = new { result.Compatible, result.UnsupportedChanges, result.RequiredRuntimeCapabilities };
             return result;
         }
         checks["existing-parent-to-cross-parent"] = Analyze("existing", before, current).Compatible;
-        checks["root-only-to-cross-parent"] = Analyze("small", small, current).Compatible;
-        // This helper intentionally selects only Processor. The separate resource
-        // workflow supplies all value/reference impact selections for small Base.
+        var smallPlan = ResourceExecutionPlanner.Compile(Directory.GetFiles(args[1], "*.dll"),
+            Directory.GetFiles(args[2], "*.dll"), new[] { args[4] }).Plans[Model];
+        files[args[4]] = Hash(args[4]);
+        checks["root-only-to-cross-parent"] = Analyze("small", small, current, plan: smallPlan).Compatible;
+        checks["small-plan-includes-packet"] = current[Model].Types.Any(type =>
+            type.Identity == "HybridCLR.Lab.VirtualSignatures.Packet" && smallPlan.CurrentStorageTypeTokens.Contains(type.Token));
+        // Graph mutations below isolate Processor. The smaller Base above uses
+        // the actual planner's full type and method selections.
         checks["physical-selection-required"] = !Analyze("unselected", before, current, select: false).Compatible;
         checks["cross-parent-removal"] = Analyze("removal", current, before).Compatible;
         checks["missing-original-peer-rejected"] = !Analyze("missing-before", current, before,

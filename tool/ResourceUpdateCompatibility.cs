@@ -145,6 +145,22 @@ internal sealed class ResourceUpdateCompatibility
         var currentFields = current.Fields.ToDictionary(field => field.StableId,
             StringComparer.OrdinalIgnoreCase);
         var unsupported = new List<string>();
+        // Materialize once and reject ambiguous sets before downstream capability
+        // scans build their own lookup tables. An invalid graph must never suppress
+        // a required capability or silently choose one of two same-name snapshots.
+        baselineAssemblySet = baselineAssemblySet?.ToArray();
+        currentAssemblySet = currentAssemblySet?.ToArray();
+        bool InvalidPeers(IEnumerable<MetaVersionSnapshot>? peers, MetaVersionSnapshot own)
+        {
+            if (peers == null) return false;
+            var names = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+            return peers.Any(peer => !names.Add(peer.AssemblyName) ||
+                string.Equals(peer.AssemblyName, own.AssemblyName, StringComparison.OrdinalIgnoreCase) &&
+                !string.Equals(peer.AssemblySha256, own.AssemblySha256, StringComparison.OrdinalIgnoreCase));
+        }
+        if (InvalidPeers(baselineAssemblySet, baseline)) unsupported.Add("invalid-baseline-assembly-snapshot-set");
+        if (InvalidPeers(currentAssemblySet, current)) unsupported.Add("invalid-current-assembly-snapshot-set");
+        if (unsupported.Count != 0) return new ResourceUpdateCompatibility { UnsupportedChanges = unsupported.ToArray() };
         var physicalTypes = new HashSet<string>(currentStorageTypes ?? Array.Empty<string>(), StringComparer.Ordinal);
         var executionTokens = new HashSet<uint>(currentExecutionMethodTokens ?? Array.Empty<uint>());
         uint[] conditionalTokens = (currentGenericContextMethodTokens ?? Array.Empty<uint>()).ToArray();
@@ -557,10 +573,8 @@ internal sealed class ResourceUpdateCompatibility
         MetaVersionSnapshot baseline, MetaVersionSnapshot current,
         IEnumerable<MetaVersionSnapshot>? currentAssemblySet)
     {
-        var snapshots = new Dictionary<string, MetaVersionSnapshot>(StringComparer.OrdinalIgnoreCase);
-        foreach (var snapshot in currentAssemblySet ?? new[] { current })
-            if (!snapshots.TryAdd(snapshot.AssemblyName, snapshot))
-                return false;
+        var snapshots = (currentAssemblySet ?? new[] { current }).ToDictionary(
+            snapshot => snapshot.AssemblyName, StringComparer.OrdinalIgnoreCase);
         snapshots[current.AssemblyName] = current;
         var baseNames = baseline.Types.Select(type => type.Identity).ToHashSet(StringComparer.Ordinal);
         foreach (MetaVersionType added in addedTypes.Where(type => !type.IsInterface))
@@ -590,9 +604,7 @@ internal sealed class ResourceUpdateCompatibility
     private static bool RequiresLogicalAttributeMetadata(MetaVersionSnapshot baseline,
         IEnumerable<MetaVersionSnapshot> currentAssemblySet)
     {
-        var snapshots = new Dictionary<string, MetaVersionSnapshot>(StringComparer.OrdinalIgnoreCase);
-        foreach (var snapshot in currentAssemblySet)
-            if (!snapshots.TryAdd(snapshot.AssemblyName, snapshot)) return false;
+        var snapshots = currentAssemblySet.ToDictionary(snapshot => snapshot.AssemblyName, StringComparer.OrdinalIgnoreCase);
         var baseTypes = baseline.Types.Select(type => type.Identity).ToHashSet(StringComparer.Ordinal);
         var baseMethods = baseline.Methods.Select(method => method.Identity).ToHashSet(StringComparer.Ordinal);
         foreach (MetaVersionAttributeUse use in snapshots.Values.SelectMany(snapshot => snapshot.AttributeUses))
