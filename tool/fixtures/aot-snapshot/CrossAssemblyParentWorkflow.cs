@@ -49,8 +49,8 @@ internal static class CrossAssemblyParentWorkflow
             References(), Path.Combine(output, "compiled-cases"), false);
         string merged = Path.Combine(output, "merged"); Directory.CreateDirectory(merged);
         foreach (string file in Directory.GetFiles(current, "*.dll")) File.Copy(file, Path.Combine(merged, Path.GetFileName(file)));
-        using (var model = ModuleDefMD.Load(modelPath))
-        using (var other = ModuleDefMD.Load(otherPath))
+        using (var model = ModuleDefMD.Load(File.ReadAllBytes(modelPath)))
+        using (var other = ModuleDefMD.Load(File.ReadAllBytes(otherPath)))
         {
             var receiver = model.Find(Owner, false)!; var parent = other.Find(Parent, false)!;
             if (receiver.BaseType?.FullName != Root || parent.BaseType?.FullName != Root || parent.BaseType.DefinitionAssembly?.Name != Model)
