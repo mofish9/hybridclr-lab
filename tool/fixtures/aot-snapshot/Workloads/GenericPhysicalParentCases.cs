@@ -47,7 +47,11 @@ namespace HybridCLR.Lab.GenericPhysicalParents
             Check("cross-assembly-parent", parent.Assembly != owner.Assembly && parent.Assembly.GetName().Name == "HybridCLR.ValueLayoutOther");
             Check("generic-definition", parent.GetGenericTypeDefinition() == typeof(GenericParent<>) && parent.GetGenericArguments()[0] == typeof(ParentPacket));
             Check("logical-parent-casts", (object)child is GenericParent<ParentPacket> && parent.IsAssignableFrom(owner) && parent.IsInstanceOfType(child));
+#if DHE_GENERIC_OWNER_PARENT
+            Check("immutable-root", parent.BaseType == typeof(GenericMiddle<ParentPacket>) && parent.BaseType.BaseType == typeof(ProcessorRoot) && typeof(IOperations).IsAssignableFrom(owner));
+#else
             Check("immutable-root", parent.BaseType == typeof(ProcessorRoot) && typeof(IOperations).IsAssignableFrom(owner));
+#endif
             Check("constructor-once", GenericParent<ParentPacket>.ConstructorCalls == before + 1);
             Check("inherited-default-layout", EqualityComparer<ParentPacket>.Default.Equals(view.GenericValue, default(ParentPacket)) && view.ParentExtra == 70000000003L);
             Check("child-layout", child.Bias == 25 && child.Extra == 1000L);
