@@ -55,7 +55,8 @@ internal static class UnityWorkflow
             ("VirtualSignatureReceiverCache.cs", "Assets"),
             ("ParentTransitionReceiverCache.cs", "Assets"),
             ("TypeDeletionReceiverCache.cs", "Assets"),
-            ("UnityBehaviourPlayer.cs", "Assets"), ("SnapshotWorkflowBuild.cs", "Assets/Editor") })
+            ("UnityBehaviourPlayer.cs", "Assets"), ("UnityAssetPlayer.cs", "Assets"),
+            ("UnityAssetBuild.cs", "Assets/Editor"), ("SnapshotWorkflowBuild.cs", "Assets/Editor") })
             File.Copy(Path.Combine(lab, "tool/fixtures/aot-snapshot/Unity", pair.Item1), Path.Combine(project, pair.Item2, pair.Item1));
         if (mixedTransactionProbe)
             File.Copy(Path.Combine(lab, "tool/fixtures/aot-snapshot/Unity/MixedTransactionPlayer.cs"), Path.Combine(project, "Assets/MixedTransactionPlayer.cs"));

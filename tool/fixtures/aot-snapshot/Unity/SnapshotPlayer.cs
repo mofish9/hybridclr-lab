@@ -27,6 +27,7 @@ namespace HybridCLR.Lab.Snapshot
             public long ordinaryAotEchoExtra;
             public int ordinaryAotStaticNeighbor;
             public string[] virtualNoopChecks;
+            public string[] unityAssetChecks;
             public string[] genericParentNoopChecks;
             public int genericParentNoopMethods, genericParentNoopAotEntries, genericParentNoopInterpreterEntries;
             public string[] virtualReceiverChecks;
@@ -237,6 +238,19 @@ namespace HybridCLR.Lab.Snapshot
                     result.passed = result.genericParentNoopChecks.Length == 29 && result.genericParentNoopAotEntries > 0 &&
                         result.genericParentNoopInterpreterEntries == 0;
                     result.stage = "generic-parent-noop-complete";
+                }
+                int assetProbe = Array.IndexOf(args, "-unityAssetProbe");
+                if (assetProbe >= 0)
+                {
+                    if (!result.passed) throw new InvalidOperationException("Business entry failed before Unity assets.");
+                    int revisionIndex = Array.IndexOf(args, "-unityAssetRevision");
+                    if (revisionIndex < 0) throw new ArgumentException("Missing authored asset revision.");
+                    result.passed = false; result.stage = "unity-assets";
+                    UnityAssetPlayer.Begin(args[assetProbe + 1] == "current", int.Parse(args[revisionIndex + 1]), (checks, failure) => {
+                        result.unityAssetChecks = checks; result.error = failure; result.passed = failure == null; result.stage = "unity-assets-complete";
+                        File.WriteAllText(args[index + 1], JsonUtility.ToJson(result, true)); Application.Quit(result.passed ? 0 : 1);
+                    });
+                    return;
                 }
                 int unityProbe = Array.IndexOf(args, "-unityBehaviourProbe");
                 if (unityProbe >= 0)

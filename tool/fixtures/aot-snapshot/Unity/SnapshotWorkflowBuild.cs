@@ -55,7 +55,11 @@ namespace HybridCLR.Lab.Editor
             File.WriteAllText(args[index + 1], JsonUtility.ToJson(report, true));
             if (!report.passed) throw new InvalidOperationException("Unity execution-plan JSON checks failed.");
         }
-        public static void Prepare() => DheProjectWorkflowRunner.Prepare(Adapter());
+        public static void Prepare()
+        {
+            UnityAssetBuild.PrepareIfPresent();
+            DheProjectWorkflowRunner.Prepare(Adapter());
+        }
         public static void StageRuntimePlan() => DheProjectWorkflowRunner.StageRuntimePlan(Adapter());
         public static void BuildScriptsOnly() => DheProjectWorkflowRunner.BuildScriptsOnly(Adapter());
         public static void BuildFinalPlayer() => DheProjectWorkflowRunner.BuildFinalPlayer(Adapter());
