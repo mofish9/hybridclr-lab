@@ -16,6 +16,8 @@ internal static class UnityBehaviourWorkflow
 
     internal static int ReferenceCurrent(string[] args)
     {
+        if (args.Length == 6 && args[5] == "type-deletion")
+            return CompileNativeProbe(args, "TypeDeletionCases", "HybridCLR.Lab.TypeDeletion.Cases", false);
         if (args.Length == 6 && (args[5] == "parent-removal" || args[5] == "parent-replacement"))
             return CompileNativeProbe(args, "ParentTransitionCases", "HybridCLR.Lab.ParentTransitions.Cases", false);
         if (args.Length == 6 && args[5] == "parent-insertion")
@@ -158,6 +160,30 @@ internal static class UnityBehaviourWorkflow
             donor.Interfaces.Clear();
         }
         var entry = module.Find("HybridCLR.Lab.ValueLayout.Factory", false)!.Methods.Single(method => method.Name == "GetRevision");
+        if (fixture == "TypeDeletionCases")
+        {
+            const string formerParent = "HybridCLR.Lab.ParentEvolution.ProcessorMiddle";
+            const string removedNamespace = "HybridCLR.Lab.ParentEvolution";
+            var receiver = module.Find("HybridCLR.Lab.VirtualSignatures.Processor", false)!;
+            var root = module.Find("HybridCLR.Lab.VirtualSignatures.ProcessorRoot", false)!;
+            if (receiver.BaseType?.FullName != formerParent)
+                throw new InvalidDataException("Type deletion requires the preserved insertion Current.");
+            var constructor = receiver.Methods.Single(method => method.IsInstanceConstructor);
+            var calls = constructor.Body.Instructions.Where(instruction => instruction.OpCode == OpCodes.Call &&
+                instruction.Operand is IMethod method && method.Name == ".ctor" && method.DeclaringType.FullName == formerParent).ToArray();
+            var previous = entry.Body.Instructions.Where(instruction => instruction.OpCode == OpCodes.Call &&
+                instruction.Operand is IMethod method && method.DeclaringType.FullName == removedNamespace + ".Cases" &&
+                method.Name == "RunIfRequested").ToArray();
+            if (calls.Length != 1 || previous.Length != 1)
+                throw new InvalidDataException("Expected the original parent constructor and optional insertion probe.");
+            receiver.BaseType = root; calls[0].Operand = root.Methods.Single(method => method.IsInstanceConstructor);
+            entry.Body.Instructions.Remove(previous[0]);
+            var deleted = module.Types.Where(type => type.Namespace == removedNamespace).ToArray();
+            if (!deleted.Any(type => type.FullName == formerParent) ||
+                !deleted.Any(type => type.Name == "ParentMarker") || !deleted.Any(type => type.Name == "Cases"))
+                throw new InvalidDataException("The original deleted type definitions must exist.");
+            foreach (var type in deleted) module.Types.Remove(type);
+        }
         if (fixture == "ParentTransitionCases")
         {
             const string formerParent = "HybridCLR.Lab.ParentEvolution.ProcessorMiddle";
@@ -185,6 +211,7 @@ internal static class UnityBehaviourWorkflow
             throw new InvalidDataException("Unexpected Current entry shape.");
         entry.Body.Instructions.Insert(insertion, Instruction.Create(OpCodes.Call, invoke));
         module.Write(model);
+        if (fixture == "TypeDeletionCases") TypeDeletionWorkflow.ValidateCurrent(model);
         File.WriteAllText(Path.Combine(output, "entry-wiring.json"), JsonSerializer.Serialize(new {
             merged, mergedSha256 = Convert.ToHexString(SHA256.HashData(File.ReadAllBytes(merged))), current = model,
             currentSha256 = Convert.ToHexString(SHA256.HashData(File.ReadAllBytes(model))), readOnly, callbackControl, fixture, probeType,
