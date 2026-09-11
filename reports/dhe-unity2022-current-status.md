@@ -27,6 +27,7 @@
 - [泛型父类准入策略](dhe-current-host-generic-parent-policy-windows.md)
 - [分析异常拒绝门禁](dhe-analysis-failclosed-windows.md)
 - [本轮公开状态并发修复与精确身份](dhe-public-status-snapshots-windows.md)
+- [新 package 绑定及新一轮 Unity 2022 native 门禁](dhe-snapshot-package-native-windows.md)
 
 ## 剩余难点与推进顺序
 
