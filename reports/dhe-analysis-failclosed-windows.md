@@ -17,7 +17,7 @@ short, deterministic exception type/message in `UnsupportedChanges`.
 
 | Component | Commit |
 |---|---|
-| Lab | `9faac9167bfbc0182fd0d242c1a79c03ee250378` |
+| Lab implementation used to build the host | `9faac9167bfbc0182fd0d242c1a79c03ee250378` |
 | HybridCLR | `6180597d2c0e455ab09fe0920d34d6dea5ad00fc` |
 | Unity 2022 IL2CPP | `819f74c08e466a0d2a8fe5b1afaad5b1d784e482` |
 | Package | `841abfd46e122343717fe4115186b97a215b58df` |
@@ -25,6 +25,9 @@ short, deterministic exception type/message in `UnsupportedChanges`.
 The source remains on the research branch
 `research/dhe-cross-assembly-parents-v8.13.0`; no formal branch, runtime tag,
 Installer default, or project was changed.
+
+The report itself is recorded by the follow-up documentation commit
+`dd20dd6`; it does not change the tested implementation.
 
 ## Evidence
 
