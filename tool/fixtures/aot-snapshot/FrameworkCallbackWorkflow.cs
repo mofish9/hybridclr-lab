@@ -54,13 +54,14 @@ internal static class FrameworkCallbackWorkflow
     {
         bool parentCache = args.Length == 6 && args[5] == "parent-transition-cached";
         bool deletionCache = args.Length == 6 && args[5] == "type-deletion-cached";
-        if (args.Length != 5 && !parentCache && !deletionCache) throw new ArgumentException("framework-callback-replay <lab> <tool.dll> <Base proof> <shared resource> <new output> [parent-transition-cached|type-deletion-cached]");
+        bool virtualCache = args.Length == 6 && args[5] == "virtual-signatures-cached";
+        if (args.Length != 5 && !parentCache && !deletionCache && !virtualCache) throw new ArgumentException("framework-callback-replay <lab> <tool.dll> <Base proof> <shared resource> <new output> [parent-transition-cached|type-deletion-cached|virtual-signatures-cached]");
         string output = Path.GetFullPath(args[4]);
         if (Directory.Exists(output)) throw new IOException("Replay output must be new.");
         Directory.CreateDirectory(output);
         string player = Path.Combine(output, "virtual-business");
         int prior = -1; string error = null;
-        try { prior = UnitySerializationWorkflow.Replay(args.Take(4).Concat(new[] { player, deletionCache ? "type-deletion-cached" : parentCache ? "parent-transition-cached" : "virtual-signatures" }).ToArray()); }
+        try { prior = UnitySerializationWorkflow.Replay(args.Take(4).Concat(new[] { player, deletionCache ? "type-deletion-cached" : parentCache ? "parent-transition-cached" : virtualCache ? "virtual-signatures-cached" : "virtual-signatures" }).ToArray()); }
         catch (Exception exception) { error = exception.ToString(); }
         string log = Path.Combine(player, "player.json.log"), previous = Path.Combine(player, "result.json");
         string[] lines = File.Exists(log) ? File.ReadAllLines(log) : Array.Empty<string>();
