@@ -40,7 +40,7 @@ The lab source evolution is isolated and committed:
 | 5c92149 | duplicate peer handling in closed-parent scan |
 | f76685e | duplicate peer handling in logical metadata scan |
 | b2b81e2 | complete Base/Current graph binding, invalid-peer rejection and full layout-plan selection |
-| fbaf2b5 | regenerate removal probe without stale fixture definitions and remove the CLR-only AOT assertion |
+| fbaf2b5 | regenerate removal probe after removing stale fixture definitions and the CLR-only AOT assertion |
 | f6c0de7 | align removal reference/replay gates with the 15-check contract |
 
 Final cross-parent tool SHA-256 is
@@ -136,9 +136,12 @@ methods keep their AOT path; no-op proofs are separate from performance claims.
 
 Base-102 already contains `CrossParent` in the AOT image. The compiler-produced
 Current removes `CrossParent` and `CrossMarker` from `ValueLayoutOther` and
-retargets `Processor` to `ProcessorRoot`. The planner now distinguishes deleted
-peer declarations from live retained references, while still rejecting a live
-missing type. It produces one resource for Base-102 and Base-101; Base-102
+retargets `Processor` to `ProcessorRoot`. The removal workflow first strips any
+older `CrossAssemblyParentRemoval.Cases` fixture and its entry call from the
+seed Current; that stale probe was a live reference to the deleted parent and
+was correctly rejected by the analyzer. The resulting Current contains no live
+reference to the deleted peer, so the producer accepts it. It produces one
+resource for Base-102 and Base-101; Base-102
 records two removed types/ten methods in `ValueLayoutOther` and Base-101 records
 six removed types/47 methods in `ValueLayoutModel`, with both plans compatible.
 
