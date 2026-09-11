@@ -3,6 +3,7 @@ using System.Runtime.Loader;
 using System.Security.Cryptography;
 using System.Text.Json;
 using dnlib.DotNet;
+using HybridCLR.DheTool;
 
 internal static class TypeDeletionWorkflow
 {
@@ -91,6 +92,60 @@ internal static class TypeDeletionWorkflow
             scope = "Immutable Player actual type deletion and complete framework/virtual/business sequence; cold objects only"
         }, new JsonSerializerOptions { WriteIndented = true }));
         Console.WriteLine("Type deletion replay: " + passed + "; checks=" + observed.Length);
+        return passed ? 0 : 1;
+    }
+
+    internal static int Audit(string[] args)
+    {
+        if (args.Length != 3) throw new ArgumentException("type-deletion-audit <shared workflow> <original Current root> <new audit file>");
+        if (File.Exists(args[2])) throw new IOException("Audit output must be new.");
+        string commonAudit = Path.GetFullPath(args[2]) + ".resource.json";
+        if (FrozenResourceAudit.Run(new[] { args[0], args[1], commonAudit }) != 0) return 1;
+        string model = Path.Combine(args[1], "HybridCLR.ValueLayoutModel.dll");
+        ValidateCurrent(model);
+        var current = MetaVersionSnapshot.Create(model);
+        var currentTypes = current.Types.Select(type => type.StableId).ToHashSet(StringComparer.Ordinal);
+        var currentMethods = current.Methods.Select(method => method.StableId).ToHashSet(StringComparer.Ordinal);
+        JsonElement Read(string path) => JsonSerializer.Deserialize<JsonElement>(File.ReadAllBytes(path));
+        var workflow = Read(Path.Combine(args[0], "result.json"));
+        string validationPath = Path.Combine(args[0], "resource/dhe-resource-update-validation.json");
+        var validation = Read(validationPath);
+        var records = new List<object>(); bool existingParent = false, rootOnly = false;
+        foreach (var player in workflow.GetProperty("players").EnumerateArray())
+        {
+            string proof = player.GetProperty("proof").GetString()!;
+            string identityPath = Path.Combine(proof, "base/build-identity.json");
+            string baseId = Read(identityPath).GetProperty("baseId").GetString()!;
+            string baselinePath = Path.Combine(proof, "base/baseline/HybridCLR.ValueLayoutModel.dll");
+            var baseline = MetaVersionSnapshot.Create(baselinePath);
+            var removedTypes = baseline.Types.Where(type => !currentTypes.Contains(type.StableId)).ToArray();
+            var removedMethods = baseline.Methods.Where(method => !currentMethods.Contains(method.StableId)).ToArray();
+            var selected = validation.GetProperty("bases").EnumerateArray().Single(row => row.GetProperty("baseId").GetString() == baseId);
+            var assembly = selected.GetProperty("assemblies").EnumerateArray()
+                .Single(row => row.GetProperty("assemblyName").GetString() == current.AssemblyName);
+            bool containsParent = baseline.Types.Any(type => type.Identity == "HybridCLR.Lab.ParentEvolution.ProcessorMiddle");
+            bool hasDeletionCapability = selected.GetProperty("requiredRuntimeCapabilities").EnumerateArray()
+                .Any(value => value.GetString() == "removed-types-v1");
+            if (!assembly.GetProperty("compatible").GetBoolean() ||
+                assembly.GetProperty("removedTypeCount").GetInt32() != removedTypes.Length ||
+                assembly.GetProperty("removedMethodCount").GetInt32() != removedMethods.Length ||
+                removedTypes.Any(type => !type.Identity.StartsWith("HybridCLR.Lab.ParentEvolution.", StringComparison.Ordinal)) ||
+                (containsParent && (removedTypes.Length == 0 || !hasDeletionCapability)) ||
+                (!containsParent && removedTypes.Length != 0))
+                throw new InvalidDataException("The resource plan does not match actual Base type/method deletion: " + baseId);
+            existingParent |= containsParent; rootOnly |= !containsParent;
+            records.Add(new { baseId, containsParent, baselinePath, baselineSha256 = Hash(baselinePath),
+                identitySha256 = Hash(identityPath), removedTypes = removedTypes.Select(type => type.Identity).ToArray(),
+                removedMethodCount = removedMethods.Length, hasDeletionCapability });
+        }
+        bool passed = existingParent && rootOnly;
+        File.WriteAllText(args[2], JsonSerializer.Serialize(new {
+            passed, existingParent, rootOnly, records, commonAuditSha256 = Hash(commonAudit),
+            validationSha256 = Hash(validationPath), currentSha256 = Hash(model),
+            hostSha256 = Hash(typeof(TypeDeletionWorkflow).Assembly.Location),
+            scope = "Independent resource identity audit plus actual deletion on existing-parent Base and absence control on root-only Base"
+        }, new JsonSerializerOptions { WriteIndented = true }));
+        Console.WriteLine("Type deletion plan audit: " + passed + "; bases=" + records.Count);
         return passed ? 0 : 1;
     }
 }
