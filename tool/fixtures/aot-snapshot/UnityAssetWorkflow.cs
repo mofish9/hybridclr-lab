@@ -9,6 +9,32 @@ internal static class UnityAssetWorkflow
     private static JsonElement Read(string path) => JsonSerializer.Deserialize<JsonElement>(File.ReadAllBytes(path));
     private static void Write(string path, object value) => File.WriteAllText(path, JsonSerializer.Serialize(value,
         new JsonSerializerOptions { WriteIndented = true }));
+    internal static int TypeTrees(string[] args)
+    {
+        if (args.Length != 2) throw new ArgumentException("unity-asset-type-trees <Base proof> <new report.json>");
+        if (File.Exists(args[1])) throw new IOException("Report must be new.");
+        var rows = new List<object>();
+        foreach (string name in new[] { "resources.assets", "level1" })
+        {
+            string path = Path.Combine(args[0], "base/player/Snapshot_Data", name);
+            using var stream = File.OpenRead(path); using var reader = new BinaryReader(stream);
+            uint Big32() { var bytes = reader.ReadBytes(4); if (BitConverter.IsLittleEndian) Array.Reverse(bytes); return BitConverter.ToUInt32(bytes, 0); }
+            ulong Big64() { var bytes = reader.ReadBytes(8); if (BitConverter.IsLittleEndian) Array.Reverse(bytes); return BitConverter.ToUInt64(bytes, 0); }
+            stream.Position = 8; uint version = Big32();
+            stream.Position = 16; byte endian = reader.ReadByte();
+            if (version != 22 || endian != 0) throw new InvalidDataException("This audit expects Unity 2022 little-endian serialized-file version 22.");
+            stream.Position = 20; uint metadataSize = Big32(); ulong size = Big64(), dataOffset = Big64();
+            if (size != (ulong)stream.Length || dataOffset >= size || metadataSize > size) throw new InvalidDataException("Invalid serialized-file header.");
+            stream.Position = 48; var engineBytes = new List<byte>(); byte value;
+            while ((value = reader.ReadByte()) != 0) { if (engineBytes.Count >= 256) throw new InvalidDataException("Invalid engine version."); engineBytes.Add(value); }
+            string engine = System.Text.Encoding.UTF8.GetString(engineBytes.ToArray());
+            int platform = reader.ReadInt32(); bool typeTreeEnabled = reader.ReadBoolean();
+            rows.Add(new { path, version, engine, platform, typeTreeEnabled, sha256 = Hash(path) });
+        }
+        Write(args[1], new { parsed = true, files = rows, hostSha256 = Hash(typeof(UnityAssetWorkflow).Assembly.Location),
+            scope = "Read-only serialized-file metadata inspection; absence of a type tree is not a correctness pass" });
+        return 0;
+    }
     internal static int Inputs(string[] args)
     {
         if (args.Length != 6 || args[5] != "base" && args[5] != "current")
