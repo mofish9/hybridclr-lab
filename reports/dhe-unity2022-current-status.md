@@ -16,7 +16,7 @@
 | AOT 保留 | no-op 用例有 AOT 入口且 DHE 解释器入口为 0；这证明路由，不代表已测得性能收益 |
 | 代码与结构变化 | 已覆盖方法体、类型和成员增删、部分字段布局/签名替换、接口/虚调用、泛型上下文、反射、异常、静态初始化及 GC；每项仍受对应报告的边界约束 |
 | 跨程序集父类增删 | Base101 与 Base102 共用 Current 的真实回放通过，分别有 15 项跨父类检查及 18 项框架检查；父类删除只验收冷启动路径 |
-| 泛型父类 | 新增解释器派生类继承已有闭合泛型父类已有验证；不等于已有物理类型可以任意更换泛型父类 |
+| 泛型父类 | 已有非泛型 AOT owner 改继承跨程序集新增闭合泛型父类，三代 Base 共用 Current 的 29 项专项通过；泛型 owner、Base 已 AOT 包含该父类后的演进仍未验收 |
 | 失败处理 | 兼容性分析异常拒绝资源并保留原因；原生加载拒绝、部分准备失败和提交后初始化失败区分重试/重启 |
 | 本轮补齐 | 公开程序集状态改为原子发布数组快照；宿主 126/126。新 package 的 Base103 已构建，no-op 25/25；Base101/102/103 共用 Current 的业务、父类删除、框架回调、失败恢复和 Component 生命周期检查通过 |
 
@@ -29,6 +29,7 @@
 - [本轮公开状态并发修复与精确身份](dhe-public-status-snapshots-windows.md)
 - [新 package 绑定及新一轮 Unity 2022 native 门禁](dhe-snapshot-package-native-windows.md)
 - [新 package Player 与三代 Base 同资源验证](dhe-current-package-three-base-windows.md)
+- [已有物理类型的闭合泛型父类：三代 Base 同资源验证](dhe-generic-physical-parents-windows.md)
 
 ## 剩余难点与推进顺序
 
@@ -36,8 +37,8 @@
    再运行最终同身份总回归。旧 Base101/102 的证据仍属于它们原来的 package。
 2. 验证 Unity 场景/Prefab 序列化、Component 生命周期、加载前已存在对象，以及父类删除后
    缓存旧对象的行为。C# 类型/字段变化必须同时满足 Unity 原生对象与序列化的要求。
-3. 继续处理已有物理类型的泛型父类与 TypeSpec 演进。这涉及布局、泛型实例化、虚表及跨程序集
-   类型身份；单纯识别 IL 差异不能解决这些问题。
+3. 非泛型 owner 改继承新增闭合泛型父类已通过。下一步构建本来就 AOT 包含该泛型父类的 Base，
+   验证 no-op、后续实参替换/父类删除及多 Base；泛型 owner 自身仍明确拒绝，需另行推进。
 4. 完成原生发布并发压力、Windows 正确性总回归及性能/内存对照，再整理可供真实项目试验的
    package/runtime/工具组合。当前还没有 P50/P95/P99 或内存收益结论。
 
@@ -51,7 +52,7 @@ Android 由用户后续在真实项目验证；Windows 通过不代表 ARM64 或
 | HybridCLR | `research/dhe-parent-transitions-v8.13.0` | `6180597d2c0e455ab09fe0920d34d6dea5ad00fc` |
 | IL2CPP Unity 2022 | `research/dhe-parent-evolution-v8.13.0` | `819f74c08e466a0d2a8fe5b1afaad5b1d784e482` |
 | package | `research/dhe-parent-transitions-v8.13.0` | `ed4b7b52a49373069d1a1336e3f8784278a03b39` |
-| lab 测试/工具 | `research/dhe-cross-assembly-parents-v8.13.0` | `46372939d728e13eb9f7c104d3b1c3c89a0d5522` |
+| lab 测试/工具 | `research/dhe-generic-physical-parents-v8.13.0` | `695fa72d132e7fccc209c3f03f989cb960c03e66` |
 
 本表为候选实现组合，不是已通过全部门禁的发布锁。后续文档提交不会替换测试报告中的实现身份。
 旧 Base101/102 的 package 仍为 `841abfd46e122343717fe4115186b97a215b58df`；
