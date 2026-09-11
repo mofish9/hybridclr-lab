@@ -15,7 +15,7 @@
     "hybridclr_unity": {
       "remote": "https://github.com/mofish9/hybridclr_unity.git",
       "ref": "refs/heads/optimize/dhe-project-trial-v8.14.1",
-      "commit": "f99bfa442082c4823ba2865e845019f351c2f7e5"
+      "commit": "d88d7babfca50eeb20673459a635b96e77c36570"
     },
     "hybridclr": {
       "remote": "https://github.com/mofish9/hybridclr.git",
