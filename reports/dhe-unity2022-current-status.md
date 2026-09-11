@@ -18,7 +18,7 @@
 | 跨程序集父类增删 | Base101 与 Base102 共用 Current 的真实回放通过，分别有 15 项跨父类检查及 18 项框架检查；父类删除只验收冷启动路径 |
 | 泛型父类 | 新增解释器派生类继承已有闭合泛型父类已有验证；不等于已有物理类型可以任意更换泛型父类 |
 | 失败处理 | 兼容性分析异常拒绝资源并保留原因；原生加载拒绝、部分准备失败和提交后初始化失败区分重试/重启 |
-| 本轮补齐 | 公开程序集状态改为原子发布数组快照；当前 package 的 .NET 宿主 126/126，旧 package 对照检出 4 项失败；未新建 Unity Player |
+| 本轮补齐 | 公开程序集状态改为原子发布数组快照；宿主 126/126。新 package 的 Base103 已构建，no-op 25/25；Base101/102/103 共用 Current 的业务、父类删除、框架回调、失败恢复和 Component 生命周期检查通过 |
 
 主要证据入口：
 
@@ -28,11 +28,12 @@
 - [分析异常拒绝门禁](dhe-analysis-failclosed-windows.md)
 - [本轮公开状态并发修复与精确身份](dhe-public-status-snapshots-windows.md)
 - [新 package 绑定及新一轮 Unity 2022 native 门禁](dhe-snapshot-package-native-windows.md)
+- [新 package Player 与三代 Base 同资源验证](dhe-current-package-three-base-windows.md)
 
 ## 剩余难点与推进顺序
 
-1. 先把最新 package 放入 Unity 2022 demo 的新 Base，统一回归同身份下的已有能力与多 Base
-   资源流程。已有旧 Player 不能因为宿主或 package 源码变更就改记为新版本证据。
+1. 新 package 的 Base103 及三 Base 资源回归已完成上述范围；无需重复构建。继续补剩余能力后，
+   再运行最终同身份总回归。旧 Base101/102 的证据仍属于它们原来的 package。
 2. 验证 Unity 场景/Prefab 序列化、Component 生命周期、加载前已存在对象，以及父类删除后
    缓存旧对象的行为。C# 类型/字段变化必须同时满足 Unity 原生对象与序列化的要求。
 3. 继续处理已有物理类型的泛型父类与 TypeSpec 演进。这涉及布局、泛型实例化、虚表及跨程序集
@@ -53,6 +54,7 @@ Android 由用户后续在真实项目验证；Windows 通过不代表 ARM64 或
 | lab 测试/工具 | `research/dhe-cross-assembly-parents-v8.13.0` | `46372939d728e13eb9f7c104d3b1c3c89a0d5522` |
 
 本表为候选实现组合，不是已通过全部门禁的发布锁。后续文档提交不会替换测试报告中的实现身份。
-旧 Player 的 package 仍为 `841abfd46e122343717fe4115186b97a215b58df`。
+旧 Base101/102 的 package 仍为 `841abfd46e122343717fe4115186b97a215b58df`；
+新 Base103 的 package 为 `ed4b7b52a49373069d1a1336e3f8784278a03b39`。
 本轮改动已提交在候选工作树；没有推进正式维护分支、runtime tag 或 Installer 默认版本。
 准确回滚步骤见各项报告。当前无需用户执行 CAT 或移动端测试来完成本轮宿主检查。
