@@ -18,7 +18,7 @@
 | 跨程序集父类增删 | Base101 与 Base102 共用 Current 的真实回放通过，分别有 15 项跨父类检查及 18 项框架检查；父类删除只验收冷启动路径 |
 | 泛型父类 | Base104 已 AOT 包含闭合泛型父类，no-op 29 项通过且解释器入口为 0；值类型实参换为引用类型后三代 Base 共用 Current 的 29 项专项通过；移除父类恢复根类的双 Base 回放通过 |
 | 泛型 owner | 类型参数与约束不变时，已有 AOT 泛型类插入 `GenericMiddle<T>` 父类的 31 项专项在 Base104/103 同资源通过；不能外推为任意泛型结构修改 |
-| 实际 Scene/Prefab | 内置资源无类型树的布局兼容失败仍在；带类型树的 AssetBundle 也未解决旧 Base 嵌套对象丢失。新原生查询候选 Base113 no-op 36/36，但 Current 配旧/最新包均失败；新布局 Base112 配最新包 42/42。资产工作流未验收 |
+| 实际 Scene/Prefab | 已修复原生公开程序集镜像身份：旧布局 Base117 与新布局 Base112 使用同一 Current 和最新带类型树的 AssetBundle，均通过 42/42。旧包的改名字段迁移仍失败；无类型树内置资源及统一代码/资产交付尚未验收 |
 | 失败处理 | 兼容性分析异常拒绝资源并保留原因；原生加载拒绝、部分准备失败和提交后初始化失败区分重试/重启 |
 | 本轮补齐 | 公开程序集状态改为原子发布数组快照；宿主 126/126。新 package 的 Base103 已构建，no-op 25/25；Base101/102/103 共用 Current 的业务、父类删除、框架回调、失败恢复和 Component 生命周期检查通过 |
 
@@ -36,14 +36,17 @@
 - [泛型类自身改变父类：准入分析与双 Base 验证](dhe-generic-owners-windows.md)
 - [真实 Scene/Prefab 的布局兼容失败与下一步](dhe-unity-assets-windows.md)
 - [带类型树 AssetBundle 与原生类型查询候选的失败证据](dhe-unity-bundles-windows.md)
+- [原生序列化路径诊断](dhe-unity-serialization-trace-windows.md)
+- [公开程序集镜像修复及双 Base 资产验证](dhe-public-image-windows.md)
 
 ## 剩余难点与推进顺序
 
 1. 新 package 的 Base103 及三 Base 资源回归已完成上述范围；无需重复构建。继续补剩余能力后，
    再运行最终同身份总回归。旧 Base101/102 的证据仍属于它们原来的 package。
-2. 保留类型树及最新 AssetBundle 的验证仍失败；四个原生类型查询入口映射也未解决。
-   下一步定位 Unity 实际使用的 class/field metadata 与序列化遍历，之后再补加载前对象、
-   旧缓存及保存数据迁移。详见 AssetBundle 报告，不能把 native compile 通过当作资产兼容通过。
+2. 公开程序集镜像修复后，旧 Base 加载最新 typed AssetBundle 已通过 42 项。
+   继续解决旧包字段改名迁移、新增序列化类型，并将代码/资产的同版本选择纳入 package。
+   当前测试的 bundle 根目录仍独立提供，尚未验收完整单包交付。随后补加载前对象、
+   旧缓存和保存数据迁移；无类型树内置资源失败继续保留。
 3. Base104 已补齐泛型父类 AOT no-op、值类型实参换引用类型和恢复根类的多 Base 回放。
    泛型 owner 参数/约束不变的父类插入也已通过。继续补更复杂泛型图演进、删除泛型定义后的
    反射查询，以及上面的序列化和旧对象边界；不能把已验证的实例组合外推到所有泛型变化。
@@ -57,10 +60,10 @@ Android 由用户后续在真实项目验证；Windows 通过不代表 ARM64 或
 
 | 仓库 | 当前候选分支 | 实现提交 |
 |---|---|---|
-| HybridCLR | `research/dhe-parent-transitions-v8.13.0` | `6180597d2c0e455ab09fe0920d34d6dea5ad00fc` |
-| IL2CPP Unity 2022 | `research/dhe-native-type-resolution-v8.13.0` | `2ff64a8708e9b54d08962c9280d9024240515bec`；资产假设未通过，旧控制为 `819f74c` |
+| HybridCLR | `research/dhe-public-image-v8.13.0` | `b0fe826f071332d109d2bde87c0aa2cc18b9f3c7` |
+| IL2CPP Unity 2022 | `research/dhe-public-image-v8.13.0` | `ecad8a09d1eb9b91a57c59fcdc69b268377bad59` |
 | package | `research/dhe-parent-transitions-v8.13.0` | `ed4b7b52a49373069d1a1336e3f8784278a03b39` |
-| lab 测试/工具 | `research/dhe-unity-bundles-v8.13.0` | 本轮构建/回放 `364ae76`；producer 仍为 `db4d17e` |
+| lab 测试/工具 | `research/dhe-public-image-v8.13.0` | 本轮构建/回放 `6981233`；producer 仍为 `db4d17e` |
 
 本表为候选实现组合，不是已通过全部门禁的发布锁。后续文档提交不会替换测试报告中的实现身份。
 旧 Base101/102 的 package 仍为 `841abfd46e122343717fe4115186b97a215b58df`；
