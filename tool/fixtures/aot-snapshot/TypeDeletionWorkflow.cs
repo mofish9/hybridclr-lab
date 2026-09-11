@@ -34,10 +34,15 @@ internal static class TypeDeletionWorkflow
 
     internal static int Reference(string[] args)
     {
-        if (args.Length != 3) throw new ArgumentException("type-deletion-reference <Current DLL root> <Base Native DLL> <new output>");
+        if (args.Length != 4) throw new ArgumentException("type-deletion-reference <Current DLL root> <Base Native DLL> <new output> <Unity CoreModule DLL>");
         string output = Path.GetFullPath(args[2]);
         if (Directory.Exists(output)) throw new IOException("Output must be new.");
         ValidateCurrent(Path.Combine(args[0], "HybridCLR.ValueLayoutModel.dll"));
+        // The complete assembly also contains the existing MonoBehaviour cases.
+        // Full type enumeration needs their actual Unity reference definitions,
+        // although this CLR oracle does not invoke Unity native functionality.
+        string unityCore = Path.GetFullPath(args[3]);
+        AssemblyLoadContext.Default.LoadFromAssemblyPath(unityCore);
         Directory.CreateDirectory(output); string previous = Path.Combine(output, "framework");
         int prior = FrameworkCallbackWorkflow.Reference(new[] { args[0], args[1], previous });
         var assembly = AssemblyLoadContext.Default.Assemblies.Single(value => value.GetName().Name == "HybridCLR.ValueLayoutModel");
@@ -54,7 +59,8 @@ internal static class TypeDeletionWorkflow
         string[] observed = Observed(trace.ToString().Split('\n').Select(line => line.TrimEnd('\r')));
         bool passed = prior == 0 && error == null && checks.SequenceEqual(Expected) && observed.SequenceEqual(Expected);
         File.WriteAllText(Path.Combine(output, "result.json"), JsonSerializer.Serialize(new {
-            passed, checks, observed, expected = Expected, error, priorResultSha256 = Hash(Path.Combine(previous, "result.json")),
+            passed, checks, observed, expected = Expected, error, unityCore, unityCoreSha256 = Hash(unityCore),
+            priorResultSha256 = Hash(Path.Combine(previous, "result.json")),
             logSha256 = Hash(log), hostSha256 = Hash(typeof(TypeDeletionWorkflow).Assembly.Location),
             scope = "CLR actual type deletion, retained child and complete framework/virtual/business sequences"
         }, new JsonSerializerOptions { WriteIndented = true }));
