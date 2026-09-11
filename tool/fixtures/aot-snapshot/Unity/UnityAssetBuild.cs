@@ -51,11 +51,14 @@ namespace HybridCLR.Lab.Editor
                 return root;
             }
             const string prefab = "Assets/Resources/DheAssetPrefab.prefab", scenePath = "Assets/Scenes/DheAssetScene.unity";
+            // Each batch phase starts a fresh Editor; its active scene can be
+            // untitled even though the preceding phase saved the startup scene.
+            var startup = EditorSceneManager.OpenScene(EditorBuildSettings.scenes.First(row => row.enabled).path, OpenSceneMode.Single);
             Directory.CreateDirectory("Assets/Resources");
             var source = Object("saved-prefab");
             if (PrefabUtility.SaveAsPrefabAsset(source, prefab) == null) throw new InvalidOperationException("Prefab was not saved.");
             UnityEngine.Object.DestroyImmediate(source);
-            var startup = SceneManager.GetActiveScene();
+            EditorSceneManager.SaveScene(startup);
             var scene = EditorSceneManager.NewScene(NewSceneSetup.EmptyScene, NewSceneMode.Additive);
             SceneManager.SetActiveScene(scene);
             Object("saved-scene");
