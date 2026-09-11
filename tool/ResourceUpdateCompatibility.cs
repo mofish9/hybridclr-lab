@@ -19,7 +19,7 @@ internal sealed class ResourceUpdateCompatibility
     internal const string FrozenBaseInstanceFrameCapability = "frozen-base-instance-frames-v1";
 	public const string Policy = "dhe-proven-safe-subset-v1";
 	public const string RuntimeProtocol = "dhe-runtime-protocol-v1";
-    public const string CurrentNativeRuntimeContract = "dhe-runtime-v32";
+    public const string CurrentNativeRuntimeContract = "dhe-runtime-v33";
     public static readonly string[] KnownRuntimeCapabilities =
     {
 		"aot-guard-v1",

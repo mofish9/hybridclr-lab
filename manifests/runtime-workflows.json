@@ -2,36 +2,6 @@
   "schemaVersion": 1,
   "workflows": [
     {
-      "id": "Tuanjie2022Fgs",
-      "nativeTestProfile": "Compatibility-Tuanjie2022-Fgs",
-      "engine": {
-        "family": "Tuanjie",
-        "version": "1.10.0",
-        "unityVersion": "2022.3.62t12",
-        "unityVersionNumber": 20220362,
-        "tuanjieVersionNumber": 11000,
-        "executablePath": "C:/Program Files/Tuanjie/Hub/Editor/2022.3.62t12/Editor/Tuanjie.exe",
-        "externalHeadersTreeSha256": "EBCDC7C61490DEFAD29B65D003FC0451F870316982A4CE75AEC4F8515A1D91D6"
-      },
-      "il2cppPlus": {
-        "tag": "df8d0123d9f5a9fce79283fe5261dba21e802aa0",
-        "commit": "df8d0123d9f5a9fce79283fe5261dba21e802aa0",
-        "path": "../repos/il2cpp_plus"
-      },
-      "fullGenericSharing": "required",
-      "productionWorkflow": {
-        "il2cppCodeGeneration": "OptimizeSize",
-        "aotMetadataPackaging": "exclude",
-        "aotMetadataMode": "none"
-      },
-      "mergeGate": [
-        "OptimizeSize/include/supplemental",
-        "OptimizeSize/include/none",
-        "OptimizeSize/exclude/none"
-      ],
-      "diagnosticGate": "Fgs-Diagnostic/OptimizeSize/exclude/none"
-    },
-    {
       "id": "Unity2022Fgs",
       "nativeTestProfile": "Compatibility-Unity2022-Fgs",
       "engine": {
@@ -44,8 +14,8 @@
         "externalHeadersTreeSha256": "D0037168A9A28B05FD8DF11EDA27812DAEAA458DC0CDFAD7765F3BE75E83EE99"
       },
       "il2cppPlus": {
-        "tag": "ecad8a09d1eb9b91a57c59fcdc69b268377bad59",
-        "commit": "ecad8a09d1eb9b91a57c59fcdc69b268377bad59",
+        "tag": "658aa64923e568a497e11640b340f316704d02f9",
+        "commit": "658aa64923e568a497e11640b340f316704d02f9",
         "path": "../repos/il2cpp_plus"
       },
       "fullGenericSharing": "required",
@@ -60,34 +30,6 @@
         "OptimizeSize/exclude/none"
       ],
       "diagnosticGate": "Unity2022-Fgs-Diagnostic/OptimizeSize/exclude/none"
-    },
-    {
-      "id": "Unity2021Standard",
-      "nativeTestProfile": "Compatibility-Unity2021-Standard",
-      "engine": {
-        "family": "Unity",
-        "version": "2021.3.45f2",
-        "unityVersion": "2021.3.45f2",
-        "unityVersionNumber": 20210345,
-        "tuanjieVersionNumber": 0,
-        "executablePath": "C:/Program Files/Unity/Hub/Editor/2021.3.45f2/Editor/Unity.exe",
-        "externalHeadersTreeSha256": "9EE19FDC537CAC92F7506CA7AB92A9F46C490875DC12871B08D378DE2BE665C1"
-      },
-      "il2cppPlus": {
-        "tag": "e654a956cbdc2730e445e11b4771b6d45b30884b",
-        "commit": "e654a956cbdc2730e445e11b4771b6d45b30884b",
-        "path": "../repos/il2cpp_plus"
-      },
-      "fullGenericSharing": "disabled",
-      "productionWorkflow": {
-        "il2cppCodeGeneration": "OptimizeSpeed",
-        "aotMetadataPackaging": "include",
-        "aotMetadataMode": "supplemental"
-      },
-      "mergeGate": [
-        "OptimizeSpeed/include/supplemental"
-      ],
-      "diagnosticGate": "disabled"
     }
   ]
 }
