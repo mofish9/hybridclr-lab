@@ -8,6 +8,8 @@
   <ItemGroup>
     <Compile Include="../../MetaVersion.cs" Link="MetaVersion.cs" />
     <Compile Include="../../ResourceUpdateCompatibility.cs" Link="ResourceUpdateCompatibility.cs" />
+    <Compile Include="../../ResourceExecutionPlan.cs" Link="ResourceExecutionPlan.cs" />
+    <Compile Include="../../DheValueLayoutImpact.cs" Link="DheValueLayoutImpact.cs" />
     <Reference Include="dnlib"><HintPath>../../dnlib.dll</HintPath></Reference>
   </ItemGroup>
 </Project>
