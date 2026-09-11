@@ -34,6 +34,9 @@ if (args.Length > 0 && args[0] == "type-deletion-reference") return TypeDeletion
 if (args.Length > 0 && args[0] == "type-deletion-replay") return TypeDeletionWorkflow.Replay(args.Skip(1).ToArray());
 if (args.Length > 0 && args[0] == "type-deletion-audit") return TypeDeletionWorkflow.Audit(args.Skip(1).ToArray());
 if (args.Length > 0 && args[0] == "cross-parent-current") return CrossAssemblyParentWorkflow.Current(args.Skip(1).ToArray());
+if (args.Length > 0 && args[0] == "generic-physical-parent-current") return GenericPhysicalParentWorkflow.Current(args.Skip(1).ToArray());
+if (args.Length > 0 && args[0] == "generic-physical-parent-reference") return GenericPhysicalParentWorkflow.Reference(args.Skip(1).ToArray());
+if (args.Length > 0 && args[0] == "generic-physical-parent-replay") return GenericPhysicalParentWorkflow.Replay(args.Skip(1).ToArray());
 if (args.Length > 0 && args[0] == "cross-parent-reference") return CrossAssemblyParentWorkflow.Reference(args.Skip(1).ToArray());
 if (args.Length > 0 && args[0] == "cross-parent-replay") return CrossAssemblyParentWorkflow.Replay(args.Skip(1).ToArray());
 if (args.Length > 0 && args[0] == "cross-parent-policy") return CrossAssemblyParentPolicy.Run(args.Skip(1).ToArray());
