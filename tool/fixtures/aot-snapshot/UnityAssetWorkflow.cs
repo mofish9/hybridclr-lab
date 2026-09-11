@@ -78,7 +78,7 @@ internal static class UnityAssetWorkflow
     }
     internal static int Replay(string[] args)
     {
-        if (args.Length != 4) throw new ArgumentException("unity-asset-replay <lab> <Base proof> <shared resource or :noop:> <new output>");
+        if (args.Length < 4 || args.Length > 5) throw new ArgumentException("unity-asset-replay <lab> <Base proof> <shared resource or :noop:> <new output> [bundle proof]");
         string lab = Path.GetFullPath(args[0]), proof = Path.GetFullPath(args[1]), output = Path.GetFullPath(args[3]);
         if (Directory.Exists(output)) throw new IOException("Output must be new.");
         Directory.CreateDirectory(output);
@@ -102,6 +102,9 @@ internal static class UnityAssetWorkflow
         var assets = Read(Path.Combine(proof, "unity-assets.json"));
         int assetRevision = assets.GetProperty("assetRevision").GetInt32();
         bool noop = args[2] == ":noop:", current = !noop || assetRevision == 2;
+        string bundleRoot = args.Length == 5 ? Path.Combine(Path.GetFullPath(args[4]), "asset-bundles") : null;
+        JsonElement? bundleEvidence = bundleRoot == null ? null : Read(Path.Combine(bundleRoot, "bundle-evidence.json"));
+        if (bundleEvidence.HasValue) assetRevision = bundleEvidence.Value.GetProperty("assetRevision").GetInt32();
         string stage = Path.Combine(proof, "stage-noop");
         if (!noop)
         {
@@ -118,12 +121,25 @@ internal static class UnityAssetWorkflow
         foreach (string kind in new[] { "scene", "prefab" })
             frozenFiles[Path.Combine(proof, "project", assets.GetProperty(kind).GetString()!)] = assets.GetProperty(kind + "Sha256").GetString()!;
         foreach (string path in Directory.GetFiles(stage, "*", SearchOption.AllDirectories)) frozenFiles[path] = Hash(path);
+        if (bundleEvidence.HasValue)
+        {
+            frozenFiles[Path.Combine(bundleRoot, "bundle-evidence.json")] = Hash(Path.Combine(bundleRoot, "bundle-evidence.json"));
+            foreach (var bundle in bundleEvidence.Value.GetProperty("bundles").EnumerateArray())
+            {
+                var serialized = bundle.GetProperty("serializedFiles").EnumerateArray().ToArray();
+                if (serialized.Length == 0 || serialized.Any(file => !file.GetProperty("typeTreeEnabled").GetBoolean()))
+                    throw new InvalidDataException("Type-tree evidence missing.");
+                frozenFiles[Path.Combine(bundleRoot, bundle.GetProperty("name").GetString()!)] = bundle.GetProperty("sha256").GetString()!;
+            }
+        }
         bool Immutable() => frozenFiles.All(row => File.Exists(row.Key) && Hash(row.Key) == row.Value);
         if (!baseResult.GetProperty("passed").GetBoolean() || !Immutable()) throw new InvalidDataException("Immutable Base/assets mismatch.");
         string report = Path.Combine(output, "player.json"), log = Path.Combine(output, "player.log"), error = null;
-        try { Execute(player, "-batchmode", "-nographics", "-snapshotResult", report, "-snapshotResourceRoot", stage,
+        var playerArgs = new[] { "-batchmode", "-nographics", "-snapshotResult", report, "-snapshotResourceRoot", stage,
             "-expectedRevision", noop ? "59" : "73", "-expectedAssemblies", identity.GetProperty("assemblies").GetArrayLength().ToString(),
-            "-unityAssetProbe", current ? "current" : "base", "-unityAssetRevision", assetRevision.ToString(), "-logFile", log); }
+            "-unityAssetProbe", current ? "current" : "base", "-unityAssetRevision", assetRevision.ToString(), "-logFile", log };
+        if (bundleRoot != null) playerArgs = playerArgs.Concat(new[] { "-unityAssetBundleRoot", bundleRoot }).ToArray();
+        try { Execute(player, playerArgs); }
         catch (Exception exception) { error = exception.ToString(); }
         string[] common = { "type", "authored-revision", "inactive", "existing-field", "nested-type", "nested-number", "nested-text", "list",
             "managed-reference", "managed-reference-method", "unity-reference", "deserialize-callback" };
@@ -131,12 +147,17 @@ internal static class UnityAssetWorkflow
             ? new[] { "added-component-field", "added-nested-field", "added-node-field" } : Array.Empty<string>())
             .Concat(new[] { "clone-fields", "clone-reference", "independent-storage-gc", "awake" }).Select(test => name + ":" + test))
             .Append("scene-unloaded").ToArray();
+        if (bundleRoot != null)
+        {
+            var values = expected.ToList(); values.InsertRange(0, new[] { "bundle-prefab-loaded", "bundle-scene-loaded" });
+            values.Insert(values.IndexOf("scene:type"), "bundle-scene-path"); expected = values.ToArray();
+        }
         var observed = File.Exists(log) ? File.ReadAllLines(log).Where(line => line.StartsWith("DHE Unity asset check: "))
             .Select(line => line["DHE Unity asset check: ".Length..]).ToArray() : Array.Empty<string>();
         bool passed = error == null && Immutable() && File.Exists(report) && Read(report).GetProperty("passed").GetBoolean() &&
             Read(report).GetProperty("baseId").GetString() == identity.GetProperty("baseId").GetString() && observed.SequenceEqual(expected) &&
             Read(report).GetProperty("unityAssetChecks").EnumerateArray().Select(row => row.GetString()).SequenceEqual(expected);
-        Write(Path.Combine(output, "result.json"), new { passed, error, noop, assetRevision, current, labHead, expected, observed, frozenFiles,
+        Write(Path.Combine(output, "result.json"), new { passed, error, noop, assetRevision, current, bundleRoot, labHead, expected, observed, frozenFiles,
             hostSha256 = Hash(typeof(UnityAssetWorkflow).Assembly.Location), playerResultSha256 = File.Exists(report) ? Hash(report) : null });
         Console.WriteLine("Unity asset replay: " + passed + "; checks=" + observed.Length); return passed ? 0 : 1;
     }

@@ -1,6 +1,7 @@
 using System;
 using System.Collections;
 using System.Collections.Generic;
+using System.IO;
 using System.Linq;
 using UnityEngine;
 using UnityEngine.SceneManagement;
@@ -16,12 +17,16 @@ namespace HybridCLR.Lab.Snapshot
         private int assetRevision, phase;
         private float deadline;
         private AsyncOperation operation;
+        private string bundleRoot, bundleScenePath;
+        private AssetBundle prefabBundle, sceneBundle;
         internal static void Begin(bool current, int assetRevision, Action<string[], string> completed)
         {
             var driver = new GameObject("DHE asset validation").AddComponent<UnityAssetPlayer>();
             DontDestroyOnLoad(driver.gameObject);
             driver.current = current; driver.assetRevision = assetRevision; driver.completed = completed;
             driver.deadline = Time.realtimeSinceStartup + 30;
+            string[] args = Environment.GetCommandLineArgs(); int bundleIndex = Array.IndexOf(args, "-unityAssetBundleRoot");
+            if (bundleIndex >= 0) driver.bundleRoot = args[bundleIndex + 1];
         }
         private void Check(string name, bool value)
         {
@@ -77,20 +82,33 @@ namespace HybridCLR.Lab.Snapshot
                     var assembly = typeof(ValueLayout.Factory).Assembly;
                     componentType = assembly.GetType("HybridCLR.Lab.UnityAssets.AssetBehaviour", true);
                     stateType = assembly.GetType("HybridCLR.Lab.UnityAssets.AssetState", true);
-                    var prefab = Resources.Load<GameObject>("DheAssetPrefab");
+                    GameObject prefab;
+                    if (bundleRoot != null)
+                    {
+                        prefabBundle = AssetBundle.LoadFromFile(Path.Combine(bundleRoot, "dhe-prefab"));
+                        Check("bundle-prefab-loaded", prefabBundle != null && !prefabBundle.isStreamedSceneAssetBundle);
+                        sceneBundle = AssetBundle.LoadFromFile(Path.Combine(bundleRoot, "dhe-scene"));
+                        Check("bundle-scene-loaded", sceneBundle != null && sceneBundle.isStreamedSceneAssetBundle);
+                        bundleScenePath = sceneBundle.GetAllScenePaths().Single();
+                        prefab = prefabBundle.LoadAsset<GameObject>("Assets/Resources/DheAssetPrefab.prefab");
+                    }
+                    else prefab = Resources.Load<GameObject>("DheAssetPrefab");
                     if (prefab == null) throw new InvalidOperationException("Archived Prefab is missing.");
                     var instance = Instantiate(prefab); Validate(instance, "prefab"); Destroy(instance);
-                    operation = SceneManager.LoadSceneAsync("DheAssetScene", LoadSceneMode.Additive);
+                    operation = SceneManager.LoadSceneAsync(bundleScenePath ?? "DheAssetScene", LoadSceneMode.Additive);
                     phase = 1; return;
                 }
                 if (!operation.isDone) return;
                 if (phase == 1)
                 {
-                    var scene = SceneManager.GetSceneByName("DheAssetScene");
+                    var scene = bundleScenePath == null ? SceneManager.GetSceneByName("DheAssetScene") : SceneManager.GetSceneByPath(bundleScenePath);
+                    if (bundleScenePath != null) Check("bundle-scene-path", scene.path == bundleScenePath && scene.name == "DheBundledScene");
                     Validate(scene.GetRootGameObjects().Single(root => root.name == "saved-scene"), "scene");
                     operation = SceneManager.UnloadSceneAsync(scene); phase = 2; return;
                 }
-                Check("scene-unloaded", !SceneManager.GetSceneByName("DheAssetScene").isLoaded);
+                Check("scene-unloaded", !(bundleScenePath == null ? SceneManager.GetSceneByName("DheAssetScene") : SceneManager.GetSceneByPath(bundleScenePath)).isLoaded);
+                if (prefabBundle != null) prefabBundle.Unload(true);
+                if (sceneBundle != null) sceneBundle.Unload(true);
                 Finish(null);
             }
             catch (Exception error) { Finish(error.ToString()); }

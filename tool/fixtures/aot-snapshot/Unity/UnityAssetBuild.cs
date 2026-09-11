@@ -17,6 +17,9 @@ namespace HybridCLR.Lab.Editor
             public int assetRevision;
             public string scene, prefab, sceneSha256, prefabSha256;
         }
+        [Serializable] private sealed class SerializedRecord { public string file, sha256; public bool typeTreeEnabled; }
+        [Serializable] private sealed class BundleRecord { public string name, sha256; public SerializedRecord[] serializedFiles; }
+        [Serializable] private sealed class BundleEvidence { public int assetRevision; public string options; public BundleRecord[] bundles; }
         internal static void PrepareIfPresent()
         {
             var assembly = typeof(ValueLayout.Factory).Assembly;
@@ -63,6 +66,9 @@ namespace HybridCLR.Lab.Editor
             SceneManager.SetActiveScene(scene);
             Object("saved-scene");
             if (!EditorSceneManager.SaveScene(scene, scenePath)) throw new InvalidOperationException("Scene was not saved.");
+            const string bundledScene = "Assets/DheBundleScenes/DheBundledScene.unity";
+            Directory.CreateDirectory("Assets/DheBundleScenes");
+            if (!EditorSceneManager.SaveScene(scene, bundledScene, true)) throw new InvalidOperationException("Bundle-only scene was not saved.");
             EditorSceneManager.CloseScene(scene, true); SceneManager.SetActiveScene(startup);
             EditorBuildSettings.scenes = EditorBuildSettings.scenes.Where(row => row.path != scenePath)
                 .Concat(new[] { new EditorBuildSettingsScene(scenePath, true) }).ToArray();
@@ -73,6 +79,37 @@ namespace HybridCLR.Lab.Editor
             File.WriteAllText(Path.Combine(Path.GetDirectoryName(Path.GetFullPath(args[index + 1])), "unity-assets.json"),
                 JsonUtility.ToJson(new Evidence { assetRevision = current ? 2 : 1, scene = scenePath, prefab = prefab,
                     sceneSha256 = Hash(scenePath), prefabSha256 = Hash(prefab) }, true));
+            string bundleOutput = Path.Combine(Path.GetDirectoryName(Path.GetFullPath(args[index + 1])), "asset-bundles");
+            if (Directory.Exists(bundleOutput)) throw new IOException("Bundle output must be new.");
+            Directory.CreateDirectory(bundleOutput);
+            var builds = new[] {
+                new AssetBundleBuild { assetBundleName = "dhe-prefab", assetNames = new[] { prefab } },
+                new AssetBundleBuild { assetBundleName = "dhe-scene", assetNames = new[] { bundledScene } },
+            };
+            const BuildAssetBundleOptions options = BuildAssetBundleOptions.UncompressedAssetBundle | BuildAssetBundleOptions.StrictMode;
+            if (BuildPipeline.BuildAssetBundles(bundleOutput, builds, options, BuildTarget.StandaloneWindows64) == null)
+                throw new InvalidOperationException("AssetBundle build failed.");
+            var records = builds.Select(build => {
+                string path = Path.Combine(bundleOutput, build.assetBundleName);
+                var bundle = new UnityFS.BundleFileReader();
+                using (var stream = File.OpenRead(path))
+                using (var reader = new UnityFS.EndianBinaryReader(stream)) bundle.Load(reader);
+                var serialized = bundle.CreateBundleFileInfo().files.Where(file => file.file.StartsWith("CAB-", StringComparison.Ordinal) &&
+                    !file.file.EndsWith(".resS", StringComparison.Ordinal) && !file.file.EndsWith(".resource", StringComparison.Ordinal)).Select(file => {
+                    var bytes = file.data;
+                    if (bytes.Length < 64 || bytes[8] != 0 || bytes[9] != 0 || bytes[10] != 0 || bytes[11] != 22 || bytes[16] != 0)
+                        throw new InvalidDataException("Expected Unity 2022 serialized-file header: " + file.file);
+                    int end = 48; while (end < bytes.Length && bytes[end] != 0) ++end;
+                    if (end > 304 || end + 5 >= bytes.Length) throw new InvalidDataException("Invalid serialized metadata.");
+                    bool trees = bytes[end + 5] != 0;
+                    using (var hash = SHA256.Create()) return new SerializedRecord { file = file.file, typeTreeEnabled = trees,
+                        sha256 = BitConverter.ToString(hash.ComputeHash(bytes)).Replace("-", "") };
+                }).ToArray();
+                if (serialized.Length == 0 || serialized.Any(file => !file.typeTreeEnabled)) throw new InvalidDataException("Typed bundle required.");
+                return new BundleRecord { name = build.assetBundleName, sha256 = Hash(path), serializedFiles = serialized };
+            }).ToArray();
+            File.WriteAllText(Path.Combine(bundleOutput, "bundle-evidence.json"), JsonUtility.ToJson(new BundleEvidence {
+                assetRevision = current ? 2 : 1, options = options.ToString(), bundles = records }, true));
         }
     }
 }
