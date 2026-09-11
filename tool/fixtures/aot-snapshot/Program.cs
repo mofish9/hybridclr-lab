@@ -36,6 +36,7 @@ if (args.Length > 0 && args[0] == "type-deletion-audit") return TypeDeletionWork
 if (args.Length > 0 && args[0] == "cross-parent-current") return CrossAssemblyParentWorkflow.Current(args.Skip(1).ToArray());
 if (args.Length > 0 && args[0] == "generic-physical-parent-current") return GenericPhysicalParentWorkflow.Current(args.Skip(1).ToArray());
 if (args.Length > 0 && args[0] == "generic-owner-current") return GenericOwnerWorkflow.Current(args.Skip(1).ToArray());
+if (args.Length > 0 && args[0] == "generic-owner-policy") return GenericOwnerPolicy.Run(args.Skip(1).ToArray());
 if (args.Length > 0 && args[0] == "generic-owner-reference") return GenericOwnerWorkflow.Reference(args.Skip(1).ToArray());
 if (args.Length > 0 && args[0] == "generic-owner-replay") return GenericOwnerWorkflow.Replay(args.Skip(1).ToArray());
 if (args.Length > 0 && args[0] == "generic-physical-parent-reference") return GenericPhysicalParentWorkflow.Reference(args.Skip(1).ToArray());
