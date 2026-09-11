@@ -12,12 +12,13 @@ using dnlib.DotNet.Emit;
 if (args.Length > 0 && args[0] == "hotfix-generic") return HotfixGenericPlanTests.Run(args.Skip(1).ToArray());
 if (args.Length > 0 && args[0] == "reference-owner-plan") return ReferenceOwnerPlanTests.Run(args.Skip(1).ToArray());
 if (args.Length > 0 && args[0] == "delivery") return DeliveryTests.Run(args.Skip(1).ToArray());
+if (args.Length > 0 && args[0] == "asset-provenance") return AssetProvenanceTests.Run(args.Skip(1).ToArray());
 if (args.Length > 0 && args[0] == "delivery-build")
 {
     if (args.Length != 4) throw new ArgumentException("delivery-build <resource> <bundle proof> <new output>");
     string digest = HybridCLR.Editor.Commands.DheDeliveryBuilder.Build(args[1], new Dictionary<string, string> {
         ["prefab"] = Path.Combine(args[2], "asset-bundles/dhe-prefab"),
-        ["scene"] = Path.Combine(args[2], "asset-bundles/dhe-scene") }, "StandaloneWindows64", "Unity2022Fgs", args[3]);
+        ["scene"] = Path.Combine(args[2], "asset-bundles/dhe-scene") }, "StandaloneWindows64", "Unity2022Fgs", args[3], Path.Combine(args[2], "asset-build.json"));
     Console.WriteLine(digest); return 0;
 }
 if (args.Length != 3 && args.Length != 4) throw new ArgumentException("<public-reflection artifact root> <new report.json> <DheTool.dll> [lab root]");

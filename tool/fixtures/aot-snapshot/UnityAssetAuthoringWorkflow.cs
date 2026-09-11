@@ -10,7 +10,7 @@ internal static class UnityAssetAuthoringWorkflow
         JsonSerializer.Serialize(value, new JsonSerializerOptions { WriteIndented = true }));
     internal static int Build(string[] args)
     {
-        if (args.Length != 5) throw new ArgumentException("unity-asset-author-bundles <lab> <editor> <template Base> <Current> <new output>");
+        if (args.Length != 6) throw new ArgumentException("unity-asset-author-bundles <lab> <editor> <template Base> <Current> <new output> <package>");
         string lab = Path.GetFullPath(args[0]), output = Path.GetFullPath(args[4]);
         if (Directory.Exists(output)) throw new IOException("Authoring output must be new.");
         Directory.CreateDirectory(output);
@@ -43,6 +43,14 @@ internal static class UnityAssetAuthoringWorkflow
             inputs[path] = Hash(path);
             File.Copy(path, Path.Combine(project, "Assets/Plugins/ValueLayout", Path.GetFileName(path)), true);
         }
+        // This is a fresh source-only authoring project, not an existing Base or
+        // its build cache. Replace its package from the reviewed source identity.
+        string packageTarget = Path.Combine(project, "Packages/com.code-philosophy.hybridclr");
+        foreach (string path in Directory.GetFiles(args[5], "*", SearchOption.AllDirectories).Where(path => !Path.GetRelativePath(args[5], path).StartsWith(".git", StringComparison.Ordinal)))
+        {
+            string destination = Path.Combine(packageTarget, Path.GetRelativePath(args[5], path));
+            Directory.CreateDirectory(Path.GetDirectoryName(destination)!); File.Copy(path, destination, true); inputs[path] = Hash(path);
+        }
         foreach (string name in new[] { "UnityAssetBuild.cs", "UnityAssetAuthorBuild.cs" })
         {
             string path = Path.Combine(lab, "tool/fixtures/aot-snapshot/Unity", name); inputs[path] = Hash(path);
@@ -53,11 +61,12 @@ internal static class UnityAssetAuthoringWorkflow
         using (var current = ModuleDefMD.Load(Path.Combine(args[3], "HybridCLR.ValueLayoutModel.dll")))
             if (addedTypes.Any(name => original.Find(name, false) != null || current.Find(name, false) == null))
                 throw new InvalidDataException("Fixture must introduce genuinely new serialized types.");
-        Directory.CreateDirectory(Path.Combine(output, "base"));
+        string assetOutput = Path.Combine(output, "authored");
         Execute(args[1], "-batchmode", "-nographics", "-quit", "-projectPath", project,
-            "-executeMethod", "HybridCLR.Lab.Editor.UnityAssetAuthorBuild.Build", "-dheOutputRoot", Path.Combine(output, "base"),
+            "-executeMethod", "HybridCLR.Lab.Editor.UnityAssetAuthorBuild.Build", "-dheOutputRoot", Path.Combine(assetOutput, "base"),
+            "-dheAssetCurrent", Path.GetFullPath(args[3]), "-dheAssetProvenanceOutput", assetOutput,
             "-logFile", Path.Combine(output, "build.log"));
-        string evidence = Path.Combine(output, "asset-bundles/bundle-evidence.json");
+        string evidence = Path.Combine(assetOutput, "asset-bundles/bundle-evidence.json");
         bool passed = File.Exists(evidence) && inputs.All(row => Hash(row.Key) == row.Value);
         Write(Path.Combine(output, "authoring-result.json"), new { passed, labHead, addedTypes, inputs,
             bundleEvidenceSha256 = File.Exists(evidence) ? Hash(evidence) : null,

@@ -18,8 +18,8 @@ internal static class DeliveryTests
             ["prefab"] = Path.Combine(args[3], "asset-bundles/dhe-prefab"),
             ["scene"] = Path.Combine(args[3], "asset-bundles/dhe-scene") };
         string deliveryRoot = Path.Combine(args[4], "delivery");
-        string manifestHash = DheDeliveryBuilder.Build(args[0], assets, "StandaloneWindows64", "Unity2022Fgs", deliveryRoot);
-        string repeated = DheDeliveryBuilder.Build(args[0], assets, "StandaloneWindows64", "Unity2022Fgs", Path.Combine(args[4], "delivery-repeat"));
+        string manifestHash = DheDeliveryBuilder.Build(args[0], assets, "StandaloneWindows64", "Unity2022Fgs", deliveryRoot, Path.Combine(args[3], "asset-build.json"));
+        string repeated = DheDeliveryBuilder.Build(args[0], assets, "StandaloneWindows64", "Unity2022Fgs", Path.Combine(args[4], "delivery-repeat"), Path.Combine(args[3], "asset-build.json"));
         if (manifestHash != repeated) throw new InvalidOperationException("Delivery builder is nondeterministic.");
         var source = new MemoryProvider();
         foreach (string file in Directory.GetFiles(deliveryRoot, "*", SearchOption.AllDirectories))

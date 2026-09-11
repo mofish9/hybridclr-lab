@@ -19,6 +19,7 @@
     <Compile Include="$(DhePackageRoot)/Runtime/DheDelivery.cs" Link="Package/DheDelivery.cs" Condition="Exists('$(DhePackageRoot)/Runtime/DheDelivery.cs')" />
     <Compile Include="$(DhePackageRoot)/Runtime/DheRuntime.Delivery.cs" Link="Package/DheRuntime.Delivery.cs" Condition="Exists('$(DhePackageRoot)/Runtime/DheRuntime.Delivery.cs')" />
     <Compile Include="$(DhePackageRoot)/Editor/Commands/DheDeliveryBuilder.cs" Link="Package/DheDeliveryBuilder.cs" Condition="Exists('$(DhePackageRoot)/Editor/Commands/DheDeliveryBuilder.cs')" />
+    <Compile Include="$(DhePackageRoot)/Editor/Commands/DheAssetBuildProvenance.cs" Link="Package/DheAssetBuildProvenance.cs" />
     <Compile Include="$(DhePackageRoot)/Runtime/DheRuntime.Loading.cs" Link="Package/DheRuntime.Loading.cs" Condition="Exists('$(DhePackageRoot)/Runtime/DheRuntime.Loading.cs')" />
     <Compile Include="$(DhePackageRoot)/Runtime/LoadImageErrorCode.cs" Link="Package/LoadImageErrorCode.cs" />
     <Compile Include="$(DhePackageRoot)/Runtime/HomologousImageMode.cs" Link="Package/HomologousImageMode.cs" />
