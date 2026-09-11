@@ -12,7 +12,8 @@ internal static class UnitySerializationWorkflow
         bool parentMemberReceiverCache = args.Length == 6 && args[5] == "parent-members-cached";
         bool virtualReceiverCache = parentMemberReceiverCache || args.Length == 6 && args[5] == "virtual-signatures-cached";
         bool parentTransitionCache = args.Length == 6 && args[5] == "parent-transition-cached";
-        bool virtualSignatures = args.Length == 6 && (args[5] == "virtual-signatures" || virtualReceiverCache || parentTransitionCache);
+        bool typeDeletionCache = args.Length == 6 && args[5] == "type-deletion-cached";
+        bool virtualSignatures = args.Length == 6 && (args[5] == "virtual-signatures" || virtualReceiverCache || parentTransitionCache || typeDeletionCache);
         if (args.Length != 6 || (!virtualSignatures && !declarations && !new[] { "read", "full", "full-unity", "reference", "full-unity-cached", "reference-cached", "reference-generic", "reference-generic-cached", "reference-dispatch", "reference-callbacks", "reference-callbacks-cached", "reference-callbacks-control", "reference-callbacks-control-cached", "hierarchy-query", "hierarchy-query-cached", "interface-remove", "interface-remove-cached", "interface-remove-methods", "interface-remove-methods-cached", "interface-replace", "interface-replace-cached", "interface-remove-compiler", "interface-remove-compiler-cached" }.Contains(args[5])))
             throw new ArgumentException("unity-serialization-replay <lab> <tool.dll> <Base proof> <resource workflow output> <new output> <read|full|full-unity|reference|full-unity-cached|reference-cached|reference-generic|reference-generic-cached|reference-dispatch|reference-callbacks|reference-callbacks-cached|reference-callbacks-control|reference-callbacks-control-cached|hierarchy-query|hierarchy-query-cached|interface-remove|interface-remove-cached|interface-remove-methods|interface-remove-methods-cached|interface-replace|interface-replace-cached|interface-remove-compiler|interface-remove-compiler-cached>");
         bool hierarchy = args[5].StartsWith("hierarchy-query", StringComparison.Ordinal);
@@ -23,7 +24,7 @@ internal static class UnitySerializationWorkflow
         bool reference = args[5].StartsWith("reference", StringComparison.Ordinal);
         bool generic = args[5].StartsWith("reference-generic", StringComparison.Ordinal);
         bool lifecycle = args[5].StartsWith("full-unity", StringComparison.Ordinal);
-        bool cached = !virtualReceiverCache && !parentTransitionCache && args[5].EndsWith("-cached", StringComparison.Ordinal);
+        bool cached = !virtualReceiverCache && !parentTransitionCache && !typeDeletionCache && args[5].EndsWith("-cached", StringComparison.Ordinal);
         string evolutionMode = interfaceEvolution ? (cached ? args[5].Substring(0, args[5].Length - "-cached".Length) : args[5]) : null;
         bool? currentReferenceStorageSelected = null;
         string cacheCurrentModelSha256 = null;
@@ -42,6 +43,10 @@ internal static class UnitySerializationWorkflow
             var start = new ProcessStartInfo(executable) { WorkingDirectory = lab, UseShellExecute = false, CreateNoWindow = true,
                 WindowStyle = ProcessWindowStyle.Hidden, RedirectStandardOutput = true, RedirectStandardError = true };
             foreach (string argument in arguments) start.ArgumentList.Add(argument);
+            if (typeDeletionCache && arguments.Contains("-snapshotResult"))
+            {
+                start.ArgumentList.Add("-typeDeletionCacheProbe"); start.ArgumentList.Add("true");
+            }
             if (parentTransitionCache && arguments.Contains("-snapshotResult"))
             {
                 start.ArgumentList.Add("-parentTransitionCacheProbe"); start.ArgumentList.Add("true");
@@ -242,7 +247,13 @@ internal static class UnitySerializationWorkflow
             parentTransitionCacheChecks.SequenceEqual(ParentTransitionWorkflow.CacheExpected) &&
             lines.Where(line => line.StartsWith("DHE parent transition cache check: "))
                 .Select(line => line["DHE parent transition cache check: ".Length..]).SequenceEqual(ParentTransitionWorkflow.CacheExpected);
-        bool passed = immutable && parentTransitionCachePassed && virtualReceiverPassed && cachePassed && lifecyclePassed && callbackFixturePassed && evolutionFixturePassed && declarationFixturePassed && report.GetProperty("passed").GetBoolean() && checks.SequenceEqual(sequence) &&
+        string[] typeDeletionCacheChecks = OptionalChecks("typeDeletionCacheChecks");
+        bool typeDeletionCachePassed = !typeDeletionCache ||
+            typeDeletionCacheChecks.SequenceEqual(TypeDeletionWorkflow.CacheExpected) &&
+            lines.Count(line => line == "DHE type deletion cache captured: original parent, object, fields, method, delegate, property, event, constructor") == 1 &&
+            lines.Where(line => line.StartsWith("DHE type deletion cache check: "))
+                .Select(line => line["DHE type deletion cache check: ".Length..]).SequenceEqual(TypeDeletionWorkflow.CacheExpected);
+        bool passed = immutable && typeDeletionCachePassed && parentTransitionCachePassed && virtualReceiverPassed && cachePassed && lifecyclePassed && callbackFixturePassed && evolutionFixturePassed && declarationFixturePassed && report.GetProperty("passed").GetBoolean() && checks.SequenceEqual(sequence) &&
             lines.Count(line => line == prefix + " pass: " + sequence.Length) == 1 &&
             lines.Where(line => line.StartsWith("DHE case begin: ")).Select(line => line.Substring(16)).SequenceEqual(
                 Read(Path.Combine(source, "reference.json")).GetProperty("records").EnumerateArray().Select(row => row.GetString()));
@@ -251,6 +262,7 @@ internal static class UnitySerializationWorkflow
             cacheCurrentModelSha256, cachedBaseMethodCount, callbacks, callbackControl, callbackFixturePassed, hierarchy, interfaceEvolution, evolutionMode, evolutionFixturePassed,
             virtualSignatures, virtualReceiverCache, virtualReceiverPassed, virtualReceiverChecks, virtualReceiverRejections,
             parentTransitionCache, parentTransitionCachePassed, parentTransitionCacheChecks,
+            typeDeletionCache, typeDeletionCachePassed, typeDeletionCacheChecks,
             declarations, declarationMode, declarationFixturePassed, declarationCacheExpectation,
             declarationParameterObjects = lines.Where(line => line.StartsWith("DHE declaration parameter objects ")).ToArray(),
             error = report.GetProperty("error").GetString(), proof, source, labHead, playerSha256 = playerHash, gameAssemblySha256 = gameHash,

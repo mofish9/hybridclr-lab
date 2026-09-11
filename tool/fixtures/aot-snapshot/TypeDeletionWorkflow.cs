@@ -8,6 +8,16 @@ using HybridCLR.DheTool;
 internal static class TypeDeletionWorkflow
 {
     private const string Prefix = "DHE type deletion check: ";
+    internal static readonly string[] CacheExpected = {
+        "cached-type-name-stable", "fresh-lookup-absent", "cached-child-type-stable", "logical-parent-removed",
+        "physical-parent-retained", "current-parent-rejected", "cached-field-owner-stable", "cached-field-read-old",
+        "cached-field-write-old", "cached-field-rejects-current", "cached-field-write-rejects-current", "cached-field-rejects-unrelated",
+        "cached-method-removed", "cached-delegate-removed", "cached-property-get-removed", "cached-property-set-removed",
+        "cached-event-add-removed", "cached-event-remove-removed", "cached-event-raise-removed", "cached-constructor-removed",
+        "fresh-removed-members-absent", "old-own-fields-retained", "current-own-fields", "changed-body-rejects-old",
+        "changed-body-accepts-current", "deleted-reference-survives-gc", "removed-marker-lookup-absent",
+        "base-event-effects-stable", "old-field-restored", "unchanged-aot-sentinel"
+    };
     private static readonly string[] Expected = {
         "assembly-lookup-absent", "assembly-ignore-case-absent", "assembly-throwing-lookup",
         "qualified-lookup-absent", "qualified-throwing-lookup", "all-types-exclude-deleted",
@@ -72,13 +82,18 @@ internal static class TypeDeletionWorkflow
 
     internal static int Replay(string[] args)
     {
-        if (args.Length != 5) throw new ArgumentException("type-deletion-replay <lab> <tool.dll> <Base proof> <shared resource> <new output>");
+        bool cached = args.Length == 6 && args[5] == "cached";
+        if (args.Length != 5 && !cached) throw new ArgumentException("type-deletion-replay <lab> <tool.dll> <Base proof> <shared resource> <new output> [cached]");
         string output = Path.GetFullPath(args[4]);
         if (Directory.Exists(output)) throw new IOException("Output must be new.");
         ValidateCurrent(Path.Combine(args[3], "current/HybridCLR.ValueLayoutModel.dll"));
         Directory.CreateDirectory(output); string previous = Path.Combine(output, "framework");
         int prior = -1; string error = null;
-        try { prior = FrameworkCallbackWorkflow.Replay(args.Take(4).Append(previous).ToArray()); }
+        try
+        {
+            var previousArgs = args.Take(4).Append(previous);
+            prior = FrameworkCallbackWorkflow.Replay((cached ? previousArgs.Append("type-deletion-cached") : previousArgs).ToArray());
+        }
         catch (Exception exception) { error = exception.ToString(); }
         string log = Path.Combine(previous, "virtual-business/player.json.log"), result = Path.Combine(previous, "result.json");
         string[] lines = File.Exists(log) ? File.ReadAllLines(log) : Array.Empty<string>();
@@ -86,10 +101,10 @@ internal static class TypeDeletionWorkflow
         bool passed = prior == 0 && error == null && observed.SequenceEqual(Expected) &&
             lines.Count(line => line == "DHE type deletion pass: " + Expected.Length) == 1;
         File.WriteAllText(Path.Combine(output, "result.json"), JsonSerializer.Serialize(new {
-            passed, checks = observed, expected = Expected, error,
+            passed, cached, checks = observed, expected = Expected, error,
             priorResultSha256 = File.Exists(result) ? Hash(result) : null,
             logSha256 = File.Exists(log) ? Hash(log) : null, hostSha256 = Hash(typeof(TypeDeletionWorkflow).Assembly.Location),
-            scope = "Immutable Player actual type deletion and complete framework/virtual/business sequence; cold objects only"
+            scope = "Immutable Player actual type deletion and complete framework/virtual/business sequence; optional explicit pre-load receiver/member cache"
         }, new JsonSerializerOptions { WriteIndented = true }));
         Console.WriteLine("Type deletion replay: " + passed + "; checks=" + observed.Length);
         return passed ? 0 : 1;

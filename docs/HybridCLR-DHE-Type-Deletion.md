@@ -37,3 +37,27 @@ uses the matched previous runtime/package/tool combination; resource rollback
 selects a compatible archived resource and restarts. This checkpoint cannot
 close broader cross-assembly/generic parent, Unity assets/startup, publication
 stress, performance or full DHE delivery gates.
+
+## Pre-load deleted-type handles and objects
+
+Build a new immutable existing-parent Base with a dedicated pre-load capture
+fixture, using the same native/package sources until a real failure demands a
+correction. Reuse the exact cold-qualified deletion Current without recompiling
+or rewriting it. Capture the original child object, parent/marker type handles,
+fields, methods, property/event accessors, a bound delegate and marker constructor
+before public DHE registration. Verify that each captured operation works in Base.
+
+After publication, fresh assembly lookup must hide deleted definitions and the
+retained child's logical ancestry must select Root. Cached type identities and
+physical old-object storage remain alive: cached fields may read/write the old
+object, and references in its old parent storage must survive GC. Incompatible
+new receivers must be rejected without corrupting either object's fields. Old
+metadata handles are not automatically migrated or destroyed.
+
+Deleted method bodies, including cached delegate/property/event/constructor
+invocations, must reach the MissingMethodException tombstone rather than execute
+removed AOT code. Existing cached event effects must not advance. This explicit
+runtime transition contract is tested alongside the unchanged 22-case CLR
+reference and full 18/25/46 Player sequences; CLR is not claimed to implement
+in-process replacement of an assembly. Collect independent assertion failures,
+retain original inputs/logs, and only then change the runtime if required.

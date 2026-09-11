@@ -29,6 +29,7 @@ namespace HybridCLR.Lab.Snapshot
             public string[] virtualNoopChecks;
             public string[] virtualReceiverChecks;
             public string[] parentTransitionCacheChecks;
+            public string[] typeDeletionCacheChecks;
             public int virtualNoopMethods, virtualNoopAotEntries, virtualNoopInterpreterEntries;
         }
         private sealed class Provider : IDheRuntimeAssetProvider
@@ -64,6 +65,8 @@ namespace HybridCLR.Lab.Snapshot
                     ? VirtualSignatureReceiverCache.Capture(typeof(ValueLayout.Factory).Assembly) : null;
                 ParentTransitionReceiverCache parentTransitionCache = Array.IndexOf(args, "-parentTransitionCacheProbe") >= 0
                     ? ParentTransitionReceiverCache.Capture(typeof(ValueLayout.Factory).Assembly) : null;
+                TypeDeletionReceiverCache typeDeletionCache = Array.IndexOf(args, "-typeDeletionCacheProbe") >= 0
+                    ? TypeDeletionReceiverCache.Capture(typeof(ValueLayout.Factory).Assembly) : null;
                 var moduleState = typeof(ValueLayout.Factory).Assembly.GetType("HybridCLR.Lab.ModuleEvolution.ModuleState");
                 System.Reflection.FieldInfo moduleConstant = null;
                 if (moduleState != null)
@@ -140,6 +143,11 @@ namespace HybridCLR.Lab.Snapshot
                 {
                     result.referenceCacheChecks = referenceCache.Verify(out string cacheFailure);
                     if (cacheFailure != null) throw new InvalidOperationException(cacheFailure);
+                }
+                if (typeDeletionCache != null)
+                {
+                    result.stage = "type-deletion-cached-receiver";
+                    result.typeDeletionCacheChecks = typeDeletionCache.Verify();
                 }
                 result.precommitChecks = PublicPrecommitPlayer.VerifyRetry(result.precommitChecks);
                 // LoadedAssemblyNames also includes authenticated frozen AOT
