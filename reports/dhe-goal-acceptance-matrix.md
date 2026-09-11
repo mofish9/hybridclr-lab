@@ -23,8 +23,9 @@ performance.
 ## Locked handoff
 
 - Package: `research/dhe-asset-provenance-v8.13.0`, `c3d61a9d9c2997753685b5f3cb14a235614f46cb`.
-- Lab: `research/dhe-asset-provenance-v8.13.0`, `9c00ce0fc0fb838a4d3d2ce9742aa3260f16e138`.
+- Lab: `research/dhe-asset-provenance-v8.13.0`, `6c1d9f77e6e7a8c43a7567579be5aaa5ecb8cb89`.
 - HybridCLR: `b0fe826f071332d109d2bde87c0aa2cc18b9f3c7`.
 - Unity 2022 IL2CPP: `ecad8a09d1eb9b91a57c59fcdc69b268377bad59`.
 - Delivery: `F:/hybridclr_artifacts/dhe-asset-provenance/three-base-delivery-01`.
+
 
