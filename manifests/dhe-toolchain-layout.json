@@ -121,7 +121,8 @@
     "templates/dhe-resource-release-qualification-config.json"
   ],
   "prefixes": [
-    "patches/dhe-lite/"
+    "patches/dhe-lite/",
+    "tool/"
   ],
   "generatedPaths": [
     "dhe-source-boundary.json",

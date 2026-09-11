@@ -4113,6 +4113,7 @@ internal static partial class Program
         var root = RequireDirectory(cli.Optional("labroot") ?? cli.Root, "DHE source root");
         var layoutPath = RequireFile(cli.Optional("layoutpath") ?? Path.Combine(root, "manifests", "dhe-toolchain-layout.json"), "DHE layout");
         var layout = ReadJson<JsonElement>(layoutPath); var output = Path.GetFullPath(cli.Require("outputroot"));
+        ToolchainSourceCoverage.Validate(root, layout);
         EnsureOutputNotAncestor(output, root);
         if (Directory.Exists(output)) { if (!cli.Has("forceoutput")) throw new DheException("OutputRoot is not empty: " + output); Directory.Delete(output, true); }
         Directory.CreateDirectory(output);
