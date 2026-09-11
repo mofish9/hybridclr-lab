@@ -2,6 +2,7 @@ extern alias model;
 using System;
 using System.Collections.Generic;
 using System.Reflection;
+using System.Runtime.CompilerServices;
 using Processor = model::HybridCLR.Lab.VirtualSignatures.Processor;
 using ProcessorRoot = model::HybridCLR.Lab.VirtualSignatures.ProcessorRoot;
 using Packet = model::HybridCLR.Lab.VirtualSignatures.Packet;
@@ -11,6 +12,13 @@ namespace HybridCLR.Lab.GenericPhysicalParents
 {
     public static class Cases
     {
+        [MethodImpl(MethodImplOptions.NoInlining)]
+        private static WeakReference InstallMarker(GenericParent<Packet> owner)
+        {
+            var marker = new ParentMarker();
+            owner.GenericValue = new Packet { Count = 19, Extra = 90000000029L, Marker = marker };
+            return new WeakReference(marker);
+        }
         public static void RunIfRequested()
         {
             if (Array.IndexOf(Environment.GetCommandLineArgs(), "-virtualSignatureProbe") >= 0) Run();
@@ -66,8 +74,12 @@ namespace HybridCLR.Lab.GenericPhysicalParents
             Check("generic-root-value", Same(((ProcessorRoot)child).Identity<Packet>(packet)));
             var next = (Processor)Activator.CreateInstance(owner);
             Check("reflection-construction", next.Bias == 25 && next.Extra == 1000L && ((GenericParent<Packet>)(object)next).GenericValue.Marker == null);
+            var weak = InstallMarker(view);
             GC.Collect(); GC.WaitForPendingFinalizers(); GC.Collect();
-            Check("inherited-value-reference-gc", Same(view.GenericValue) && ((ParentMarker)view.ParentReference).Value == 1927);
+            Check("inherited-value-reference-gc", weak.IsAlive && ReferenceEquals(weak.Target, view.GenericValue.Marker) &&
+                ((ParentMarker)view.GenericValue.Marker).Value == 1927 && view.GenericValue.Count == 19 &&
+                view.GenericValue.Extra == 90000000029L && ((ParentMarker)view.ParentReference).Value == 1927);
+            view.GenericValue = packet;
             Check("independent-objects", !ReferenceEquals(view.ParentReference, ((GenericParent<Packet>)(object)next).ParentReference));
             bool expected = false; GenericParent<Packet>.ThrowConstruction = true;
             try { new Processor(); }
