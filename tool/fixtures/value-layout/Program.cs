@@ -255,6 +255,7 @@ if (args.Length == 6 && args[0] == "probe-project")
     CopyTree(package, Path.Combine(destination, "Packages/com.code-philosophy.hybridclr"));
     var packageManifest = JsonNode.Parse(File.ReadAllText(Path.Combine(lab, "unity2021-dhe-demo/Packages/manifest.json")))!;
     packageManifest["dependencies"]!.AsObject().Remove("com.code-philosophy.hybridclr");
+    packageManifest["dependencies"]!["com.unity.modules.assetbundle"] = "1.0.0";
     if (args[3] == "Unity2022Fgs") packageManifest["dependencies"]!.AsObject().Remove("com.unity.modules.infinity");
     File.WriteAllText(Path.Combine(destination, "Packages/manifest.json"), packageManifest.ToJsonString(json));
     File.WriteAllText(Path.Combine(destination, "ProjectSettings/ProjectVersion.txt"), "m_EditorVersion: " + engineVersion + "\n");
