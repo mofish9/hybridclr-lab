@@ -1,5 +1,86 @@
 # Actual hotfix type deletion: Unity 2022 Windows
 
+## Latest cached-object checkpoint
+
+All thirty pre-load cache assertions now pass on immutable Base-101, together
+with the complete 22 deletion, 18 framework, 25 virtual-signature and 46 business
+sequences. Both Base101 and the earlier root-only Base100 consume the exact
+original current-01/current DLLs and pass the cold sequences, independent
+deletion/resource audit and native preparation failure/fresh-process recovery.
+No runtime/package/IL2CPP correction was needed; 6180597 / 841abfd / 819f74c and
+their real-header native03 gate remain unchanged.
+
+Lab64937468529d069e9bd5e3e9de45db21211a6d42 contains the committed cache fixture,
+build wiring and explicit replay validation. Base101, host04 and all new
+qualification runs use that clean source. Host04 SHA-256:
+84C17349A318DEC73EC380F861E0DBFB002ECBC13700847AC50DA8C0E1B9A249.
+The resource tool remains parent-transitions/tool-02 at its original identity.
+The subsequent report commit does not rebind these results.
+
+Base101 uses the preserved inserted-parent base-input-95 and builds with the
+same runtime02 manifest. Its added ordinary Player fixture captures the original
+parent/marker Type, child object, fields, method, bound delegate, property, event
+and constructor before public DHE registration. It exercises original Base
+operations before selection; no archived Player or Current DLL is patched.
+
+Base101 ID: 201527da06a947fc334fe518517a378afaf3c2dcd5353e41e5a22d53d1f750cf.
+GameAssembly SHA-256:
+B55F7DF5972F9D8AB87D61A2BC888CE16CF4D7F1CE53762DB5D169CE63064E1F.
+Snapshot SHA-256:
+7fe3d7fb10fbba1b4d15623b59932fb0074e265c9924152520a32815949a6ad7.
+Build/startup/generated no-op and noop-base101-01 pass. The no-op has all 25
+checks, six unchanged implementations, 4,151 AOT entries and zero DHE interpreter
+entries; this is routing evidence, not a throughput result.
+
+Paths below are relative to C:/hybridclr_optimize/artifacts/dhe-type-deletion:
+
+- shared-two-base-02 passes with identical original Current on Bases101/100.
+  Result SHA-256:
+  62950502D2EAADAD3AC78ABD700ACCCCF63924BD342CD010C662516654FC7F22.
+- probe-base101-cached-01 passes all thirty cached assertions and the full
+  22/18/25/46 sequences. Fresh lookup hides removed types; the child's logical
+  ancestry changes while cached type identities and old physical storage remain
+  valid. Cached fields read/write the old object, reject incompatible receivers
+  and retain the removed marker reference across GC. Cached methods, delegates,
+  property accessors, event accessors/raise and constructors throw the required
+  MissingMethodException, rather than running removed bodies. Existing event
+  effects and both objects' own fields remain intact. Player log SHA-256:
+  59184D7DBEB15E0AA12B2918A3A64481CE9A2640C805B231888BD1EC9B757113.
+- probe-base101-cold-01 and probe-base100-03 pass the full cold sequences.
+- shared-two-base-audit-02.json and its .resource.json companion verify original
+  Base/Current identities, six actual type/47 method removals on Base101, zero
+  corresponding removals on Base100, 121 files and three successful business
+  executions. Deletion audit SHA-256:
+  DF4FAA848D746042C5F6715FC61EC9ADD6B73D367E27AC1E166D3C679600D982.
+- shared-public-probes-02 passes sixteen deliberate native preparation failure
+  and fresh-process recovery checks, binding 96 files.
+
+The negative control probe-base99-missing-cache-01 intentionally uses the older
+Player, which has no deletion-cache fixture. That Player passes its ordinary
+22/18/25/46 sequences, while the new host rejects the run because the required
+capture record and thirty checks are absent. The wrapper exits1 and preserves
+the original Player bytes; it is an expected missing-coverage rejection, not a
+runtime failure. An old Player ignoring the new command-line option cannot be
+mistaken for a passing cache test.
+
+For reproduction, use host04 and append `cached` to type-deletion-replay for
+Base101 only. Cold replay, standard resource generation, deletion audit and
+public recovery use the same commands below with the new proof/output paths.
+All relevant candidate worktrees are committed and clean; no formal publication,
+Installer default, CAT, Unity2021, Tuanjie or mobile change occurred. The new
+artifact directory inherits standard NTFS compression; no files were deleted.
+C: has approximately 8 GiB free after qualification.
+
+This closes the stated cached deletion contract for the preserved Current and
+existing-parent Base. It does not establish automatic object migration, in-process
+assembly replacement, arbitrary native references to deleted types or general
+Scene/Prefab/startup support. Cross-assembly and generic parent evolution,
+publication stress, production-equivalent performance/memory, full current-source
+regression and project handoff remain open. The prior cold evidence below remains
+bound to its original sources and Players.
+
+## Previous cold checkpoint
+
 The same Current DLLs now pass all 22 deletion checks on immutable Base-99 and
 Base-100, together with the complete 18 framework, 25 virtual-signature and 46
 business sequences. The existing-parent Base actually loses six type definitions
