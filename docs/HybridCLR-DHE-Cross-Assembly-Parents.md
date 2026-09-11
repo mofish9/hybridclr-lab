@@ -1,12 +1,16 @@
 # Cross-assembly hotfix parent evolution
 
 Continue the full DHE objective on Unity 2022.3.62f3 Windows. Use immutable
-existing-parent Base101 and root-only/smaller-layout Base100. Produce one Current
-from the preserved deletion Current, adding CrossParent to the Other hotfix DLL
-and making the existing Model.Processor inherit it. CrossParent itself inherits
-the original Model.ProcessorRoot, so the type hierarchy is acyclic and retains
-the original immutable System.Object boundary. Compile the parent against Model,
-then compile the assertions against the updated Other and record the fixture
+existing-parent Base101 and root-only/smaller-layout Base100 for parent addition,
+and Base102 (whose AOT image already contains the cross-assembly parent) together
+with Base101 for parent removal. Produce one Current from the preserved deletion
+Current, adding CrossParent to the Other hotfix DLL and making the existing
+Model.Processor inherit it. The reverse Current removes CrossParent and
+CrossMarker, retargets Processor to ProcessorRoot, and removes the old removal
+probe before compiling its replacement. CrossParent itself inherits the original
+Model.ProcessorRoot, so the type hierarchy is acyclic and retains the original
+immutable System.Object boundary. Compile the parent against Model, then compile
+the assertions against the updated Other and record the fixture
 parent/constructor/entry wiring. This intentionally exercises assembly dependency
 cycles already representable by the DLL workflow; it does not change Unity asmdef
 compilation rules. Ordinary AOT inputs and archived Players remain untouched.
@@ -33,9 +37,9 @@ without peer Base snapshots must remain conservative.
 Planner acceptance alone is not runtime qualification. If real Player execution
 fails, retain the exact Current and original failed Player, isolate the native
 fix with any needed package capability, commit before tests and build new Bases.
-Later qualify a Base that originally already has a cross-assembly parent, then
-removal/replacement: existing snapshots on both sides are essential to that case.
-Generic parent evolution, broader Unity assets/startup objects, publication stress,
-performance/memory and full project handoff remain open. No CAT, Installer default,
-formal branch/tag/push, Unity2021, Tuanjie or mobile work. Roll back with the matched
-source combination or a compatible archived resource plus a process restart.
+The cold removal path is now qualified on Base102/Base101; cached old
+cross-assembly-parent objects remain unqualified. Generic parent evolution,
+broader Unity assets/startup objects, publication stress, performance/memory and
+full project handoff remain open. No CAT, Installer default, formal branch/tag/push,
+Unity2021, Tuanjie or mobile work. Roll back with the matched source combination
+or a compatible archived resource plus a process restart.
