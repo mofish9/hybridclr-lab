@@ -27,7 +27,9 @@ internal static class GenericPhysicalParentWorkflow
 
     internal static int Current(string[] args)
     {
-        if (args.Length != 5) throw new ArgumentException("generic-physical-parent-current <lab> <Base proof> <root-parent Current> <Unity editor> <new output>");
+        if (args.Length < 5 || args.Length > 6 || args.Length == 6 && args[5] != "reference-argument")
+            throw new ArgumentException("generic-physical-parent-current <lab> <Base proof> <source Current> <Unity editor> <new output> [reference-argument]");
+        bool referenceArgument = args.Length == 6;
         string lab = Path.GetFullPath(args[0]), source = Path.GetFullPath(args[2]), output = Path.GetFullPath(args[4]);
         if (Directory.Exists(output)) throw new IOException("Output must be new.");
         string current = Path.Combine(output, "current"); Directory.CreateDirectory(current);
@@ -40,22 +42,38 @@ internal static class GenericPhysicalParentWorkflow
         string modelPath = Path.Combine(current, Model + ".dll"), otherPath = Path.Combine(current, Other + ".dll");
         string[] References() => snapshot.Assemblies.Where(row => !row.Dhe).Select(row => row.Path)
             .Concat(Directory.GetFiles(current, "*.dll")).ToArray();
-        FrozenStaticWorkflow.CompileAndMerge(lab, args[3], "GenericPhysicalParentDefinitions", otherPath,
+        if (referenceArgument)
+        {
+            using var seed = ModuleDefMD.Load(File.ReadAllBytes(modelPath));
+            var prior = seed.Find(Probe, false) ?? throw new InvalidDataException("Missing original generic probe.");
+            var entry = seed.Find("HybridCLR.Lab.ValueLayout.Factory", false)!.Methods.Single(method => method.Name == "GetRevision");
+            var call = entry.Body.Instructions.Single(instruction => instruction.OpCode == OpCodes.Call &&
+                instruction.Operand is IMethod method && method.DeclaringType.FullName == Probe);
+            call.Operand = seed.Find("HybridCLR.Lab.CrossAssemblyParentRemoval.Cases", false)!
+                .Methods.Single(method => method.Name == "RunIfRequested");
+            seed.Types.Remove(prior); seed.Write(modelPath);
+        }
+        FrozenStaticWorkflow.CompileAndMerge(lab, args[3], referenceArgument
+            ? "GenericPhysicalParentReferencePacket" : "GenericPhysicalParentDefinitions", otherPath,
             References(), Path.Combine(output, "compiled-parent"), false);
         FrozenStaticWorkflow.CompileAndMerge(lab, args[3], "GenericPhysicalParentCases", modelPath,
-            References(), Path.Combine(output, "compiled-cases"), false);
+            References(), Path.Combine(output, "compiled-cases"), false,
+            referenceArgument ? "DHE_PARENT_REFERENCE_ARGUMENT" : null);
         using (var model = ModuleDefMD.Load(File.ReadAllBytes(modelPath)))
         using (var other = ModuleDefMD.Load(File.ReadAllBytes(otherPath)))
         {
             var owner = model.Find(Owner, false)!; var parent = other.Find(Parent, false)!;
-            if (owner.BaseType?.FullName != Root || parent.BaseType?.FullName != Root)
+            string oldParent = referenceArgument ? Parent + "<HybridCLR.Lab.VirtualSignatures.Packet>" : Root;
+            if (owner.BaseType?.FullName != oldParent || parent.BaseType?.FullName != Root)
                 throw new InvalidDataException("Expected a common original root.");
             var ctor = owner.Methods.Single(method => method.IsInstanceConstructor);
             var call = ctor.Body.Instructions.Single(instruction => instruction.OpCode == OpCodes.Call &&
-                instruction.Operand is IMethod method && method.Name == ".ctor" && method.DeclaringType.FullName == Root);
+                instruction.Operand is IMethod method && method.Name == ".ctor" && method.DeclaringType.FullName == oldParent);
             var importer = new Importer(model);
-            var closed = new TypeSpecUser(new GenericInstSig(new ClassSig(importer.Import(parent)),
-                new ValueTypeSig(model.Find("HybridCLR.Lab.VirtualSignatures.Packet", false)!)));
+            TypeSig argument = referenceArgument
+                ? new ClassSig(importer.Import(other.Find("HybridCLR.Lab.GenericPhysicalParents.ReferencePacket", false)!))
+                : new ValueTypeSig(model.Find("HybridCLR.Lab.VirtualSignatures.Packet", false)!);
+            var closed = new TypeSpecUser(new GenericInstSig(new ClassSig(importer.Import(parent)), argument));
             owner.BaseType = closed;
             call.Operand = new MemberRefUser(model, ".ctor", MethodSig.CreateInstance(model.CorLibTypes.Void), closed);
             var entry = model.Find("HybridCLR.Lab.ValueLayout.Factory", false)!.Methods.Single(method => method.Name == "GetRevision");
@@ -68,7 +86,9 @@ internal static class GenericPhysicalParentWorkflow
         Write(Path.Combine(output, "current-evidence.json"), new { inputs,
             current = Directory.GetFiles(current, "*.dll").ToDictionary(Path.GetFileName, Hash),
             snapshotSha256 = snapshot.Sha256, hostSha256 = Hash(typeof(GenericPhysicalParentWorkflow).Assembly.Location),
-            scope = "Unity-compiled generic physical parent and probes; existing owner changed to GenericParent<Packet> across assemblies" });
+            referenceArgument,
+            scope = referenceArgument ? "Unity-compiled reference argument; existing owner changes from GenericParent<Packet> to GenericParent<ReferencePacket>"
+                : "Unity-compiled generic physical parent and probes; existing owner changed to GenericParent<Packet> across assemblies" });
         Console.WriteLine(current); return 0;
     }
 
