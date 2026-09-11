@@ -6,6 +6,7 @@ using Processor = model::HybridCLR.Lab.VirtualSignatures.Processor;
 using ProcessorRoot = model::HybridCLR.Lab.VirtualSignatures.ProcessorRoot;
 using Packet = model::HybridCLR.Lab.VirtualSignatures.Packet;
 using IOperations = model::HybridCLR.Lab.VirtualSignatures.IOperations;
+using ValueLayout = model::HybridCLR.Lab.ValueLayout;
 
 namespace HybridCLR.Lab.CrossAssemblyParentRemoval
 {
