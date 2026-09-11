@@ -590,7 +590,9 @@ internal sealed class ResourceUpdateCompatibility
     private static bool RequiresLogicalAttributeMetadata(MetaVersionSnapshot baseline,
         IEnumerable<MetaVersionSnapshot> currentAssemblySet)
     {
-        var snapshots = currentAssemblySet.ToDictionary(snapshot => snapshot.AssemblyName, StringComparer.OrdinalIgnoreCase);
+        var snapshots = new Dictionary<string, MetaVersionSnapshot>(StringComparer.OrdinalIgnoreCase);
+        foreach (var snapshot in currentAssemblySet)
+            if (!snapshots.TryAdd(snapshot.AssemblyName, snapshot)) return false;
         var baseTypes = baseline.Types.Select(type => type.Identity).ToHashSet(StringComparer.Ordinal);
         var baseMethods = baseline.Methods.Select(method => method.Identity).ToHashSet(StringComparer.Ordinal);
         foreach (MetaVersionAttributeUse use in snapshots.Values.SelectMany(snapshot => snapshot.AttributeUses))
