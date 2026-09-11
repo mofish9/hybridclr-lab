@@ -53,8 +53,8 @@
         "path": "../worktrees/il2cpp-plus-metadata-tuanjie-v8.13.0"
       },
       "Unity2021": {
-        "tag": "v2021-8.1.0-opt3",
-        "commit": "511df62f4aa7cba2bdb505deead48a8d080d582c",
+        "tag": "v2021-8.1.0",
+        "commit": "10cbacd02b3ed291af6a6a34d444ae50c85462e0",
         "path": "../worktrees/il2cpp-plus-metadata-unity2021-v8.1.0"
       },
       "Unity2022": {

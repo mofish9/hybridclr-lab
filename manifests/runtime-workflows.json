@@ -23,8 +23,8 @@
         "path": "../worktrees/il2cpp-plus-metadata-tuanjie-v8.13.0"
       },
       "metadataPackage": {
-        "tag": "v8.13.0-opt3",
-        "commit": "ac0fdc5c6363a1b6323d017e068c536dd22127dc"
+        "tag": "v8.13.0",
+        "commit": "b33f823982c52587f6c0c909227b2347c88764ff"
       },
       "fullGenericSharing": "required",
       "productionWorkflow": {
@@ -62,8 +62,8 @@
         "path": "../worktrees/il2cpp-plus-metadata-unity2022-v8.11.0"
       },
       "metadataPackage": {
-        "tag": "v8.13.0-opt3",
-        "commit": "ac0fdc5c6363a1b6323d017e068c536dd22127dc"
+        "tag": "v8.13.0",
+        "commit": "b33f823982c52587f6c0c909227b2347c88764ff"
       },
       "fullGenericSharing": "required",
       "productionWorkflow": {
@@ -90,18 +90,18 @@
         "executablePath": "C:/Program Files/Unity/Hub/Editor/2021.3.45f2/Editor/Unity.exe"
       },
       "il2cppPlus": {
-        "tag": "v2021-8.1.0-opt3",
-        "commit": "511df62f4aa7cba2bdb505deead48a8d080d582c",
+        "tag": "v2021-8.1.0",
+        "commit": "10cbacd02b3ed291af6a6a34d444ae50c85462e0",
         "path": "../worktrees/il2cpp-plus-metadata-unity2021-v8.1.0"
       },
       "metadataIl2cppPlus": {
-        "tag": "v2021-8.1.0-opt3",
-        "commit": "511df62f4aa7cba2bdb505deead48a8d080d582c",
+        "tag": "v2021-8.1.0",
+        "commit": "10cbacd02b3ed291af6a6a34d444ae50c85462e0",
         "path": "../worktrees/il2cpp-plus-metadata-unity2021-v8.1.0"
       },
       "metadataPackage": {
-        "tag": "v8.13.0-opt3",
-        "commit": "ac0fdc5c6363a1b6323d017e068c536dd22127dc"
+        "tag": "v8.13.0",
+        "commit": "b33f823982c52587f6c0c909227b2347c88764ff"
       },
       "fullGenericSharing": "disabled",
       "productionWorkflow": {
