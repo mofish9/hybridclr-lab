@@ -52,3 +52,11 @@ times were 9015–9057 ms (mean 9026.8 ms; exploratory maximum 9057 ms). These
 times include process startup, Unity initialization and asset checks, rather than
 isolated DHE load time; the sample is below the 100-process policy for a P99 gate.
 Raw records are in `F:/hybridclr_artifacts/dhe-asset-provenance/timing-02`.
+
+A follow-up 100-process attempt was intentionally not accepted as a P99 gate:
+the sequential runner stopped after 55 completed samples when Windows reused a
+previously exited PID. The partial records are in
+`F:/hybridclr_artifacts/dhe-asset-provenance/timing-100-01`; this identifies a
+runner design issue. A formal gate must use a concurrent process window or record
+PID plus process creation identity while still enforcing the policy's unique-PID
+requirement.
