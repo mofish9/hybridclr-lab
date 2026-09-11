@@ -40,8 +40,19 @@ internal static class DeliveryPlayerWorkflow
         {
             string proof = baseRecord.GetProperty("proof").GetString()!, root = Path.Combine(proof, "base/player");
             var identity = Read(Path.Combine(proof, "base/build-identity.json"));
-            var files = Read(Path.Combine(proof, "asset-player-files.json")).EnumerateObject().ToDictionary(
-                property => Path.Combine(root, property.Name), property => property.Value.GetString()!);
+            Check("shared-player-binding-" + index,
+                Hash(Path.Combine(root, "Snapshot.exe")) == baseRecord.GetProperty("playerSha256").GetString() &&
+                Hash(Path.Combine(root, "GameAssembly.dll")) == baseRecord.GetProperty("gameAssemblySha256").GetString());
+            string archivedInventory = Path.Combine(proof, "asset-player-files.json");
+            var files = File.Exists(archivedInventory)
+                ? Read(archivedInventory).EnumerateObject().ToDictionary(
+                    property => Path.Combine(root, property.Name), property => property.Value.GetString()!)
+                : Directory.GetFiles(root, "*", SearchOption.AllDirectories).ToDictionary(path => path, Hash);
+            // A Base built through the general workflow has no asset inventory.
+            // Bind its tested binaries above and freeze all files for this replay;
+            // never write a retrospective inventory into an archived Base.
+            File.WriteAllText(Path.Combine(output, "player-files-" + index + ".json"),
+                JsonSerializer.Serialize(files, new JsonSerializerOptions { WriteIndented = true }));
             Check("original-player-" + index, files.All(row => Hash(row.Key) == row.Value));
             foreach (string mode in new[] { "missing-asset", "wrong-manifest-hash", "valid" })
             {
