@@ -69,3 +69,10 @@ PID cardinality was 97. P50 was 16,574 ms, P95 17,026 ms, P99 18,769 ms, maximum
 `F:/hybridclr_artifacts/dhe-asset-provenance/timing-concurrent-100b`.
 This measures startup plus prepare/load/assets, not isolated method execution or
 Android performance.
+
+The final audit intentionally retried the older `shared-two-base-01` resource
+with the package after the explicit public-image capability token was added. It
+was rejected at `prepare-0` because that historical resource/Base identity does
+not contain the new capability. This is expected stale-identity fail-closed
+behavior, not a regression of the current three-Base delivery. Current evidence
+must use `shared-three-base-01` and `three-base-delivery-01`.
