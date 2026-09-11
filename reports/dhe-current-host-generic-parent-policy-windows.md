@@ -17,7 +17,7 @@ generic-parent Player checkpoint.
 
 | Item | Value |
 |---|---|
-| Lab source | `658e60a` (`research/dhe-cross-assembly-parents-v8.13.0`) |
+| Lab source | `1f4a148` (`research/dhe-cross-assembly-parents-v8.13.0`) |
 | Package source | `841abfd46e122343717fe4115186b97a215b58df` |
 | Fixture result | `C:/hybridclr_optimize/artifacts/dhe-cross-assembly-parents/generic-parent-currenthost-03/result/report.json` |
 | Result SHA-256 | `8C0BED67E013E7BD5A59E72B3C316DE97ABAD080413BA4D66C8F6B80B8B031E4` |
