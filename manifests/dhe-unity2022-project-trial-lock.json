@@ -26,11 +26,6 @@
       "remote": "https://github.com/mofish9/il2cpp_plus.git",
       "ref": "refs/heads/optimize/dhe-project-trial-unity2022-v8.14.0",
       "commit": "658aa64923e568a497e11640b340f316704d02f9"
-    },
-    "hybridclr_lab": {
-      "remote": "https://github.com/mofish9/hybridclr-lab.git",
-      "ref": "refs/heads/optimize/dhe-unity2022-project-trial-v8.13.0",
-      "commit": "84b1e5e"
     }
   },
   "validation": {
