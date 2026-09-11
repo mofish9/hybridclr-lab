@@ -24,3 +24,21 @@ ed4b7b5. Use F:/hybridclr_artifacts/dhe-unity-bundles for new artifacts. Unity
 2022.3.62f3 Windows only; no CAT, formal release, Installer or mobile change.
 Rollback uses compatible archived code/assets and restarts the Player. All tests
 bind committed source and unique output paths; no old artifact is overwritten.
+
+## Native type resolution experiment
+
+Base111/112 no-op bundle probes pass 36/42 checks. With one Current, Base111
+loses nested State with either old or latest typed bundles; Base112 plus the old
+bundle does not restore the renamed nested field, while Base112/latest passes.
+Thus preserving type trees alone does not qualify this workflow.
+
+The C API maps System.Type to the selected physical reference class, but its
+Il2CppType/name/element lookup APIs still return the original class. Hypothesis:
+Unity's nested serialization traversal caches metadata inconsistent with the
+selected reference allocation. An isolated Unity 2022 IL2CPP candidate applies
+the same existing mapping at those four type-resolution boundaries. Internal
+Class helpers, actual object class queries and receiver/ABI validation stay
+strict. The mapping excludes value layouts and uses its existing publication
+and metadata locks. Require real-header compile/CTest and a new immutable Base
+against the same unchanged Current/bundles before accepting this hypothesis.
+Old failing Players are controls and cannot acquire this behavior retroactively.
