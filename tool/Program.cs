@@ -4128,8 +4128,9 @@ internal static partial class Program
                     CopyDirectoryFiltered(source, destination, path =>
                     {
                         string relative = Path.GetRelativePath(source, path).Replace('\\', '/');
-                        return !relative.StartsWith("obj/", StringComparison.OrdinalIgnoreCase) &&
-                               !relative.StartsWith("bin/", StringComparison.OrdinalIgnoreCase);
+                        return !relative.Split('/').Any(segment =>
+                            segment.Equals("obj", StringComparison.OrdinalIgnoreCase) ||
+                            segment.Equals("bin", StringComparison.OrdinalIgnoreCase));
                     });
                 else
                     CopyDirectory(source, destination);
