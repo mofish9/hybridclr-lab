@@ -4,6 +4,69 @@ The complete DHE objective remains open. This report records the current
 correction and preserves failed immutable Players; it is not a release or a
 project handoff. Only Unity 2022.3.62f3 Windows is under qualification.
 
+## Latest verified Player checkpoint
+
+Runtime6180597 / IL2CPP819f74c / package841abfd now pass removal and replacement
+on immutable Base-99, including the original cached-object failure. Both exact
+Current sets that failed on Bases95/96 are reused without changing their bytes.
+Base-99 was built at labcea876870974f56f41992d9eefc67b5e5ecd0de1 using host03
+and tool02 from lab85949a2. All final replays/audits/recovery also use that clean
+lab checkpoint and those binaries. Later report commits do not rebind them.
+
+Base-99 ID: abffce206450aca233e9f72098b3c337cda25b424c7290310df49adaba15465f.
+GameAssembly SHA-256:
+461C3DF3B45C563D501D75A680DA632C29D7C0205AFEBE5CDC3BC7781DBDB7BF.
+Snapshot: d4a28c534a0d2a7755e8743d7b8d11ccbe7d45d125668a4b379343e3114da580.
+
+| Gate | Removal | Replacement |
+| --- | --- | --- |
+| Base-99 cold parent checks | 21 pass | 31 pass |
+| Base-99 original objects/member caches and field validation | 29 pass | 29 pass |
+| Framework / virtual signatures / business, every explicit replay | 18 / 25 / 46 pass | 18 / 25 / 46 pass |
+| Same Current on Base-81 new-type control | complete sequences pass | complete sequences pass |
+| Independent two-Base resource audit | 121 files, 46 cases | 121 files, 46 cases |
+| Native preparation failure / fresh-process recovery | 16 checks, 96 files | 16 checks, 96 files |
+
+Base-81 has no original Processor/Middle declarations. Its success is a new-type
+control and shared-resource proof, not a second existing-parent evolution proof.
+Base-99 provides the actual removal/replacement and old-object evidence. The
+29 checks preserve the original fourteen and add old-field writes, unrelated/null
+receiver rejection, invalid values, custom Binder behavior without changing
+global logical assignability, static/literal/open generic fields and data safety.
+No automatic object migration is claimed.
+
+Artifacts are relative to `C:/hybridclr_optimize/artifacts/dhe-parent-transitions`:
+
+- `shared-removal-03`, `shared-replacement-03`: both complete standard workflows.
+- `probe-removal-base99-01`, `probe-replacement-base99-01`: cold existing-type runs.
+- `probe-removal-base99-cached-01`, `probe-replacement-base99-cached-01`: 29 cache
+  checks together with the full parent/framework/virtual/business sequences.
+- `probe-removal-base81-02`, `probe-replacement-base81-02`: explicit control runs.
+  The attempted `*-base81-01` output names were rejected because those historical
+  directories already existed; no old output or Player was overwritten.
+- `noop-base99-01`: all 25 checks, six unchanged implementations, 4,151 AOT
+  entries and zero DHE interpreter entries. This is not performance evidence.
+
+The Current-set hashes remain
+fac561fce0528e05759337bd6ad46f218477b2fc04504229c0a474499dd9dcc9 (removal) and
+22422ea2ea897c942bc53c3582ebd6857062bde05da3932b7d94a5c56a1d6c3b (replacement).
+Cached Player log hashes are respectively
+4DAD0F3302881B1B790BD1AA96B4239D967CE95E93578A4F1995D9C6739B958C and
+B3892D3A35919923DE85DE9F3209AD4A8A9847E0901480E75FAC67619E255550.
+Audit03 hashes are
+1101DDC1DEB99B8F17AF2D18DFA6C0AB906A91068183E8A113A51A49C5F04EE1 and
+26F0B2E403E88F5F63B9C2A4D81D38F414BB6ED94E773508694642FAB5DF45B7.
+Public recovery result hashes are
+55E162F38C5962B44676C2BE008C660951FD71097A66FC9ABBC9CFF2BE617448 and
+F380B3CF88A7BEF19F0B201D4F848BF1AC591E77D33809D5065468249FF589B1.
+
+These scenarios are now conditionally qualified on Windows. A second existing
+Base with root-only ancestry and different fields, insertion regression on the
+latest runtime, type deletion, cross-assembly/generic parents, Unity assets and
+startup state, publication stress and performance/memory remain open. Inputs
+for the root-only Base are preserved at `base-input-97`, derived from Base-94;
+they have not yet been built with the latest runtime. Full DHE is not complete.
+
 ## Original transition evidence
 
 Lab d118fc4 builds Base-95 from the preceding insertion Current, so its AOT
@@ -83,13 +146,14 @@ malformed-prefix/signature controls and both capability requirements.
 `old-base95-rejection-01` and `old-base96-rejection-01` reject their original
 resources for the respective missing capability before any Player execution.
 
-Player qualification for runtime6180597 remains outstanding. Base-97 stops in
+At this earlier native checkpoint, Player qualification remained outstanding.
+Base-97 stops in
 Installer CopyFileOrDirectory with only about 0.5 GiB C: space remaining, before
 any Player is generated. Its install/process logs and partial project remain.
 The intended Player fixture retains the original fourteen cache assertions and
 adds fifteen checks for old-field writes, unrelated/null targets, invalid values,
 custom Binder execution and logical ancestry, static/literal/open generic fields
-and data preservation. None are claimed as a Player pass yet.
+and data preservation. These subsequently pass on Base-99 as recorded above.
 
 Base-98 proceeds through Installer and compilation but fails copying
 GameAssembly.pdb during BuildScriptsOnly: the build log explicitly reports disk
@@ -110,9 +174,9 @@ checks. The final twenty-five receipts are retained in
 are in command receipts. C: has approximately 7.9 GiB available after this work.
 No files were deleted and no executable-compression/reparse mechanism was used.
 
-Next: build a new immutable Player with runtime02, replay the exact two Current
-sets cold and cached, then finish compatible multi-Base resources, independent
-identity audits and preparation failure/recovery. Keep all failures visible.
+The Base-99 replays/audits/recovery above close the next gate for these two
+Current sets. Continue with the second existing Base and the remaining
+evolution/Unity boundaries. Keep all failures visible.
 Broader deletion/parent/generic/Unity asset and startup-object semantics,
 publication stress, performance and memory still require qualification. Windows
 results do not establish ARM64 correctness or mobile performance.
