@@ -557,8 +557,10 @@ internal sealed class ResourceUpdateCompatibility
         MetaVersionSnapshot baseline, MetaVersionSnapshot current,
         IEnumerable<MetaVersionSnapshot>? currentAssemblySet)
     {
-        var snapshots = (currentAssemblySet ?? new[] { current }).ToDictionary(
-            snapshot => snapshot.AssemblyName, StringComparer.OrdinalIgnoreCase);
+        var snapshots = new Dictionary<string, MetaVersionSnapshot>(StringComparer.OrdinalIgnoreCase);
+        foreach (var snapshot in currentAssemblySet ?? new[] { current })
+            if (!snapshots.TryAdd(snapshot.AssemblyName, snapshot))
+                return false;
         snapshots[current.AssemblyName] = current;
         var baseNames = baseline.Types.Select(type => type.Identity).ToHashSet(StringComparer.Ordinal);
         foreach (MetaVersionType added in addedTypes.Where(type => !type.IsInterface))
