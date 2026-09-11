@@ -8,6 +8,8 @@ namespace UnityEngine
     public static class Debug { public static void Log(object value) { } }
     public static class JsonUtility
     {
+        public static string ToJson(object value, bool prettyPrint = false) => JsonSerializer.Serialize(value,
+            new JsonSerializerOptions { IncludeFields = true, WriteIndented = prettyPrint });
         public static T FromJson<T>(string json)
         {
             using var document = JsonDocument.Parse(json);

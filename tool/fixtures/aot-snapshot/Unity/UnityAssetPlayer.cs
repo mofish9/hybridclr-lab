@@ -10,6 +10,7 @@ namespace HybridCLR.Lab.Snapshot
 {
     public sealed class UnityAssetPlayer : MonoBehaviour
     {
+        internal static Func<string, byte[]> LoadDeliveryAsset;
         private readonly List<string> checks = new List<string>();
         private Action<string[], string> completed;
         private Type componentType, stateType;
@@ -95,11 +96,15 @@ namespace HybridCLR.Lab.Snapshot
                     componentType = assembly.GetType("HybridCLR.Lab.UnityAssets.AssetBehaviour", true);
                     stateType = assembly.GetType("HybridCLR.Lab.UnityAssets.AssetState", true);
                     GameObject prefab;
-                    if (bundleRoot != null)
+                    if (bundleRoot != null || LoadDeliveryAsset != null)
                     {
-                        prefabBundle = AssetBundle.LoadFromFile(Path.Combine(bundleRoot, "dhe-prefab"));
+                        prefabBundle = LoadDeliveryAsset != null
+                            ? AssetBundle.LoadFromMemory(LoadDeliveryAsset("prefab"))
+                            : AssetBundle.LoadFromFile(Path.Combine(bundleRoot, "dhe-prefab"));
                         Check("bundle-prefab-loaded", prefabBundle != null && !prefabBundle.isStreamedSceneAssetBundle);
-                        sceneBundle = AssetBundle.LoadFromFile(Path.Combine(bundleRoot, "dhe-scene"));
+                        sceneBundle = LoadDeliveryAsset != null
+                            ? AssetBundle.LoadFromMemory(LoadDeliveryAsset("scene"))
+                            : AssetBundle.LoadFromFile(Path.Combine(bundleRoot, "dhe-scene"));
                         Check("bundle-scene-loaded", sceneBundle != null && sceneBundle.isStreamedSceneAssetBundle);
                         bundleScenePath = sceneBundle.GetAllScenePaths().Single();
                         prefab = prefabBundle.LoadAsset<GameObject>("Assets/Resources/DheAssetPrefab.prefab");
