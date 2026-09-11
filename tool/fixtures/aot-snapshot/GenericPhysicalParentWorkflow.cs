@@ -12,7 +12,7 @@ internal static class GenericPhysicalParentWorkflow
     private const string Owner = "HybridCLR.Lab.VirtualSignatures.Processor", Root = "HybridCLR.Lab.VirtualSignatures.ProcessorRoot";
     private const string Parent = "HybridCLR.Lab.GenericPhysicalParents.GenericParent`1", Probe = "HybridCLR.Lab.GenericPhysicalParents.Cases";
     private const string Prefix = "DHE generic physical parent check: ";
-    private static readonly string[] Expected = {
+    internal static readonly string[] Expected = {
         "closed-parent-identity", "cross-assembly-parent", "generic-definition", "logical-parent-casts", "immutable-root",
         "constructor-once", "inherited-default-layout", "child-layout", "generic-value-field", "generic-field-owner",
         "generic-field-read", "generic-field-write", "inherited-generic-method", "generic-method-owner", "generic-method-reflection",

@@ -18,11 +18,11 @@ internal static class FrozenResourceWorkflow
 
     public static int NewBase(string[] args)
     {
-        if (args.Length < 6 || args.Length > 7) throw new ArgumentException("frozen-resource-new-base <lab> <package> <editor> <runtime manifest> <old proof> <new output> [Base Current DLL root]");
+        if (args.Length < 6 || args.Length > 8) throw new ArgumentException("frozen-resource-new-base <lab> <package> <editor> <runtime manifest> <old proof> <new output> [Base Current DLL root] [tool.dll]");
         string proof = Path.GetFullPath(args[4]), inputs = Path.GetFullPath(args[5]) + ".inputs";
         if (Directory.Exists(inputs)) throw new IOException("New Base inputs must be new.");
         Directory.CreateDirectory(inputs);
-        string sourceCurrent = args.Length == 7 ? Path.GetFullPath(args[6]) : Path.Combine(proof, "frozen-entry-current");
+        string sourceCurrent = args.Length >= 7 ? Path.GetFullPath(args[6]) : Path.Combine(proof, "frozen-entry-current");
         foreach (string source in Directory.GetFiles(sourceCurrent, "*.dll"))
             File.Copy(source, Path.Combine(inputs, Path.GetFileName(source)));
         string identityPath = Path.Combine(proof, "base/build-identity.json"); var identity = Read(identityPath);
@@ -37,7 +37,9 @@ internal static class FrozenResourceWorkflow
             revision.Body = new CilBody(); revision.Body.Instructions.Add(Instruction.Create(OpCodes.Ldc_I4, 59));
             revision.Body.Instructions.Add(Instruction.Create(OpCodes.Ret)); module.Write(modelPath);
         }
-        return UnityWorkflow.Run(args.Take(4).Concat(new[] { inputs, args[5], "59", ":all-ordinary-guards:" }).ToArray());
+        var workflow = args.Take(4).Concat(new[] { inputs, args[5], "59", ":all-ordinary-guards:" });
+        if (args.Length == 8) workflow = workflow.Append(Path.GetFullPath(args[7]));
+        return UnityWorkflow.Run(workflow.ToArray());
     }
 
     public static int Reference(string[] args)

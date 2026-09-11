@@ -22,7 +22,9 @@ internal static class VirtualSignatureWorkflow
 
     internal static int Noop(string[] args)
     {
-        if (args.Length != 3) throw new ArgumentException("virtual-signature-noop <lab> <passed Base proof> <new output>");
+        if (args.Length < 3 || args.Length > 4 || args.Length == 4 && args[3] != "generic-parent")
+            throw new ArgumentException("virtual-signature-noop <lab> <passed Base proof> <new output> [generic-parent]");
+        bool genericParent = args.Length == 4;
         string lab = Path.GetFullPath(args[0]), proof = Path.GetFullPath(args[1]), output = Path.GetFullPath(args[2]);
         if (Directory.Exists(output)) throw new IOException("No-op output must be new.");
         Directory.CreateDirectory(output);
@@ -50,9 +52,11 @@ internal static class VirtualSignatureWorkflow
             gameHash != original.GetProperty("gameAssemblySha256").GetString()) throw new InvalidDataException("Base proof identity mismatch.");
         var stageHashes = Directory.GetFiles(stage, "*", SearchOption.AllDirectories).ToDictionary(path => path, Hash);
         string report = Path.Combine(output, "player.json"), log = Path.Combine(output, "player.log");
-        string trace = Execute(player, out int exit, out int pid, "-batchmode", "-nographics", "-snapshotResult", report,
+        var playerArgs = new[] { "-batchmode", "-nographics", "-snapshotResult", report,
             "-snapshotResourceRoot", stage, "-expectedRevision", "59", "-expectedAssemblies",
-            identity.GetProperty("assemblies").GetArrayLength().ToString(), "-virtualSignatureNoopProbe", "true", "-logFile", log);
+            identity.GetProperty("assemblies").GetArrayLength().ToString(), "-virtualSignatureNoopProbe", "true", "-logFile", log };
+        if (genericParent) playerArgs = playerArgs.Concat(new[] { "-genericParentNoopProbe", "true" }).ToArray();
+        string trace = Execute(player, out int exit, out int pid, playerArgs);
         File.WriteAllText(Path.Combine(output, "process.log"), trace);
         var result = Read(report);
         var observed = File.ReadAllLines(log).Where(line => line.StartsWith("DHE virtual signature check: "))
@@ -63,8 +67,14 @@ internal static class VirtualSignatureWorkflow
             result.GetProperty("virtualNoopChecks").EnumerateArray().Select(row => row.GetString()).SequenceEqual(Expected) &&
             observed.SequenceEqual(Expected) && result.GetProperty("virtualNoopMethods").GetInt32() == 6 &&
             result.GetProperty("virtualNoopInterpreterEntries").GetInt32() == 0 && result.GetProperty("virtualNoopAotEntries").GetInt32() > 0;
+        if (genericParent)
+            passed &= result.GetProperty("genericParentNoopChecks").EnumerateArray().Select(row => row.GetString())
+                .SequenceEqual(GenericPhysicalParentWorkflow.Expected) &&
+                result.GetProperty("genericParentNoopMethods").GetInt32() == 7 &&
+                result.GetProperty("genericParentNoopInterpreterEntries").GetInt32() == 0 &&
+                result.GetProperty("genericParentNoopAotEntries").GetInt32() > 0;
         File.WriteAllText(Path.Combine(output, "result.json"), JsonSerializer.Serialize(new {
-            passed, immutable, proof, labHead, pid, exit, observed, playerHash, gameHash, stageHashes,
+            passed, immutable, proof, labHead, pid, exit, observed, genericParent, playerHash, gameHash, stageHashes,
             playerResultSha256 = Hash(report), logSha256 = Hash(log), hostSha256 = Hash(typeof(VirtualSignatureWorkflow).Assembly.Location),
             scope = "25 unchanged virtual-signature checks on the original generated no-op resource; six implementations unchanged, positive AOT entries and zero DHE interpreter entries"
         }, new JsonSerializerOptions { WriteIndented = true }));

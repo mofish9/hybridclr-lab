@@ -44,3 +44,16 @@ The starting matched candidate is HybridCLR `6180597`, IL2CPP `819f74c`, package
 `ed4b7b5`, lab `c5a2541`. Work is isolated on
 `research/dhe-generic-physical-parents-v8.13.0`. Rollback selects that preceding
 combination and its archived compatible resources, then restarts the Player.
+
+## AOT-parent Base continuation
+
+Build a new Base from the qualified generic-parent Current using the existing
+C# Base workflow and explicit producer DLL. Reset only its business revision to
+59 as in previous archived Bases. Add an opt-in no-op probe to the source Player
+fixture: execute the 29 generic-parent cases after resetting dispatch counters,
+require unchanged parent methods, positive AOT entries and zero DHE interpreter
+entries. Preserve the existing 25 virtual checks and all old Player bytes.
+Then reuse the original Current on the new and historical Bases before testing
+parent argument replacement/removal. This is still correctness/routing work,
+not a throughput or ARM64 claim. Candidate sources must be committed before
+building; generated project sources must not be edited to fix build failures.

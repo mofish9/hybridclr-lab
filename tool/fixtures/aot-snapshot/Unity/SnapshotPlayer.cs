@@ -27,6 +27,8 @@ namespace HybridCLR.Lab.Snapshot
             public long ordinaryAotEchoExtra;
             public int ordinaryAotStaticNeighbor;
             public string[] virtualNoopChecks;
+            public string[] genericParentNoopChecks;
+            public int genericParentNoopMethods, genericParentNoopAotEntries, genericParentNoopInterpreterEntries;
             public string[] virtualReceiverChecks;
             public string[] parentTransitionCacheChecks;
             public string[] typeDeletionCacheChecks;
@@ -212,6 +214,29 @@ namespace HybridCLR.Lab.Snapshot
                     result.passed = methods.Length == 6 && result.virtualNoopChecks.Length == 25 &&
                         result.virtualNoopAotEntries > 0 && result.virtualNoopInterpreterEntries == 0;
                     result.stage = "virtual-signature-noop-complete";
+                }
+                if (Array.IndexOf(args, "-genericParentNoopProbe") >= 0)
+                {
+                    if (!result.passed) throw new InvalidOperationException("Prior checks failed before generic parent no-op validation.");
+                    result.passed = false; result.stage = "generic-parent-noop";
+                    var assembly = typeof(ValueLayout.Factory).Assembly;
+                    var parent = assembly.GetType("HybridCLR.Lab.VirtualSignatures.Processor", true).BaseType;
+                    if (!parent.IsGenericType || parent.GetGenericTypeDefinition().FullName !=
+                        "HybridCLR.Lab.GenericPhysicalParents.GenericParent`1")
+                        throw new InvalidDataException("Expected an AOT generic physical parent.");
+                    var methods = parent.GetMethods(System.Reflection.BindingFlags.Instance | System.Reflection.BindingFlags.Public |
+                        System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.DeclaredOnly);
+                    result.genericParentNoopMethods = methods.Length;
+                    if (methods.Length != 7 || methods.Any(RuntimeApi.IsDifferentialMethodChanged))
+                        throw new InvalidDataException("Unchanged generic parent implementations were not preserved.");
+                    RuntimeApi.ResetDifferentialDispatchCounters();
+                    result.genericParentNoopChecks = (string[])assembly.GetType("HybridCLR.Lab.GenericPhysicalParents.Cases", true)
+                        .GetMethod("Run").Invoke(null, null);
+                    result.genericParentNoopAotEntries = RuntimeApi.GetDifferentialAotEntryCount();
+                    result.genericParentNoopInterpreterEntries = RuntimeApi.GetDifferentialInterpreterEntryCount();
+                    result.passed = result.genericParentNoopChecks.Length == 29 && result.genericParentNoopAotEntries > 0 &&
+                        result.genericParentNoopInterpreterEntries == 0;
+                    result.stage = "generic-parent-noop-complete";
                 }
                 int unityProbe = Array.IndexOf(args, "-unityBehaviourProbe");
                 if (unityProbe >= 0)
