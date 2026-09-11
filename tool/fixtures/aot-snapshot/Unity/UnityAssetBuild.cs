@@ -51,6 +51,25 @@ namespace HybridCLR.Lab.Editor
                 componentType.GetField("Node").SetValue(component, node);
                 componentType.GetField("Target").SetValue(component, child);
                 if (current) componentType.GetField("Extra").SetValue(component, 90000000017L);
+                var addedField = componentType.GetField("Added");
+                if (addedField != null)
+                {
+                    object Added(int number)
+                    {
+                        var value = Activator.CreateInstance(addedField.FieldType);
+                        addedField.FieldType.GetField("Number").SetValue(value, number);
+                        addedField.FieldType.GetField("Text").SetValue(value, name);
+                        return value;
+                    }
+                    addedField.SetValue(component, Added(101));
+                    var items = Array.CreateInstance(addedField.FieldType, 2);
+                    items.SetValue(Added(103), 0); items.SetValue(Added(107), 1);
+                    componentType.GetField("AddedItems").SetValue(component, items);
+                    var addedNodeType = assembly.GetType("HybridCLR.Lab.UnityAssets.AssetAddedNode", true);
+                    var addedNode = Activator.CreateInstance(addedNodeType);
+                    addedNodeType.GetField("Value").SetValue(addedNode, 109);
+                    componentType.GetField("AddedNode").SetValue(component, addedNode);
+                }
                 return root;
             }
             const string prefab = "Assets/Resources/DheAssetPrefab.prefab", scenePath = "Assets/Scenes/DheAssetScene.unity";

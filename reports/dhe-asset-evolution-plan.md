@@ -17,3 +17,12 @@ first, so a general control-fixture failure cannot explain an old-bundle failure
 Then qualify newly added serialized types and implement coherent code/asset
 selection in the package workflow. Reuse capable immutable Bases where possible.
 All large outputs go to F:, Windows only; no mobile or production claim.
+
+The new-type test adds AssetExtension (inline field and array) and AssetAddedNode
+(new SerializeReference implementation) to Current only. Use a source-only copy
+of the Base authoring project and replace DLL inputs to build bundles without
+rebuilding the Player. Keep the 42 existing assertions, and require successful
+data-bearing callbacks for both prefab and scene, including repeated clone
+callbacks. Missing all new fields must fail the added-type gate, even if the
+ordinary checks pass. Confirm the new declarations are absent from the template
+Base and present in Current before authoring.

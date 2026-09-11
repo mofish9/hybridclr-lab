@@ -37,8 +37,8 @@ internal static class UnityAssetWorkflow
     }
     internal static int Inputs(string[] args)
     {
-        if (args.Length != 6 || args[5] != "base" && args[5] != "current")
-            throw new ArgumentException("unity-asset-inputs <lab> <Base proof> <seed Current> <editor> <new output> <base|current>");
+        if (args.Length != 6 || args[5] != "base" && args[5] != "current" && args[5] != "current-added")
+            throw new ArgumentException("unity-asset-inputs <lab> <Base proof> <seed Current> <editor> <new output> <base|current|current-added>");
         string output = Path.GetFullPath(args[4]);
         if (Directory.Exists(output)) throw new IOException("Output must be new.");
         string current = Path.Combine(output, "current"); Directory.CreateDirectory(current);
@@ -57,7 +57,8 @@ internal static class UnityAssetWorkflow
         }).Append(Path.Combine(data, "MonoBleedingEdge/lib/mono/unityaot-win32/Facades/netstandard.dll"))
             .Concat(Directory.GetFiles(current, "*.dll"));
         FrozenStaticWorkflow.CompileAndMerge(args[0], args[3], "UnityAssetDefinitions", Path.Combine(current, "HybridCLR.ValueLayoutModel.dll"),
-            references, Path.Combine(output, "compiled"), false, args[5] == "current" ? "UNITY_ASSET_CURRENT" : null);
+            references, Path.Combine(output, "compiled"), false, args[5] == "current-added"
+                ? "UNITY_ASSET_CURRENT;UNITY_ASSET_ADDED_TYPES" : args[5] == "current" ? "UNITY_ASSET_CURRENT" : null);
         foreach (string path in Directory.GetFiles(current, "*.dll")) FrozenStaticWorkflow.NormalizeSelfReferences(path);
         if (inputs.Any(row => Hash(row.Key) != row.Value)) throw new InvalidDataException("Input DLL changed.");
         Write(Path.Combine(output, "input-evidence.json"), new { inputs, schema = args[5],
