@@ -3,6 +3,7 @@ using System.Security.Cryptography;
 using System.Text;
 using System.Text.Json;
 using System.Text.Json.Nodes;
+using System.Threading;
 using HybridCLR;
 using HybridCLR.DheTool;
 using dnlib.DotNet;
@@ -162,6 +163,22 @@ void RunCase(string name, int baseIndex, Action<JsonNode, JsonNode, JsonNode, Pr
 }
 RunCase("old-base-public-loader", 0, null, true);
 RunCase("new-base-same-current-public-loader", 1, null, true);
+
+// Pause before the second assembly is added so readers must not observe the
+// partly populated private plan, even without an enumeration exception.
+{
+    var provider = providers[0].Copy();
+    var manifest = Clone(manifestDocument);
+    var validation = Clone(validationDocument);
+    var plan = Clone(planDocument);
+    provider.Bytes[assets + "validation.json"] = Encoding.UTF8.GetBytes(validation.ToJsonString());
+    provider.Bytes[assets + "dhe-runtime-plan.json"] = Encoding.UTF8.GetBytes(plan.ToJsonString());
+    manifest["runtimePlanSha256"] = Hash(provider.Bytes[assets + "dhe-runtime-plan.json"]);
+    manifest["validationSha256"] = Hash(provider.Bytes[assets + "validation.json"]);
+    provider.Bytes[manifestPath] = Encoding.UTF8.GetBytes(manifest.ToJsonString());
+    PublicSnapshotTests.Run(cases, provider, identities[0], manifestPath, assets,
+        plan["assemblies"][1]["currentMetaVersion"].GetValue<string>());
+}
 RunCase("wrong-analysis-snapshot-binding", 0, (m, v, p, _) =>
 {
     m["supportedBases"][0]["aotAnalysisSnapshotSha256"] = emptyHash;
@@ -538,6 +555,7 @@ foreach (int phase in new[] { 1, 3 })
     cases[prefix + "restart-state"] = PublicState("RestartRequired") is true && PublicState("LoadState")?.ToString() == "RestartRequired";
     cases[prefix + "confirmed-commit"] = Equals(PublicState("MetadataCommitted"), phase == 3);
     cases[prefix + "original-exception"] = error.Contains("DHE deliberate public module failure") && Equals(PublicState("LastLoadError"), error);
+    cases[prefix + "published-set-visible-before-reset-attempt"] = phase == 3 ? DheRuntime.LoadedAssemblyNames.SequenceEqual(names) : DheRuntime.LoadedAssemblyNames.Length == 0;
     cases[prefix + "reset-rejected"] = ResetRejected();
     cases[prefix + "reinitialize-rejected"] = !DheRuntime.InitializeFromResourceUpdate(provider, identities[0], manifestPath, out _, assets);
     int count = RuntimeApi.Calls;
@@ -569,6 +587,10 @@ foreach (int phase in new[] { 1, 3 })
     };
     cases["public-corrected-native-retry-succeeds"] = DheRuntime.LoadCurrentAssemblyImages(names, dlls, out _, out _) &&
         PublicState("LoadState")?.ToString() == "Ready" && PublicState("MetadataCommitted") is true && PublicState("RestartRequired") is false;
+    cases["public-loaded-snapshot-visible-before-reset-attempt"] = DheRuntime.LoadedAssemblyNames.SequenceEqual(names);
+    string[] loadedCopy = DheRuntime.LoadedAssemblyNames;
+    if (loadedCopy.Length != 0) loadedCopy[0] = "caller-mutated-loaded-status";
+    cases["public-loaded-snapshot-cannot-be-mutated"] = DheRuntime.LoadedAssemblyNames.SequenceEqual(names);
     cases["public-worker-reentry-rejected"] = reentry && observedLoading;
     cases["public-worker-reset-rejected"] = reset;
     cases["public-worker-reinitialize-rejected"] = configure;
@@ -589,10 +611,19 @@ string GitHead(string directory)
     if (process.ExitCode != 0) throw new IOException("Cannot bind source identity: " + directory);
     return value.Trim();
 }
+bool GitDirty(string directory)
+{
+    var start = new System.Diagnostics.ProcessStartInfo("git") { UseShellExecute = false, RedirectStandardOutput = true, CreateNoWindow = true };
+    foreach (string argument in new[] { "-C", directory, "status", "--porcelain", "--untracked-files=normal" }) start.ArgumentList.Add(argument);
+    using var process = System.Diagnostics.Process.Start(start);
+    string value = process.StandardOutput.ReadToEnd(); process.WaitForExit();
+    if (process.ExitCode != 0) throw new IOException("Cannot bind source state: " + directory);
+    return !string.IsNullOrWhiteSpace(value);
+}
 File.WriteAllText(output, JsonSerializer.Serialize(new { passed = cases.Values.All(value => value),
     scope = "Package resource validation and native argument selection on .NET host; native calls are recorded, not executed",
-    cases, errors, sourceInputs = root, labHead = GitHead(labRoot),
-    packageHead = GitHead(packageRoot), hostSha256 = Hash(File.ReadAllBytes(Assembly.GetExecutingAssembly().Location)),
+    cases, errors, sourceInputs = root, labHead = GitHead(labRoot), labDirty = GitDirty(labRoot),
+    packageHead = GitHead(packageRoot), packageDirty = GitDirty(packageRoot), hostSha256 = Hash(File.ReadAllBytes(Assembly.GetExecutingAssembly().Location)),
     toolSha256 = Hash(File.ReadAllBytes(args[2])), packageSources = new[] { "DheRuntime.cs", "DheRuntime.Loading.cs", "DheExecutionPlan.cs", "LoadImageErrorCode.cs", "HomologousImageMode.cs" }
         .Where(name => File.Exists(Path.Combine(packageRoot, "Runtime", name)))
         .Select(name => new { path = name, sha256 = Hash(File.ReadAllBytes(Path.Combine(packageRoot, "Runtime", name))) }).ToArray() }, json));
