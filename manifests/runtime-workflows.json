@@ -44,8 +44,8 @@
         "externalHeadersTreeSha256": "D0037168A9A28B05FD8DF11EDA27812DAEAA458DC0CDFAD7765F3BE75E83EE99"
       },
       "il2cppPlus": {
-        "tag": "2ff64a8708e9b54d08962c9280d9024240515bec",
-        "commit": "2ff64a8708e9b54d08962c9280d9024240515bec",
+        "tag": "fa267cf8292e069460030856c1afbf5271577443",
+        "commit": "fa267cf8292e069460030856c1afbf5271577443",
         "path": "../repos/il2cpp_plus"
       },
       "fullGenericSharing": "required",
