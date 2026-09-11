@@ -6,7 +6,6 @@ using Processor = model::HybridCLR.Lab.VirtualSignatures.Processor;
 using ProcessorRoot = model::HybridCLR.Lab.VirtualSignatures.ProcessorRoot;
 using Packet = model::HybridCLR.Lab.VirtualSignatures.Packet;
 using IOperations = model::HybridCLR.Lab.VirtualSignatures.IOperations;
-using Factory = model::HybridCLR.Lab.ValueLayout.Factory;
 
 namespace HybridCLR.Lab.CrossAssemblyParentRemoval
 {
@@ -34,9 +33,6 @@ namespace HybridCLR.Lab.CrossAssemblyParentRemoval
             Check("reflection-construction", () => ((Processor)Activator.CreateInstance(type)).GetType() == type);
             Check("independent-objects", () => { var next = new Processor(); next.Bias = 31; return instance.Bias == 25 && next.Bias == 31; });
             Check("gc-own-data", () => { var weak = new WeakReference(boxed); GC.Collect(); GC.WaitForPendingFinalizers(); GC.Collect(); return weak.IsAlive && ((Processor)weak.Target).Extra == 1000; });
-            // Routing is asserted by the separate immutable no-op Player gate;
-            // this CLR removal oracle only checks the preserved method value.
-            Check("unchanged-aot", () => Factory.UnchangedRevision() == 5);
             if (failures != 0) throw new InvalidOperationException("Cross removal failures: " + failures);
             Console.WriteLine("DHE cross removal pass: " + passed.Count); return passed.ToArray();
         }

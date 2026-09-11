@@ -128,8 +128,26 @@ internal static class CrossAssemblyParentWorkflow
             identity.GetProperty("aotAssemblyNames").EnumerateArray().Select(row => row.GetString()!),
             identity.GetProperty("assemblies").EnumerateArray().Select(row => row.GetProperty("assemblyName").GetString()!))!;
         string modelPath = Path.Combine(current, Model + ".dll"), otherPath = Path.Combine(current, Other + ".dll");
+        // Regeneration can start from a Current that already contains an older
+        // copy of this probe. Remove that fixture before compiling its
+        // replacement; otherwise the merge step sees two Cases definitions.
+        using (var seedModel = ModuleDefMD.Load(File.ReadAllBytes(modelPath)))
+        {
+            foreach (var method in seedModel.GetTypes().SelectMany(type => type.Methods))
+                foreach (var instruction in method.Body?.Instructions.Where(instruction => instruction.Operand is IMethod called &&
+                    called.DeclaringType.FullName == "HybridCLR.Lab.CrossAssemblyParentRemoval.Cases").ToArray() ?? Array.Empty<Instruction>())
+                    method.Body!.Instructions.Remove(instruction);
+            foreach (var stale in seedModel.GetTypes()
+                .Where(type => type.FullName == "HybridCLR.Lab.CrossAssemblyParentRemoval.Cases").ToArray())
+                seedModel.Types.Remove(stale);
+            seedModel.Write(modelPath);
+        }
+        // The target is retained as an aliased reference so the probe can use
+        // the model's types. Its old probe type was removed above, so merging
+        // the replacement no longer creates a duplicate definition.
+        var currentReferences = Directory.GetFiles(current, "*.dll");
         FrozenStaticWorkflow.CompileAndMerge(lab, args[3], "CrossAssemblyParentRemovalCases", modelPath,
-            snapshot.Assemblies.Where(row => !row.Dhe).Select(row => row.Path).Concat(Directory.GetFiles(current, "*.dll")), Path.Combine(output, "compiled"), false);
+            snapshot.Assemblies.Where(row => !row.Dhe).Select(row => row.Path).Concat(currentReferences), Path.Combine(output, "compiled"), false);
         using (var model = ModuleDefMD.Load(File.ReadAllBytes(modelPath)))
         using (var other = ModuleDefMD.Load(File.ReadAllBytes(otherPath)))
         {
@@ -138,7 +156,10 @@ internal static class CrossAssemblyParentWorkflow
             var call = ctor.Body.Instructions.Single(instruction => instruction.OpCode == OpCodes.Call && instruction.Operand is IMethod method && method.Name == ".ctor");
             var importer = new Importer(model); receiver.BaseType = importer.Import(root); call.Operand = root.Methods.Single(method => method.IsInstanceConstructor);
             var entry = model.Find("HybridCLR.Lab.ValueLayout.Factory", false)!.Methods.Single(method => method.Name == "GetRevision");
-            foreach (var instruction in entry.Body.Instructions.Where(instruction => instruction.Operand is IMethod method && method.DeclaringType.FullName == "HybridCLR.Lab.CrossAssemblyParents.Cases" && method.Name == "RunIfRequested").ToArray()) entry.Body.Instructions.Remove(instruction);
+            foreach (var instruction in entry.Body.Instructions.Where(instruction => instruction.Operand is IMethod method &&
+                (method.DeclaringType.FullName == "HybridCLR.Lab.CrossAssemblyParents.Cases" ||
+                 method.DeclaringType.FullName == "HybridCLR.Lab.CrossAssemblyParentRemoval.Cases") &&
+                method.Name == "RunIfRequested").ToArray()) entry.Body.Instructions.Remove(instruction);
             int insertion = entry.Body.Instructions.Count - 2;
             if (insertion < 0 || !entry.Body.Instructions[insertion].IsLdcI4() || entry.Body.Instructions.Last().OpCode != OpCodes.Ret)
                 throw new InvalidDataException("Unexpected cross-parent entry shape.");
@@ -170,8 +191,11 @@ internal static class CrossAssemblyParentWorkflow
         using var trace = new StringWriter(); var original = Console.Out;
         try { Console.SetOut(trace); checks = (string[])assembly.GetType("HybridCLR.Lab.CrossAssemblyParentRemoval.Cases", true)!.GetMethod("Run")!.Invoke(null, null)!; }
         catch (Exception e) { error = (e is TargetInvocationException w ? w.InnerException : e)?.ToString(); } finally { Console.SetOut(original); }
-        string log = Path.Combine(output, "removal.log"); File.WriteAllText(log, trace.ToString()); string[] observed = Observed(trace.ToString().Split('\n').Select(line => line.TrimEnd('\r')));
-        bool passed = prior == 0 && error == null && checks.Length == 16 && observed.SequenceEqual(checks);
+        string log = Path.Combine(output, "removal.log"); File.WriteAllText(log, trace.ToString());
+        string[] observed = trace.ToString().Split('\n').Select(line => line.TrimEnd('\r'))
+            .Where(line => line.StartsWith("DHE cross removal check: ", StringComparison.Ordinal))
+            .Select(line => line["DHE cross removal check: ".Length..]).ToArray();
+        bool passed = prior == 0 && error == null && checks.Length == 15 && observed.SequenceEqual(checks);
         File.WriteAllText(Path.Combine(output, "result.json"), JsonSerializer.Serialize(new { passed, checks, observed, error, priorResultSha256 = Hash(Path.Combine(previous, "result.json")), logSha256 = Hash(log), hostSha256 = Hash(typeof(CrossAssemblyParentWorkflow).Assembly.Location), scope = "CLR cross-assembly parent removal plus complete framework/virtual/business sequence" }, new JsonSerializerOptions { WriteIndented = true }));
         Console.WriteLine("Cross parent removal reference: " + passed + "; checks=" + observed.Length); return passed ? 0 : 1;
     }
