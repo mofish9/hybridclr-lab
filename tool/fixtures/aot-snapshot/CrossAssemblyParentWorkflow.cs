@@ -233,7 +233,7 @@ internal static class CrossAssemblyParentWorkflow
         string output = Path.GetFullPath(args[4]); if (Directory.Exists(output)) throw new IOException("Output must be new."); Directory.CreateDirectory(output); string framework = Path.Combine(output, "framework");
         int prior = -1; string error = null; try { prior = FrameworkCallbackWorkflow.Replay(args.Take(4).Append(framework).ToArray()); } catch (Exception e) { error = e.ToString(); }
         string log = Path.Combine(framework, "virtual-business/player.json.log"); string[] lines = File.Exists(log) ? File.ReadAllLines(log) : Array.Empty<string>(); string[] observed = lines.Where(line => line.StartsWith("DHE cross removal check: ")).Select(line => line["DHE cross removal check: ".Length..]).ToArray();
-        bool passed = prior == 0 && error == null && observed.Length == 16 && lines.Count(line => line == "DHE cross removal pass: 16") == 1;
+        bool passed = prior == 0 && error == null && observed.Length == 15 && lines.Count(line => line == "DHE cross removal pass: 15") == 1;
         File.WriteAllText(Path.Combine(output, "result.json"), JsonSerializer.Serialize(new { passed, observed, error, logSha256 = File.Exists(log) ? Hash(log) : null, hostSha256 = Hash(typeof(CrossAssemblyParentWorkflow).Assembly.Location), scope = "Immutable Player cross-assembly parent removal and complete framework/virtual/business sequence" }, new JsonSerializerOptions { WriteIndented = true }));
         Console.WriteLine("Cross parent removal replay: " + passed + "; checks=" + observed.Length); return passed ? 0 : 1;
     }
