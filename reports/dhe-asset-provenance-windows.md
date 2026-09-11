@@ -28,3 +28,17 @@ The package now exposes the explicit capability token
 header macro `HYBRIDCLR_DHE_HAS_PUBLIC_ASSEMBLY_IMAGE`. This token has not yet been
 validated by a newly rebuilt Player identity; existing Bases must not be relabeled
 until that gate passes.
+
+## Capability Base checkpoint
+
+A fresh Base Player was built at
+`F:/hybridclr_artifacts/dhe-asset-provenance/new-base-05`. Its
+`base/build-identity.json` contains `public-assembly-image-resolution-v1` and
+has Base ID `f3ab99dfacffeb2f50a1259b6123bf7a41a8b0b719c2e62e18c8559139292fc1`.
+The first direct delivery attempt used a resource generated for Base119 and was
+correctly rejected during prepare because the Base identity did not match. A
+second attempt copied the Player to a fresh directory to avoid a stale Windows
+file lock; it reached the same prepare validation and was rejected for the same
+reason. This is a valid negative gate, not a successful delivery result. A
+resource must be generated from the new Base's own snapshot before claiming the
+new capability Base can consume a delivery.
