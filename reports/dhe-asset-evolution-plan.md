@@ -26,3 +26,5 @@ data-bearing callbacks for both prefab and scene, including repeated clone
 callbacks. Missing all new fields must fail the added-type gate, even if the
 ordinary checks pass. Confirm the new declarations are absent from the template
 Base and present in Current before authoring.
+Also validate the new data in Awake: the existing immutable Player performs a
+full GC before activating each root, so this independently checks post-GC data.

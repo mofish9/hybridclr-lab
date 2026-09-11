@@ -64,9 +64,9 @@ namespace HybridCLR.Lab.UnityAssets
         private const int Delta = 1;
 #endif
         public void OnBeforeSerialize() { }
-        public void OnAfterDeserialize()
-        {
 #if UNITY_ASSET_ADDED_TYPES
+        private void CheckAddedData(string phase)
+        {
             // Empty Editor/default instances are allowed. The replay separately
             // requires successful data-bearing callbacks for both saved assets.
             if (Added != null || AddedItems != null || AddedNode != null)
@@ -77,11 +77,24 @@ namespace HybridCLR.Lab.UnityAssets
                     AddedItems[0].Text != Added.Text || AddedItems[1].Text != Added.Text ||
                     AddedNode == null || AddedNode.GetType() != typeof(AssetAddedNode) || AddedNode.Read() != 309)
                     throw new InvalidOperationException("New serialized type data was not preserved.");
-                Console.WriteLine("DHE added serialized types pass: " + Added.Text);
+                Console.WriteLine("DHE added serialized types " + phase + ": " + Added.Text);
             }
+        }
+#endif
+        public void OnAfterDeserialize()
+        {
+#if UNITY_ASSET_ADDED_TYPES
+            CheckAddedData("pass");
 #endif
             DeserializedStamp = Delta;
         }
-        private void Awake() { Awakened = Delta; }
+        private void Awake()
+        {
+#if UNITY_ASSET_ADDED_TYPES
+            // The immutable Player explicitly runs GC before activating each root.
+            CheckAddedData("after-gc pass");
+#endif
+            Awakened = Delta;
+        }
     }
 }

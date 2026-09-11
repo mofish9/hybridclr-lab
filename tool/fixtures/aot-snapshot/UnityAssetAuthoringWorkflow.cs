@@ -71,9 +71,12 @@ internal static class UnityAssetAuthoringWorkflow
         var lines = File.ReadAllLines(Path.Combine(args[3], "player.log"));
         const string prefix = "DHE added serialized types pass: ";
         int prefab = lines.Count(line => line == prefix + "saved-prefab"), scene = lines.Count(line => line == prefix + "saved-scene");
-        bool passed = ordinary == 0 && prefab >= 2 && scene >= 2;
+        bool prefabAfterGc = lines.Contains("DHE added serialized types after-gc pass: saved-prefab");
+        bool sceneAfterGc = lines.Contains("DHE added serialized types after-gc pass: saved-scene");
+        bool passed = ordinary == 0 && prefab >= 2 && scene >= 2 && prefabAfterGc && sceneAfterGc;
         Write(Path.Combine(args[3], "added-types-result.json"), new { passed, prefabCallbacks = prefab, sceneCallbacks = scene,
-            require = "42 existing checks plus validated new inline class/array and SerializeReference implementation in both assets and clones" });
+            prefabAfterGc, sceneAfterGc,
+            require = "42 existing checks plus validated new inline class/array and SerializeReference implementation in both assets, clones and after GC" });
         Console.WriteLine("Added serialized types: " + passed + "; prefab=" + prefab + "; scene=" + scene);
         return passed ? 0 : 1;
     }
