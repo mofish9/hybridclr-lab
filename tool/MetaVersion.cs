@@ -271,10 +271,11 @@ internal sealed class MetaVersionSnapshot
                 string.Join(",", type.GenericParameters.Select(StableGenericParameter)),
                 string.Join(",", type.Interfaces.Select(row => (row.Interface.DefinitionAssembly?.FullName ?? "") +
                     "|" + row.Interface.FullName).OrderBy(value => value, StringComparer.Ordinal)))),
-            CanUsePhysicalParentEvolution = !type.IsInterface && !type.IsValueType && !type.HasGenericParameters,
+            CanUsePhysicalParentEvolution = !type.IsInterface && !type.IsValueType,
             CanBePhysicalReferenceParent = !type.IsInterface && !type.IsValueType && !type.IsSealed,
             PhysicalParent = MetaVersionParentSignature.Create(type.BaseType?.ToTypeSig()),
             ParentGenericParameterCount = type.GenericParameters.Count,
+            ParentGenericParametersValid = type.GenericParameters.Select((parameter, index) => parameter.Number == index).All(valid => valid),
         };
     }
 
@@ -873,6 +874,7 @@ internal sealed record MetaVersionType(string Identity, string StableId, string 
     [JsonIgnore] public bool CanBePhysicalReferenceParent { get; init; }
     [JsonIgnore] public MetaVersionParentSignature? PhysicalParent { get; init; }
     [JsonIgnore] public int ParentGenericParameterCount { get; init; }
+    [JsonIgnore] public bool ParentGenericParametersValid { get; init; }
 }
 
 // Admission-only structure. Display names cannot substitute class variables
@@ -883,12 +885,18 @@ internal sealed class MetaVersionParentSignature
     internal ElementType Kind { get; }
     internal string AssemblyName { get; }
     internal string DefinitionName { get; }
-    private uint Index { get; }
+    internal uint Index { get; }
     internal MetaVersionParentSignature[] Arguments { get; }
     internal bool IsReferenceParent => Kind == ElementType.Class || Kind == ElementType.GenericInst;
     internal bool IsValueType => Kind == ElementType.ValueType || Kind == ElementType.GenericInst && Index == 1;
     internal string Key { get; }
     private static string Piece(string value) => value.Length.ToString(CultureInfo.InvariantCulture) + ":" + value;
+
+    // A symbolic parameter is anchored to the owner being compared. Reusing its
+    // position through each parent substitution proves the boundary for every
+    // instantiation rather than guessing one representative closed argument.
+    internal static MetaVersionParentSignature OwnerParameter(uint index) =>
+        new(ElementType.Var, "", "", index, Array.Empty<MetaVersionParentSignature>());
 
     private MetaVersionParentSignature(ElementType kind, string assembly, string name,
         uint index, MetaVersionParentSignature[] arguments)

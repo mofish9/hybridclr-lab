@@ -765,19 +765,21 @@ internal sealed class ResourceUpdateCompatibility
             if (before == null || after == null) return null;
             var assemblies = original ? before : after;
             var definitions = original ? beforeTypes : afterTypes;
-            if (!definitions.TryGetValue((ownerAssembly, ownerType), out var owner)) return null;
-            var parent = owner.PhysicalParent?.Close(Array.Empty<MetaVersionParentSignature>());
+            if (!definitions.TryGetValue((ownerAssembly, ownerType), out var owner) || !owner.ParentGenericParametersValid) return null;
+            var context = Enumerable.Range(0, owner.ParentGenericParameterCount)
+                .Select(index => MetaVersionParentSignature.OwnerParameter((uint)index)).ToArray();
+            var parent = owner.PhysicalParent?.Close(context);
             var visited = new HashSet<(string Assembly, string Type)> { (ownerAssembly, ownerType) };
             var validatedArguments = new HashSet<MetaVersionParentSignature>();
             bool ValidSignature(MetaVersionParentSignature value)
             {
                 if (!validatedArguments.Add(value)) return true;
-                if (value.Kind == dnlib.DotNet.ElementType.Var) return false;
+                if (value.Kind == dnlib.DotNet.ElementType.Var) return value.Index < context.Length;
                 if (value.AssemblyName.Length != 0)
                 {
                     if (assemblies.ContainsKey(value.AssemblyName))
                     {
-                        if (!definitions.TryGetValue((value.AssemblyName, value.DefinitionName), out var argument) ||
+                        if (!definitions.TryGetValue((value.AssemblyName, value.DefinitionName), out var argument) || !argument.ParentGenericParametersValid ||
                             argument.ParentGenericParameterCount != value.Arguments.Length ||
                             ((argument.Flags & 1u) != 0) != value.IsValueType)
                             return false;
@@ -794,7 +796,7 @@ internal sealed class ResourceUpdateCompatibility
                 if (!visited.Add(key) || string.IsNullOrEmpty(parent.AssemblyName) || !ValidSignature(parent)) return null;
                 if (!assemblies.ContainsKey(parent.AssemblyName))
                     return mutableAssemblies.Contains(parent.AssemblyName) ? null : parent.Key;
-                if (!definitions.TryGetValue(key, out var definition) || !definition.CanBePhysicalReferenceParent ||
+                if (!definitions.TryGetValue(key, out var definition) || !definition.CanBePhysicalReferenceParent || !definition.ParentGenericParametersValid ||
                     definition.ParentGenericParameterCount != parent.Arguments.Length)
                     return null;
                 parent = definition.PhysicalParent?.Close(parent.Arguments);
