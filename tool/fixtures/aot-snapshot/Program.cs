@@ -13,6 +13,7 @@ if (args.Length > 0 && args[0] == "unity-asset-stock-control") return UnityAsset
 if (args.Length > 0 && args[0] == "unity-asset-author-bundles") return UnityAssetAuthoringWorkflow.Build(args.Skip(1).ToArray());
 if (args.Length > 0 && args[0] == "unity-added-asset-replay") return UnityAssetAuthoringWorkflow.Replay(args.Skip(1).ToArray());
 if (args.Length > 0 && args[0] == "delivery-player-workflow") return DeliveryPlayerWorkflow.Run(args.Skip(1).ToArray());
+if (args.Length > 0 && args[0] == "delivery-timing") return DeliveryTimingWorkflow.Run(args.Skip(1).ToArray());
 if (args.Length > 0 && args[0] == "unity-asset-type-trees") return UnityAssetWorkflow.TypeTrees(args.Skip(1).ToArray());
 if (args.Length > 0 && args[0] == "unity-asset-new-base") return UnityAssetWorkflow.NewBase(args.Skip(1).ToArray());
 if (args.Length > 0 && args[0] == "unity-asset-replay") return UnityAssetWorkflow.Replay(args.Skip(1).ToArray());

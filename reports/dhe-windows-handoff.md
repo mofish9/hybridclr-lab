@@ -60,3 +60,12 @@ previously exited PID. The partial records are in
 runner design issue. A formal gate must use a concurrent process window or record
 PID plus process creation identity while still enforcing the policy's unique-PID
 requirement.
+
+The corrected C# concurrent sampler then completed 100/100 independent Player
+processes successfully. Unique process identities (PID plus creation time) were
+100; Windows reused three numeric PIDs after earlier processes exited, so numeric
+PID cardinality was 97. P50 was 16,574 ms, P95 17,026 ms, P99 18,769 ms, maximum
+20,653 ms and mean 15,891.03 ms. Raw records are in
+`F:/hybridclr_artifacts/dhe-asset-provenance/timing-concurrent-100b`.
+This measures startup plus prepare/load/assets, not isolated method execution or
+Android performance.
