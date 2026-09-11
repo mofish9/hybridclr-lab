@@ -4,7 +4,78 @@ The complete DHE objective remains open. This report records the current
 correction and preserves failed immutable Players; it is not a release or a
 project handoff. Only Unity 2022.3.62f3 Windows is under qualification.
 
-## Latest verified Player checkpoint
+## Latest two-existing-Base checkpoint
+
+The latest runtime now also builds immutable root-only, smaller-layout Base-100.
+Both Base-99 and Base-100 pass the exact original removal/replacement Current
+sets, and the preserved extended insertion Current. No runtime/package/IL2CPP
+source changed: 6180597 / 841abfd / 819f74c remain qualified by native03 with
+real Unity 2022 headers. This adds the missing second existing-type Base and
+insertion regression; it does not qualify full DHE or production deployment.
+
+Base-100 was built from preserved base-input-97 using clean lab
+c90f6153e32c6ba434ff7c2513eadd2e2d605ad3, host03/tool02 from lab85949a2 and
+runtime02. All following transition workflows, replays, audits and recovery use
+that same lab checkout and those binaries. The input directory name refers to
+earlier preparation, not the failed Base-97 build. Base-100 ID:
+6fe4431c2a3ff785c933e0f892a796eb4be4ff8f1e9c0ba71f6bf9823fefb707.
+GameAssembly SHA-256:
+05450C2235E7A20FAED0C04D24D7BD7B71DC68337E78DA82B5FBE36A33C41AAF.
+Snapshot SHA-256:
+d62d7d655fe945797a3b3e30af97fe75d6fef52d129e77a1ec7a6ecbb5157968.
+Build/startup/generated no-op pass. noop-base100-01 passes all 25 checks with
+six unchanged implementations, 4,136 AOT entries and zero DHE interpreter entries.
+These counts establish routing, not performance. Base-99's earlier no-op evidence
+remains bound to its original identity.
+
+| Resource | Base-99 | Base-100 | Old objects / caches | Audit / recovery |
+| --- | --- | --- | --- | --- |
+| shared-removal-04 | 21 checks | 21 checks | Base99: 29 checks | 121 files; 16 recovery checks / 96 files |
+| shared-replacement-04 | 31 checks | 31 checks | Base99: 29 checks | 125 files; 16 recovery checks / 99 files |
+| shared-insertion-01 | 28 checks | 28 checks | Base100: 12 checks | 121 files; 16 recovery checks / 96 files |
+
+Every explicit replay also passes 18 framework, 25 virtual-signature and 46
+business checks. Base99 originally has Middle; Base100 originally has Processor
+directly inheriting Root, smaller Packet fields, and the existing virtual methods.
+Thus Base99 proves actual parent removal, Base100 proves insertion, and their
+replacement plans begin from different original parent/storage graphs. Base100
+is not labelled as a second original-Middle removal proof. Its twelve insertion
+cache checks reject incompatible old physical receivers and preserve data;
+no automatic migration is claimed.
+
+Explicit outputs are probe-removal-base99-04, probe-removal-base100-04,
+probe-removal-base99-cached-04, the corresponding replacement paths,
+probe-insertion-base99-01, probe-insertion-base100-01 and
+probe-insertion-base100-cached-01. Paths are relative to
+C:/hybridclr_optimize/artifacts/dhe-parent-transitions. Each resource uses the
+same original DLL bytes across both Bases. Removal/replacement hashes remain
+the original values below; insertion uses current-02/current from parent-evolution
+with set hash 80cc5c6e51265fbd72706ea152c052c38f5a72c85102cbef92151b3909c37d72.
+
+Independent audit hashes (removal / replacement / insertion):
+869BE3FE027D84556CDC3A07AEA6A33F29D5A2224E0958B59D9C0F43EFCA3928,
+7B36BD0D4CDCFAC903B1B26CFDBC14447C8286C49F4B924B606A255D927B7D47,
+BDCE9EE16FF11FD99C068A51086FC0E5C86C973E514BB6A6C1CE14D8EA34F78B.
+The three shared-public-probes-* result hashes in the same order are
+5E666BAB1E784B973D3101B9EDA9FF66CE8AFDE4B6643E19652C7CD3C940FF79,
+B90CFBEBF0623F1D82EA0B00F3A637E67BD22BCD50328FA955735389F56061ED,
+F198DE82F4CEBE618B66AAC072AE3C1CC05BE7EAEFCBE3E560E1FF180821DC72.
+Recovery means deliberate native preparation failure followed by recovery in a
+fresh process. The full file/Player/resource identities are verified independently.
+
+Twenty-four additional inactive archived Player directories were losslessly
+NTFS-compressed before/during the build. All complete file-tree hashes match;
+receipts are archive-compression-02.json. No files were removed. C: has about
+12 GiB free after qualification; earlier space figures below are historical.
+
+All transition sources remain committed and isolated, with no formal publication,
+Installer default or CAT changes. A separate following candidate tests actual
+type deletion. Cross-assembly/generic parent evolution, broader Unity assets and
+startup state, publication stress, performance/memory and final source-bound
+regression remain open. The preceding failures and checkpoints below are retained
+under their own identities; later documentation does not rebind those results.
+
+## Previous single-existing-Base checkpoint
 
 Runtime6180597 / IL2CPP819f74c / package841abfd now pass removal and replacement
 on immutable Base-99, including the original cached-object failure. Both exact
