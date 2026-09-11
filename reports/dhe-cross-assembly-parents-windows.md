@@ -112,6 +112,24 @@ No runtime ABI guard was weakened. Required physical parent, frame, reference,
 reflection and snapshot capabilities remain in each selected plan. Unchanged
 methods keep their AOT path; no-op proofs are separate from performance claims.
 
+## Cross-parent removal boundary
+
+The reverse workflow was attempted on Base-102, whose AOT image already contains
+CrossParent in ValueLayoutOther. The compiler-produced Current removes CrossParent
+and retargets Processor to ProcessorRoot; its managed cold reference validates the
+16 retained-child/root checks. The standard resource producer currently fails
+closed before Player execution with:
+
+`Missing current hotfix type: HybridCLR.ValueLayoutOther|HybridCLR.Lab.CrossAssemblyParents.CrossParent`.
+
+This is a real unresolved-reference boundary: the existing impact walk encounters
+the deleted peer type while processing the changed Model graph. It must not be
+silently mapped to Current or ignored. The exact Current, partial resource
+validation and failure log remain under `current-removal-04` and `shared-removal-01`;
+no Player pass is claimed. The next fix should teach the impact/planner graph to
+distinguish references owned by removed types/methods from live retained references,
+then rebuild a fresh Base/resource and re-run the full 18/25/46 gates.
+
 ## Remaining gates
 
 The reverse case—an immutable Base that already contains a cross-assembly parent—
