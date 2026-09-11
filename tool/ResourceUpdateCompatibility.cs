@@ -129,7 +129,8 @@ internal sealed class ResourceUpdateCompatibility
         MetaVersionSnapshot current, IEnumerable<string>? addressTakenFields = null,
         bool usesUnresolvedCallStubs = true, IEnumerable<MetaVersionSnapshot>? currentAssemblySet = null,
         IEnumerable<string>? currentStorageTypes = null, IEnumerable<uint>? currentExecutionMethodTokens = null,
-        IEnumerable<uint>? currentGenericContextMethodTokens = null)
+        IEnumerable<uint>? currentGenericContextMethodTokens = null,
+        IEnumerable<MetaVersionSnapshot>? baselineAssemblySet = null)
     {
         var baselineMethods = baseline.Methods.ToDictionary(method => method.StableId,
             StringComparer.OrdinalIgnoreCase);
@@ -286,6 +287,7 @@ internal sealed class ResourceUpdateCompatibility
         bool requiresPhysicalInterfaceAddition = false;
         bool requiresPhysicalInterfaceEvolution = false;
         bool requiresPhysicalParentEvolution = false;
+        var parentGraphs = new PhysicalParentGraphs(baseline, current, baselineAssemblySet, currentAssemblySet);
         foreach (MetaVersionType type in changedTypes)
         {
             MetaVersionType currentType = currentTypes[type.StableId];
@@ -294,7 +296,7 @@ internal sealed class ResourceUpdateCompatibility
             bool physicalInterfaceEvolution = !physicalInterfaceAddition && physicalTypes.Contains(type.StableId) &&
                 HasOnlySupportedPhysicalInterfaceEvolution(type, currentType);
             bool physicalParentEvolution = physicalTypes.Contains(type.StableId) &&
-                HasOnlySupportedPhysicalParentEvolution(type, currentType, baseline, current, currentAssemblySet);
+                HasOnlySupportedPhysicalParentEvolution(type, currentType, baseline, current, parentGraphs);
             requiresPhysicalInterfaceAddition |= physicalInterfaceAddition;
             requiresPhysicalInterfaceEvolution |= physicalInterfaceEvolution;
             requiresPhysicalParentEvolution |= physicalParentEvolution;
@@ -653,7 +655,7 @@ internal sealed class ResourceUpdateCompatibility
     }
 
     private static bool HasOnlySupportedPhysicalParentEvolution(MetaVersionType before, MetaVersionType after,
-        MetaVersionSnapshot baseline, MetaVersionSnapshot current, IEnumerable<MetaVersionSnapshot>? currentAssemblySet)
+        MetaVersionSnapshot baseline, MetaVersionSnapshot current, PhysicalParentGraphs graphs)
     {
         if (!before.CanUsePhysicalParentEvolution || !after.CanUsePhysicalParentEvolution ||
             before.ParentIndependentLayoutVersion.Length == 0 ||
@@ -661,31 +663,62 @@ internal sealed class ResourceUpdateCompatibility
             !baseline.TypeParents.TryGetValue(before.Identity, out var oldParent) ||
             !current.TypeParents.TryGetValue(after.Identity, out var newParent) || oldParent == newParent)
             return false;
-        var mutableAssemblies = (currentAssemblySet ?? new[] { current }).Select(assembly => assembly.AssemblyName)
-            .ToHashSet(StringComparer.Ordinal);
-        mutableAssemblies.Add(current.AssemblyName);
-        MetaVersionTypeReference? Boundary(MetaVersionSnapshot snapshot, MetaVersionTypeReference parent)
+        var oldBoundary = graphs.Boundary(baseline.AssemblyName, before.Identity, oldParent, true);
+        return oldBoundary != null && oldBoundary == graphs.Boundary(current.AssemblyName, after.Identity, newParent, false);
+    }
+
+    // Both sides use their own original/current assembly set. The producer binds
+    // the original set to the archived Base identity; Current is never a fallback
+    // for a missing Base peer. Index once per assembly analysis, not per type.
+    private sealed class PhysicalParentGraphs
+    {
+        private readonly Dictionary<string, MetaVersionSnapshot>? before, after;
+        private readonly Dictionary<(string Assembly, string Type), MetaVersionType> beforeTypes, afterTypes;
+        private readonly HashSet<string> mutableAssemblies;
+
+        internal PhysicalParentGraphs(MetaVersionSnapshot baseline, MetaVersionSnapshot current,
+            IEnumerable<MetaVersionSnapshot>? baselinePeers, IEnumerable<MetaVersionSnapshot>? currentPeers)
         {
-            var visited = new HashSet<string>(StringComparer.Ordinal) { before.Identity };
-            var definitions = snapshot.Types.ToDictionary(type => type.Identity, StringComparer.Ordinal);
-            while (parent.AssemblyName == snapshot.AssemblyName)
+            before = Assemblies(baseline, baselinePeers); after = Assemblies(current, currentPeers);
+            beforeTypes = Types(before); afterTypes = Types(after);
+            mutableAssemblies = new HashSet<string>((before?.Keys ?? Enumerable.Empty<string>())
+                .Concat(after?.Keys ?? Enumerable.Empty<string>()), StringComparer.Ordinal);
+        }
+
+        private static Dictionary<string, MetaVersionSnapshot>? Assemblies(MetaVersionSnapshot own,
+            IEnumerable<MetaVersionSnapshot>? peers)
+        {
+            var assemblies = new Dictionary<string, MetaVersionSnapshot>(StringComparer.Ordinal);
+            foreach (var peer in peers ?? Array.Empty<MetaVersionSnapshot>())
+                if (!assemblies.TryAdd(peer.AssemblyName, peer)) return null;
+            if (assemblies.TryGetValue(own.AssemblyName, out var supplied) &&
+                !string.Equals(supplied.AssemblySha256, own.AssemblySha256, StringComparison.OrdinalIgnoreCase)) return null;
+            assemblies[own.AssemblyName] = own;
+            return assemblies;
+        }
+
+        private static Dictionary<(string Assembly, string Type), MetaVersionType> Types(Dictionary<string, MetaVersionSnapshot>? assemblies)
+            => assemblies == null ? new() : assemblies.Values.SelectMany(assembly => assembly.Types
+                .Select(type => (Key: (assembly.AssemblyName, type.Identity), Type: type))).ToDictionary(row => row.Key, row => row.Type);
+
+        internal MetaVersionTypeReference? Boundary(string ownerAssembly, string ownerType, MetaVersionTypeReference parent, bool original)
+        {
+            if (before == null || after == null) return null;
+            var assemblies = original ? before : after;
+            var definitions = original ? beforeTypes : afterTypes;
+            var visited = new HashSet<(string Assembly, string Type)> { (ownerAssembly, ownerType) };
+            while (true)
             {
-                if (parent.DefinitionName != null && parent.DefinitionName != parent.TypeName ||
-                    !visited.Add(parent.TypeName) || !definitions.TryGetValue(parent.TypeName, out var definition) ||
-                    !definition.CanBePhysicalReferenceParent || !snapshot.TypeParents.TryGetValue(parent.TypeName, out var next))
+                var key = (parent.AssemblyName, parent.TypeName);
+                if (parent.DefinitionName != null && parent.DefinitionName != parent.TypeName || !visited.Add(key)) return null;
+                if (!assemblies.TryGetValue(parent.AssemblyName, out var assembly))
+                    return mutableAssemblies.Contains(parent.AssemblyName) ? null : parent;
+                if (!definitions.TryGetValue(key, out var definition) || !definition.CanBePhysicalReferenceParent ||
+                    !assembly.TypeParents.TryGetValue(parent.TypeName, out var next))
                     return null;
                 parent = next;
             }
-            // Cross-assembly hotfix changes need both original ancestry maps;
-            // this per-assembly comparison must not treat Current as its Base.
-            return mutableAssemblies.Contains(parent.AssemblyName) ||
-                parent.DefinitionName != null && parent.DefinitionName != parent.TypeName ? null : parent;
         }
-        // Native/ordinary-AOT parent layout remains an immutable boundary.
-        // New physical storage is already required by the caller; constructors
-        // and affected methods enter through the existing Current execution plan.
-        var oldBoundary = Boundary(baseline, oldParent);
-        return oldBoundary != null && oldBoundary == Boundary(current, newParent);
     }
 
     private static bool HasOnlySupportedPhysicalInterfaceEvolution(MetaVersionType baseline, MetaVersionType current)

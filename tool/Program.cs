@@ -334,7 +334,9 @@ internal static partial class Program
             ResourceUpdateCompatibility compatibility = ResourceUpdateCompatibility.Analyze(
                 candidate.BaseMetaVersion, candidate.CurrentMetaVersion, addressTakenFields,
                 currentAssemblySet: candidates.Where(item => item.CurrentMetaVersion != null)
-                    .Select(item => item.CurrentMetaVersion!));
+                    .Select(item => item.CurrentMetaVersion!),
+                baselineAssemblySet: candidates.Where(item => item.BaseMetaVersion != null)
+                    .Select(item => item.BaseMetaVersion!));
             WriteJson(baseJson, candidate.BaseMetaVersion.ToJson(candidate.Baseline));
             candidate.BaseMetaVersion.WriteBinary(baseBinary);
             WriteJson(currentJson, candidate.CurrentMetaVersion.ToJson(candidate.Current));
@@ -1195,6 +1197,8 @@ internal static partial class Program
             }).ToArray();
             var managedAssemblySetSha256 = NamedAssemblySetHash(
                 baselineRecords.Select(record => (record.name, record.path)));
+            var baselineSnapshots = baselineRecords.ToDictionary(record => record.name,
+                record => MetaVersionSnapshot.Create(record.path), StringComparer.Ordinal);
             var aotAnalysis = AotAnalysisSnapshot.Read(buildIdentityPath, buildIdentity,
                 baseAotAssemblyNames, identityAssemblyNames);
             var execution = ResourceExecutionPlanner.Compile(
@@ -1244,7 +1248,7 @@ internal static partial class Program
                 unsupported.Add("base-native-runtime-protocol:" + nativeManifestPath);
             foreach (var baselineRecord in baselineRecords)
             {
-                var baselineSnapshot = MetaVersionSnapshot.Create(baselineRecord.path);
+                var baselineSnapshot = baselineSnapshots[baselineRecord.name];
                 var baselineMvBytes = baselineSnapshot.ToBinary();
                 baseMvSet.Add((baselineRecord.name, baselineMvBytes));
                 if (!currentVariant.Snapshots.TryGetValue(baselineRecord.name,
@@ -1260,7 +1264,8 @@ internal static partial class Program
                         ? currentSnapshot.Types.Where(type => executionPlan.CurrentStorageTypeTokens.Contains(type.Token)).Select(type => type.StableId)
                         : Array.Empty<string>(),
                     currentExecutionMethodTokens: executionPlan?.CurrentExecutionMethodTokens,
-                    currentGenericContextMethodTokens: executionPlan?.CurrentGenericContextMethodTokens);
+                    currentGenericContextMethodTokens: executionPlan?.CurrentGenericContextMethodTokens,
+                    baselineAssemblySet: baselineSnapshots.Values);
                 requiredRuntimeCapabilities.UnionWith(
                     compatibility.RequiredRuntimeCapabilities);
                 var missingGuards = compatibility.GuardRequiredMethods.Where(method =>

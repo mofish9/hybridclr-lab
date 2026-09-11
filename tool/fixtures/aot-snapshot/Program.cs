@@ -36,6 +36,7 @@ if (args.Length > 0 && args[0] == "type-deletion-audit") return TypeDeletionWork
 if (args.Length > 0 && args[0] == "cross-parent-current") return CrossAssemblyParentWorkflow.Current(args.Skip(1).ToArray());
 if (args.Length > 0 && args[0] == "cross-parent-reference") return CrossAssemblyParentWorkflow.Reference(args.Skip(1).ToArray());
 if (args.Length > 0 && args[0] == "cross-parent-replay") return CrossAssemblyParentWorkflow.Replay(args.Skip(1).ToArray());
+if (args.Length > 0 && args[0] == "cross-parent-policy") return CrossAssemblyParentPolicy.Run(args.Skip(1).ToArray());
 if (args.Length > 0 && args[0] == "frozen-field-policy") return FrozenFieldValidationPolicy.Run(args.Skip(1).ToArray());
 if (args.Length > 0 && args[0] == "framework-callback-replay") return FrameworkCallbackWorkflow.Replay(args.Skip(1).ToArray());
 if (args.Length > 0 && args[0] == "virtual-signature-policy") return VirtualSignaturePolicyTests.Run(args.Skip(1).ToArray());
