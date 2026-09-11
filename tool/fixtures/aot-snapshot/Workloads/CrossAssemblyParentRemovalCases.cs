@@ -6,7 +6,7 @@ using Processor = model::HybridCLR.Lab.VirtualSignatures.Processor;
 using ProcessorRoot = model::HybridCLR.Lab.VirtualSignatures.ProcessorRoot;
 using Packet = model::HybridCLR.Lab.VirtualSignatures.Packet;
 using IOperations = model::HybridCLR.Lab.VirtualSignatures.IOperations;
-using ValueLayout = model::HybridCLR.Lab.ValueLayout;
+using Factory = model::HybridCLR.Lab.ValueLayout.Factory;
 
 namespace HybridCLR.Lab.CrossAssemblyParentRemoval
 {
@@ -34,7 +34,7 @@ namespace HybridCLR.Lab.CrossAssemblyParentRemoval
             Check("reflection-construction", () => ((Processor)Activator.CreateInstance(type)).GetType() == type);
             Check("independent-objects", () => { var next = new Processor(); next.Bias = 31; return instance.Bias == 25 && next.Bias == 31; });
             Check("gc-own-data", () => { var weak = new WeakReference(boxed); GC.Collect(); GC.WaitForPendingFinalizers(); GC.Collect(); return weak.IsAlive && ((Processor)weak.Target).Extra == 1000; });
-            Check("unchanged-aot", () => ValueLayout.Factory.UnchangedRevision() == 5 && !RuntimeApi.IsDifferentialMethodChanged(typeof(ValueLayout.Factory).GetMethod("UnchangedRevision")));
+            Check("unchanged-aot", () => Factory.UnchangedRevision() == 5 && !RuntimeApi.IsDifferentialMethodChanged(typeof(Factory).GetMethod("UnchangedRevision")));
             if (failures != 0) throw new InvalidOperationException("Cross removal failures: " + failures);
             Console.WriteLine("DHE cross removal pass: " + passed.Count); return passed.ToArray();
         }
