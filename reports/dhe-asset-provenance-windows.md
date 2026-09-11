@@ -42,3 +42,17 @@ file lock; it reached the same prepare validation and was rejected for the same
 reason. This is a valid negative gate, not a successful delivery result. A
 resource must be generated from the new Base's own snapshot before claiming the
 new capability Base can consume a delivery.
+
+## Three-Base delivery result
+
+That resource was subsequently generated from the new Base snapshot and replayed
+with one delivery directory at
+`F:/hybridclr_artifacts/dhe-asset-provenance/three-base-delivery-01`.
+The workflow passed 33 checks across the new capability Base, Base119 and Base120:
+each valid run completed 46 business and 42 asset checks; missing-asset and
+wrong-manifest-hash variants were rejected before native effects; all Player and
+delivery files remained immutable. Delivery manifest SHA-256 is
+`904F4624C27F502757B87561F90F70F4752F268131472AF08134FA7BBEDF8910`.
+This is the strongest current Windows evidence for one Current payload serving
+multiple Base identities. It remains a candidate result pending final performance,
+memory, ARM64 and release gates.
