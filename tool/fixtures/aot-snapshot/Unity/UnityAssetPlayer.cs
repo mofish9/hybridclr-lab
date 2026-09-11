@@ -72,6 +72,18 @@ namespace HybridCLR.Lab.Snapshot
             Check(prefix + ":awake", (int)Field(component, "Awakened") == (current ? 2 : 1) && (int)Field(component, "Count") == 17);
             Destroy(clone);
         }
+        private void TraceStorage(GameObject root, string phaseName)
+        {
+            if (Environment.GetEnvironmentVariable("HYBRIDCLR_DHE_TRACE_UNITY_ASSETS") == null) return;
+            var component = root.GetComponent(componentType);
+            foreach (string name in new[] { "AssetRevision", "Count", "State", "Items", "Node", "Target", "DeserializedStamp" })
+            {
+                var field = componentType.GetField(name);
+                var value = field.GetValue(component);
+                Console.WriteLine("DHE asset managed " + phaseName + ": field=" + name +
+                    " declared=" + field.FieldType.FullName + " value=" + (value == null ? "<null>" : value.ToString()));
+            }
+        }
         private void Update()
         {
             try
@@ -94,7 +106,9 @@ namespace HybridCLR.Lab.Snapshot
                     }
                     else prefab = Resources.Load<GameObject>("DheAssetPrefab");
                     if (prefab == null) throw new InvalidOperationException("Archived Prefab is missing.");
-                    var instance = Instantiate(prefab); Validate(instance, "prefab"); Destroy(instance);
+                    TraceStorage(prefab, "loaded-prefab");
+                    var instance = Instantiate(prefab); TraceStorage(instance, "cloned-prefab");
+                    Validate(instance, "prefab"); Destroy(instance);
                     operation = SceneManager.LoadSceneAsync(bundleScenePath ?? "DheAssetScene", LoadSceneMode.Additive);
                     phase = 1; return;
                 }
