@@ -23,7 +23,8 @@ Player result SHA-256: `3EFF3DB4A9305518B3B19C368C250C7F5AA5B475BB0727D4C1A2981D
 
 This is conditional Unity 2022 Windows evidence. Android/iOS/ARM64, performance,
 memory benefit, automatic migration and all serialization features remain unproven.
-The public-image runtime change is present in tested sources, but its capability
-is not yet an independent manifest admission token. That token requires paired
-HybridCLR and Unity 2022 IL2CPP changes and a new Player build; existing Bases must
-not be relabeled before that gate passes.
+The package now exposes the explicit capability token
+`public-assembly-image-resolution-v1`, and the build pipeline requires the native
+header macro `HYBRIDCLR_DHE_HAS_PUBLIC_ASSEMBLY_IMAGE`. This token has not yet been
+validated by a newly rebuilt Player identity; existing Bases must not be relabeled
+until that gate passes.
