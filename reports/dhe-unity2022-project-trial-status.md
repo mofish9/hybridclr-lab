@@ -4,7 +4,7 @@ This is the frozen Windows handoff candidate for a real Unity 2022 project trial
 
 ## Source identity
 
-- Package candidate: `hybridclr-unity-dhe-project-trial-v8.14.1`, commit `d88d7babfca50eeb20673459a635b96e77c36570`.
+- Package candidate: `hybridclr-unity-dhe-project-trial-v8.14.1`, commit `206c106`.
 - HybridCLR runtime: `research/dhe-public-image-v8.13.0`, commit `b0fe826f071332d109d2bde87c0aa2cc18b9f3c7`.
 - Unity 2022 IL2CPP candidate: commit `658aa64923e568a497e11640b340f316704d02f9`.
 - Lab: `optimize/dhe-unity2022-project-trial-v8.13.0`.
