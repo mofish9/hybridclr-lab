@@ -127,7 +127,7 @@ internal static class CrossAssemblyParentWorkflow
         var snapshot = AotAnalysisSnapshot.Read(identityPath, identity,
             identity.GetProperty("aotAssemblyNames").EnumerateArray().Select(row => row.GetString()!),
             identity.GetProperty("assemblies").EnumerateArray().Select(row => row.GetProperty("assemblyName").GetString()!))!;
-        string modelPath = Path.Combine(current, Model), otherPath = Path.Combine(current, Other);
+        string modelPath = Path.Combine(current, Model + ".dll"), otherPath = Path.Combine(current, Other + ".dll");
         FrozenStaticWorkflow.CompileAndMerge(lab, args[3], "CrossAssemblyParentRemovalCases", modelPath,
             snapshot.Assemblies.Where(row => !row.Dhe).Select(row => row.Path).Concat(Directory.GetFiles(current, "*.dll")), Path.Combine(output, "compiled"), false);
         using (var model = ModuleDefMD.Load(File.ReadAllBytes(modelPath)))
