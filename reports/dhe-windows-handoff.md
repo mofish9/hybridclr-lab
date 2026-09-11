@@ -43,3 +43,12 @@ above, then Android. Android/iOS/ARM64 correctness, performance/memory gates,
 download authentication, save-data migration and all Unity serialization forms are
 outside this Windows checkpoint. No runtime tags or maintenance branches were
 created; this remains a candidate pending those gates.
+
+## Exploratory timing sample
+
+Ten independent Windows processes loaded the three-Base delivery using the new
+capability Base copy. All ten completed successfully at revision 73. Wall-clock
+times were 9015–9057 ms (mean 9026.8 ms; exploratory maximum 9057 ms). These
+times include process startup, Unity initialization and asset checks, rather than
+isolated DHE load time; the sample is below the 100-process policy for a P99 gate.
+Raw records are in `F:/hybridclr_artifacts/dhe-asset-provenance/timing-02`.
