@@ -4121,7 +4121,19 @@ internal static partial class Program
         foreach (var prefix in layout.GetProperty("prefixes").EnumerateArray())
         {
             var relativePrefix = prefix.GetString()!.TrimEnd('/', '\\'); var source = Path.Combine(root, relativePrefix.Replace('/', Path.DirectorySeparatorChar));
-            if (Directory.Exists(source)) CopyDirectory(source, Path.Combine(output, relativePrefix));
+            if (Directory.Exists(source))
+            {
+                string destination = Path.Combine(output, relativePrefix);
+                if (relativePrefix.Equals("tool", StringComparison.OrdinalIgnoreCase))
+                    CopyDirectoryFiltered(source, destination, path =>
+                    {
+                        string relative = Path.GetRelativePath(source, path).Replace('\\', '/');
+                        return !relative.StartsWith("obj/", StringComparison.OrdinalIgnoreCase) &&
+                               !relative.StartsWith("bin/", StringComparison.OrdinalIgnoreCase);
+                    });
+                else
+                    CopyDirectory(source, destination);
+            }
         }
         File.WriteAllText(Path.Combine(output, ".gitattributes"), "/** text eol=lf\n/tool/dnlib.dll binary\n/patches/dhe-lite/*.patch binary\n", new UTF8Encoding(false));
         var boundary = new { schemaVersion = 1, format = "hybridclr.dhe-source-boundary.json", pathBase = "manifest-directory-v1", exactPaths = new[] { ".gitattributes", "dhe-source-boundary.json", "dhe-toolchain-manifest.json" }, prefixes = new[] { "docs/", "manifests/", "patches/dhe-lite/", "schemas/", "templates/", "tool/" }, generatedPrefixes = new[] { "artifacts/", "staging/", "reports/" } };
@@ -4685,7 +4697,20 @@ internal static partial class Program
     private static long GetLong(JsonElement e, string key) => e.ValueKind == JsonValueKind.Object && e.TryGetProperty(key, out var p) && p.TryGetInt64(out var value) ? value : 0;
     private static string? GetString(JsonElement e, string key) => e.ValueKind == JsonValueKind.Object && e.TryGetProperty(key, out var p) && p.ValueKind == JsonValueKind.String ? p.GetString() : null;
     private static bool GetBool(JsonElement e, string key) => e.ValueKind == JsonValueKind.Object && e.TryGetProperty(key, out var p) && p.ValueKind is JsonValueKind.True or JsonValueKind.False && p.GetBoolean();
-    private static void CopyDirectory(string source, string destination) { Directory.CreateDirectory(destination); foreach (var file in Directory.GetFiles(source, "*", SearchOption.AllDirectories)) { var relative = Path.GetRelativePath(source, file); var target = Path.Combine(destination, relative); Directory.CreateDirectory(Path.GetDirectoryName(target)!); File.Copy(file, target, true); } }
+    private static void CopyDirectory(string source, string destination) => CopyDirectoryFiltered(source, destination, _ => true);
+
+    private static void CopyDirectoryFiltered(string source, string destination, Func<string, bool> include)
+    {
+        Directory.CreateDirectory(destination);
+        foreach (var file in Directory.GetFiles(source, "*", SearchOption.AllDirectories))
+        {
+            if (!include(file)) continue;
+            var relative = Path.GetRelativePath(source, file);
+            var target = Path.Combine(destination, relative);
+            Directory.CreateDirectory(Path.GetDirectoryName(target)!);
+            File.Copy(file, target, true);
+        }
+    }
     private static void CopyRelative(string sourceRoot, string destinationRoot, string relative) { var source = Path.Combine(sourceRoot, relative.Replace('/', Path.DirectorySeparatorChar)); if (!File.Exists(source)) throw new DheException("Layout source file was not found: " + source); var destination = Path.Combine(destinationRoot, relative.Replace('/', Path.DirectorySeparatorChar)); Directory.CreateDirectory(Path.GetDirectoryName(destination)!); File.Copy(source, destination, true); }
     private static string GitValue(string root, params string[] arguments) { try { root = Path.GetFullPath(root); var start = new ProcessStartInfo("git") { WorkingDirectory = root, UseShellExecute = false, RedirectStandardOutput = true, RedirectStandardError = true }; start.ArgumentList.Add("-C"); start.ArgumentList.Add(root); foreach (var arg in arguments) start.ArgumentList.Add(arg); using var process = Process.Start(start); if (process == null) return ""; var output = process.StandardOutput.ReadToEnd().Trim(); process.WaitForExit(); return process.ExitCode == 0 ? output : ""; } catch { return ""; } }
     private static string Sha256Text(string value) => Convert.ToHexString(SHA256.HashData(Encoding.UTF8.GetBytes(value))).ToLowerInvariant();
