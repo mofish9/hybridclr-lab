@@ -82,7 +82,12 @@
     "evidence": "F:/hybridclr_artifacts/dhe-il2cpp-811-restore/installer-result.json",
     "evidenceSha256": "F6DD0932D1B70B9FD962B5F72A6BACBB7BF01F0511231F93D30001A80465979E"
   },
-  "status": "opt5-approved-upstream-restored-windows-trial-conditionally-qualified",
+  "status": "opt5-structural-player-gate-failed-no-package-promotion",
+  "latestReview": {
+    "report": "reports/dhe-package-delivery-review.md",
+    "evidenceLock": "manifests/dhe-package-delivery-review.json",
+    "scope": "Prior method-only and native results retain their original identities. New structural Player failures prevent promotion of the package-delivery candidate; formal repository refs are unchanged."
+  },
   "androidQualified": false,
   "iosQualified": false,
   "formalRelease": false,

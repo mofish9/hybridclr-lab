@@ -1,0 +1,160 @@
+{
+  "schemaVersion": 1,
+  "format": "hybridclr.lab-review-evidence.json",
+  "status": "structural-player-gate-failed",
+  "releaseReady": false,
+  "projectTrialReady": false,
+  "report": "reports/dhe-package-delivery-review.md",
+  "formal": {
+    "hybridclr": {
+      "branch": "optimize/v8.13.0",
+      "commit": "b0fe826f071332d109d2bde87c0aa2cc18b9f3c7",
+      "tag": "v8.13.0-opt5"
+    },
+    "il2cpp_plus": {
+      "branch": "optimize/unity2022-v8.11.0",
+      "commit": "ecad8a09d1eb9b91a57c59fcdc69b268377bad59",
+      "tag": "v2022-8.11.0-opt5"
+    },
+    "hybridclr_unity": {
+      "branch": "optimize/v8.13.0",
+      "commit": "4fb36af996871ff1e7ab8585f096395dad5d2bd3"
+    }
+  },
+  "candidate": {
+    "repository": "hybridclr_unity",
+    "branch": "optimize/dhe-package-delivery-v8.13.0",
+    "commit": "dbc02036c0eac6db5fce17b4a5facf3520888114",
+    "testedFunctionalCommit": "82170b04a91e220b694a6b4498fe30563038a703",
+    "toolSourceCommit": "7265f36a28e54902ce572c96e643f45f83424627",
+    "toolPackageId": "3ca8f50e1b99fd7624c8788aa672bfd03ebef86a7c89e7ecb512561abfa93659",
+    "promoted": false
+  },
+  "scope": {
+    "engine": "Unity 2022.3.62f3 Windows",
+    "codeGeneration": "OptimizeSize",
+    "runtimeChanged": false,
+    "catChanged": false,
+    "androidQualified": false,
+    "iosQualified": false,
+    "tuanjieQualified": false,
+    "performanceQualified": false
+  },
+  "checks": {
+    "installationAndPlanning": 29,
+    "portableTool": 26,
+    "managed": 126,
+    "publicationRejections": 6,
+    "baseBuildsPassed": 2,
+    "ordinaryAotAssembliesPerBase": 40,
+    "ordinaryGuardRequestsPerBase": 49650,
+    "methodUpdatePlayersPassed": 2,
+    "structuralReferenceCases": 46,
+    "structuralPlanAdmissionPassed": 2,
+    "structuralPlayersPassed": 0,
+    "structuralPlayersFailed": 2
+  },
+  "blockers": [
+    "Existing thread-static value slots cannot follow changed value layouts; update admission rejects this scenario.",
+    "A changed value layout with a new TLS owner passes admission but fails at List<T>.Enumerator.Dispose in both immutable Players.",
+    "Full Release evidence/archive and mobile qualification remain incomplete."
+  ],
+  "evidence": [
+    {
+      "path": "F:/hybridclr_artifacts/dhe-package-delivery/unit-06/result.json",
+      "sha256": "F8B74CF4335F604832C7A3E4BE9D31ECDBB0DD44FF1C05108D68B98B2FEB231D",
+      "passed": true
+    },
+    {
+      "path": "F:/hybridclr_artifacts/dhe-package-delivery/tool-tests-03/result.json",
+      "sha256": "52989B6CAF8CAB2220C05BCA8F2C6BD76E44F5D6B2A1BC98C0EEC9E2B531FF64",
+      "passed": true
+    },
+    {
+      "path": "F:/hybridclr_artifacts/dhe-package-delivery/execution-result-03.json",
+      "sha256": "D0368BBAF5510AEC35FDAAE952EB838919892982111F652884C275475FD01641",
+      "passed": true
+    },
+    {
+      "path": "F:/hybridclr_artifacts/dhe-package-delivery/publication-tests-03/result.json",
+      "sha256": "8D731DEA8F8EC12A830E2D7659783A7912AC1AD157F9D3601BF040CFB8B5FEF2",
+      "passed": true
+    },
+    {
+      "path": "F:/hybridclr_artifacts/dhe-package-delivery/base-02/result.json",
+      "sha256": "142233966645864E9CE564EBC374EDF5E04FC036742DC4CEDE330A8E53513E08",
+      "passed": true
+    },
+    {
+      "path": "F:/hybridclr_artifacts/dhe-package-delivery/base-03/result.json",
+      "sha256": "760A6A6B919743C9DE4A17C839AEBE665968440B96BECC5208F2891C2B7BEF8D",
+      "passed": true
+    },
+    {
+      "path": "F:/hybridclr_artifacts/dhe-package-delivery/base-02/ordinary-guard-coverage.json",
+      "sha256": "69AF86FEDD59EBBA0BD64E2AA52B334A62FBDAF68DB35C08E826637616F8C24C",
+      "passed": true
+    },
+    {
+      "path": "F:/hybridclr_artifacts/dhe-package-delivery/base-03/ordinary-guard-coverage.json",
+      "sha256": "6E9CDD0AAB3230E9B487D329021BFBB10DEF8FBFEE0114E219C6866E4B2C1453",
+      "passed": true
+    },
+    {
+      "path": "F:/hybridclr_artifacts/dhe-package-delivery/method-update-02/dhe-resource-update.json",
+      "sha256": "F1ACE54E5931A6DAAD7ABC05AB4070555497583F5A52E06E43D7F821A9D89153",
+      "passed": null
+    },
+    {
+      "path": "F:/hybridclr_artifacts/dhe-package-delivery/method-player-base-02.json",
+      "sha256": "85F1E5CC97A2F4185E6ABE3EE5C6E3196506783F54C198A166E58A7F6A39551A",
+      "passed": true
+    },
+    {
+      "path": "F:/hybridclr_artifacts/dhe-package-delivery/method-player-base-03.json",
+      "sha256": "C418B32EE8B17A6A6036531D2B1285803D98670B9A5119CDAD6F4A0BE4F2EE36",
+      "passed": true
+    },
+    {
+      "path": "F:/hybridclr_artifacts/dhe-package-delivery/structural-03/resource/dhe-resource-update-validation.json",
+      "sha256": "EADF7359C4A50547097DED4A4EE243ABCBD2C31DCAA909A5B507DC9BC3E03173",
+      "passed": false
+    },
+    {
+      "path": "F:/hybridclr_artifacts/dhe-package-delivery/structural-05/reference.json",
+      "sha256": "19406E103189BD8E3B793ADDAC8FBC0D289A41B027DD01CE589450C44746080D",
+      "passed": true
+    },
+    {
+      "path": "F:/hybridclr_artifacts/dhe-package-delivery/structural-05/resource/dhe-resource-update-validation.json",
+      "sha256": "BF5D05D2CF3DAE86EAD5ADE87BA3C95177466EE52C27DA64D3AD6F03927DF813",
+      "passed": true
+    },
+    {
+      "path": "F:/hybridclr_artifacts/dhe-package-delivery/structural-05/player-0.json",
+      "sha256": "C689E3670992F8A4115E6D68746CB156B2FC4099D64053B4B846EDA10C94DA02",
+      "passed": false
+    },
+    {
+      "path": "F:/hybridclr_artifacts/dhe-package-delivery/structural-player-base-03.json",
+      "sha256": "CA6234B9CF17B074430D374727160870FBF9FF3216DA7C2445F2440426A0BFA4",
+      "passed": false
+    }
+  ],
+  "bases": [
+    {
+      "name": "base-02",
+      "baseId": "d106832272bab78db56c1dd3b379ec044ecd52e2c451b8498cd83770c4b62337",
+      "buildPackageCommit": "22cdbbb43a118248540db7ca43268e4e59fc28af",
+      "playerUnchanged": true,
+      "gameAssemblyUnchanged": true
+    },
+    {
+      "name": "base-03",
+      "baseId": "9ee743eafec0ba3e0c4427a16c2bcb126f2bb0643bf04c6678dbc7d3e4012e37",
+      "buildPackageCommit": "22cdbbb43a118248540db7ca43268e4e59fc28af",
+      "playerUnchanged": true,
+      "gameAssemblyUnchanged": true
+    }
+  ]
+}
