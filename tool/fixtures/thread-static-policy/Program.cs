@@ -100,6 +100,12 @@ internal static class ThreadStaticPolicyTests
         Require("actual-base-dispose-is-storage-independent", Empty(dispose));
         Require("actual-move-next-still-needs-adaptation", !Empty(owner.Methods.Single(method => method.Name == "MoveNext")));
         Require("constructors-never-exempt", !Empty(owner.Methods.Single(method => method.IsInstanceConstructor)));
+        var implementation = dispose.ImplAttributes;
+        dispose.ImplAttributes |= MethodImplAttributes.Synchronized;
+        Require("synchronized-methods-never-exempt", !Empty(dispose)); dispose.ImplAttributes = implementation;
+        var convention = dispose.MethodSig.CallingConvention;
+        dispose.MethodSig.CallingConvention = (convention & ~CallingConvention.Mask) | CallingConvention.VarArg;
+        Require("vararg-methods-never-exempt", !Empty(dispose)); dispose.MethodSig.CallingConvention = convention;
         dispose.MethodSig.Params.Add(core.CorLibTypes.Int32);
         Require("parameters-never-exempt", !Empty(dispose)); dispose.MethodSig.Params.Clear();
         dispose.Body.Instructions.Insert(0, Instruction.Create(OpCodes.Nop));
