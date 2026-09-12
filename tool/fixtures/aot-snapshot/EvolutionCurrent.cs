@@ -7,7 +7,8 @@ internal static class EvolutionCurrent
 {
     public static int Run(string[] args)
     {
-        if (args.Length != 2) throw new ArgumentException("synthesize-evolution <source DLL root> <new output root>");
+        if (args.Length != 2 && (args.Length != 3 || args[2] != "require-new-layout"))
+            throw new ArgumentException("synthesize-evolution <source DLL root> <new output root> [require-new-layout]");
         string sourceRoot = Path.GetFullPath(args[0]), outputRoot = Path.GetFullPath(args[1]);
         if (!Directory.Exists(sourceRoot) || Directory.Exists(outputRoot)) throw new IOException("Invalid evolution roots.");
         Directory.CreateDirectory(outputRoot);
@@ -22,6 +23,11 @@ internal static class EvolutionCurrent
                 payload.Fields.Add(new FieldDefUser("Extra", new FieldSig(module.CorLibTypes.Int64), FieldAttributes.Public));
             if (payload.Fields.All(field => field.Name != "Reference"))
                 payload.Fields.Add(new FieldDefUser("Reference", new FieldSig(module.CorLibTypes.Object), FieldAttributes.Public));
+            if (args.Length == 3)
+            {
+                if (payload.Fields.Any(field => field.Name == "DeliveryMarker")) throw new InvalidDataException("Delivery layout already exists.");
+                payload.Fields.Insert(0, new FieldDefUser("DeliveryMarker", new FieldSig(module.CorLibTypes.Object), FieldAttributes.Public));
+            }
             var options = new ModuleWriterOptions(module);
             options.PEHeadersOptions.TimeDateStamp = 123456789;
             module.Write(target, options);

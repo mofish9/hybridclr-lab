@@ -1,7 +1,7 @@
 using System.Diagnostics;
 using System.Text.Json;
 
-if (args.Length != 3) throw new ArgumentException("<Lab publisher DLL> <clean Lab source> <new output>");
+if (args.Length != 3) throw new ArgumentException("<package source publisher DLL> <clean package source> <new output>");
 string publisher = Path.GetFullPath(args[0]), lab = Path.GetFullPath(args[1]), output = Path.GetFullPath(args[2]);
 if (Directory.Exists(output)) throw new IOException("Output must be new.");
 Directory.CreateDirectory(output);
@@ -22,7 +22,7 @@ var checks = new Dictionary<string, bool>();
 void Reject(string name, string expected, params string[] options)
 {
     string destination = Path.Combine(output, name);
-    string actual = Run("dotnet", new[] { publisher, "publish-unity-tool", "-LabRoot", lab, "-OutputRoot", destination }.Concat(options).ToArray());
+    string actual = Run("dotnet", new[] { publisher, "publish-unity-tool", "-PackageSourceRoot", lab, "-OutputRoot", destination }.Concat(options).ToArray());
     bool passed = actual.StartsWith("1\n") && actual.Contains(expected, StringComparison.OrdinalIgnoreCase) && !Directory.Exists(destination);
     checks[name] = passed;
     if (!passed) throw new Exception(name + ": " + actual);

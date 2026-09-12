@@ -81,6 +81,16 @@ internal static class PackageDeliveryTests
         Require("config-resolves-installation-receipt", Path.GetFullPath(configDoc.RootElement.GetProperty("runtimeManifestPath").GetString()!) == Path.GetFullPath(receipt));
         Require("exploratory-bundle-cannot-claim-release", Run("verify-package", "-PackageRoot", bundle, "-RequireRelease") != 0);
 
+        JsonElement Identity(object value) => JsonSerializer.SerializeToElement(value);
+        var emptyBase = Identity(new { aotMetadataSetId = Convert.ToHexString(System.Security.Cryptography.SHA256.HashData(Array.Empty<byte>())) });
+        Require("legacy-empty-base-ignores-current-metadata-settings", Tool.ReadBaseAotMetadataNames(emptyBase, new[] { "mscorlib" }).Length == 0);
+        var namedBase = Identity(new { aotMetadataAssemblyNames = new[] { "System" }, aotAssemblyNames = new[] { "System", "mscorlib" } });
+        Require("base-metadata-selection-does-not-follow-project-changes", Tool.ReadBaseAotMetadataNames(namedBase, new[] { "mscorlib" }).SequenceEqual(new[] { "System" }));
+        bool invalidSelectionRejected = false;
+        try { Tool.ReadBaseAotMetadataNames(Identity(new { aotMetadataAssemblyNames = new[] { "System", "system" } }), Array.Empty<string>()); }
+        catch { invalidSelectionRejected = true; }
+        Require("duplicate-base-metadata-names-rejected", invalidSelectionRejected);
+
         int Exec(string executable, params string[] arguments)
         {
             var start = new ProcessStartInfo(executable) { WorkingDirectory = output, UseShellExecute = false, CreateNoWindow = true,
