@@ -15,7 +15,7 @@
     "hybridclr_unity": {
       "remote": "https://github.com/mofish9/hybridclr_unity.git",
       "ref": "refs/heads/optimize/v8.13.0",
-      "commit": "ce1b8a89a4e80616dc7343c3fe3f8e405cc2e889"
+      "commit": "5122957ee8e6647f1663205c3286ccc2e99c1e70"
     },
     "hybridclr": {
       "remote": "https://github.com/mofish9/hybridclr.git",
@@ -74,6 +74,16 @@
     "runtimePlanSha256": "3484C993B7E5E01181257E3FA916EC08297923210202E9B554C8C216573A5CC3",
     "report": "reports/dhe-package-tool-fixes.md",
     "scope": "Portable Windows tool and Unity Editor compilation/invocation; unchanged runtime, no new native Player or mobile qualification"
+  },
+  "installerRepositoryValidation": {
+    "packageCommit": "5122957ee8e6647f1663205c3286ccc2e99c1e70",
+    "testSourceCommit": "1d08071453382387cbd7620e61faa5238bf1bdc1",
+    "configuredRepositoriesUsed": true,
+    "missingConfiguredRepositoryRejected": true,
+    "manifestSelectsRefOnly": true,
+    "runtimeFilesVerified": 930,
+    "evidenceSha256": "3621EC60916A6439CB59631453E959F299EDDBBF22C374642B456929ADA508E5",
+    "report": "reports/dhe-project-repository-settings.md"
   },
   "status": "opt5-runtime-tags-published-conditionally-qualified",
   "androidQualified": false,
