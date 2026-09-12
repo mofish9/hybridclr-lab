@@ -77,8 +77,8 @@ internal static class PackageDeliveryTests
         using var configDoc = JsonDocument.Parse(File.ReadAllBytes(config));
         using var toolDoc = JsonDocument.Parse(File.ReadAllBytes(Path.Combine(bundle, "dhe-toolchain-manifest.json")));
         Require("config-pins-real-bundle", configDoc.RootElement.GetProperty("expectedToolchainPackageId").GetString() == toolDoc.RootElement.GetProperty("packageId").GetString());
-        Require("config-resolves-installed-tool", configDoc.RootElement.GetProperty("toolchainRoot").GetString() == bundle);
-        Require("config-resolves-installation-receipt", configDoc.RootElement.GetProperty("runtimeManifestPath").GetString() == receipt);
+        Require("config-resolves-installed-tool", Path.GetFullPath(configDoc.RootElement.GetProperty("toolchainRoot").GetString()!) == Path.GetFullPath(bundle));
+        Require("config-resolves-installation-receipt", Path.GetFullPath(configDoc.RootElement.GetProperty("runtimeManifestPath").GetString()!) == Path.GetFullPath(receipt));
         Require("exploratory-bundle-cannot-claim-release", Run("verify-package", "-PackageRoot", bundle, "-RequireRelease") != 0);
 
         int Exec(string executable, params string[] arguments)
