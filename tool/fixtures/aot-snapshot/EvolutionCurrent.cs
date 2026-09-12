@@ -8,8 +8,9 @@ internal static class EvolutionCurrent
 {
     public static int Run(string[] args)
     {
-        if (args.Length != 2 && (args.Length != 3 || args[2] != "require-new-layout"))
-            throw new ArgumentException("synthesize-evolution <source DLL root> <new output root> [require-new-layout]");
+        if (args.Length < 2 || args.Length > 4 || (args.Length >= 3 && args[2] != "require-new-layout") ||
+            (args.Length == 4 && args[3] != "new-thread-storage"))
+            throw new ArgumentException("synthesize-evolution <source DLL root> <new output root> [require-new-layout [new-thread-storage]]");
         string sourceRoot = Path.GetFullPath(args[0]), outputRoot = Path.GetFullPath(args[1]);
         if (!Directory.Exists(sourceRoot) || Directory.Exists(outputRoot)) throw new IOException("Invalid evolution roots.");
         Directory.CreateDirectory(outputRoot);
@@ -24,10 +25,21 @@ internal static class EvolutionCurrent
                 payload.Fields.Add(new FieldDefUser("Extra", new FieldSig(module.CorLibTypes.Int64), FieldAttributes.Public));
             if (payload.Fields.All(field => field.Name != "Reference"))
                 payload.Fields.Add(new FieldDefUser("Reference", new FieldSig(module.CorLibTypes.Object), FieldAttributes.Public));
-            if (args.Length == 3)
+            if (args.Length >= 3)
             {
                 if (payload.Fields.Any(field => field.Name == "DeliveryMarker")) throw new InvalidDataException("Delivery layout already exists.");
                 payload.Fields.Insert(0, new FieldDefUser("DeliveryMarker", new FieldSig(module.CorLibTypes.Object), FieldAttributes.Public));
+                if (args.Length == 4)
+                {
+                    // A separate positive fixture creates a new TLS owner. The
+                    // unchanged owner remains a negative capability test: opt5
+                    // cannot grow an existing thread-static native value slot.
+                    string oldOwner = FrozenResourceCasesCompiler.ProbeName + "/ThreadValue";
+                    var owner = module.Find(oldOwner, false) ?? throw new InvalidDataException("Thread-static owner is missing.");
+                    var references = module.GetTypeRefs().Where(type => type.FullName == oldOwner).ToArray();
+                    owner.Name = "CurrentThreadValue";
+                    foreach (var reference in references) reference.Name = owner.Name;
+                }
                 // Some archived fixture inputs already contain the compiled suite,
                 // but their Base entry deliberately returns a fixed revision.
                 // Reactivate that suite after the actual layout mutation.
