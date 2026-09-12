@@ -16,7 +16,7 @@
     "pathSemantics": { "const": "package-relative-v1" },
     "packageIdAlgorithm": { "const": "sha256-canonical-manifest-v2" },
     "packageId": { "type": "string", "pattern": "^[0-9a-fA-F]{64}$" },
-    "entryPoint": { "const": "tool/HybridCLR.DheTool.csproj" },
+    "entryPoint": { "enum": ["tool/HybridCLR.DheTool.csproj", "HybridCLR.DheTool.dll"] },
     "commands": { "type": "array", "minItems": 1, "uniqueItems": true, "items": { "type": "string" } },
     "layoutSha256": { "type": "string", "pattern": "^[0-9a-fA-F]{64}$" },
     "sourceIdentity": {

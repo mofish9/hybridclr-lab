@@ -158,6 +158,10 @@ internal static partial class Program
         try
         {
             var cli = Cli.Parse(args);
+            PrepareUnityTool(cli);
+#if DHE_PACKAGE_TOOL
+            if (cli.Command is "help" or "") return 0;
+#endif
             if (cli.Command is "help" or "") { PrintHelp(); return 0; }
             return cli.Command.ToLowerInvariant() switch
             {
@@ -188,6 +192,7 @@ internal static partial class Program
                 "verify-package" => VerifyPackage(cli),
                 "release-evidence" => ReleaseEvidence(cli),
                 "publish" => Publish(cli),
+                "publish-unity-tool" => PublishUnityTool(cli),
                 "install" => Install(cli),
                 "new-adapter" => NewAdapter(cli),
                 "new-config" => NewConfig(cli),
@@ -4009,7 +4014,7 @@ internal static partial class Program
         result.SchemaValid = GetInt(manifest, "schemaVersion") == 1 &&
             GetString(manifest, "format") == "hybridclr.dhe-toolchain-manifest.json" &&
             GetString(manifest, "pathSemantics") == "package-relative-v1" &&
-            GetString(manifest, "entryPoint") == "tool/HybridCLR.DheTool.csproj" &&
+            GetString(manifest, "entryPoint") is "tool/HybridCLR.DheTool.csproj" or "HybridCLR.DheTool.dll" &&
             GetString(manifest, "packageIdAlgorithm") == PackageIdAlgorithm &&
             !string.IsNullOrWhiteSpace(result.ToolchainVersion) && result.ContractVersion == 1;
         if (!result.SchemaValid) result.Errors.Add("DHE toolchain manifest contract is invalid.");
@@ -4609,6 +4614,8 @@ internal static partial class Program
             var manifestCommands = manifest.GetProperty("commands").EnumerateArray().Select(value => value.GetString() ?? "")
                 .OrderBy(value => value, StringComparer.Ordinal);
             valid &= layoutCommands.SequenceEqual(manifestCommands, StringComparer.Ordinal);
+            valid &= layout.GetProperty("exactPaths").EnumerateArray()
+                .Any(entry => entry.GetString() == GetString(manifest, "entryPoint"));
             foreach (var entry in layout.GetProperty("exactPaths").EnumerateArray())
             {
                 var relative = entry.GetString() ?? "";
