@@ -36,8 +36,13 @@ internal static class EvolutionCurrent
                 {
                     var entry = module.Find("HybridCLR.Lab.ValueLayout.Factory", false)!.Methods.Single(method => method.Name == "GetRevision");
                     entry.Body = new CilBody();
-                    entry.Body.Instructions.Add(Instruction.Create(OpCodes.Call, suite.Methods.Single(method => method.Name == "Run")));
-                    entry.Body.Instructions.Add(Instruction.Create(OpCodes.Pop));
+                    foreach (string suiteName in new[] { FrozenResourceCasesCompiler.ProbeName, FrozenAddedAssemblyCompiler.CallerName, FrozenStaticWorkflow.ProbeName })
+                    {
+                        var included = module.Find(suiteName, false);
+                        if (included == null) continue;
+                        entry.Body.Instructions.Add(Instruction.Create(OpCodes.Call, included.Methods.Single(method => method.Name == "Run")));
+                        entry.Body.Instructions.Add(Instruction.Create(OpCodes.Pop));
+                    }
                     entry.Body.Instructions.Add(Instruction.Create(OpCodes.Ldc_I4, 73));
                     entry.Body.Instructions.Add(Instruction.Create(OpCodes.Ret));
                 }
