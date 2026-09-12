@@ -1,18 +1,23 @@
 # Unity 2022 DHE project-trial status
 
-This is the frozen Windows handoff candidate for a real Unity 2022 project trial. It is not an Android/iOS or production-release qualification.
+The sources are now integrated into the three maintenance repositories without new tags. This is not an Android/iOS or production-release qualification. Historical Player evidence and current maintenance integration checks are distinguished below.
 
 ## Source identity
 
-- Package candidate: `hybridclr-unity-dhe-project-trial-v8.14.1`, commit `206c106`.
-- HybridCLR runtime: `research/dhe-public-image-v8.13.0`, commit `b0fe826f071332d109d2bde87c0aa2cc18b9f3c7`.
-- Unity 2022 IL2CPP candidate: commit `658aa64923e568a497e11640b340f316704d02f9`.
+- Package: `optimize/v8.14.1`, commit `c6a7aff28f509144b8654e2a1c37c57f1de34971`.
+- HybridCLR: `optimize/v8.13.0`, commit `b0fe826f071332d109d2bde87c0aa2cc18b9f3c7`.
+- Unity 2022 IL2CPP: `optimize/unity2022-v8.14.0`, commit `658aa64923e568a497e11640b340f316704d02f9`.
 - Lab: `optimize/dhe-unity2022-project-trial-v8.13.0`.
 - Unity: `2022.3.62f3`, Windows x64, `Unity2022Fgs`, FGS enabled, `OptimizeSize`, no supplemental metadata.
 
 Unity 2021 remains explicitly on official HybridCLR `v8.13.0` and IL2CPP `v2021-8.1.0`. Tuanjie is not part of this trial.
 
 ## Passing evidence
+
+The records in this section are historical candidate evidence. In particular,
+the complete Base workflow used package `f99bfa4`, not the maintenance package.
+Current source assembly, native CTest, managed regression and Installer checks
+are recorded in `dhe-maintenance-integration.md`.
 
 - Native gate: `F:/hybridclr_artifacts/dhe-project-trial-20260912/native/DHE-Unity2022/native-gate.json` reports `passed=true`, `mergeReady=true`, and `surrogateExternalHeadersUsed=false`.
 - New Base workflow: `F:/hybridclr_artifacts/dhe-project-trial-20260912/base-01/result.json` reports `passed=true`, 40 ordinary AOT assemblies, and runtime contract `dhe-runtime-v33`.
