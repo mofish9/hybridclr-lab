@@ -1,0 +1,69 @@
+{
+  "scope": "Unity2022 Windows project trial; conditional",
+  "packageCommit": "044d55337ae5b4ad6226fc73f2087becd6b7a48d",
+  "packageVersion": "8.13.0",
+  "nativeRuntimeUnchanged": true,
+  "artifactRoot": "F:/hybridclr_artifacts/dhe-opt5-review",
+  "artifacts": [
+    {
+      "path": "runtime/DHE-Unity2022/runtime-manifest.json",
+      "sha256": "9C06A1306BAF40CD84904356262E237DB8445E27BCD61F9894FE75185C1884DF"
+    },
+    {
+      "path": "installer-result.json",
+      "sha256": "410540A087FDE59AA400B303CA7E0EA7FAE99B2085D52669F5DA86ECCE006B95"
+    },
+    {
+      "path": "native-ctest.log",
+      "sha256": "12E45E8A8B4D66698A8E9F32A00847C002DA3A9748BE9BBA21143EB4ECF622D1"
+    },
+    {
+      "path": "execution-result.json",
+      "sha256": "1651987A3FE489182656585AE78604FCE05A2E9305CA87C8145277260161B526"
+    },
+    {
+      "path": "linker-result/report.json",
+      "sha256": "76D85B146D5FD46FBD6E04D8FD5197CAEF0F14C4B3186A9C79F4230B4E227376"
+    },
+    {
+      "path": "source-binding-controls/report.json",
+      "sha256": "9F3E1DA9A5F37FEF2A76304B22F8B9387A15F3A5DA3639BA2D3FE8EEA2B67280"
+    },
+    {
+      "path": "asset-provenance/result.json",
+      "sha256": "56340AD6D0C40A5B0DB414C4910F7BC7E2564F9546B06337DE5BB0663DE32363"
+    },
+    {
+      "path": "base-02/base/build-identity.json",
+      "sha256": "0C1A9840BCD8579FFD4770E4F6609B5EC3C111BC24F2DF99BEB675CEF80FD2F4"
+    },
+    {
+      "path": "base-02/base/adapter/native-finalize.json",
+      "sha256": "0D036C8DEF94C437829D20EB295A125850B585130D0AFDAFD1FE21F24832AE7C"
+    },
+    {
+      "path": "base-02/base/adapter/build-final-player.json",
+      "sha256": "02CE78A8C0141BC085719DBCD09DF9626821337A68FCA4A2FDB1341AE5C48BD4"
+    },
+    {
+      "path": "base-59-result.json",
+      "sha256": "625E82872D720FC015A635CA3E0E801B401161B9EC8D36AB0051117EE629EBBB"
+    },
+    {
+      "path": "current-73-result.json",
+      "sha256": "E16E97985C8B6811A0200F77828C0244E10FD118FE7BCD8FD826F67403EF949A"
+    },
+    {
+      "path": "stage-73.json",
+      "sha256": "36C20D3CD539C7C225EDA52D98337A4D55AD09D98100E7EEB284E2C43DD194FB"
+    },
+    {
+      "path": "base-02/base/player/Snapshot.exe",
+      "sha256": "143DD3C6A93A45819A98E3CCA8FD1535B461CDF860C927D955CA54815FAF5D7B"
+    },
+    {
+      "path": "base-02/base/player/GameAssembly.dll",
+      "sha256": "7CE2B3AD407E6106BA1AD6D369FC29279BFA4E393C7F0AA3D3C82B467DE043D7"
+    }
+  ]
+}

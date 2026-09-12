@@ -33,19 +33,32 @@
       "passed": true,
       "mergeReady": true,
       "surrogateExternalHeadersUsed": false,
-      "runtimeManifestSha256": "FFDBD20E5B7575F4CF5FC7BDB8B73E52FF57269D2BCF22E04D67FC4A62305F97"
+      "evidence": "F:/hybridclr_artifacts/dhe-maintenance-20260912/native/DHE-Unity2022/native-gate.json",
+      "evidenceScope": "Previously compiled exact opt5 runtime commits; CTest rerun in dhe-opt5-review/native-ctest.log. The newly assembled runtime has the identical staged runtime hash."
+    },
+    "packageCommit": "044d55337ae5b4ad6226fc73f2087becd6b7a48d",
+    "runtimeManifestSha256": "9C06A1306BAF40CD84904356262E237DB8445E27BCD61F9894FE75185C1884DF",
+    "installer": {
+      "passed": true,
+      "runtimeFilesVerified": 930
+    },
+    "managed": {
+      "executionPlanCases": 126,
+      "linkerCases": 11,
+      "sourceBindingCases": 12,
+      "assetProvenanceCases": 16
     },
     "baseWorkflow": {
       "passed": true,
-      "resultSha256": "08F6B2C96BB36DCF0E7394B5BBAC533180605D29E329F0DD0C26F135A84987B5",
-      "runtimeContract": "dhe-runtime-v33"
+      "baseRevision": 59,
+      "currentRevision": 73,
+      "basePlayerResultSha256": "625E82872D720FC015A635CA3E0E801B401161B9EC8D36AB0051117EE629EBBB",
+      "currentPlayerResultSha256": "E16E97985C8B6811A0200F77828C0244E10FD118FE7BCD8FD826F67403EF949A",
+      "stageSha256": "36C20D3CD539C7C225EDA52D98337A4D55AD09D98100E7EEB284E2C43DD194FB",
+      "runtimeContract": "dhe-runtime-v33",
+      "scope": "One new Windows Base; four DHE assemblies loaded and one method updated through resources. Not full structural/multi-Base/asset Player qualification."
     },
-    "toolchain": {
-      "verification": "passed",
-      "expectedFileCount": 306,
-      "packageId": "0c1bb88743e5cbcc76e4b484cb1a5f5ff0709d5e8d230338e42b5c7a94b521b8"
-    },
-    "evidenceScope": "Historical Windows evidence listed below belongs to package f99bfa4, not a full Player build of the maintenance package. Maintenance-package c6a7aff checks and opt5 publication checks are recorded separately in their respective reports. formalRelease=false denotes missing full qualification, not missing runtime tags."
+    "evidenceScope": "Current package evidence is in reports/dhe-opt5-release.md. Historical structural/multi-Base evidence is not attributed to this package. Fresh toolchain packages must independently pass verify-package; package ID is recorded in their generated manifest."
   },
   "status": "opt5-runtime-tags-published-conditionally-qualified",
   "androidQualified": false,

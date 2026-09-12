@@ -4,13 +4,16 @@ The sources are integrated into the three maintenance repositories. Runtime tags
 
 ## Source identity
 
-- Package: `optimize/v8.13.0`, commit `65581c17c7e67ea8e972fccfa3b84152262fd65c`.
+- Package: `optimize/v8.13.0`, commit `044d55337ae5b4ad6226fc73f2087becd6b7a48d`.
 - HybridCLR: `optimize/v8.13.0`, commit `b0fe826f071332d109d2bde87c0aa2cc18b9f3c7`.
 - Unity 2022 IL2CPP: `optimize/unity2022-v8.14.0`, commit `658aa64923e568a497e11640b340f316704d02f9`.
 - Lab: `optimize/dhe-unity2022-project-trial-v8.13.0`.
 - Unity: `2022.3.62f3`, Windows x64, `Unity2022Fgs`, FGS enabled, `OptimizeSize`, no supplemental metadata.
 
 Unity 2021 remains explicitly on official HybridCLR `v8.13.0` and IL2CPP `v2021-8.1.0`. Tuanjie is not part of this trial.
+
+Current 8.13 package validation and the 59 -> 73 resource-only Player check are
+recorded in `dhe-opt5-release.md`. Older records below retain their original identity.
 
 ## Passing evidence
 

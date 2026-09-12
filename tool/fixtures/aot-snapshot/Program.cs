@@ -7,6 +7,7 @@ using HybridCLR.Editor.Commands;
 using HybridCLR.DheTool;
 using System.Text.Json.Nodes;
 
+if (args.Length > 0 && args[0] == "trial-method-current") return TrialMethodCurrent.Run(args.Skip(1).ToArray());
 if (args.Length > 0 && args[0] == "unity-workflow") return UnityWorkflow.Run(args.Skip(1).ToArray());
 if (args.Length > 0 && args[0] == "unity-asset-inputs") return UnityAssetWorkflow.Inputs(args.Skip(1).ToArray());
 if (args.Length > 0 && args[0] == "unity-asset-stock-control") return UnityAssetControlWorkflow.Run(args.Skip(1).ToArray());
