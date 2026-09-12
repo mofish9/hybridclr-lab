@@ -15,7 +15,7 @@
     "hybridclr_unity": {
       "remote": "https://github.com/mofish9/hybridclr_unity.git",
       "ref": "refs/heads/optimize/v8.13.0",
-      "commit": "044d55337ae5b4ad6226fc73f2087becd6b7a48d"
+      "commit": "02dc136e4f2eb7d32990486e7bdbf58bbe1772fd"
     },
     "hybridclr": {
       "remote": "https://github.com/mofish9/hybridclr.git",
@@ -58,7 +58,20 @@
       "runtimeContract": "dhe-runtime-v33",
       "scope": "One new Windows Base; four DHE assemblies loaded and one method updated through resources. Not full structural/multi-Base/asset Player qualification."
     },
-    "evidenceScope": "Current package evidence is in reports/dhe-opt5-release.md. Historical structural/multi-Base evidence is not attributed to this package. Fresh toolchain packages must independently pass verify-package; package ID is recorded in their generated manifest."
+    "evidenceScope": "This validation block records the earlier 044d553 package and Player identity. It is historical reference for the current tool-only package update; see bundledToolValidation for current evidence. No historical Player result is attributed to a new package commit."
+  },
+  "bundledToolValidation": {
+    "packageCommit": "02dc136e4f2eb7d32990486e7bdbf58bbe1772fd",
+    "toolSourceCommit": "ad93b9dbc5103b3c3141c1d2dd897c63218c9ea2",
+    "toolPackageId": "713b0e7d2da71eeebfc5df21b6897861e89b571e3e2d781235cde0cb1bec9b65",
+    "fileCount": 83,
+    "portableToolCases": 13,
+    "managedExecutionPlanCases": 126,
+    "resourcePayloadFilesCompared": 11,
+    "resourcePayloadHashMismatches": 0,
+    "runtimePlanSha256": "3484C993B7E5E01181257E3FA916EC08297923210202E9B554C8C216573A5CC3",
+    "report": "reports/dhe-package-tool.md",
+    "scope": "Portable Windows tool and Unity Editor compilation/invocation; unchanged runtime, no new native Player or mobile qualification"
   },
   "status": "opt5-runtime-tags-published-conditionally-qualified",
   "androidQualified": false,

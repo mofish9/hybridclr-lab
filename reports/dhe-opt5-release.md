@@ -1,10 +1,15 @@
 # Unity 2022 DHE opt5 project-trial release
 
+This report preserves the 044d553 package/Player validation identity. The newer
+package-owned binary tool distribution uses package 02dc136; current tool-only
+evidence and project usage are in [dhe-package-tool.md](dhe-package-tool.md).
+Do not attribute the Player results below to that later package commit.
+
 Status: conditionally qualified for Windows project trials. Existing runtime tags
 are unchanged. Use the corrected package commit below; 65581c1 was an incomplete
 rollback and is not a usable DHE package. This is not mobile production approval.
 
-## Current source identity
+## Source identity validated in this report
 
 | Repository | Maintenance branch | Commit | Runtime tag |
 |---|---|---|---|
