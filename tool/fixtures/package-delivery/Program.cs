@@ -103,6 +103,22 @@ internal static class PackageDeliveryTests
         catch { invalidSelectionRejected = true; }
         Require("duplicate-base-metadata-names-rejected", invalidSelectionRejected);
 
+        using (var core = dnlib.DotNet.ModuleDefMD.Load(typeof(List<>).Assembly.Location))
+        {
+            var list = core.Find("System.Collections.Generic.List`1", false)!;
+            var enumerator = list.NestedTypes.Single(type => type.Name == "Enumerator");
+            var constructor = enumerator.Methods.Single(method => method.IsInstanceConstructor);
+            var selected = new Dictionary<uint, HashSet<string>> { [constructor.MDToken.Raw] = new() { "generic-argument-storage" } };
+            void Select(dnlib.DotNet.MethodDef method) => selected[method.MDToken.Raw] = new() { "generic-argument-storage" };
+            FrozenAotAdaptation.ExpandGenericCallers(core, selected, Select);
+            Require("generic-caller-of-value-constructor-selected", selected.ContainsKey(list.Methods.Single(method => method.Name == "GetEnumerator").MDToken.Raw));
+            Require("generic-interface-caller-closure-selected", list.Methods.Where(method => method.Name.String.EndsWith(".GetEnumerator", StringComparison.Ordinal))
+                .All(method => selected.ContainsKey(method.MDToken.Raw)));
+            int selectedCount = selected.Count;
+            FrozenAotAdaptation.ExpandGenericCallers(core, selected, Select);
+            Require("generic-caller-closure-reaches-fixed-point", selected.Count == selectedCount);
+        }
+
         int Exec(string executable, params string[] arguments)
         {
             var start = new ProcessStartInfo(executable) { WorkingDirectory = output, UseShellExecute = false, CreateNoWindow = true,
