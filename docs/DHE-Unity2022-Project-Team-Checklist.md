@@ -10,7 +10,7 @@ Use these maintenance commits (runtime installation selects the opt5 tags below)
 
 | Repository | Branch | Commit |
 |---|---|---|
-| `hybridclr_unity` | `optimize/v8.14.1` | `936592974000e53846e36800fa1fd363ffbcc3f6` |
+| `hybridclr_unity` | `optimize/v8.13.0` | `65581c17c7e67ea8e972fccfa3b84152262fd65c` |
 | `hybridclr` | `optimize/v8.13.0` | `b0fe826f071332d109d2bde87c0aa2cc18b9f3c7` |
 | `il2cpp_plus` | `optimize/unity2022-v8.14.0` | `658aa64923e568a497e11640b340f316704d02f9` |
 

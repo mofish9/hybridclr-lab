@@ -11,7 +11,7 @@ performance gains. The package change only updates runtime selection and docs.
 |---|---|---|---|
 | hybridclr | optimize/v8.13.0 | b0fe826f071332d109d2bde87c0aa2cc18b9f3c7 | v8.13.0-opt5 |
 | il2cpp_plus | optimize/unity2022-v8.14.0 | 658aa64923e568a497e11640b340f316704d02f9 | v2022-8.14.0-opt5 |
-| hybridclr_unity | optimize/v8.14.1 | 936592974000e53846e36800fa1fd363ffbcc3f6 | none; migrate by commit |
+| hybridclr_unity | optimize/v8.13.0 | 65581c17c7e67ea8e972fccfa3b84152262fd65c | none; migrate by commit |
 
 Lab locks and tools are maintained on
 `optimize/dhe-unity2022-project-trial-v8.13.0` in `mofish9/hybridclr-lab`.
@@ -23,7 +23,7 @@ Canonical source SHA-256 values (LF-normalized content):
 - HybridCLR `hybridclr/`: `6E51FF1692784E3106606CE1E7C060EE6A3FB26307B954FDD1B19269B1429FCA`.
 - IL2CPP `libil2cpp/`: `45DA48D66495FC3865439E9F99224447FD67384A69E84C181376EEE0F0870887`.
 - Package root excluding Git and the existing explicitly ignored importer meta:
-  `FC9D934317FA4464134887406504A1333DEDF41D7C605E53DC2D9ADD97DC86CC`.
+  `156734464A7911E18F76F14CF47598FF649236ACC628AE5B7C5945D3F5804853`.
 
 Unity 2021 still uses official `v8.13.0` / `v2021-8.1.0`. Tuanjie retains
 `v8.13.0-opt4.2` / `v2022-tuanjie-8.13.0-opt4.1`. Neither is qualified for opt5.
@@ -47,12 +47,13 @@ The existing native gate at
 covers these exact runtime commits and source hashes: passed, mergeReady=true,
 real Unity 2022.3.62f3 headers, surrogateExternalHeadersUsed=false, FGS enabled.
 Its SHA-256 is `B7ACC9FB0303B6C8C0E6C17D54BE9F2A042C2FF04B2CC68EDE3A65704CD24F04`.
-Its runtime manifest records package c6a7aff, not the opt5 package commit.
+Its runtime manifest records the earlier package c6a7aff, not the corrected
+8.13.0 package commit; those results remain historical evidence.
 
 The 126/126 managed checks and real Unity Installer's 930-file comparison in
 [dhe-maintenance-integration.md](dhe-maintenance-integration.md) belong to package
 c6a7aff. This tag-selection-only publication does not relabel those runs as
-9365929 results. The full Base/Player workflow remains historical package
+65581c1 results. The full Base/Player workflow remains historical package
 f99bfa4 evidence. No full current-package Player build or Unity Installer UI run
 was repeated for opt5; fresh Git tag clone and identity checks were performed.
 

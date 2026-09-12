@@ -8,14 +8,14 @@
     "executablePath": "C:/Program Files/Unity/Hub/Editor/2022.3.62f3/Editor/Unity.exe",
     "externalHeadersTreeSha256": "D0037168A9A28B05FD8DF11EDA27812DAEAA458DC0CDFAD7765F3BE75E83EE99"
   },
-  "packageVersion": "8.14.1",
+  "packageVersion": "8.13.0",
   "repositories": {
     "hybridclr_unity": {
       "upstream": "https://github.com/focus-creative-games/hybridclr_unity.git",
       "fork": "https://github.com/mofish9/hybridclr_unity.git",
-      "tag": "936592974000e53846e36800fa1fd363ffbcc3f6",
-      "commit": "936592974000e53846e36800fa1fd363ffbcc3f6",
-      "localBranch": "optimize/v8.14.1"
+      "tag": "65581c17c7e67ea8e972fccfa3b84152262fd65c",
+      "commit": "65581c17c7e67ea8e972fccfa3b84152262fd65c",
+      "localBranch": "optimize/v8.13.0"
     },
     "hybridclr": {
       "upstream": "https://github.com/focus-creative-games/hybridclr.git",
