@@ -80,6 +80,18 @@ internal static class PackageDeliveryTests
         Require("config-resolves-installed-tool", Path.GetFullPath(configDoc.RootElement.GetProperty("toolchainRoot").GetString()!) == Path.GetFullPath(bundle));
         Require("config-resolves-installation-receipt", Path.GetFullPath(configDoc.RootElement.GetProperty("runtimeManifestPath").GetString()!) == Path.GetFullPath(receipt));
         Require("exploratory-bundle-cannot-claim-release", Run("verify-package", "-PackageRoot", bundle, "-RequireRelease") != 0);
+        Require("installation-receipts-pass-shipped-schemas", Run("schema-gate", "-SchemasRoot", Path.Combine(bundle, "schemas"),
+            "-InputRoot", Path.Combine(project, "HybridCLRData/DHE"), "-Output", Path.Combine(output, "installation-schema.json"), "-RequireKnownFormats") == 0);
+        string settingsPath = Path.Combine(project, "ProjectSettings/HybridCLRSettings.asset");
+        File.AppendAllText(settingsPath, "  hotUpdateAssemblies:\n  - ExampleHotfix\n  dheAotAssemblies:\n  - ExampleHotfix\n");
+        // Exercise only the source contract with release=true, without changing
+        // the Exploratory bundle's eligibility or creating Release evidence.
+        var sourcePreflight = typeof(Tool).GetMethod("WriteSourcePreflight", BindingFlags.Static | BindingFlags.NonPublic)!;
+        var sourceArgs = new object?[] { new Cli("workflow", new Dictionary<string, string> { ["bootstrap"] = "true" }), true,
+            project, settingsPath, Path.Combine(output, "unused-bootstrap-baseline"), "StandaloneWindows64",
+            Path.Combine(output, "release-source-preflight.json"), null };
+        Require("release-source-contract-needs-only-installed-project", (bool)sourcePreflight.Invoke(null, sourceArgs)!);
+        Require("source-contract-discovers-local-receipt", Path.GetFullPath((string)sourceArgs[7]!) == Path.GetFullPath(receipt));
 
         JsonElement Identity(object value) => JsonSerializer.SerializeToElement(value);
         var emptyBase = Identity(new { aotMetadataSetId = Convert.ToHexString(System.Security.Cryptography.SHA256.HashData(Array.Empty<byte>())) });
