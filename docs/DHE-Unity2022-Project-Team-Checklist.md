@@ -6,18 +6,18 @@ trial; Unity 2021 remains on the official `v8.13.0` / `v2021-8.1.0` combination.
 
 ## Source checkout
 
-Use these exact remote branches:
+Use these maintenance commits (runtime installation selects the opt5 tags below):
 
 | Repository | Branch | Commit |
 |---|---|---|
-| `hybridclr_unity` | `optimize/v8.14.1` | `c6a7aff28f509144b8654e2a1c37c57f1de34971` |
+| `hybridclr_unity` | `optimize/v8.14.1` | `936592974000e53846e36800fa1fd363ffbcc3f6` |
 | `hybridclr` | `optimize/v8.13.0` | `b0fe826f071332d109d2bde87c0aa2cc18b9f3c7` |
 | `il2cpp_plus` | `optimize/unity2022-v8.14.0` | `658aa64923e568a497e11640b340f316704d02f9` |
 
 The C# tooling remains on hybridclr-lab branch
 `optimize/dhe-unity2022-project-trial-v8.13.0`. Use the synchronized locks on that
-branch; old final-01 through final-07 zip bundles are superseded. No new tag was
-created for maintenance integration, per the maintainer's instruction.
+branch; old final-01 through final-07 zip bundles are superseded. Runtime tags are
+`v8.13.0-opt5` and `v2022-8.14.0-opt5`; the package has no opt tag.
 
 Do not mix these with the official runtime or an older DHE Base. The runtime
 contract is `dhe-runtime-v33`; changing package or native runtime source requires

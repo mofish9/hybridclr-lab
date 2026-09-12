@@ -1,5 +1,8 @@
 # Unity 2022 DHE maintenance integration, 2026-09-12
 
+Historical integration snapshot. Subsequent opt5 publication and its package
+identity are recorded in [dhe-opt5-release.md](dhe-opt5-release.md).
+
 The latest DHE sources are included in the three maintenance branches under
 `repos`. The maintainer explicitly requested no new tags; none were created or
 moved. This source integration is conditionally qualified for Windows project

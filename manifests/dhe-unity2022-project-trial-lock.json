@@ -15,16 +15,16 @@
     "hybridclr_unity": {
       "remote": "https://github.com/mofish9/hybridclr_unity.git",
       "ref": "refs/heads/optimize/v8.14.1",
-      "commit": "c6a7aff28f509144b8654e2a1c37c57f1de34971"
+      "commit": "936592974000e53846e36800fa1fd363ffbcc3f6"
     },
     "hybridclr": {
       "remote": "https://github.com/mofish9/hybridclr.git",
-      "ref": "refs/heads/optimize/v8.13.0",
+      "ref": "refs/tags/v8.13.0-opt5",
       "commit": "b0fe826f071332d109d2bde87c0aa2cc18b9f3c7"
     },
     "il2cpp_plus": {
       "remote": "https://github.com/mofish9/il2cpp_plus.git",
-      "ref": "refs/heads/optimize/unity2022-v8.14.0",
+      "ref": "refs/tags/v2022-8.14.0-opt5",
       "commit": "658aa64923e568a497e11640b340f316704d02f9"
     }
   },
@@ -45,9 +45,9 @@
       "expectedFileCount": 306,
       "packageId": "0c1bb88743e5cbcc76e4b484cb1a5f5ff0709d5e8d230338e42b5c7a94b521b8"
     },
-    "evidenceScope": "Historical Windows evidence listed below belongs to package f99bfa4, not a full Player build of the maintenance package. Current integration checks are recorded separately."
+    "evidenceScope": "Historical Windows evidence listed below belongs to package f99bfa4, not a full Player build of the maintenance package. Maintenance-package c6a7aff checks and opt5 publication checks are recorded separately in their respective reports. formalRelease=false denotes missing full qualification, not missing runtime tags."
   },
-  "status": "maintenance-integrated-without-new-tags",
+  "status": "opt5-runtime-tags-published-conditionally-qualified",
   "androidQualified": false,
   "iosQualified": false,
   "formalRelease": false
