@@ -1,2 +1,13 @@
 <Project>
+  <!-- Fixtures compile package-owned implementations, never a second Lab copy. -->
+  <Target Name="ResolvePackageToolSources" BeforeTargets="CoreCompile">
+    <ItemGroup>
+      <_DheLegacyToolSource Include="@(Compile)" Condition="'%(Compile.Extension)' == '.cs' and '%(Compile.FullPath)' == '$(DheLabToolRoot)%(Compile.Filename)%(Compile.Extension)'" />
+    </ItemGroup>
+    <Error Condition="'@(_DheLegacyToolSource)' != '' and '$(DheToolSourceRoot)' == ''" Text="Pass DhePackageRoot (or DheToolSourceRoot) for package-owned production sources." />
+    <ItemGroup>
+      <Compile Remove="@(_DheLegacyToolSource)" />
+      <Compile Include="@(_DheLegacyToolSource->'$(DheToolSourceRoot)/%(Filename)%(Extension)')" Link="PackageTool/%(Filename)%(Extension)" />
+    </ItemGroup>
+  </Target>
 </Project>

@@ -5,6 +5,8 @@
     <TreatWarningsAsErrors>true</TreatWarningsAsErrors>
     <Deterministic>true</Deterministic>
     <ContinuousIntegrationBuild Condition="'$(CI)' == 'true'">true</ContinuousIntegrationBuild>
+    <DheToolSourceRoot Condition="'$(DheToolSourceRoot)' == '' and '$(DhePackageRoot)' != ''">$(DhePackageRoot)/ToolsSource~/DHE</DheToolSourceRoot>
+    <DheToolSourceRoot Condition="'$(DheToolSourceRoot)' == '' and '$(DheUnityPackageRoot)' != ''">$(DheUnityPackageRoot)/ToolsSource~/DHE</DheToolSourceRoot>
+    <DheLabToolRoot>$([System.IO.Path]::GetFullPath('$(MSBuildThisFileDirectory)tool/'))</DheLabToolRoot>
   </PropertyGroup>
 </Project>
-

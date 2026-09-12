@@ -29,6 +29,7 @@ namespace HybridCLR.Lab.Editor
         }
         public static void Prepare()
         {
+            bool installDefault = Array.IndexOf(Environment.GetCommandLineArgs(), "-probeInstallDefault") >= 0;
             var settings = HybridCLRSettings.Instance;
             settings.enable = true; settings.useGlobalIl2cpp = false;
             settings.hotUpdateAssemblyDefinitions = Array.Empty<UnityEditorInternal.AssemblyDefinitionAsset>();
@@ -36,16 +37,24 @@ namespace HybridCLR.Lab.Editor
             settings.preserveHotUpdateAssemblies = Array.Empty<string>();
             settings.externalHotUpdateAssembliyDirs = new[] { "Assets/Plugins/ValueLayout" };
             settings.patchAOTAssemblies = new[] { "mscorlib", "System", "System.Core" };
+            if (installDefault)
+            {
+                settings.hybridclrRepoURL = "https://github.com/mofish9/hybridclr.git";
+                settings.il2cppPlusRepoURL = "https://github.com/mofish9/il2cpp_plus.git";
+            }
             HybridCLRSettings.Save();
             PlayerSettings.SetScriptingBackend(BuildTargetGroup.Standalone, ScriptingImplementation.IL2CPP);
             PlayerSettings.SetIl2CppCodeGeneration(UnityEditor.Build.NamedBuildTarget.Standalone, Il2CppCodeGeneration.OptimizeSize);
-            var installer = new InstallerController(); installer.InstallFromLocal(Argument("-probeRuntime"));
+            var installer = new InstallerController();
+            if (installDefault) installer.InstallDefaultHybridCLR();
+            else installer.InstallFromLocal(Argument("-probeRuntime"));
             if (!installer.HasInstalledHybridCLR()) throw new BuildFailedException("Runtime installation failed.");
             Directory.CreateDirectory("Assets/Scenes");
             var scene = EditorSceneManager.NewScene(NewSceneSetup.EmptyScene, NewSceneMode.Single);
             EditorSceneManager.SaveScene(scene, "Assets/Scenes/CurrentStorage.unity");
             EditorBuildSettings.scenes = new[] { new EditorBuildSettingsScene("Assets/Scenes/CurrentStorage.unity", true) };
             AssetDatabase.SaveAssets(); AssetDatabase.Refresh();
+            if (installDefault) return;
             string output = Argument("-probeOutput");
             DheBuildPipeline.PrepareProjectArtifacts(new DheProjectPrepareOptions
             {

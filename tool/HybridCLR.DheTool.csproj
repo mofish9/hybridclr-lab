@@ -4,22 +4,17 @@
     <TargetFramework>net6.0</TargetFramework>
     <ImplicitUsings>enable</ImplicitUsings>
     <Nullable>enable</Nullable>
+    <EnableDefaultCompileItems>false</EnableDefaultCompileItems>
     <AssemblyName>HybridCLR.DheTool</AssemblyName>
     <RootNamespace>HybridCLR.DheTool</RootNamespace>
   </PropertyGroup>
-  <!-- The Unity package ships the exact dnlib build used by the editor.
-       Override DheDnlibPath when building the host outside this workspace. -->
-  <PropertyGroup>
-    <DheDnlibPath Condition="'$(DheDnlibPath)' == ''">$(MSBuildThisFileDirectory)dnlib.dll</DheDnlibPath>
-  </PropertyGroup>
+  <Target Name="RequirePackageToolSource" BeforeTargets="PrepareForBuild">
+    <Error Condition="!Exists('$(DheToolSourceRoot)/HybridCLR.DheTool.csproj')" Text="Pass DhePackageRoot for the package-owned DHE tool source." />
+  </Target>
   <ItemGroup>
-    <Compile Remove="fixtures/**/*.cs" />
-    <Reference Include="dnlib">
-      <HintPath>$(DheDnlibPath)</HintPath>
-      <Private>true</Private>
-    </Reference>
-    <None Include="dnlib.dll" CopyToOutputDirectory="PreserveNewest" />
-    <None Include="../templates/DheWorkflowBuild.cs" Link="templates/DheWorkflowBuild.cs" CopyToOutputDirectory="PreserveNewest" />
-    <None Include="../templates/DheBuildIdentity.cs" Link="templates/DheBuildIdentity.cs" CopyToOutputDirectory="PreserveNewest" />
+    <Compile Include="$(DheToolSourceRoot)/*.cs" />
+    <Reference Include="dnlib"><HintPath>$(DheToolSourceRoot)/../../Tools~/DHE/dnlib.dll</HintPath><Private>true</Private></Reference>
+    <None Include="$(DheToolSourceRoot)/templates/DheWorkflowBuild.cs" Link="templates/DheWorkflowBuild.cs" CopyToOutputDirectory="PreserveNewest" />
+    <None Include="$(DheToolSourceRoot)/templates/DheBuildIdentity.cs" Link="templates/DheBuildIdentity.cs" CopyToOutputDirectory="PreserveNewest" />
   </ItemGroup>
 </Project>

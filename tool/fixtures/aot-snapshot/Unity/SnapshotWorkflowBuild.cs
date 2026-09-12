@@ -63,7 +63,19 @@ namespace HybridCLR.Lab.Editor
         public static void StageRuntimePlan() => DheProjectWorkflowRunner.StageRuntimePlan(Adapter());
         public static void BuildScriptsOnly() => DheProjectWorkflowRunner.BuildScriptsOnly(Adapter());
         public static void BuildFinalPlayer() => DheProjectWorkflowRunner.BuildFinalPlayer(Adapter());
-        private static DheProjectWorkflowAdapter Adapter() => new DheProjectWorkflowAdapter
+        public static void BuildBase()
+        {
+            string[] args = Environment.GetCommandLineArgs();
+            int index = Array.IndexOf(args, "-probeOutput");
+            if (index < 0 || index + 1 >= args.Length) throw new ArgumentException("-probeOutput");
+            string output = Path.GetFullPath(args[index + 1]);
+            DheProjectWorkflowRunner.BuildBase(Adapter(true), new DheProjectWorkflowOptions
+            {
+                Target = BuildTarget.StandaloneWindows64, OutputRoot = output,
+                BaselineRoot = Path.Combine(output, "baseline"), Bootstrap = true,
+            });
+        }
+        private static DheProjectWorkflowAdapter Adapter(bool completeCoverage = false) => new DheProjectWorkflowAdapter
         {
             ProjectRoot = Directory.GetParent(Application.dataPath).FullName,
             Workflow = "aot-snapshot-package-workflow",
@@ -81,7 +93,7 @@ namespace HybridCLR.Lab.Editor
             },
             ResolvePlayerOutput = (target, output) => Path.Combine(output, "player", "Snapshot.exe"),
             AdditionalGuardMvJsonPaths = OrdinaryGuardMvJsonPaths(),
-            GuardOrdinaryAotMethods = GuardAllOrdinaryAot(),
+            GuardOrdinaryAotMethods = completeCoverage || GuardAllOrdinaryAot(),
         };
 
         private static string[] OrdinaryGuardMvJsonPaths()

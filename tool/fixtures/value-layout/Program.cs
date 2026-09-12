@@ -249,7 +249,7 @@ if (args.Length == 6 && args[0] == "probe-project")
         foreach (string file in Directory.GetFiles(source))
             if (Path.GetFileName(file) != ".git") File.Copy(file, Path.Combine(target, Path.GetFileName(file)));
         foreach (string directory in Directory.GetDirectories(source))
-            if (Path.GetFileName(directory) != ".git") CopyTree(directory, Path.Combine(target, Path.GetFileName(directory)));
+            if (Path.GetFileName(directory) is not (".git" or "bin" or "obj")) CopyTree(directory, Path.Combine(target, Path.GetFileName(directory)));
     }
     CopyTree(Path.Combine(lab, "unity2021-dhe-demo/ProjectSettings"), Path.Combine(destination, "ProjectSettings"));
     CopyTree(package, Path.Combine(destination, "Packages/com.code-philosophy.hybridclr"));

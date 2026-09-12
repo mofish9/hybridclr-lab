@@ -12,7 +12,8 @@ internal static class UnityWorkflow
         if (args.Length == 9) args = args.Take(8).ToArray();
         string expectedRevision = args.Length >= 7 ? int.Parse(args[6]).ToString() : "41";
         bool mixedTransactionProbe = args.Length == 8 && args[7] == ":mixed-transaction:";
-        bool allOrdinaryGuards = mixedTransactionProbe || args.Length == 8 && (args[7] == ":frozen-entry-all-guards:" || args[7] == ":all-ordinary-guards:");
+        bool packageDelivery = args.Length == 8 && args[7] == ":package-delivery:";
+        bool allOrdinaryGuards = packageDelivery || mixedTransactionProbe || args.Length == 8 && (args[7] == ":frozen-entry-all-guards:" || args[7] == ":all-ordinary-guards:");
         bool frozenEntryProbe = args.Length == 8 && (args[7] == ":frozen-entry:" || args[7] == ":frozen-entry-all-guards:");
         string latestCurrentRoot = args.Length == 8 && args[7] != ":evolve:" && !frozenEntryProbe && !allOrdinaryGuards ? Path.GetFullPath(args[7]) : null;
         bool synthesizeEvolution = args.Length == 8 && args[7] == ":evolve:";
@@ -23,7 +24,8 @@ internal static class UnityWorkflow
         string project = Path.Combine(output, "project"), build = Path.Combine(output, "base");
         string ordinaryGuardRoot = Path.Combine(output, "ordinary-guard-mv");
         if (!allOrdinaryGuards) Directory.CreateDirectory(ordinaryGuardRoot);
-        string tool = toolOverride ?? Path.Combine(lab, "tool/bin/Release/net6.0/HybridCLR.DheTool.dll");
+        string tool = packageDelivery ? Path.Combine(package, "Tools~/DHE/HybridCLR.DheTool.dll") :
+            toolOverride ?? Path.Combine(lab, "tool/bin/Release/net6.0/HybridCLR.DheTool.dll");
         string probe = Path.Combine(lab, "tool/fixtures/value-layout/bin/Release/net6.0/ValueLayoutTests.dll");
         string Execute(string exe, params string[] arguments)
         {
@@ -64,11 +66,21 @@ internal static class UnityWorkflow
             File.Copy(Path.Combine(lab, "tool/fixtures/aot-snapshot/Unity/FrozenEntryPlayer.cs"), Path.Combine(project, "Assets/FrozenEntryPlayer.cs"));
         File.WriteAllText(Path.Combine(project, "Assets/SnapshotIdentity.cs"),
             File.ReadAllText(Path.Combine(lab, "templates/DheBuildIdentity.cs")).Replace("__DHE_IDENTITY_NAMESPACE__", "HybridCLR.Lab.Snapshot"));
-        using var runtime = JsonDocument.Parse(File.ReadAllBytes(runtimeManifest));
-        Execute(editor, "-batchmode", "-nographics", "-quit", "-projectPath", project,
-            "-executeMethod", "HybridCLR.Lab.Editor.CurrentStorageProbeBuild.Prepare", "-probeRuntime",
-            runtime.RootElement.GetProperty("stagedLibil2cpp").GetString(), "-probeOutput", Path.Combine(output, "install"),
-            "-logFile", Path.Combine(output, "install.log"));
+        if (packageDelivery)
+        {
+            Execute(editor, "-batchmode", "-nographics", "-quit", "-projectPath", project,
+                "-executeMethod", "HybridCLR.Lab.Editor.CurrentStorageProbeBuild.Prepare", "-probeInstallDefault",
+                "-logFile", Path.Combine(output, "install.log"));
+            runtimeManifest = Path.Combine(project, "HybridCLRData/DHE/runtime-manifest.json");
+        }
+        else
+        {
+            using var runtime = JsonDocument.Parse(File.ReadAllBytes(runtimeManifest));
+            Execute(editor, "-batchmode", "-nographics", "-quit", "-projectPath", project,
+                "-executeMethod", "HybridCLR.Lab.Editor.CurrentStorageProbeBuild.Prepare", "-probeRuntime",
+                runtime.RootElement.GetProperty("stagedLibil2cpp").GetString(), "-probeOutput", Path.Combine(output, "install"),
+                "-logFile", Path.Combine(output, "install.log"));
+        }
         Directory.CreateDirectory(build);
         string plan = Path.Combine(build, "project-preflight/dhe-project-plan.json");
         void Phase(string phase)
@@ -82,6 +94,12 @@ internal static class UnityWorkflow
                 "-dheGuardAllOrdinaryAot", allOrdinaryGuards ? "true" : "false",
                 "-logFile", Path.Combine(output, phase + ".log"));
         }
+        if (packageDelivery)
+            Execute(editor, "-batchmode", "-nographics", "-quit", "-projectPath", project,
+                "-executeMethod", "HybridCLR.Lab.Editor.SnapshotWorkflowBuild.BuildBase",
+                "-probeOutput", build, "-logFile", Path.Combine(output, "BuildBase.log"));
+        else
+        {
         Phase("Prepare");
         var prepared = JsonSerializer.Deserialize<JsonElement>(File.ReadAllText(Path.Combine(build, "adapter/prepare.json")));
         string stripped = prepared.GetProperty("currentSourceRoot").GetString();
@@ -99,6 +117,7 @@ internal static class UnityWorkflow
             "-BaselineRoot", Path.Combine(build, "baseline"), "-CurrentRoot", Path.Combine(build, "current"),
             "-OutputRoot", Path.Combine(build, "project-preflight"), "-ProjectRoot", project, "-RequireDheEqualsHotUpdate", "-RequireCompleteCoverage");
         Phase("StageRuntimePlan"); Phase("BuildScriptsOnly"); Phase("BuildFinalPlayer");
+        }
         string identityPath = Path.Combine(build, "build-identity.json");
         using var identity = JsonDocument.Parse(File.ReadAllBytes(identityPath));
         string[] Names(string property, string child = null) => identity.RootElement.GetProperty(property).EnumerateArray()
@@ -131,14 +150,10 @@ internal static class UnityWorkflow
             EvolutionCurrent.Run(new[] { Path.Combine(build, "current"), latestCurrentRoot });
         }
         string resourceCurrentRoot = latestCurrentRoot ?? Path.Combine(build, "current");
-        string frozen = Path.Combine(output, "frozen-aot");
-        FrozenAotMaterialize.Run(new[] { identityPath, resourceCurrentRoot, frozen,
-            "Assets/StreamingAssets/SnapshotDHE", "Assets/StreamingAssets/SnapshotDHE/BaseMetaVersion" });
         Execute("dotnet", tool, "resource-update", "-CurrentRoot", resourceCurrentRoot, "-SettingsFile",
             Path.Combine(project, "ProjectSettings/HybridCLRSettings.asset"), "-BaselineRoot", Path.Combine(build, "baseline"),
             "-BaseNativeManifest", nativeManifest, "-BaseBuildIdentity", identityPath,
             "-AotMetadataRoot", Path.Combine(Path.GetDirectoryName(snapshot.ManifestPath), "assemblies"),
-            "-FrozenAotPlans", Path.Combine(frozen, "frozen-aot-source-plan.json"),
             "-Mode", "Exploratory", "-OutputRoot", resource);
         string embeddedAssets = Path.Combine(build, "player/Snapshot_Data/StreamingAssets/SnapshotDHE");
         foreach (string source in Directory.GetFiles(embeddedAssets, "*", SearchOption.AllDirectories))
@@ -158,7 +173,7 @@ internal static class UnityWorkflow
             loadedResource.RootElement.GetProperty("baseId").GetString() == identity.RootElement.GetProperty("baseId").GetString();
         File.WriteAllText(Path.Combine(output, "result.json"), JsonSerializer.Serialize(new
         {
-            passed, scope = "Unity2022 package Base phases, final snapshot/native validation and generated no-op resource loaded by the same immutable Player; not layout resource release qualification",
+            passed, packageDelivery, scope = "Unity2022 package Base phases, final snapshot/native validation and generated no-op resource loaded by the same immutable Player; not layout resource release qualification",
             labHead, packageHead, toolSha256 = Hash(tool), hostSha256 = Hash(typeof(UnityWorkflow).Assembly.Location),
             runtimeManifest, runtimeManifestSha256 = Hash(runtimeManifest), identitySha256 = Hash(identityPath),
             snapshotManifestSha256 = snapshot.Sha256, ordinaryAotCount = snapshot.OrdinaryAssemblyPaths.Length,
