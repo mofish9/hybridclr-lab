@@ -1,5 +1,8 @@
 # Unity 2022 package-owned DHE tool delivery
 
+This report records the original 02dc136 delivery. The current package and
+review-fix evidence are in [dhe-package-tool-fixes.md](dhe-package-tool-fixes.md).
+
 The required build tool now ships with `hybridclr_unity` maintenance branch
 `optimize/v8.13.0`, commit `02dc136e4f2eb7d32990486e7bdbf58bbe1772fd`.
 It stays on upstream 8.13.0. There is no new package or runtime tag.
