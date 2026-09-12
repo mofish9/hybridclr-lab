@@ -2,6 +2,7 @@ using System;
 using System.IO;
 using dnlib.DotNet;
 using dnlib.DotNet.Writer;
+using dnlib.DotNet.Emit;
 
 internal static class EvolutionCurrent
 {
@@ -27,6 +28,19 @@ internal static class EvolutionCurrent
             {
                 if (payload.Fields.Any(field => field.Name == "DeliveryMarker")) throw new InvalidDataException("Delivery layout already exists.");
                 payload.Fields.Insert(0, new FieldDefUser("DeliveryMarker", new FieldSig(module.CorLibTypes.Object), FieldAttributes.Public));
+                // Some archived fixture inputs already contain the compiled suite,
+                // but their Base entry deliberately returns a fixed revision.
+                // Reactivate that suite after the actual layout mutation.
+                var suite = module.Find(FrozenResourceCasesCompiler.ProbeName, false);
+                if (suite != null)
+                {
+                    var entry = module.Find("HybridCLR.Lab.ValueLayout.Factory", false)!.Methods.Single(method => method.Name == "GetRevision");
+                    entry.Body = new CilBody();
+                    entry.Body.Instructions.Add(Instruction.Create(OpCodes.Call, suite.Methods.Single(method => method.Name == "Run")));
+                    entry.Body.Instructions.Add(Instruction.Create(OpCodes.Pop));
+                    entry.Body.Instructions.Add(Instruction.Create(OpCodes.Ldc_I4, 73));
+                    entry.Body.Instructions.Add(Instruction.Create(OpCodes.Ret));
+                }
             }
             var options = new ModuleWriterOptions(module);
             options.PEHeadersOptions.TimeDateStamp = 123456789;
