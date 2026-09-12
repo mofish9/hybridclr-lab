@@ -27,9 +27,9 @@
     "il2cpp_plus": {
       "upstream": "https://github.com/focus-creative-games/il2cpp_plus.git",
       "fork": "https://github.com/mofish9/il2cpp_plus.git",
-      "tag": "v2022-8.14.0-opt5",
-      "commit": "658aa64923e568a497e11640b340f316704d02f9",
-      "localBranch": "optimize/unity2022-v8.14.0"
+      "tag": "v2022-8.11.0-opt5",
+      "commit": "ecad8a09d1eb9b91a57c59fcdc69b268377bad59",
+      "localBranch": "optimize/unity2022-v8.11.0"
     }
   },
   "forks": {
