@@ -68,6 +68,7 @@ internal static partial class Program
                 "Channel state Operation must be snapshot, adopt-existing, or promote.");
 
         string stateRoot = Path.GetFullPath(cli.Require("stateroot"));
+        ProtectUnityToolOutput(stateRoot);
         string channelId = cli.Require("channelid").Trim();
         if (!IsRegistryId(channelId))
             throw new DheException("ChannelId contains unsupported characters.");

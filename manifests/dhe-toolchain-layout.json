@@ -10,6 +10,8 @@
     "tool/HybridCLR.DheTool.csproj",
     "tool/Program.cs",
     "tool/UnityToolBundle.cs",
+    "tool/ToolPublicationPolicy.cs",
+    "tool/ToolOutputProtection.cs",
     "docs/DHE-Tool-Binary-Notices.md",
     "tool/SchemaValidation.cs",
     "tool/ArchiveSupport.cs",

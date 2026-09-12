@@ -32,8 +32,13 @@ internal static partial class Program
         var inspection = InspectPackage(root, null, false);
         if (!inspection.Passed)
             throw new DheException("Bundled tool integrity check failed: " + string.Join("; ", inspection.Errors));
+        // CLI values win over configuration; defaults are applied only after
+        // configuration has been read. ProductionWorkflow may read it again,
+        // but its merge is idempotent and preserves the resolved values.
+        if (cli.Command.Equals("workflow", StringComparison.OrdinalIgnoreCase)) ApplyWorkflowConfig(cli);
         if (!cli.Has("root")) cli.Values["root"] = root;
         if (!cli.Has("toolchainroot")) cli.Values["toolchainroot"] = root;
+        ProtectUnityToolOutputOptions(cli);
 #endif
     }
 
@@ -50,6 +55,7 @@ internal static partial class Program
         if (output.StartsWith(root + Path.DirectorySeparatorChar, StringComparison.OrdinalIgnoreCase) ||
             Directory.Exists(output) || File.Exists(output))
             throw new DheException("OutputRoot must be a new directory outside the source tree.");
+        ToolPublicationPolicy publication = ResolveToolPublicationPolicy(cli, root, head, tree, true, true);
         // Never accept arbitrary prebuilt binaries with a claimed source commit.
         string temporary = Path.Combine(Path.GetTempPath(), "hybridclr-dhe-tool-" + Guid.NewGuid().ToString("N"));
         Directory.CreateDirectory(temporary);
@@ -73,6 +79,10 @@ internal static partial class Program
             if (GitValue(root, "rev-parse", "HEAD") != head ||
                 !string.IsNullOrWhiteSpace(GitValue(root, "status", "--porcelain")))
                 throw new DheException("Lab source changed during compilation.");
+            // Evidence is external input. Revalidate it after the build before
+            // creating any distributable output or marking the manifest Release.
+            if (ResolveToolPublicationPolicy(cli, root, head, tree, true, true) != publication)
+                throw new DheException("Toolchain release evidence changed during compilation.");
 
             Directory.CreateDirectory(output);
             string[] binaries = { "HybridCLR.DheTool.dll", "dnlib.dll", "HybridCLR.DheTool.deps.json", "HybridCLR.DheTool.runtimeconfig.json" };
@@ -90,7 +100,8 @@ internal static partial class Program
                 sourceRepository = "https://github.com/mofish9/hybridclr-lab.git", sourceCommit = head, sourceTree = tree,
                 project = "tool/HybridCLR.DheTool.csproj", projectSha256 = Sha256File(Path.Combine(root, "tool/HybridCLR.DheTool.csproj")),
                 dnlibSha256 = Sha256File(Path.Combine(root, "tool/dnlib.dll")), arguments = buildArgs.Where(a => a != temporary).ToArray(),
-                targetFramework = "net6.0", profile = "DHE_PACKAGE_TOOL"
+                targetFramework = "net6.0", profile = "DHE_PACKAGE_TOOL",
+                publicationMode = publication.Mode, releaseEvidenceSha256 = publication.EvidenceSha256
             });
             string version = GetString(sourceLayout, "toolchainVersion")!;
             string layoutPath = Path.Combine(output, "manifests/dhe-toolchain-layout.json");
@@ -111,16 +122,17 @@ internal static partial class Program
                 .Select(p => new PackageFileEntry(Path.GetRelativePath(output, p).Replace('\\', '/'), new FileInfo(p).Length, Sha256File(p)))
                 .OrderBy(f => f.Path, StringComparer.Ordinal).ToArray();
             string layoutHash = Sha256File(layoutPath);
-            string packageId = CalculatePackageId(version, 1, "Exploratory", false, head, tree, true, true, layoutHash, UnityToolCommands, files);
+            string packageId = CalculatePackageId(version, 1, publication.Mode, publication.ReleaseReady,
+                head, tree, true, true, layoutHash, UnityToolCommands, files);
             WriteJson(Path.Combine(output, "dhe-toolchain-manifest.json"), new
             {
                 schemaVersion = 1, format = "hybridclr.dhe-toolchain-manifest.json", generatedAtUtc = DateTimeOffset.UtcNow,
-                toolchainVersion = version, contractVersion = 1, mode = "Exploratory", releaseReady = false,
+                toolchainVersion = version, contractVersion = 1, mode = publication.Mode, releaseReady = publication.ReleaseReady,
                 pathSemantics = "package-relative-v1", packageIdAlgorithm = PackageIdAlgorithm, packageId,
                 entryPoint = "HybridCLR.DheTool.dll", commands = UnityToolCommands, layoutSha256 = layoutHash,
                 sourceIdentity = new { head, tree, clean = true, tracked = true }, fileCount = files.Length, files
             });
-            var inspection = InspectPackage(output, packageId, false);
+            var inspection = InspectPackage(output, packageId, publication.ReleaseReady);
             if (!inspection.Passed) throw new DheException(string.Join("; ", inspection.Errors));
             Console.WriteLine($"Unity DHE tool: {files.Length + 1} files, packageId={packageId}, output={output}");
             return 0;

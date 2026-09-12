@@ -11,6 +11,7 @@ internal static partial class Program
     {
         var updateRoot = RequireDirectory(cli.Require("updateroot"), "DHE resource update root");
         var assetRoot = RequireDirectory(cli.Require("assetroot"), "DHE runtime asset destination");
+        ProtectUnityToolOutput(assetRoot);
         var baseBuildIdentityPath = RequireFile(cli.Require("basebuildidentity"),
             "Base Player build identity");
         var baseBuildIdentity = ReadJson<JsonElement>(baseBuildIdentityPath);

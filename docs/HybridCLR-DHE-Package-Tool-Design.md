@@ -1,5 +1,13 @@
 # Package-owned DHE build tool
 
+Delivery hardening acceptance: both source and binary publishers use the same
+Release evidence policy (clean exact source, complete authenticated evidence),
+and invalid/missing evidence produces no binary distribution. Package outputs
+must not overlap the executing tool, including directory ancestors and resolved
+links. Workflow precedence is explicit CLI, then JSON config, then package
+defaults. Tests must reproduce template overwrite, directory output overlap,
+config precedence and rejected Release publication without weakening any gate.
+
 Projects receive a portable .NET 6 DLL in the Unity package's `Tools~/DHE`,
 invoked by an Editor C# API using Unity's bundled runtime. No SDK, Lab checkout,
 PowerShell, test sources, historical patches, PDB or platform apphost is required

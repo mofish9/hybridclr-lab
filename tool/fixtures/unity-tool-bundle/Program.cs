@@ -58,6 +58,57 @@ var policy = new ProcessStartInfo(DheToolCommand.ResolveDotnetHost()) { UseShell
 policy.ArgumentList.Add(Path.Combine(copied, "HybridCLR.DheTool.dll")); policy.ArgumentList.Add("publish");
 using (var child = Process.Start(policy)) { string error = child.StandardError.ReadToEnd(); child.WaitForExit(); Require("lab-command-unavailable-in-binary", child.ExitCode != 0 && error.Contains("belongs to the Lab")); }
 Require("restored-bundle-verifies", DheToolCommand.Run("verify-package").Contains("passed"));
+string template = Path.Combine(copied, "templates", "dhe-workflow-config.json");
+string bundleParent = Path.GetDirectoryName(copied);
+byte[] templateBefore = File.ReadAllBytes(template);
+Reject("mv-cannot-overwrite-bundle-template", () => DheToolCommand.Run("mv", "-Assembly", assembly,
+    "-Output", template, "-Binary", Path.Combine(output, "forbidden.mv")), "overlap the executing tool");
+Require("rejected-write-keeps-template", File.ReadAllBytes(template).SequenceEqual(templateBefore));
+Reject("mv-binary-cannot-overwrite-dependency", () => DheToolCommand.Run("mv", "-Assembly", assembly,
+    "-Output", Path.Combine(output, "no-partial.json"), "-Binary", Path.Combine(copied, "dnlib.dll")), "overlap the executing tool");
+Require("both-mv-outputs-validated-before-write", !File.Exists(Path.Combine(output, "no-partial.json")));
+Reject("ancestor-output-root-rejected", () => DheToolCommand.Run("batch", "-BaselineRoot", output,
+    "-CurrentRoot", output, "-OutputRoot", bundleParent), "overlap the executing tool");
+Reject("root-override-cannot-disable-output-protection", () => DheToolCommand.Run("new-config",
+    "-Root", output, "-Output", template), "overlap the executing tool");
+Reject("normalized-parent-traversal-rejected", () => DheToolCommand.Run("new-config", "-Output",
+    Path.Combine(copied, "templates", "..", "templates", "dhe-workflow-config.json")), "overlap the executing tool");
+Reject("stage-destination-rejected-before-input-processing", () => DheToolCommand.Run("stage-resource-update",
+    "-AssetRoot", copied), "overlap the executing tool");
+Require("all-rejected-writes-keep-bundle-valid", DheToolCommand.Run("verify-package").Contains("passed"));
+
+string configPath = Path.Combine(output, "precedence.json");
+string configOutput = Path.Combine(output, "config-run");
+string explicitRoot = Path.Combine(output, "intended-missing-root");
+File.WriteAllText(configPath, JsonSerializer.Serialize(new {
+    projectPath = output, settingsFile = assembly, outputRoot = configOutput,
+    target = "StandaloneWindows64", adapterMethod = "MustNotLaunchUnity", unity = DheToolCommand.ResolveDotnetHost(),
+    mode = "Release", runPlayer = true, bootstrap = true, toolchainRoot = explicitRoot,
+    expectedToolchainPackageId = new string('0', 64)
+}));
+(int Exit, string Error) External(params string[] arguments)
+{
+    var info = new ProcessStartInfo(DheToolCommand.ResolveDotnetHost()) { UseShellExecute = false,
+        RedirectStandardOutput = true, RedirectStandardError = true, WorkingDirectory = output };
+    info.ArgumentList.Add(Path.Combine(copied, "HybridCLR.DheTool.dll"));
+    foreach (string argument in arguments) info.ArgumentList.Add(argument);
+    using var child = Process.Start(info);
+    var stdout = child.StandardOutput.ReadToEndAsync(); var stderr = child.StandardError.ReadToEndAsync();
+    if (!child.WaitForExit(10000)) { child.Kill(true); throw new Exception("Diagnostic command timed out"); }
+    Task.WaitAll(stdout, stderr); return (child.ExitCode, stderr.Result + stdout.Result);
+}
+var fromConfig = External("workflow", "-Config", configPath);
+Require("config-toolchain-root-beats-package-default", fromConfig.Exit != 0 && fromConfig.Error.Contains("installed release-ready") &&
+    !File.Exists(Path.Combine(configOutput, "toolchain-gate.json")));
+var fromCli = External("workflow", "-Config", configPath, "-ToolchainRoot", copied);
+Require("explicit-cli-beats-config", fromCli.Exit != 0 && File.Exists(Path.Combine(configOutput, "toolchain-gate.json")) &&
+    JsonDocument.Parse(File.ReadAllText(Path.Combine(configOutput, "toolchain-gate.json"))).RootElement.GetProperty("packageRoot").GetString()
+        .TrimEnd('\\', '/').Equals(copied, StringComparison.OrdinalIgnoreCase));
+var badConfig = new { outputRoot = copied, mode = "Release" };
+File.WriteAllText(configPath, JsonSerializer.Serialize(badConfig));
+var unsafeConfig = External("workflow", "-Config", configPath);
+Require("config-output-protected-before-workflow", unsafeConfig.Exit != 0 && unsafeConfig.Error.Contains("overlap the executing tool"));
+Require("configuration-rejections-keep-bundle-valid", DheToolCommand.Run("verify-package").Contains("passed"));
 File.WriteAllText(Path.Combine(output, "result.json"), JsonSerializer.Serialize(new { passed = true, checks }, new JsonSerializerOptions { WriteIndented = true }));
 Console.WriteLine($"PASS {checks.Count} package-tool checks");
 return 0;

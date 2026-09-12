@@ -4150,23 +4150,9 @@ internal static partial class Program
                 new FileInfo(path).Length, Sha256File(path)))
             .OrderBy(file => file.Path, StringComparer.Ordinal).ToArray();
         var sourceHead = GitValue(root, "rev-parse", "HEAD"); var sourceTree = GitValue(root, "rev-parse", "HEAD^{tree}"); var tracked = !string.IsNullOrWhiteSpace(sourceHead); var clean = tracked && string.IsNullOrWhiteSpace(GitValue(root, "status", "--porcelain"));
-        var mode = cli.Optional("mode") ?? "Exploratory";
-        if (!mode.Equals("Exploratory", StringComparison.OrdinalIgnoreCase) && !mode.Equals("Release", StringComparison.OrdinalIgnoreCase)) throw new DheException("Mode must be Exploratory or Release.");
-        var releaseReady = false;
-        if (mode.Equals("Release", StringComparison.OrdinalIgnoreCase))
-        {
-            var evidencePath = RequireFile(cli.Require("releaseevidence"), "DHE toolchain release evidence");
-            var evidence = ReadJson<JsonElement>(evidencePath);
-            if (GetInt(evidence, "schemaVersion") != 1 || GetString(evidence, "format") != "hybridclr.dhe-toolchain-release-evidence.json" || !GetBool(evidence, "passed"))
-                throw new DheException("Toolchain release evidence is not a passing production evidence report.");
-            if (!string.Equals(GetString(evidence, "sourceHead"), sourceHead, StringComparison.OrdinalIgnoreCase) ||
-                !string.Equals(GetString(evidence, "sourceTree"), sourceTree, StringComparison.OrdinalIgnoreCase))
-                throw new DheException("Toolchain release evidence does not match the source HEAD/tree being published.");
-            ValidateEvidenceFiles(evidence, Path.GetDirectoryName(evidencePath)!, root,
-                cli.GetList("evidencetoolchainroots"));
-            releaseReady = true;
-        }
-        if (releaseReady && (!clean || !tracked)) throw new DheException("Release publishing requires a clean Git-tracked source tree.");
+        ToolPublicationPolicy publication = ResolveToolPublicationPolicy(cli, root, sourceHead, sourceTree, clean, tracked);
+        string mode = publication.Mode;
+        bool releaseReady = publication.ReleaseReady;
         var layoutHash = Sha256File(layoutPath);
         var commands = layout.GetProperty("commands").EnumerateArray().Select(value => value.GetString() ?? "").ToArray();
         var packageId = CalculatePackageId(GetString(layout, "toolchainVersion") ?? "", GetInt(layout, "contractVersion"),
@@ -4570,10 +4556,10 @@ internal static partial class Program
     }
 
     private static T ReadJson<T>(string path) => JsonSerializer.Deserialize<T>(File.ReadAllText(path), Json) ?? throw new DheException("Invalid JSON: " + path);
-    private static void WriteJson(string path, object value) { Directory.CreateDirectory(Path.GetDirectoryName(path)!); File.WriteAllText(path, JsonSerializer.Serialize(value, Json), new UTF8Encoding(false)); }
+    private static void WriteJson(string path, object value) { ProtectUnityToolOutput(path); Directory.CreateDirectory(Path.GetDirectoryName(path)!); File.WriteAllText(path, JsonSerializer.Serialize(value, Json), new UTF8Encoding(false)); }
     private static string RequireFile(string path, string description) { var full = Path.GetFullPath(path); if (!File.Exists(full)) throw new DheException($"{description} was not found: {full}"); return full; }
     private static string RequireDirectory(string path, string description) { var full = Path.GetFullPath(path); if (!Directory.Exists(full)) throw new DheException($"{description} was not found: {full}"); return full; }
-    private static string SafeReportPath(string path, IEnumerable<string> protectedPaths) { var full = Path.GetFullPath(path); foreach (var item in protectedPaths) if (full.Equals(Path.GetFullPath(item), StringComparison.OrdinalIgnoreCase)) throw new DheException("Output must not overwrite an input: " + full); return full; }
+    private static string SafeReportPath(string path, IEnumerable<string> protectedPaths) { ProtectUnityToolOutput(path); var full = Path.GetFullPath(path); foreach (var item in protectedPaths) if (full.Equals(Path.GetFullPath(item), StringComparison.OrdinalIgnoreCase)) throw new DheException("Output must not overwrite an input: " + full); return full; }
     private static string SafeOutputRoot(string path, IEnumerable<string> protectedPaths) { var full = SafeReportPath(path, protectedPaths); if (Directory.Exists(full) && (File.Exists(Path.Combine(full, ".git")) || Directory.Exists(Path.Combine(full, ".git")) || Directory.Exists(Path.Combine(full, ".svn")))) throw new DheException("Output root cannot be a repository root: " + full); return full; }
     private static void EnsureOutputNotAncestor(string output, string root) { var outPath = Path.GetFullPath(output).TrimEnd(Path.DirectorySeparatorChar, Path.AltDirectorySeparatorChar); var rootPath = Path.GetFullPath(root).TrimEnd(Path.DirectorySeparatorChar, Path.AltDirectorySeparatorChar) + Path.DirectorySeparatorChar; if (rootPath.StartsWith(outPath + Path.DirectorySeparatorChar, StringComparison.OrdinalIgnoreCase) || rootPath.TrimEnd(Path.DirectorySeparatorChar).Equals(outPath, StringComparison.OrdinalIgnoreCase)) throw new DheException("Output cannot be the source root or an ancestor of it: " + output); }
     private static void EnsureOutputOutsideRoot(string output, string root) { var outPath = Path.GetFullPath(output).TrimEnd(Path.DirectorySeparatorChar, Path.AltDirectorySeparatorChar); var rootPath = Path.GetFullPath(root).TrimEnd(Path.DirectorySeparatorChar, Path.AltDirectorySeparatorChar); if (outPath.StartsWith(rootPath + Path.DirectorySeparatorChar, StringComparison.OrdinalIgnoreCase) || rootPath.StartsWith(outPath + Path.DirectorySeparatorChar, StringComparison.OrdinalIgnoreCase) || rootPath.Equals(outPath, StringComparison.OrdinalIgnoreCase)) throw new DheException("Output must be external to the source root: " + output); }
