@@ -45,7 +45,7 @@ internal static class ThreadStaticPolicyTests
         Require("shared-to-tls-transition-still-rejected", compatibility.UnsupportedChanges.Any(reason => reason == "existing-field-metadata-change:" + field.Identity));
         string Hash(string path) => Convert.ToHexString(SHA256.HashData(File.ReadAllBytes(path)));
         File.WriteAllText(Path.Combine(output, "result.json"), JsonSerializer.Serialize(new { passed = true, checks,
-            snapshotSha256 = snapshot.Sha256, identitySha256 = Hash(identityPath), current = afterFiles.ToDictionary(Path.GetFileName, Hash),
+            snapshotSha256 = snapshot.Sha256, identitySha256 = Hash(identityPath), current = afterFiles.ToDictionary(path => Path.GetFileName(path)!, Hash),
             hostSha256 = Hash(typeof(ThreadStaticPolicyTests).Assembly.Location), scope = "Static policy only; actual TLS allocation and GC require the immutable Player suite." }, new JsonSerializerOptions { WriteIndented = true }));
         Console.WriteLine("TLS policy checks passed: " + checks.Count);
         return 0;
