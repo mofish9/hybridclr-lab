@@ -3,12 +3,14 @@ using System.Security.Cryptography;
 using dnlib.DotNet;
 using dnlib.DotNet.Emit;
 using HybridCLR.DheTool;
+using System.Runtime.Loader;
 
 internal static class ThreadStaticPolicyTests
 {
     internal static int Main(string[] args)
     {
         if (args.Length == 3 && args[0] == "make-current") return MakeCurrent(args[1], args[2]);
+        if (args.Length == 4 && args[0] == "reference") return Reference(args[1], args[2], args[3]);
         if (args.Length != 3) throw new ArgumentException("<Base proof> <evolved Current with original TLS owner> <new output>");
         string proof = Path.GetFullPath(args[0]), current = Path.GetFullPath(args[1]), output = Path.GetFullPath(args[2]);
         if (Directory.Exists(output)) throw new IOException("Output must be new.");
@@ -79,5 +81,28 @@ internal static class ThreadStaticPolicyTests
         module.Write(file);
         Console.WriteLine("Isolated TLS Current: " + output);
         return 0;
+    }
+
+    private static int Reference(string current, string native, string output)
+    {
+        current = Path.GetFullPath(current); native = Path.GetFullPath(native);
+        if (File.Exists(output)) throw new IOException("Reference output must be new.");
+        AssemblyLoadContext.Default.Resolving += (_, name) =>
+            AssemblyLoadContext.Default.LoadFromAssemblyPath(name.Name == "HybridCLR.ValueLayoutNative" ? native : Path.Combine(current, name.Name + ".dll"));
+        var assembly = AssemblyLoadContext.Default.LoadFromAssemblyPath(Path.Combine(current, "HybridCLR.ValueLayoutModel.dll"));
+        using var trace = new StringWriter(); var original = Console.Out;
+        int revision;
+        try
+        {
+            Console.SetOut(trace);
+            revision = (int)assembly.GetType("HybridCLR.Lab.ValueLayout.Factory", true)!.GetMethod("GetRevision")!.Invoke(null, null)!;
+        }
+        finally { Console.SetOut(original); }
+        string[] records = trace.ToString().Split('\n').Select(line => line.TrimEnd('\r'))
+            .Where(line => line.StartsWith("DHE case begin: ")).Select(line => line.Substring(16)).ToArray();
+        bool passed = revision == 73 && records.SequenceEqual(new[] { "thread-static-current-value-isolation" });
+        File.WriteAllText(output, JsonSerializer.Serialize(new { passed, revision, records }, new JsonSerializerOptions { WriteIndented = true }));
+        Console.WriteLine("TLS reference: " + passed);
+        return passed ? 0 : 1;
     }
 }
