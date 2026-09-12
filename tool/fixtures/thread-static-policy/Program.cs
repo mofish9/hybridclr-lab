@@ -11,6 +11,7 @@ internal static class ThreadStaticPolicyTests
     {
         if (args.Length == 3 && args[0] == "make-current") return MakeCurrent(args[1], args[2]);
         if (args.Length == 4 && args[0] == "reference") return Reference(args[1], args[2], args[3]);
+        if (args.Length == 3 && args[0] == "noop-policy") return NoopPolicy(args[1], args[2]);
         if (args.Length != 3) throw new ArgumentException("<Base proof> <evolved Current with original TLS owner> <new output>");
         string proof = Path.GetFullPath(args[0]), current = Path.GetFullPath(args[1]), output = Path.GetFullPath(args[2]);
         if (Directory.Exists(output)) throw new IOException("Output must be new.");
@@ -81,6 +82,40 @@ internal static class ThreadStaticPolicyTests
         module.Write(file);
         Console.WriteLine("Isolated TLS Current: " + output);
         return 0;
+    }
+
+    private static int NoopPolicy(string proof, string output)
+    {
+        string identityPath = Path.Combine(proof, "base/build-identity.json");
+        var identity = JsonSerializer.Deserialize<JsonElement>(File.ReadAllText(identityPath));
+        var snapshot = AotAnalysisSnapshot.Read(identityPath, identity,
+            identity.GetProperty("aotAssemblyNames").EnumerateArray().Select(row => row.GetString()!),
+            identity.GetProperty("assemblies").EnumerateArray().Select(row => row.GetProperty("assemblyName").GetString()!))!;
+        using var core = ModuleDefMD.Load(snapshot.Assemblies.Single(row => row.AssemblyName == "mscorlib").ReadVerifiedBytes());
+        var owner = core.Find("System.Collections.Generic.List`1/Enumerator", false)!;
+        var dispose = owner.Methods.Single(method => method.Name == "Dispose");
+        var checks = new Dictionary<string, bool>();
+        void Require(string name, bool ok) { checks[name] = ok; if (!ok) throw new InvalidDataException(name); }
+        bool Empty(MethodDef method) => FrozenAotAdaptation.IsStorageIndependentEmptyValueMethod(method);
+        Require("actual-base-dispose-is-storage-independent", Empty(dispose));
+        Require("actual-move-next-still-needs-adaptation", !Empty(owner.Methods.Single(method => method.Name == "MoveNext")));
+        Require("constructors-never-exempt", !Empty(owner.Methods.Single(method => method.IsInstanceConstructor)));
+        dispose.MethodSig.Params.Add(core.CorLibTypes.Int32);
+        Require("parameters-never-exempt", !Empty(dispose)); dispose.MethodSig.Params.Clear();
+        dispose.Body.Instructions.Insert(0, Instruction.Create(OpCodes.Nop));
+        Require("debug-nop-does-not-change-proof", Empty(dispose));
+        dispose.Body.Instructions.Insert(0, Instruction.Create(OpCodes.Ldarg_0));
+        dispose.Body.Instructions.Insert(1, Instruction.Create(OpCodes.Pop));
+        Require("receiver-reading-methods-never-exempt", !Empty(dispose));
+        dispose.Body.Instructions.RemoveAt(0); dispose.Body.Instructions.RemoveAt(0);
+        var initializer = new MethodDefUser(".cctor", MethodSig.CreateStatic(core.CorLibTypes.Void),
+            MethodImplAttributes.IL, MethodAttributes.Static | MethodAttributes.SpecialName | MethodAttributes.RTSpecialName) { Body = new CilBody() };
+        initializer.Body.Instructions.Add(Instruction.Create(OpCodes.Ret)); owner.Methods.Add(initializer);
+        Require("owners-with-type-initializers-never-exempt", !Empty(dispose));
+        if (File.Exists(output)) throw new IOException("Output must be new.");
+        File.WriteAllText(output, JsonSerializer.Serialize(new { passed = true, checks, snapshotSha256 = snapshot.Sha256,
+            scope = "Native eligibility proof for frozen empty value methods only; not a Player result." }, new JsonSerializerOptions { WriteIndented = true }));
+        Console.WriteLine("Empty frozen method checks: " + checks.Count); return 0;
     }
 
     private static int Reference(string current, string native, string output)
