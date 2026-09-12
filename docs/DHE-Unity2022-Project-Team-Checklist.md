@@ -10,22 +10,23 @@ Use these maintenance commits (runtime installation selects the opt5 tags below)
 
 | Repository | Branch | Commit |
 |---|---|---|
-| `hybridclr_unity` | `optimize/v8.13.0` | `044d55337ae5b4ad6226fc73f2087becd6b7a48d` |
+| `hybridclr_unity` | `optimize/v8.13.0` | `4fb36af996871ff1e7ab8585f096395dad5d2bd3` |
 | `hybridclr` | `optimize/v8.13.0` | `b0fe826f071332d109d2bde87c0aa2cc18b9f3c7` |
-| `il2cpp_plus` | `optimize/unity2022-v8.14.0` | `658aa64923e568a497e11640b340f316704d02f9` |
+| `il2cpp_plus` | `optimize/unity2022-v8.11.0` | `ecad8a09d1eb9b91a57c59fcdc69b268377bad59` |
 
 The C# tooling remains on hybridclr-lab branch
 `optimize/dhe-unity2022-project-trial-v8.13.0`. Use the synchronized locks on that
 branch; old final-01 through final-07 zip bundles are superseded. Runtime tags are
-`v8.13.0-opt5` and `v2022-8.14.0-opt5`; the package has no opt tag.
+`v8.13.0-opt5` and `v2022-8.11.0-opt5`; the package has no opt tag.
 
 Do not mix these with the official runtime or an older DHE Base. The runtime
 contract is `dhe-runtime-v33`; changing package or native runtime source requires
 building a new Base and invalidates the previous Base identity.
 
-Package 65581c1 is incomplete and superseded. Keep upstream package version 8.13.0;
-do not select the deleted 8.14.1 maintenance or trial branches. The existing
-IL2CPP tag name remains v2022-8.14.0-opt5; no runtime tag was changed.
+Keep the approved upstream baselines: package/HybridCLR 8.13.0 and IL2CPP
+v2022-8.11.0. The earlier v2022-8.14.0-opt5 actually included an unapproved
+upstream upgrade; it is superseded and must not be selected for new builds.
+See `../reports/dhe-il2cpp-811-restoration.md` for fresh validation identities.
 
 After copying this exact package, run HybridCLR > Installer > Install and then
 regenerate through the DHE workflow. JSONSerialize is now declared as a package
@@ -33,7 +34,10 @@ dependency. Start with a new Base; do not reuse the v32 Base from earlier trials
 
 ## Toolchain check
 
-From the extracted C# toolchain directory, run `verify-package` and require:
+The authenticated C# tool is shipped in the package's `Tools~/DHE`; do not copy
+Lab source or build an external toolchain into the project. Run Unity menu
+`HybridCLR/DHE/Verify Bundled Tool` (or C#
+`HybridCLR.Editor.Commands.DheToolCommand.Run("verify-package")`) and require:
 
 ```text
 passed=true
@@ -42,14 +46,17 @@ hashesValid=true
 actualFileCount=expectedFileCount
 ```
 
-Build a working copy of the toolchain, or set both `BaseIntermediateOutputPath`
-and the output directory outside the authenticated package. Setting only `-o`
-does not redirect `obj`. Verify the original package before and after building.
+The package invokes Unity's bundled .NET Runtime; a separate SDK or PowerShell
+is not required. Keep all outputs outside the authenticated tool directory and
+its ancestors. The current bundle is Exploratory, not production Release.
+See package `Documentation~/dhe-bundled-tool.md` for C# and CI usage.
 
 ## Project configuration
 
 1. Copy the package into the project without renaming its `@8.13.0` suffix if the
-   project already uses that directory convention.
+   project already uses that directory convention. Set repository URLs in the
+   project's `HybridCLRSettings.asset`; `Data~/hybridclr_version.json` contains
+   refs only. Run Installer after updating sources, then create a fresh Base.
 2. Set `hotUpdateAssemblies` to the project's existing hotfix assemblies.
 3. For the first DHE trial set `dheAotAssemblies` equal to that complete hotfix
    set. Ordinary AOT assemblies stay outside both lists.

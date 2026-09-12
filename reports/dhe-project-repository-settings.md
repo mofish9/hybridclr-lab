@@ -1,5 +1,9 @@
 # Project-owned runtime repository selection
 
+> Historical identity. For the corrected IL2CPP 8.11 baseline, current package
+> and fresh validation, see [dhe-il2cpp-811-restoration.md](dhe-il2cpp-811-restoration.md).
+> Results below retain their original identity and are not current build evidence.
+
 Package `optimize/v8.13.0` commit `5122957ee8e6647f1663205c3286ccc2e99c1e70`
 restores the historical Unity 2021 optimized-ref convention: version JSON selects
 branch/tag; project HybridCLRSettings selects each repository URL. Neither

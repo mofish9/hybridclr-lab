@@ -1,5 +1,9 @@
 # Unity 2022 DHE opt5 project-trial release
 
+> Historical identity. For the corrected IL2CPP 8.11 baseline, current package
+> and fresh validation, see [dhe-il2cpp-811-restoration.md](dhe-il2cpp-811-restoration.md).
+> Results below retain their original identity and are not current build evidence.
+
 This report preserves the 044d553 package/Player validation identity. The newer
 package-owned binary tool distribution uses package 02dc136; current tool-only
 evidence and project usage are in [dhe-package-tool.md](dhe-package-tool.md).

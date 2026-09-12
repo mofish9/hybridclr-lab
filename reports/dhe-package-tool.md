@@ -1,5 +1,9 @@
 # Unity 2022 package-owned DHE tool delivery
 
+> Historical identity. For the corrected IL2CPP 8.11 baseline, current package
+> and fresh validation, see [dhe-il2cpp-811-restoration.md](dhe-il2cpp-811-restoration.md).
+> Results below retain their original identity and are not current build evidence.
+
 This report records the original 02dc136 delivery. The current package and
 review-fix evidence are in [dhe-package-tool-fixes.md](dhe-package-tool-fixes.md).
 

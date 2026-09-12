@@ -1,5 +1,9 @@
 # DHE package tool delivery fixes
 
+> Historical identity. For the corrected IL2CPP 8.11 baseline, current package
+> and fresh validation, see [dhe-il2cpp-811-restoration.md](dhe-il2cpp-811-restoration.md).
+> Results below retain their original identity and are not current build evidence.
+
 The three package-tool review findings are implemented and validated for Windows
 project trials. Package maintenance branch `optimize/v8.13.0` is locked to
 `ce1b8a89a4e80616dc7343c3fe3f8e405cc2e889`. Its canonical source hash is

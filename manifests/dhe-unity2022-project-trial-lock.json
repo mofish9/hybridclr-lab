@@ -15,7 +15,7 @@
     "hybridclr_unity": {
       "remote": "https://github.com/mofish9/hybridclr_unity.git",
       "ref": "refs/heads/optimize/v8.13.0",
-      "commit": "5122957ee8e6647f1663205c3286ccc2e99c1e70"
+      "commit": "4fb36af996871ff1e7ab8585f096395dad5d2bd3"
     },
     "hybridclr": {
       "remote": "https://github.com/mofish9/hybridclr.git",
@@ -24,69 +24,82 @@
     },
     "il2cpp_plus": {
       "remote": "https://github.com/mofish9/il2cpp_plus.git",
-      "ref": "refs/tags/v2022-8.14.0-opt5",
-      "commit": "658aa64923e568a497e11640b340f316704d02f9"
+      "ref": "refs/tags/v2022-8.11.0-opt5",
+      "commit": "ecad8a09d1eb9b91a57c59fcdc69b268377bad59"
     }
   },
   "validation": {
+    "packageCommit": "4fb36af996871ff1e7ab8585f096395dad5d2bd3",
+    "labValidationCommit": "19929b8ee82d9221b4441ae6984cb9a98ff04aba",
+    "runtimeManifestSha256": "6524090F8D9FE2E4E9D09374AFB93F48BA30479C674B1DAE6AE2CA71B33CBE60",
+    "runtimeTreeSha256": "76693E1901221112CABA207FC2FA09AF870E51DF68BAE956EBE38818F6ED15B8",
     "nativeGate": {
       "passed": true,
       "mergeReady": true,
       "surrogateExternalHeadersUsed": false,
-      "evidence": "F:/hybridclr_artifacts/dhe-maintenance-20260912/native/DHE-Unity2022/native-gate.json",
-      "evidenceScope": "Previously compiled exact opt5 runtime commits; CTest rerun in dhe-opt5-review/native-ctest.log. The newly assembled runtime has the identical staged runtime hash."
-    },
-    "packageCommit": "044d55337ae5b4ad6226fc73f2087becd6b7a48d",
-    "runtimeManifestSha256": "9C06A1306BAF40CD84904356262E237DB8445E27BCD61F9894FE75185C1884DF",
-    "installer": {
-      "passed": true,
-      "runtimeFilesVerified": 930
+      "fullGenericSharingTests": true,
+      "evidence": "F:/hybridclr_artifacts/dhe-il2cpp-811-restore/native/DHE-Unity2022/native-gate.json",
+      "evidenceScope": "Fresh native compilation and CTest against real Unity 2022 headers on the restored 8.11.0 runtime."
     },
     "managed": {
       "executionPlanCases": 126,
-      "linkerCases": 11,
-      "sourceBindingCases": 12,
-      "assetProvenanceCases": 16
+      "evidence": "F:/hybridclr_artifacts/dhe-il2cpp-811-restore/execution-result.json",
+      "scope": "Managed host validation; native calls recorded, not executed."
     },
     "baseWorkflow": {
       "passed": true,
       "baseRevision": 59,
       "currentRevision": 73,
-      "basePlayerResultSha256": "625E82872D720FC015A635CA3E0E801B401161B9EC8D36AB0051117EE629EBBB",
-      "currentPlayerResultSha256": "E16E97985C8B6811A0200F77828C0244E10FD118FE7BCD8FD826F67403EF949A",
-      "stageSha256": "36C20D3CD539C7C225EDA52D98337A4D55AD09D98100E7EEB284E2C43DD194FB",
+      "loadedDheAssemblies": 4,
+      "sentinel": 5,
+      "baseId": "3887221165bc808e62710a394103520adb9b3551c5fc6b4f47f4bd9901643295",
+      "basePlayerResultSha256": "71712723980951510306AC8FA059B17B4458900F7B2848596FC66D8BCC3F80C2",
+      "currentPlayerResultSha256": "281ECF1520669326575A93AAE8F7C29B10F8758C9F7063A82D76635D216CAC12",
+      "stageSha256": "92F27BA2609F5720C1187D611E9B0A9DF7D54881746E59A5AD118C9D37F5E05A",
+      "immutablePlayerVerified": true,
       "runtimeContract": "dhe-runtime-v33",
-      "scope": "One new Windows Base; four DHE assemblies loaded and one method updated through resources. Not full structural/multi-Base/asset Player qualification."
+      "evidence": "F:/hybridclr_artifacts/dhe-il2cpp-811-restore/base/result.json",
+      "currentEvidence": "F:/hybridclr_artifacts/dhe-il2cpp-811-restore/current-player-result.json",
+      "scope": "New Windows Base, no-op resource update and method 59 -> 73 in the same Player. Not full structural/multi-Base/asset or performance qualification."
     },
-    "evidenceScope": "This validation block records the earlier 044d553 package and Player identity. It is historical reference for the current tool-only package update; see bundledToolValidation for current evidence. No historical Player result is attributed to a new package commit."
+    "report": "reports/dhe-il2cpp-811-restoration.md"
   },
   "bundledToolValidation": {
-    "packageCommit": "ce1b8a89a4e80616dc7343c3fe3f8e405cc2e889",
-    "toolSourceCommit": "4d29155e6e3467a68a27d642fc71ec65509547b0",
-    "toolPackageId": "2ba6dd4cb4083e72ee8722f15975539895f2bf6154e806a2d767a1347caf8da6",
+    "packageCommit": "4fb36af996871ff1e7ab8585f096395dad5d2bd3",
+    "toolSourceCommit": "74edbcfc6f2a968fce23c5f194cc3906a1905b75",
+    "toolPackageId": "b00e802bf163f7029b3675b9491b0dac62a03be11444b7a76dad79e8b3bb4c09",
     "fileCount": 83,
     "portableToolCases": 26,
-    "releasePublicationRejectionCases": 6,
-    "junctionOutputRejectionVerified": true,
-    "managedExecutionPlanCases": 126,
-    "resourcePayloadFilesCompared": 11,
-    "resourcePayloadHashMismatches": 0,
-    "runtimePlanSha256": "3484C993B7E5E01181257E3FA916EC08297923210202E9B554C8C216573A5CC3",
-    "report": "reports/dhe-package-tool-fixes.md",
-    "scope": "Portable Windows tool and Unity Editor compilation/invocation; unchanged runtime, no new native Player or mobile qualification"
+    "evidence": "F:/hybridclr_artifacts/dhe-il2cpp-811-restore/tool-tests/result.json",
+    "scope": "Fresh portable tool checks and generation/staging of revision 73 using the package DLL."
   },
   "installerRepositoryValidation": {
-    "packageCommit": "5122957ee8e6647f1663205c3286ccc2e99c1e70",
-    "testSourceCommit": "1d08071453382387cbd7620e61faa5238bf1bdc1",
+    "packageCommit": "4fb36af996871ff1e7ab8585f096395dad5d2bd3",
     "configuredRepositoriesUsed": true,
     "missingConfiguredRepositoryRejected": true,
     "manifestSelectsRefOnly": true,
     "runtimeFilesVerified": 930,
-    "evidenceSha256": "3621EC60916A6439CB59631453E959F299EDDBBF22C374642B456929ADA508E5",
-    "report": "reports/dhe-project-repository-settings.md"
+    "evidence": "F:/hybridclr_artifacts/dhe-il2cpp-811-restore/installer-result.json",
+    "evidenceSha256": "F6DD0932D1B70B9FD962B5F72A6BACBB7BF01F0511231F93D30001A80465979E"
   },
-  "status": "opt5-runtime-tags-published-conditionally-qualified",
+  "status": "opt5-approved-upstream-restored-windows-trial-conditionally-qualified",
   "androidQualified": false,
   "iosQualified": false,
-  "formalRelease": false
+  "formalRelease": false,
+  "approvedUpstream": {
+    "hybridclr_unity": "v8.13.0",
+    "hybridclr": "v8.13.0",
+    "il2cpp_plus": "v2022-8.11.0",
+    "unapprovedIl2CppAncestorAbsent": "11251b938d2ce7fa865165130bf257ca239db69f"
+  },
+  "historicalEvidence": {
+    "supersededRuntimeTag": "v2022-8.14.0-opt5",
+    "reports": [
+      "reports/dhe-opt5-release.md",
+      "reports/dhe-package-tool.md",
+      "reports/dhe-package-tool-fixes.md",
+      "reports/dhe-project-repository-settings.md"
+    ],
+    "scope": "Original results retain their original commits and are not attributed to the restored 8.11 runtime."
+  }
 }
