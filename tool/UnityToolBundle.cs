@@ -77,8 +77,10 @@ internal static partial class Program
             Directory.CreateDirectory(output);
             string[] binaries = { "HybridCLR.DheTool.dll", "dnlib.dll", "HybridCLR.DheTool.deps.json", "HybridCLR.DheTool.runtimeconfig.json" };
             foreach (string file in binaries) CopyRelative(temporary, output, file);
-            foreach (string directory in new[] { "schemas", "templates" })
-                CopyDirectory(Path.Combine(root, directory), Path.Combine(output, directory));
+            var sourceLayout = ReadJson<JsonElement>(Path.Combine(root, "manifests/dhe-toolchain-layout.json"));
+            foreach (string relative in sourceLayout.GetProperty("exactPaths").EnumerateArray().Select(e => e.GetString()!))
+                if (relative.StartsWith("schemas/", StringComparison.Ordinal) || relative.StartsWith("templates/", StringComparison.Ordinal))
+                    CopyRelative(root, output, relative);
             CopyRelative(root, output, "manifests/runtime-workflows.json");
             CopyRelative(root, output, "manifests/dhe-toolchain-evidence-authorities.json");
             CopyRelative(root, output, "docs/THIRD-PARTY-NOTICES.md");
@@ -90,7 +92,7 @@ internal static partial class Program
                 dnlibSha256 = Sha256File(Path.Combine(root, "tool/dnlib.dll")), arguments = buildArgs.Where(a => a != temporary).ToArray(),
                 targetFramework = "net6.0", profile = "DHE_PACKAGE_TOOL"
             });
-            string version = GetString(ReadJson<JsonElement>(Path.Combine(root, "manifests/dhe-toolchain-layout.json")), "toolchainVersion")!;
+            string version = GetString(sourceLayout, "toolchainVersion")!;
             string layoutPath = Path.Combine(output, "manifests/dhe-toolchain-layout.json");
             WriteJson(layoutPath, new
             {
