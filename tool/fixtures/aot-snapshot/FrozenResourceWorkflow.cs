@@ -57,6 +57,7 @@ internal static class FrozenResourceWorkflow
         var addedCaller = model.GetType(FrozenAddedAssemblyCompiler.CallerName);
         if (addedCaller != null) expectedCount += FrozenAddedAssemblyCompiler.CaseCount;
         if (model.GetType(FrozenStaticWorkflow.ProbeName) != null) expectedCount += FrozenStaticWorkflow.CaseCount;
+        if (model.GetType(BoxedEnumeratorWorkflow.ProbeName) != null) expectedCount++;
         string[] records;
         int revision;
         if (probe.FullName == FrozenResourceCasesCompiler.ProbeName)

@@ -1577,6 +1577,43 @@ namespace
         changed.parameters_count = physicalCurrent.parameters_count = 0;
         changed.parameters = physicalCurrent.parameters = nullptr;
         changed.return_type = physicalCurrent.return_type = &scalarType;
+        // Selected method declarations can retain a fallback-image owner while
+        // allocations use the Base definition with Current generic arguments.
+        // Only the resolved physical owner is a compatible receiver.
+        hybridclr::native_test::SetDhePhysicalSelection(&executionClass->byval_arg, &unrelatedClass->byval_arg);
+        hybridclr::native_test::ConfigurePhysicalType(&unrelatedClass->byval_arg, unrelatedClass);
+        CHECK(hybridclr::dhe::PrepareAndRegisterMetaVersions({ executionRegistration }));
+        CHECK(hybridclr::dhe::ResolveCurrentReceiverMethod(&changed, &unrelatedReceiver) == &physicalCurrent);
+        CHECK(hybridclr::dhe::ResolveCurrentReceiverMethod(&changed, &oldReceiver) == &changed);
+        CHECK(hybridclr::dhe::ResolveCurrentReceiverMethod(&changed, &currentReceiver) == &changed);
+        CHECK(hybridclr::dhe::ResolveNativeReferenceInvokeMethod(&changed, &unrelatedReceiver) == &physicalCurrent);
+        CHECK(hybridclr::dhe::ResolveInterpreterVirtualMethod(&changed, &unrelatedReceiver, &changed) == &physicalCurrent);
+        MethodInfo wrongSignature = changed;
+        Il2CppType wrongReturn{}; wrongReturn.type = IL2CPP_TYPE_I8;
+        wrongSignature.return_type = &wrongReturn;
+        hybridclr::native_test::CaptureVmExceptions(true);
+        bool rejectedSignature = false;
+        try { hybridclr::dhe::ResolveInterpreterVirtualMethod(&changed, &unrelatedReceiver, &wrongSignature); }
+        catch (const hybridclr::native_test::RaisedVmException&) { rejectedSignature = true; }
+        CHECK(rejectedSignature);
+        // A generic reference receiver alone never grants native ABI entry.
+        Il2CppGenericClass genericOwner{};
+        klass->generic_class = &genericOwner;
+        bool rejectedNativeFrame = false;
+        try { hybridclr::dhe::ShouldDispatchToInterpreter(&changed); }
+        catch (const hybridclr::native_test::RaisedVmException&) { rejectedNativeFrame = true; }
+        CHECK(rejectedNativeFrame);
+        klass->generic_class = nullptr;
+        hybridclr::native_test::CaptureVmExceptions(false);
+        executionClass->byval_arg.valuetype = klass->byval_arg.valuetype = unrelatedClass->byval_arg.valuetype = 1;
+        CHECK(hybridclr::dhe::ResolveInterpreterVirtualMethod(&changed, &unrelatedReceiver, &changed) == &physicalCurrent);
+        CHECK(hybridclr::dhe::ResolveInterpreterVirtualMethod(&changed, &oldReceiver, &changed) == &changed);
+        CHECK(hybridclr::dhe::ResolveNativeReferenceInvokeMethod(&changed, &unrelatedReceiver) == &changed);
+        executionClass->byval_arg.valuetype = klass->byval_arg.valuetype = unrelatedClass->byval_arg.valuetype = 0;
+        hybridclr::native_test::SetDhePhysicalSelection(nullptr, nullptr);
+        hybridclr::native_test::ClearPhysicalTypes();
+        hybridclr::dhe::ResetForTests();
+        physicalCurrent.isInterpterImpl = false;
         std::free(derivedClass); std::free(unrelatedClass);
 #endif
 

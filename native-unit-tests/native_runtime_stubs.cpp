@@ -576,6 +576,12 @@ namespace native_test
 
 namespace metadata
 {
+    Il2CppClass* MetadataModule::GetDheExecutionClass(Il2CppClass* klass)
+    {
+        if (klass && &klass->byval_arg == s_selectedBefore.load(std::memory_order_acquire))
+            return il2cpp::vm::Class::FromIl2CppType(s_selectedAfter.load(std::memory_order_acquire));
+        return klass;
+    }
 #if __has_include("hybridclr/DheRuntime.h")
     class TestAotImage : public AOTHomologousImage
     {

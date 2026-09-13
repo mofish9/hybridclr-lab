@@ -20,9 +20,9 @@
     "hybridclr": {
       "upstream": "https://github.com/focus-creative-games/hybridclr.git",
       "fork": "https://github.com/mofish9/hybridclr.git",
-      "tag": "dbae47b32170f0da415e80a9b2bb5b12b633119e",
-      "commit": "dbae47b32170f0da415e80a9b2bb5b12b633119e",
-      "localBranch": "research/dhe-constrained-trace-v8.13.0"
+      "tag": "1b7d5a9fe7100290fb3ef54c30e142896bcef561",
+      "commit": "1b7d5a9fe7100290fb3ef54c30e142896bcef561",
+      "localBranch": "optimize/dhe-physical-dispatch-v8.13.0"
     },
     "il2cpp_plus": {
       "upstream": "https://github.com/focus-creative-games/il2cpp_plus.git",
