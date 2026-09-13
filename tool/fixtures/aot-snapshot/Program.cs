@@ -90,6 +90,7 @@ if (args.Length > 0 && args[0] == "frozen-admission-policy") return FrozenAdmiss
 if (args.Length > 0 && args[0] == "boxed-enumerator-current") return BoxedEnumeratorWorkflow.Compile(args.Skip(1).ToArray());
 if (args.Length > 0 && args[0] == "frozen-resource-workflow") return FrozenResourceWorkflow.Run(args.Skip(1).ToArray());
 if (args.Length > 0 && args[0] == "frozen-resource-audit") return FrozenResourceAudit.Run(args.Skip(1).ToArray());
+if (args.Length > 0 && args[0] == "frozen-resource-audit-policy") return FrozenResourceAudit.Policy(args.Skip(1).ToArray());
 if (args.Length > 0 && args[0] == "frozen-resource-cases") return FrozenResourceDiagnostics.Run(args.Skip(1).ToArray());
 if (args.Length > 0 && args[0] == "compile-added-resource-current") return FrozenAddedAssemblyCompiler.Run(args.Skip(1).ToArray());
 if (args.Length > 0 && args[0] == "frozen-resource-reference") return FrozenResourceWorkflow.Reference(args.Skip(1).ToArray());

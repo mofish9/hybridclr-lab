@@ -4,6 +4,40 @@ using dnlib.DotNet;
 
 internal static class FrozenResourceAudit
 {
+    // Fixture builders opt into this suite with a direct call from GetRevision.
+    // Retaining ModuleState (or its initializer) alone does not invoke Verify.
+    private static bool CallsModuleVerification(ModuleDef model) =>
+        model.Find("HybridCLR.Lab.ValueLayout.Factory", false)?.Methods
+            .Single(method => method.Name == "GetRevision").Body?.Instructions.Any(instruction =>
+                instruction.OpCode == dnlib.DotNet.Emit.OpCodes.Call && instruction.Operand is IMethod called &&
+                called.ResolveMethodDef() is MethodDef target && target.Module == model &&
+                target.DeclaringType.FullName == "HybridCLR.Lab.ModuleEvolution.ModuleState" && target.Name == "Verify") == true;
+
+    private static bool ModuleVerificationMatches(string[] log, bool called, string expected) =>
+        log.Where(line => line.StartsWith("DHE module evolution pass: ", StringComparison.Ordinal))
+            .SequenceEqual(called ? new[] { "DHE module evolution pass: " + expected } : Array.Empty<string>());
+
+    internal static int Policy(string[] args)
+    {
+        if (args.Length != 1) throw new ArgumentException("frozen-resource-audit-policy <boxed Current Model DLL>");
+        using var model = ModuleDefMD.Load(args[0]);
+        if (CallsModuleVerification(model)) throw new InvalidDataException("Expected retained but uncalled module fixture.");
+        var verify = model.Find("HybridCLR.Lab.ModuleEvolution.ModuleState", false)!.Methods.Single(method => method.Name == "Verify");
+        var entry = model.Find("HybridCLR.Lab.ValueLayout.Factory", false)!.Methods.Single(method => method.Name == "GetRevision");
+        entry.Body.Instructions.Insert(0, dnlib.DotNet.Emit.Instruction.Create(dnlib.DotNet.Emit.OpCodes.Call, verify));
+        if (!CallsModuleVerification(model)) throw new InvalidDataException("Explicit module fixture call was missed.");
+        const string marker = "DHE module evolution pass: 202:1";
+        if (!ModuleVerificationMatches(Array.Empty<string>(), false, "202:1") ||
+            !ModuleVerificationMatches(new[] { marker }, true, "202:1") ||
+            ModuleVerificationMatches(Array.Empty<string>(), true, "202:1") ||
+            ModuleVerificationMatches(new[] { marker, marker }, true, "202:1") ||
+            ModuleVerificationMatches(new[] { marker }, true, "101:1") ||
+            ModuleVerificationMatches(new[] { marker }, false, "202:1"))
+            throw new InvalidDataException("Module verification missing/duplicate/unexpected/value policy failed.");
+        Console.WriteLine("Frozen resource audit policy passed: retained type, explicit call, and six log checks; input DLL unchanged.");
+        return 0;
+    }
+
     // Recheck the original Base evidence, not only before/after hashes taken
     // by the update runner. This command never starts or modifies a Player.
     internal static int Run(string[] args)
@@ -72,9 +106,10 @@ internal static class FrozenResourceAudit
             manifest.GetProperty("supportedBases").EnumerateArray().All(row => row.GetProperty("currentAssemblySetSha256").GetString() == currentSet));
         string[] originalNames = Directory.GetFiles(current, "*.dll").Select(Path.GetFileNameWithoutExtension).OrderBy(name => name, StringComparer.Ordinal).ToArray()!;
         int? moduleConstant = null, literalNumber = null;
-        bool selectedInitializer = false, secondInitializer = false, inlineHotfix = false;
+        bool selectedInitializer = false, secondInitializer = false, inlineHotfix = false, moduleVerificationCalled = false;
         using (var model = ModuleDefMD.Load(Path.Combine(current, "HybridCLR.ValueLayoutModel.dll")))
         {
+            moduleVerificationCalled = CallsModuleVerification(model);
             moduleConstant = model.Find("HybridCLR.Lab.ModuleEvolution.ModuleState", false)?
                 .Fields.Single(field => field.Name == "ExpectedVersion").Constant?.Value as int?;
             selectedInitializer = model.GlobalType.Methods.Any(method => method.IsStaticConstructor);
@@ -186,8 +221,8 @@ internal static class FrozenResourceAudit
                     string[] starts = log.Where(line => line.StartsWith("DHE selected module: ", StringComparison.Ordinal)).ToArray();
                     Require(key + "-selected-initializer-once", selectedInitializer
                         ? starts.SequenceEqual(new[] { "DHE selected module: " + moduleConstant.Value + ":1" }) : starts.Length == 0);
-                    Require(key + "-module-entry-verification", log.Count(line => line == "DHE module evolution pass: " +
-                        (selectedInitializer ? moduleConstant.Value + ":1" : "0:0")) == 1);
+                    Require(key + "-module-entry-verification", ModuleVerificationMatches(log, moduleVerificationCalled,
+                        selectedInitializer ? moduleConstant.Value + ":1" : "0:0"));
                     if (secondInitializer)
                         Require(key + "-second-module-initializer-once", log.Count(line => line == "DHE second AOT module initializer: 1") == 1);
                 }
@@ -239,7 +274,7 @@ internal static class FrozenResourceAudit
         File.WriteAllText(args[2], JsonSerializer.Serialize(new { passed = true, workflowResultSha256 = Hash(resultPath),
             auditHostSha256 = Hash(typeof(FrozenResourceAudit).Assembly.Location),
             caseCount = expected.Length, baseCount = bases.Count, successfulRuns, rejectedRuns, expectedModuleInitializers = modules,
-            moduleInitializerTransitions, validationMode,
+            moduleInitializerTransitions, moduleVerificationCalled, validationMode,
             checks, rehashedFileCount = files.Count, files,
             scope = "Independent read-only original Base/Current identity and full successful/restored case-sequence audit; no performance or platform extrapolation"
         }, new JsonSerializerOptions { WriteIndented = true }));
