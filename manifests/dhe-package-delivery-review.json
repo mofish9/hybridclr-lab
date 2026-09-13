@@ -1,5 +1,6 @@
 {
   "schemaVersion": 1,
+  "supersededBy": "manifests/dhe-unity2022-project-trial-lock.json",
   "format": "hybridclr.lab-review-evidence.json",
   "status": "structural-player-gate-failed",
   "releaseReady": false,

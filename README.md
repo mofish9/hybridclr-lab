@@ -1,9 +1,9 @@
 # HybridCLR Lab
 
-Correctness, differential testing, and performance benchmarking for the
-HybridCLR community runtime on Tuanjie 1.10.0.
+Correctness, differential testing, and release evidence for the customized
+HybridCLR runtime. The current DHE delivery targets Unity 2022 project trials.
 
-## Fixed baseline
+## Historical Tuanjie baseline
 
 - Tuanjie: `1.10.0` (`2022.3.62t12`)
 - HybridCLR package: `v8.13.0` (`18abd01`, canonical tree
@@ -17,18 +17,18 @@ Their immutable inputs are recorded in `manifests/repo-lock.json`.
 
 ## Current phase
 
-Opt5 is retired for new DHE delivery. The Unity 2022 physical receiver dispatch
-fix passes real-header native compile/CTest and the unchanged 47-case Current
-on two newly built Windows Bases, including resource rejection/restoration and
-Unity lifecycle/preparation failure recovery. See
-`reports/dhe-physical-dispatch-windows.md` and its evidence manifest.
-This source-isolation result is not a release of the pending package candidate;
-formal repos and historical tags have not moved. Unity 2021 remains official,
-Tuanjie is deferred, and upstream stays at 8.13.0 / v2022-8.11.0.
+Opt6 is published on the formal runtime branches with package commit dff1913.
+Two new Bases passed ordinary Installer, full C# BuildBase, two 47-case Current
+payloads, 42 asset checks, failure recovery and archived A/B/A resource rollback.
+See `reports/dhe-opt6-project-trial.md`, `docs/HybridCLR-DHE-Opt6-Project-Trial.md`
+and `manifests/dhe-unity2022-project-trial-lock.json` for exact identities.
+The tool remains Exploratory: this is Windows packaging-trial evidence, not
+mobile production or performance qualification. Opt5 is retired. Unity 2021 stays
+official, Tuanjie is deferred, and upstream remains 8.13.0 / v2022-8.11.0.
 
 ## Earlier physical reference checkpoint
 
-The active checkpoint is physical reference owners; see
+The earlier checkpoint covered physical reference owners; see
 `reports/dhe-reference-owner-windows.md`. Immutable Base-70/71 pass the exact
 previously failing Current DLLs, all 46 business cases, generic reflection,
 cached receivers, native interface callbacks, serialization, complete lifecycle

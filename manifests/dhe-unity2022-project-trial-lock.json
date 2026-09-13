@@ -1,110 +1,306 @@
 {
   "schemaVersion": 1,
   "format": "hybridclr.dhe-unity2022-project-trial-lock.json",
+  "status": "opt6-windows-project-packaging-trial-ready",
+  "sourcePublished": true,
+  "projectTrialReady": true,
+  "formalRelease": false,
+  "releaseReady": false,
+  "report": "reports/dhe-opt6-project-trial.md",
+  "projectGuide": "docs/HybridCLR-DHE-Opt6-Project-Trial.md",
   "engine": {
     "family": "Unity",
     "version": "2022.3.62f3",
     "workflow": "Unity2022Fgs",
+    "target": "StandaloneWindows64",
     "il2cppCodeGeneration": "OptimizeSize",
     "fullGenericSharing": true,
     "aotMetadataMode": "none"
   },
   "runtimeProtocol": "dhe-runtime-protocol-v1",
-  "runtimeContract": "dhe-runtime-v33",
-  "repositories": {
-    "hybridclr_unity": {
-      "remote": "https://github.com/mofish9/hybridclr_unity.git",
-      "ref": "refs/heads/optimize/v8.13.0",
-      "commit": "4fb36af996871ff1e7ab8585f096395dad5d2bd3"
-    },
-    "hybridclr": {
-      "remote": "https://github.com/mofish9/hybridclr.git",
-      "ref": "refs/tags/v8.13.0-opt5",
-      "commit": "b0fe826f071332d109d2bde87c0aa2cc18b9f3c7"
-    },
-    "il2cpp_plus": {
-      "remote": "https://github.com/mofish9/il2cpp_plus.git",
-      "ref": "refs/tags/v2022-8.11.0-opt5",
-      "commit": "ecad8a09d1eb9b91a57c59fcdc69b268377bad59"
-    }
-  },
-  "validation": {
-    "packageCommit": "4fb36af996871ff1e7ab8585f096395dad5d2bd3",
-    "labValidationCommit": "19929b8ee82d9221b4441ae6984cb9a98ff04aba",
-    "runtimeManifestSha256": "6524090F8D9FE2E4E9D09374AFB93F48BA30479C674B1DAE6AE2CA71B33CBE60",
-    "runtimeTreeSha256": "76693E1901221112CABA207FC2FA09AF870E51DF68BAE956EBE38818F6ED15B8",
-    "nativeGate": {
-      "passed": true,
-      "mergeReady": true,
-      "surrogateExternalHeadersUsed": false,
-      "fullGenericSharingTests": true,
-      "evidence": "F:/hybridclr_artifacts/dhe-il2cpp-811-restore/native/DHE-Unity2022/native-gate.json",
-      "evidenceScope": "Fresh native compilation and CTest against real Unity 2022 headers on the restored 8.11.0 runtime."
-    },
-    "managed": {
-      "executionPlanCases": 126,
-      "evidence": "F:/hybridclr_artifacts/dhe-il2cpp-811-restore/execution-result.json",
-      "scope": "Managed host validation; native calls recorded, not executed."
-    },
-    "baseWorkflow": {
-      "passed": true,
-      "baseRevision": 59,
-      "currentRevision": 73,
-      "loadedDheAssemblies": 4,
-      "sentinel": 5,
-      "baseId": "3887221165bc808e62710a394103520adb9b3551c5fc6b4f47f4bd9901643295",
-      "basePlayerResultSha256": "71712723980951510306AC8FA059B17B4458900F7B2848596FC66D8BCC3F80C2",
-      "currentPlayerResultSha256": "281ECF1520669326575A93AAE8F7C29B10F8758C9F7063A82D76635D216CAC12",
-      "stageSha256": "92F27BA2609F5720C1187D611E9B0A9DF7D54881746E59A5AD118C9D37F5E05A",
-      "immutablePlayerVerified": true,
-      "runtimeContract": "dhe-runtime-v33",
-      "evidence": "F:/hybridclr_artifacts/dhe-il2cpp-811-restore/base/result.json",
-      "currentEvidence": "F:/hybridclr_artifacts/dhe-il2cpp-811-restore/current-player-result.json",
-      "scope": "New Windows Base, no-op resource update and method 59 -> 73 in the same Player. Not full structural/multi-Base/asset or performance qualification."
-    },
-    "report": "reports/dhe-il2cpp-811-restoration.md"
-  },
-  "bundledToolValidation": {
-    "packageCommit": "4fb36af996871ff1e7ab8585f096395dad5d2bd3",
-    "toolSourceCommit": "74edbcfc6f2a968fce23c5f194cc3906a1905b75",
-    "toolPackageId": "b00e802bf163f7029b3675b9491b0dac62a03be11444b7a76dad79e8b3bb4c09",
-    "fileCount": 83,
-    "portableToolCases": 26,
-    "evidence": "F:/hybridclr_artifacts/dhe-il2cpp-811-restore/tool-tests/result.json",
-    "scope": "Fresh portable tool checks and generation/staging of revision 73 using the package DLL."
-  },
-  "installerRepositoryValidation": {
-    "packageCommit": "4fb36af996871ff1e7ab8585f096395dad5d2bd3",
-    "configuredRepositoriesUsed": true,
-    "missingConfiguredRepositoryRejected": true,
-    "manifestSelectsRefOnly": true,
-    "runtimeFilesVerified": 930,
-    "evidence": "F:/hybridclr_artifacts/dhe-il2cpp-811-restore/installer-result.json",
-    "evidenceSha256": "F6DD0932D1B70B9FD962B5F72A6BACBB7BF01F0511231F93D30001A80465979E"
-  },
-  "status": "opt5-retired-runtime-fix-candidate-not-promoted",
-  "latestReview": {
-    "report": "reports/dhe-physical-dispatch-windows.md",
-    "evidenceLock": "manifests/dhe-physical-dispatch-windows.json",
-    "scope": "Opt5 is retired for new delivery. A new source-bound runtime candidate passes the 47-case Current on two new Bases; this is not a release of the new package. Historical refs and evidence above remain unchanged."
-  },
-  "androidQualified": false,
-  "iosQualified": false,
-  "formalRelease": false,
+  "runtimeContract": "dhe-runtime-v34",
+  "newCapability": "physical-current-receiver-dispatch-v1",
   "approvedUpstream": {
     "hybridclr_unity": "v8.13.0",
     "hybridclr": "v8.13.0",
     "il2cpp_plus": "v2022-8.11.0",
     "unapprovedIl2CppAncestorAbsent": "11251b938d2ce7fa865165130bf257ca239db69f"
   },
-  "historicalEvidence": {
-    "supersededRuntimeTag": "v2022-8.14.0-opt5",
-    "reports": [
-      "reports/dhe-opt5-release.md",
-      "reports/dhe-package-tool.md",
-      "reports/dhe-package-tool-fixes.md",
-      "reports/dhe-project-repository-settings.md"
+  "repositories": {
+    "hybridclr": {
+      "remote": "https://github.com/mofish9/hybridclr.git",
+      "branch": "optimize/v8.13.0",
+      "tag": "v8.13.0-opt6",
+      "annotatedTagObject": "09e39065e3f9ac93e6a08415d7e140d07fc80839",
+      "commit": "04bd9b5cd5153a31e76815d65bc1a9b5655a5a05",
+      "canonicalTreeSha256": "FED6C114D18FA4D5500C2D2E0E1D76ED92B22C8C5D22959A7578749358D5FDFA"
+    },
+    "il2cpp_plus": {
+      "remote": "https://github.com/mofish9/il2cpp_plus.git",
+      "branch": "optimize/unity2022-v8.11.0",
+      "tag": "v2022-8.11.0-opt6",
+      "annotatedTagObject": "56024d3b70e29156953cac47a90509d692b40bbf",
+      "commit": "57f3a065e84e3b1e7e13c1012752e27f23e4c041",
+      "canonicalTreeSha256": "4CFAD250799EA6B5CA4A802420930B4ECB90B54AE603A164B214481CBAF486D3"
+    },
+    "hybridclr_unity": {
+      "remote": "https://github.com/mofish9/hybridclr_unity.git",
+      "branch": "optimize/v8.13.0",
+      "commit": "dff191350c250c60d9a9fb910b1e612e049fd445",
+      "gitTree": "d3ca470e07563c604777fa199bcf25c01db5df42",
+      "canonicalTreeSha256": "297A34E2036C03345EECB58A1378B258E32E4540642FDB60EF46A63D499B6AC0",
+      "treeHashIgnoredPaths": [
+        "Editor/BuildProcessors/AddLil2cppSourceCodeToXcodeproj2023OrNewer.cs.meta"
+      ]
+    }
+  },
+  "bundle": {
+    "sourceCommit": "339338efc968d1c29e24567e93042a5af5882d9a",
+    "sourceTree": "f1d5ccc6fe5b2ca8267762475b6254886c4293c7",
+    "distributionCommit": "a2b9a47cbc8260184c0212d8a978afb8d0136d9f",
+    "packageId": "81f07c851487c43dfa7bdc4d1fb1a4ef0e025e1f8af3ed7520cfeb1410e8e53b",
+    "dllSha256": "28CFEC6AE2343232AF9D1666BB018CCE9C70C7F3D39FDD63957B0B19EEEB819E",
+    "mode": "Exploratory",
+    "fileCount": 85,
+    "releaseReady": false
+  },
+  "export": {
+    "path": "F:/hybridclr_artifacts/dhe-opt6/hybridclr-unity-opt6-project-trial.zip",
+    "sha256": "7B9F11A2F987F2F5B82DD9D4DBB3F482E494D99C53A104F9008901C5A2574538",
+    "gitCommit": "dff191350c250c60d9a9fb910b1e612e049fd445",
+    "trackedFileCount": 575,
+    "toolFileCount": 85,
+    "prefix": "com.code-philosophy.hybridclr@8.13.0/",
+    "ignoredBuildOutputsAbsent": true
+  },
+  "validationIdentity": {
+    "nativeLabCommit": "09e7a3b93eb36d13d07124bfc8cdcf887bf1207f",
+    "baseAndAuthoringLabCommit": "3ef0e1a0b84aae0cd0a7d11a523d44e1a021dfee",
+    "resourceAndDeliveryLabCommit": "193df62ca3ae0724da87e07ad8bc1929868b4d81",
+    "formalAssemblyLabCommit": "9da0f7070d146ec61a480bc7d60b12d23d285d6c",
+    "basePackageCommit": "a2b9a47cbc8260184c0212d8a978afb8d0136d9f",
+    "finalPackageDifference": "Only Documentation~/dhe-project-integration.md changed after the two Base builds. All 573 other tracked files matched both installed packages, excluding that document and the declared generated .meta. Final package installation/receipt suite reran at dff1913.",
+    "baseHostSha256": "25E94C982EFE41D4462E14246EECAFAACC5BAD8F019778A4F49A2114AB76A0A8",
+    "hostProofs": [
+      {
+        "fixture": "aot-snapshot/AotSnapshotTests",
+        "sha256": "65F244AF57A756C177FEFD6A5F061EE5BD00335F8A862AB39BE57CA157CFD063"
+      },
+      {
+        "fixture": "package-delivery/PackageDeliveryTests",
+        "sha256": "51D875B231670780ED698EF2DE3B896F443CCB201C73D5D03D0F79927609689F"
+      },
+      {
+        "fixture": "unity-tool-bundle/UnityToolBundleTests",
+        "sha256": "E6DB4BEBA8849858CACED78A493A7EBCA2A220D470B7B09849D052CA5B5246B9"
+      },
+      {
+        "fixture": "execution-plan/ExecutionPlanTests",
+        "sha256": "26FEDBCBEE1F28F9CA7785094ED32CE78F115A4B7CD7D33780CE8060FC244802"
+      },
+      {
+        "fixture": "unity-tool-publication/UnityToolPublicationTests",
+        "sha256": "2DBED3B72DFE282420BB4AF427CAA893957A6F58B0EBB04ACEB861597D0DB8E6"
+      }
     ],
-    "scope": "Original results retain their original commits and are not attributed to the restored 8.11 runtime."
-  }
+    "finalRuntimeIdenticalToNativeTestedTree": true,
+    "runtimeTreeSha256": "6B4A37DCC805E20F77C4D3EB15C9FA73E4FE5C533C8F64ADA7BA78F6A040EF55",
+    "nativeSourceCanonicalSha256": "2AC42408020D134A8E3D8DABBF7012BC7580DC910204E9EB675C93B28527BFF4",
+    "nativeSourceFileCount": 927
+  },
+  "checks": {
+    "nativeCompileCtest": true,
+    "mergeReady": true,
+    "surrogateExternalHeadersUsed": false,
+    "packageInstallation": 30,
+    "managedLoadState": 126,
+    "portableTool": 26,
+    "releasePublicationRejections": 6,
+    "capabilityNegotiation": 5,
+    "newBaseBuilds": 2,
+    "ordinaryAotAssembliesPerBase": 40,
+    "ordinaryGuardRequestsPerBase": 49650,
+    "missingOrdinaryGuards": 0,
+    "currentVariantsIndependentlyTested": 2,
+    "businessCasesPerCurrentPerBase": 47,
+    "differential": 0,
+    "assetProvenance": 16,
+    "managedDelivery": 49,
+    "assetChecksPerValidDeliveryPlayer": 42,
+    "deliveryPlayerProcesses": 6,
+    "rollbackPlayerProcesses": 6,
+    "publicRecoveryPlayerProcesses": 6,
+    "rollbackSequence": "A/B/A with a fresh process per selection",
+    "readOnlyResourceAuditsPassed": true
+  },
+  "bases": [
+    {
+      "revision": 59,
+      "baseId": "c445a700233c3d4d6f49fe71266735721eeae1f44fe4e3d51b8d6af4adad15e4",
+      "gameAssemblySha256": "A2B37AFB5B3C49F05F8C0FBC65829DD682977E38612AE2B1D841E14BD0888773"
+    },
+    {
+      "revision": 61,
+      "baseId": "f8dde3f739d6d25d07cc78264394e2c71ff0510960e175a6381db80cd46ea8b4",
+      "gameAssemblySha256": "670CE84C39C1471FFAAE4C923978C33A95902F9D6D276BDC7EB6A07E1714C50D"
+    }
+  ],
+  "currentSets": {
+    "boxed": "a4cffad3bd4901c4daae24cce65265bca30d8936af0aa5dbd3c50c029350724e",
+    "assetEvolution": "1b173f2e78278e2948c1dc948c77e098459c6811607a1bfc28923379ac4020d3"
+  },
+  "deliveryManifestSha256": "BC04DD554F71DF7AB005A70AB6CF23BE89DCCEEEC98133A1631F356220256E42",
+  "evidence": [
+    {
+      "path": "F:/hybridclr_artifacts/dhe-opt6/runtime-01/DHE-Unity2022/runtime-manifest.json",
+      "sha256": "74C01923C921B0CFB7C8B85BDFCDBA7698A643481E952AADB56A3270FECEA9DB",
+      "passed": null
+    },
+    {
+      "path": "F:/hybridclr_artifacts/dhe-opt6/native-01/DHE-Unity2022/native-gate.json",
+      "sha256": "4AA7D17D076F71653A9840044CDB61355F08EBE588F90F8A7914F7012E7A7F60",
+      "passed": true
+    },
+    {
+      "path": "F:/hybridclr_artifacts/dhe-opt6/base-01/result.json",
+      "sha256": "EF42989A2ED67888DD57E8D1ED6D3FD3F0EBA3F048949DC84827B989A8771E28",
+      "passed": true
+    },
+    {
+      "path": "F:/hybridclr_artifacts/dhe-opt6/base-01/base-recovery/result.json",
+      "sha256": "98C964A36164E0686295FEEA91CE67873BD2873466183EAC4AE550CBBAEE55AA",
+      "passed": true
+    },
+    {
+      "path": "F:/hybridclr_artifacts/dhe-opt6/base-01/ordinary-guard-coverage.json",
+      "sha256": "82FBB1A039A15136AF8F16A6441401EB717FA070DFAC081129E2C3F408D40A7C",
+      "passed": true
+    },
+    {
+      "path": "F:/hybridclr_artifacts/dhe-opt6/base-02/result.json",
+      "sha256": "B90BA097C722141244D15033B92BA2F7559B5E337854AE303E0D3F80720DF92D",
+      "passed": true
+    },
+    {
+      "path": "F:/hybridclr_artifacts/dhe-opt6/base-02/base-recovery/result.json",
+      "sha256": "98C964A36164E0686295FEEA91CE67873BD2873466183EAC4AE550CBBAEE55AA",
+      "passed": true
+    },
+    {
+      "path": "F:/hybridclr_artifacts/dhe-opt6/base-02/ordinary-guard-coverage.json",
+      "sha256": "69A12C005684D473A9582D3ACB6CD0BA3F9DD407860DF7D663A320301629FF79",
+      "passed": true
+    },
+    {
+      "path": "F:/hybridclr_artifacts/dhe-opt6/receiver-capability-01.json",
+      "sha256": "A94836BE4B52AE13F223D6B5621EAB31F1237E124E84EB4F89FB5D511EF616FF",
+      "passed": true
+    },
+    {
+      "path": "F:/hybridclr_artifacts/dhe-opt6/old-opt5-rejection-01/dhe-resource-update-validation.json",
+      "sha256": "E0508D4A3F97F15BE2985FE76CC8F027D5D167405DC61E160227CB42762C2320",
+      "passed": false,
+      "expectedRejection": true,
+      "expectedReason": "base-missing-runtime-capability:physical-current-receiver-dispatch-v1"
+    },
+    {
+      "path": "F:/hybridclr_artifacts/dhe-opt6/package-tests-02/result.json",
+      "sha256": "C26B1B06B9BCE492E3C75ADBED32E583D01BC42B53BFCA3E2AC468DD4A208C12",
+      "passed": true
+    },
+    {
+      "path": "F:/hybridclr_artifacts/dhe-opt6/execution-tests-01.json",
+      "sha256": "1F55724C7F80F90E8EE5D5B7A630D27621344B816F4171A7258DFE1C2E86AC46",
+      "passed": true
+    },
+    {
+      "path": "F:/hybridclr_artifacts/dhe-opt6/tool-tests-01/result.json",
+      "sha256": "52989B6CAF8CAB2220C05BCA8F2C6BD76E44F5D6B2A1BC98C0EEC9E2B531FF64",
+      "passed": true
+    },
+    {
+      "path": "F:/hybridclr_artifacts/dhe-opt6/publication-tests-01/result.json",
+      "sha256": "A0503ED3867746CB8F326866BCE7AD7E3FCBC1C02CF7CD44B2E2B77495A2E0ED",
+      "passed": true
+    },
+    {
+      "path": "F:/hybridclr_artifacts/dhe-opt6/boxed-01/result.json",
+      "sha256": "C88D8D906D6AC18B3314FDC48B6D1D1B29E4D1F648D36D48BF7E9EB0A153642C",
+      "passed": true
+    },
+    {
+      "path": "F:/hybridclr_artifacts/dhe-opt6/boxed-audit-01.json",
+      "sha256": "3CEDDE7A222CB45D3C00A9C07E15D36BCADAF1876E080240E0A03E2395104103",
+      "passed": true
+    },
+    {
+      "path": "F:/hybridclr_artifacts/dhe-opt6/asset-resource-01/result.json",
+      "sha256": "4431AF62812271C3AB9E29E027EE71EAEDE02F160F320FEA6B0D3A543BE3CF13",
+      "passed": true
+    },
+    {
+      "path": "F:/hybridclr_artifacts/dhe-opt6/asset-audit-01.json",
+      "sha256": "6F7B49B92E4C19CF1F8A1503FA3BCA60B3AAD8973CE5E9709F263CDEBB9118C6",
+      "passed": true
+    },
+    {
+      "path": "F:/hybridclr_artifacts/dhe-opt6/authoring-01/authoring-result.json",
+      "sha256": "56B232B8CE506CCC1782862FFE1ABFC7E69E76FAD4FE77C2EDD1401A3DFEE28C",
+      "passed": true
+    },
+    {
+      "path": "F:/hybridclr_artifacts/dhe-opt6/asset-provenance-tests-01/result.json",
+      "sha256": "365A2D6B13522ECD163B38C1C092B6EFCDEC489EE4B9F569431406BBBC8E6E3F",
+      "passed": true
+    },
+    {
+      "path": "F:/hybridclr_artifacts/dhe-opt6/delivery-managed-01/result.json",
+      "sha256": "A88D17AC886023FC48930AC91F98033873B63E059744B12D6D216F8E82A57D2C",
+      "passed": true
+    },
+    {
+      "path": "F:/hybridclr_artifacts/dhe-opt6/delivery-player-01/result.json",
+      "sha256": "B125754C9884DB0D4D0C1ECE302250854D63D5B3862B0794CB458B99611F620D",
+      "passed": true
+    },
+    {
+      "path": "F:/hybridclr_artifacts/dhe-opt6/public-probes-01/result.json",
+      "sha256": "32E0D467501739A8472E41F71A1785F1E150006E63A24592B2FDD74C8D72271A",
+      "passed": true
+    },
+    {
+      "path": "F:/hybridclr_artifacts/dhe-opt6/rollback-01/result.json",
+      "sha256": "3B15FFE5E2B876F217CF6EB1CB946BED587192EAC9B1CA422B49B21BC8957FD7",
+      "passed": true
+    },
+    {
+      "path": "F:/hybridclr_artifacts/dhe-opt6/runtime-final-01/DHE-Unity2022/runtime-manifest.json",
+      "sha256": "D0695CADFFEABE98572C6115DC63129344B4A341C1EDDFEF73B405612FD7C03A",
+      "passed": null
+    }
+  ],
+  "scope": {
+    "unity2021": "official-unoptimized",
+    "tuanjie": "deferred-previous-selection-unchanged",
+    "androidQualified": false,
+    "iosQualified": false,
+    "macosQualified": false,
+    "arm64Qualified": false,
+    "performanceQualified": false,
+    "memoryQualified": false,
+    "p99Qualified": false,
+    "catChanged": false,
+    "projectBuildAdapterStillOwnedByProject": true
+  },
+  "retiredTags": [
+    "v8.13.0-opt5",
+    "v2022-8.11.0-opt5"
+  ],
+  "remainingProductionGates": [
+    "Project-specific adapter, resource provider, signing/upload and application correctness",
+    "Android/iOS/macOS/ARM64 and Tuanjie qualification",
+    "Performance, memory and P99 evidence",
+    "Full Release toolchain certification; do not relabel this Exploratory bundle"
+  ],
+  "rollback": "Select an archived compatible resource in a fresh process on the same fixed Base. Native runtime changes require a new Base. Do not move tags, replace old Player native binaries in place, or resume retired opt5."
 }
