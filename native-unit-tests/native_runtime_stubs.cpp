@@ -31,6 +31,7 @@
 #endif
 #include "hybridclr/metadata/MetadataUtil.h"
 #include "native_test_hooks.h"
+#include "hybridclr/metadata/MetadataModule.h"
 
 #if __has_include("hybridclr/metadata/DheInterfaceSlots.h")
 namespace hybridclr { namespace dhe {
