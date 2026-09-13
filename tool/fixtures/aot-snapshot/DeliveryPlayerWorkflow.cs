@@ -29,6 +29,11 @@ internal static class DeliveryPlayerWorkflow
         string labHead = Execute("git", true, "rev-parse", "HEAD");
         var shared = Read(Path.Combine(args[1], "result.json"));
         if (!shared.GetProperty("passed").GetBoolean()) throw new InvalidDataException("Shared Current must pass first.");
+        var reference = Read(Path.Combine(args[1], "reference.json"));
+        string[] expected = reference.GetProperty("records").EnumerateArray().Select(row => row.GetString()!).ToArray();
+        if (!reference.GetProperty("passed").GetBoolean() || expected.Length == 0 ||
+            !expected.SequenceEqual(shared.GetProperty("expected").EnumerateArray().Select(row => row.GetString())))
+            throw new InvalidDataException("Delivery requires the exact successful shared CLR reference.");
         string delivery = Path.Combine(output, "delivery");
         Execute("dotnet", true, args[3], "delivery-build", Path.Combine(args[1], "resource"), args[2], delivery);
         string manifestHash = Hash(Path.Combine(delivery, "dhe-delivery.json"));
@@ -78,7 +83,8 @@ internal static class DeliveryPlayerWorkflow
                 {
                     Check(name, result.GetProperty("passed").GetBoolean() && result.GetProperty("metadataCommitted").GetBoolean() &&
                         result.GetProperty("checks").GetArrayLength() == 42 && result.GetProperty("revision").GetInt32() == 73 &&
-                        lines.Count(line => line.StartsWith("DHE case begin: ", StringComparison.Ordinal)) == 46 &&
+                        lines.Where(line => line.StartsWith("DHE case begin: ", StringComparison.Ordinal))
+                            .Select(line => line.Substring(16)).SequenceEqual(expected) &&
                         lines.Contains("DHE added serialized types after-gc pass: saved-prefab") &&
                         lines.Contains("DHE added serialized types after-gc pass: saved-scene"));
                 }
@@ -91,7 +97,7 @@ internal static class DeliveryPlayerWorkflow
             index++;
         }
         Check("multiple-bases", index >= 2);
-        File.WriteAllText(Path.Combine(output, "result.json"), JsonSerializer.Serialize(new { passed = true, labHead, manifestHash, checks, runs, inventory,
+        File.WriteAllText(Path.Combine(output, "result.json"), JsonSerializer.Serialize(new { passed = true, labHead, manifestHash, expected, checks, runs, inventory,
             hostSha256 = Hash(typeof(DeliveryPlayerWorkflow).Assembly.Location), builderHostSha256 = Hash(args[3]) }, new JsonSerializerOptions { WriteIndented = true }));
         Console.WriteLine("Delivery Player workflow passed: " + index + " Bases"); return 0;
     }
