@@ -244,8 +244,7 @@ internal static class FrozenResourceWorkflow
             checks["standard-resource-player-" + index] = result.GetProperty("passed").GetBoolean() && result.GetProperty("resourceUpdate").GetBoolean() &&
                 result.GetProperty("revision").GetInt32() == Read(referenceFile).GetProperty("revision").GetInt32() &&
                 result.GetProperty("sentinel").GetInt32() == 5 && result.GetProperty("loadedAssemblies").GetInt32() == currentNames.Length &&
-                (expected.Length == FrozenResourceCasesCompiler.CaseCount || expected.Length == FrozenResourceCasesCompiler.CaseCount + FrozenAddedAssemblyCompiler.CaseCount ||
-                 expected.Length == FrozenResourceCasesCompiler.CaseCount + FrozenAddedAssemblyCompiler.CaseCount + FrozenStaticWorkflow.CaseCount || expected.Length == 4);
+                Read(referenceFile).GetProperty("passed").GetBoolean();
             if (expected.Length != 4)
                 checks["complete-reference-case-sequence-" + index] = File.ReadAllLines(report + ".log")
                     .Where(line => line.StartsWith("DHE case begin: ")).Select(line => line.Substring(16)).SequenceEqual(expected);
