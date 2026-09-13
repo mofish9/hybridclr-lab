@@ -63,6 +63,50 @@ namespace HybridCLR.Lab.Editor
         public static void StageRuntimePlan() => DheProjectWorkflowRunner.StageRuntimePlan(Adapter());
         public static void BuildScriptsOnly() => DheProjectWorkflowRunner.BuildScriptsOnly(Adapter());
         public static void BuildFinalPlayer() => DheProjectWorkflowRunner.BuildFinalPlayer(Adapter());
+        public static void BuildBase()
+        {
+            string[] args = Environment.GetCommandLineArgs();
+            int index = Array.IndexOf(args, "-probeOutput");
+            if (index < 0 || index + 1 >= args.Length) throw new ArgumentException("-probeOutput");
+            string output = Path.GetFullPath(args[index + 1]);
+            VerifyLifecycleRecovery(output);
+            DheProjectWorkflowRunner.BuildBase(Adapter(true), new DheProjectWorkflowOptions
+            {
+                Target = BuildTarget.StandaloneWindows64, OutputRoot = output,
+                BaselineRoot = Path.Combine(output, "baseline"), Bootstrap = true,
+                ProjectPlanPath = Path.Combine(output, "project-preflight", "custom-project-plan.json"),
+            });
+        }
+        [Serializable] private sealed class RecoveryEvidence
+        {
+            public bool passed, beforeFailureObserved, afterCallbackRan, invalidIdentityRejected, identityRestored;
+        }
+        private static void VerifyLifecycleRecovery(string output)
+        {
+            string recoveryRoot = output + "-recovery";
+            var context = DheProjectWorkflowContext.Create(new DheProjectWorkflowOptions
+            {
+                Target = BuildTarget.StandaloneWindows64, OutputRoot = recoveryRoot,
+                BaselineRoot = Path.Combine(recoveryRoot, "baseline"), Bootstrap = true,
+            });
+            var result = new RecoveryEvidence();
+            var adapter = Adapter(true);
+            adapter.BeforeCurrentGeneration = names => throw new InvalidOperationException("fixture-current-input-failure");
+            adapter.AfterCurrentGeneration = names => result.afterCallbackRan = true;
+            try { DheProjectWorkflowRunner.Prepare(adapter, context); }
+            catch (InvalidOperationException error) when (error.Message == "fixture-current-input-failure") { result.beforeFailureObserved = true; }
+            string source = Path.GetFullPath(adapter.BuildIdentityAssetPath);
+            string original = File.ReadAllText(source);
+            if (!original.Contains("IdentityVersion = 1;")) throw new InvalidOperationException("Unexpected identity template.");
+            File.WriteAllText(source, original.Replace("IdentityVersion = 1;", "IdentityVersion = 2;"));
+            try { DheProjectWorkflowRunner.BuildFinalPlayer(Adapter(true), context); }
+            catch (FileNotFoundException) { result.invalidIdentityRejected = true; }
+            result.identityRestored = File.ReadAllText(source) == original;
+            result.passed = result.beforeFailureObserved && result.afterCallbackRan && result.invalidIdentityRejected && result.identityRestored;
+            Directory.CreateDirectory(recoveryRoot);
+            File.WriteAllText(Path.Combine(recoveryRoot, "result.json"), JsonUtility.ToJson(result, true));
+            if (!result.passed) throw new InvalidOperationException("Package lifecycle recovery checks failed.");
+        }
         private static DheProjectWorkflowAdapter Adapter(bool completeCoverage = false) => new DheProjectWorkflowAdapter
         {
             ProjectRoot = Directory.GetParent(Application.dataPath).FullName,

@@ -44,6 +44,17 @@ internal static class PackageDeliveryTests
         Require("capture-without-lab-or-repo-checkouts", Run("capture-installation", "-ProjectPath", project,
             "-PackageRoot", package, "-EditorContents", editor, "-EditorVersion", "2022.3.62f3") == 0);
         Require("installed-project-verifies", Verify() == 0);
+        string releaseFile = Path.Combine(package, "Data~/dhe-runtime-release.json");
+        byte[] originalRelease = File.ReadAllBytes(releaseFile);
+        try
+        {
+            var release = JsonNode.Parse(originalRelease)!.AsObject();
+            release["runtimeContract"] = "dhe-runtime-v33";
+            File.WriteAllText(releaseFile, release.ToJsonString());
+            Require("stale-contract-cannot-create-installation-receipt", Run("capture-installation", "-ProjectPath", project,
+                "-PackageRoot", package, "-EditorContents", editor, "-EditorVersion", "2022.3.62f3") != 0);
+        }
+        finally { File.WriteAllBytes(releaseFile, originalRelease); }
         void Mutation(string name, string path, Action change)
         {
             byte[]? before = File.Exists(path) ? File.ReadAllBytes(path) : null;

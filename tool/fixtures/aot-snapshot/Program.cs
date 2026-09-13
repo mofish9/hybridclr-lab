@@ -88,6 +88,7 @@ if (args.Length > 0 && args[0] == "frozen-aot-policy") return FrozenAotPolicy.Ru
 if (args.Length > 0 && args[0] == "frozen-resource-binding") return FrozenResourceBinding.Run(args.Skip(1).ToArray());
 if (args.Length > 0 && args[0] == "frozen-admission-policy") return FrozenAdmissionPolicy.Run(args.Skip(1).ToArray());
 if (args.Length > 0 && args[0] == "boxed-enumerator-current") return BoxedEnumeratorWorkflow.Compile(args.Skip(1).ToArray());
+if (args.Length > 0 && args[0] == "physical-receiver-capability") return PhysicalReceiverCapabilityTests.Run(args.Skip(1).ToArray());
 if (args.Length > 0 && args[0] == "frozen-resource-workflow") return FrozenResourceWorkflow.Run(args.Skip(1).ToArray());
 if (args.Length > 0 && args[0] == "frozen-resource-audit") return FrozenResourceAudit.Run(args.Skip(1).ToArray());
 if (args.Length > 0 && args[0] == "frozen-resource-audit-policy") return FrozenResourceAudit.Policy(args.Skip(1).ToArray());
