@@ -17,6 +17,17 @@ Their immutable inputs are recorded in `manifests/repo-lock.json`.
 
 ## Current phase
 
+Opt5 is retired for new DHE delivery. The Unity 2022 physical receiver dispatch
+fix passes real-header native compile/CTest and the unchanged 47-case Current
+on two newly built Windows Bases, including resource rejection/restoration and
+Unity lifecycle/preparation failure recovery. See
+`reports/dhe-physical-dispatch-windows.md` and its evidence manifest.
+This source-isolation result is not a release of the pending package candidate;
+formal repos and historical tags have not moved. Unity 2021 remains official,
+Tuanjie is deferred, and upstream stays at 8.13.0 / v2022-8.11.0.
+
+## Earlier physical reference checkpoint
+
 The active checkpoint is physical reference owners; see
 `reports/dhe-reference-owner-windows.md`. Immutable Base-70/71 pass the exact
 previously failing Current DLLs, all 46 business cases, generic reflection,

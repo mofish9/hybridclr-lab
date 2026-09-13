@@ -1,0 +1,146 @@
+{
+  "schemaVersion": 1,
+  "format": "hybridclr.lab-review-evidence.json",
+  "status": "conditional-unity2022-windows-physical-dispatch-passed",
+  "releaseReady": false,
+  "projectTrialReady": false,
+  "report": "reports/dhe-physical-dispatch-windows.md",
+  "retiredDelivery": {
+    "tags": [
+      "v8.13.0-opt5",
+      "v2022-8.11.0-opt5"
+    ],
+    "reason": "User retired opt5; it is not a target for new project trials or replacement runtime contents.",
+    "refsDeleted": false,
+    "refsMoved": false,
+    "replacementTag": null
+  },
+  "approvedUpstream": {
+    "hybridclr": "v8.13.0",
+    "hybridclr_unity": "v8.13.0",
+    "il2cpp_plus": "v2022-8.11.0"
+  },
+  "source": {
+    "hybridclr": {
+      "branch": "optimize/dhe-physical-dispatch-v8.13.0",
+      "commit": "1b7d5a9fe7100290fb3ef54c30e142896bcef561",
+      "canonicalTreeSha256": "80F9096AF4C9AB73E081617E91E1543A0E1019BAF6C079F4838DE2751AB3F983",
+      "promoted": false
+    },
+    "il2cpp_plus": {
+      "branch": "optimize/unity2022-v8.11.0",
+      "commit": "ecad8a09d1eb9b91a57c59fcdc69b268377bad59",
+      "changed": false
+    },
+    "basePackage": {
+      "branch": "optimize/v8.13.0",
+      "commit": "4fb36af996871ff1e7ab8585f096395dad5d2bd3"
+    },
+    "bundledTool": {
+      "packageCommit": "5476c95b9692834c83bf8646a6d029138aaf4cfa",
+      "sourceCommit": "ccc01f9b533a9782b380dc68f358a5b9085fd729",
+      "sha256": "9812CAF9F66EB30844698025D78BF33EDB0076567EC603BE32A99ED404A314AD",
+      "bundleId": "74a4855640b1169c7a47a6cc2bde761bd173cc9c931a8a5cb8012fbac037d32b",
+      "releaseCertified": false
+    },
+    "lab": {
+      "baseBuildCommit": "f7fd2440dcf3711de410ed41cad7a5f31a9985e3",
+      "resourceAndPublicProbeCommit": "56e51b651dd9e56f3ffc76585d0678c9b5598e50",
+      "auditCommit": "94db3b1f4085d20a7595ae36d513d54708c31a09"
+    }
+  },
+  "checks": {
+    "native": {
+      "passed": true,
+      "mergeReady": true,
+      "surrogateExternalHeadersUsed": false,
+      "fullGenericSharingTests": true
+    },
+    "newBases": 2,
+    "ordinaryAotAssembliesPerBase": 40,
+    "ordinaryGuardRequestsPerBase": 49650,
+    "missingGuards": 0,
+    "sharedCurrentPayloads": 1,
+    "referenceCases": 47,
+    "successfulSharedResourceRuns": 4,
+    "rejectedTamperedRuns": 2,
+    "referenceSequenceDifferences": 0,
+    "auditedFiles": 125,
+    "publicProbeChecks": 16,
+    "publicPlayerRuns": 6,
+    "preparationChecksPerBase": 11,
+    "unityChecksPerSuccessfulProbe": 17
+  },
+  "bases": [
+    {
+      "revision": 59,
+      "baseId": "ab9af5efbc39ab7378797bfda01d20d5da2c37d150cd1d80ff797bbfe246b262",
+      "gameAssemblySha256": "75765650CB151A954F83B7EC723E1A654939CB027749840F4FCF84620E120584"
+    },
+    {
+      "revision": 61,
+      "baseId": "29b360ac6bf02d1a6893c3ff50b96e0d4d03346d7f2cc7779f3b5ec7e02ff636",
+      "gameAssemblySha256": "AA9F8751122158D094671E0D45996DEA4F5C8832C79D6CE8EC7E91607C9500EF"
+    }
+  ],
+  "currentAssemblySetSha256": "a4cffad3bd4901c4daae24cce65265bca30d8936af0aa5dbd3c50c029350724e",
+  "evidence": [
+    {
+      "path": "F:/hybridclr_artifacts/dhe-physical-dispatch/runtime-01/DHE-Unity2022/runtime-manifest.json",
+      "sha256": "118969493C27EA4A9CD4C8EAC2170AE33EF651B4041C7190A4D7FF825AAAE07E"
+    },
+    {
+      "path": "F:/hybridclr_artifacts/dhe-physical-dispatch/native-02/DHE-Unity2022/native-gate.json",
+      "sha256": "E96842786D10868C08C61EFEAC47100D28E18AE77E518F94115F20CC2B6F65B2"
+    },
+    {
+      "path": "F:/hybridclr_artifacts/dhe-physical-dispatch/base-01/result.json",
+      "sha256": "572C0D2D6E817E65A7C67DD905A748970333A5CFEDB59636ACD78CC87245DFB5"
+    },
+    {
+      "path": "F:/hybridclr_artifacts/dhe-physical-dispatch/base-01/ordinary-guard-coverage.json",
+      "sha256": "0C9CF36361EB69720165950204C90F9DE577DB943F1CA50F046377DE9FCAD100"
+    },
+    {
+      "path": "F:/hybridclr_artifacts/dhe-physical-dispatch/base-02/result.json",
+      "sha256": "EB3A7BE3D85280037560ECC0D5FA7ACD17791A62D3317EB22A3477D567F13966"
+    },
+    {
+      "path": "F:/hybridclr_artifacts/dhe-physical-dispatch/base-02/ordinary-guard-coverage.json",
+      "sha256": "A3CB97E4A3A48E22684401A51E5DEB9057AEAC6B0603002C211DC8339CC9A9FD"
+    },
+    {
+      "path": "F:/hybridclr_artifacts/dhe-physical-dispatch/boxed-02/result.json",
+      "sha256": "FDCC552D1ED43BC6A479DABBBABB976C4082C73C2BDFC332A9CC8B27146C28FA"
+    },
+    {
+      "path": "F:/hybridclr_artifacts/dhe-physical-dispatch/boxed-02/reference.json",
+      "sha256": "5C53CC9E3D052C424B169BCE3A620FAC953B8F315AC5B5D8648624C6B5EB6712"
+    },
+    {
+      "path": "F:/hybridclr_artifacts/dhe-physical-dispatch/boxed-02/audit-02.json",
+      "sha256": "12331763BFEC6B6C737FACDBA593CE469E166842E3FF56DF02E669EF8C70C040"
+    },
+    {
+      "path": "F:/hybridclr_artifacts/dhe-physical-dispatch/public-probes-01/result.json",
+      "sha256": "DC520961807EA622906530CDE3D744B516EC381050DE5EF4BE50917BB2BEA7E8"
+    }
+  ],
+  "remainingGates": [
+    "Allocate new managed/runtime release identity and synchronize installation receipts; v33 strings in these source-isolation Bases are not a new release.",
+    "Integrate candidate package and runtime source in formal repos, build new Bases with that exact package through installation/build/resource workflow, then freeze release locks.",
+    "Rebuild the source tool host from its locked package before release; source assembly/native checks used an existing unbundled host, not a newly certified bundle.",
+    "Windows evidence only; no Android/iOS/ARM64, Tuanjie, performance, memory, P99 or arbitrary structural-change qualification.",
+    "Old opt5 Player native code cannot receive this fix through a managed resource-only update."
+  ],
+  "scope": {
+    "engine": "Unity 2022.3.62f3 Windows",
+    "fullGenericSharing": true,
+    "codeGeneration": "OptimizeSize",
+    "supplementalAotMetadata": false,
+    "catChanged": false,
+    "newTagCreated": false,
+    "unity2021": "official-unoptimized",
+    "tuanjie": "deferred"
+  }
+}
