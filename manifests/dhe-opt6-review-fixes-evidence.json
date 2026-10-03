@@ -12,7 +12,7 @@
   "release": {
     "hybridclr": { "tag": "v8.13.0-opt7", "commit": "a4807e563c0cb245519a44c6ea7cc633246dd337", "branch": "optimize/v8.13.0" },
     "il2cpp_plus": { "tag": "v2022-8.11.0-opt7", "commit": "a1ec0324a8a58cb8e175c7b86665d70b5afae57e", "branch": "optimize/unity2022-v8.11.0" },
-    "hybridclr_unity": { "commit": "bf62316c5dd7b6f83c16ef5f8d0fa1cda5f52fbf", "branch": "optimize/v8.13.0" }
+    "hybridclr_unity": { "commit": "bf62316bafa6e2c84dbb922faace3af06ee3f6ca", "branch": "optimize/v8.13.0" }
   },
   "checks": {
     "unity2022NativeCompileCtest": true,
