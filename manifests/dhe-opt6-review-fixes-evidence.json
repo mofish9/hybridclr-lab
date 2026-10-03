@@ -37,6 +37,6 @@
   "remainingGates": [
     "Tuanjie still needs the same implementation migrated to its maintained line, followed by Player and device qualification.",
     "Android/ARM64/iOS/macOS, race detector/ARM64 concurrency, performance, memory and P99 are unverified.",
-    "No formal runtime tag or package release promotion is authorized by this evidence."
+    "Runtime opt7 tags are locked, but no production Package release promotion is authorized; the bundled tool remains Exploratory."
   ]
 }

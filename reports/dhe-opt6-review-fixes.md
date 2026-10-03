@@ -28,7 +28,7 @@
 |---|---|---|
 | HybridCLR | optimize/v8.13.0 / `v8.13.0-opt7` | a4807e563c0cb245519a44c6ea7cc633246dd337 |
 | Unity2022 IL2CPP | optimize/unity2022-v8.11.0 / `v2022-8.11.0-opt7` | a1ec0324a8a58cb8e175c7b86665d70b5afae57e |
-| package | optimize/v8.13.0 | bf62316c5dd7b6f83c16ef5f8d0fa1cda5f52fbf |
+| package | optimize/v8.13.0 | bf62316bafa6e2c84dbb922faace3af06ee3f6ca |
 | Lab | optimize/dhe-release-lab-v8.13.0 | 本次锁定提交 |
 
 Package 使用 Unity2022 两个 opt7 runtime tag，bundled tool 已在 package commit
