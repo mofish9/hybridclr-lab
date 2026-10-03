@@ -35,8 +35,8 @@
       "repository": "hybridclr_unity",
       "sourceMode": "integrated",
       "baseCommit": "623073baafd5a1d12ea46df8145de9fddc899fac",
-      "integratedCommit": "dff191350c250c60d9a9fb910b1e612e049fd445",
-      "expectedTreeSha256": "297A34E2036C03345EECB58A1378B258E32E4540642FDB60EF46A63D499B6AC0",
+      "integratedCommit": "58be0e3eed4f91ed4338227035675a7711d4d36c",
+      "expectedTreeSha256": "9279D3C27710A5F5E15BC579EF4B64ED17791DBE28557D9D8ADC6A448B90D3E1",
       "treeHashIgnoredPaths": [
         "Editor/BuildProcessors/AddLil2cppSourceCodeToXcodeproj2023OrNewer.cs.meta"
       ],

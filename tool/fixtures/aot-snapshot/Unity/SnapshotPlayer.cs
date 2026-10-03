@@ -62,8 +62,10 @@ namespace HybridCLR.Lab.Snapshot
             {
                 var identity = DheBuildIdentity.Create();
                 // Capture genuine Base storage before publication for boxed-reflection negatives.
-                OldBoxedEnumerator = ((System.Collections.IEnumerable)
-                    new System.Collections.Generic.List<HybridCLR.Lab.ValueLayout.Payload>()).GetEnumerator();
+                var basePayload = typeof(HybridCLR.Lab.ValueLayout.Factory).Assembly
+                    .GetType("HybridCLR.Lab.ValueLayout.Payload", true);
+                var baseList = typeof(System.Collections.Generic.List<>).MakeGenericType(basePayload);
+                OldBoxedEnumerator = ((System.Collections.IEnumerable)Activator.CreateInstance(baseList)).GetEnumerator();
                 result.baseId = identity.BaseId; result.aotAnalysisSnapshotSha256 = identity.AotAnalysisSnapshotSha256;
                 var unityType = typeof(ValueLayout.Factory).Assembly.GetType("HybridCLR.Lab.UnityCases.EvolvingBehaviour");
                 if (unityType != null) result.unityBaseDelta = (int)unityType.GetField("Delta", System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.Static).GetRawConstantValue();
