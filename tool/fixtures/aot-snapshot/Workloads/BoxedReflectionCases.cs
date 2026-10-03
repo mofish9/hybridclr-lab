@@ -18,8 +18,10 @@ namespace HybridCLR.Lab.Review
             IEnumerator iterator = NewIterator(marker);
             var concrete = iterator.GetType().GetMethod("MoveNext");
             VerifyMove(move, iterator, marker);
+            Console.WriteLine("DHE review passed: boxed-interface-reflection");
             typeof(IEnumerator).GetMethod("Reset").Invoke(iterator, null);
             VerifyMove(concrete, iterator, marker);
+            Console.WriteLine("DHE review passed: boxed-concrete-reflection");
             ((IDisposable)iterator).Dispose();
 
             foreach (var assembly in AppDomain.CurrentDomain.GetAssemblies())

@@ -1173,7 +1173,7 @@ namespace
         MethodInfo originalUnchanged = unchanged;
         Il2CppImage executionImage{};
         executionImage.assembly = &assembly;
-        Il2CppClass* executionClass = static_cast<Il2CppClass*>(std::calloc(1, sizeof(Il2CppClass)));
+        Il2CppClass* executionClass = static_cast<Il2CppClass*>(std::calloc(1, sizeof(Il2CppClass) + sizeof(VirtualInvokeData)));
         CHECK(executionClass != nullptr);
         if (!executionClass) { std::free(klass); return; }
         executionClass->image = &executionImage;
@@ -1239,8 +1239,14 @@ namespace
         int genericContainerMarker = 0;
         klass->genericContainerHandle = reinterpret_cast<Il2CppMetadataGenericContainerHandle>(&genericContainerMarker);
         executionClass->genericContainerHandle = klass->genericContainerHandle;
+        executionClass->vtable_count = 1;
+        executionClass->vtable[0].method = &physicalCurrent;
+        executionClass->vtable[0].methodPtr = reinterpret_cast<Il2CppMethodPointer>(InterpreterProbeMethod);
+        physicalCurrent.slot = 0;
         CHECK(hybridclr::dhe::PrepareAndRegisterMetaVersions({ frozenRegistration }));
         CHECK(physicalCurrent.isInterpterImpl); // Ready before a generic lookup can publish an instance.
+        CHECK(executionClass->vtable[0].methodPtr == reinterpret_cast<Il2CppMethodPointer>(InterpreterProbeMethod));
+        executionClass->vtable_count = 0;
         const Il2CppType* arguments[] = { &scalarType };
         Il2CppGenericInst inst{}; inst.type_argc = 1; inst.type_argv = arguments;
         Il2CppGenericMethod generic{}; generic.methodDefinition = &changed; generic.context.class_inst = &inst;
