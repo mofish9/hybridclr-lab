@@ -1,0 +1,97 @@
+# opt6 review 修复与验证
+
+日期：2026-10-03。状态：源码候选；最终 Windows Player 回归通过，正式发布门禁仍未齐全。
+
+## 实现与边界
+
+装箱反射与解释器虚调用共用 Current receiver 选择逻辑。值接收者要求精确物理 box
+类型；保留 raw native 未装箱入口的限制以及解释器的具体签名/byref 检查。反射入口
+的早期检查在声明 owner 被映射时使用物理 owner，随后才执行虚查询、unbox 和参数
+转换。旧物理 box 不得通过一个已经描述 Current 的 MethodInfo 进入 Current 方法。
+
+删除 ResolveInterpreterMethod / ResolveCurrentExecutionMethod 的执行期标志位写入。
+注册事务在发布前准备 selected generic definition 的 interpreter 标志，泛型实例
+继承这个状态；失败时由 snapshot 恢复。guard 使用 acquire 读取 interpData，并交给
+已有一次性 transform 逻辑处理首次触达。泛型定义的 flag snapshot 不提交 vtable，
+因为此时还没有具体调用帧的桥接指针。
+
+没有增加缓存、改变 raw ABI 放行策略或升级上游。仅覆盖启动加载后执行 Current，
+不提供业务运行中的对象/TLS 迁移。不宣称性能、内存或 P99 收益。之前审查中的
+全局 metadata 锁成本保留为独立测量事项。
+
+## 锁定组合
+
+| 组件 | 候选分支 | commit |
+|---|---|---|
+| HybridCLR | optimize/dhe-opt6-review-fixes-v8.13.0 | a4807e563c0cb245519a44c6ea7cc633246dd337 |
+| Unity2022 IL2CPP | optimize/dhe-opt6-review-fixes-unity2022-v8.11.0 | a1ec0324a8a58cb8e175c7b86665d70b5afae57e |
+| package 验证组合 | optimize/dhe-opt6-review-fixes-package-v8.13.0 | 85eaa246356becb83a02174201bc7626b34429f9 |
+| Lab 构建/回归输入冻结点 | optimize/dhe-opt6-review-fixes-lab-v8.13.0 | 6403d74fc9fd017c857f256948839ad5828609a0 |
+
+package 分支只提供本地候选安装身份和重建的 Exploratory bundle；Data~ 用精确候选
+commit pin，验证使用 InstallFromLocal。它不是远端 InstallerDefault 可消费的正式
+迁移包。没有创建 package tag，没有创建/移动 runtime tag，也没有推送或合入正式
+维护线。Unity2022 上游仍为 package/HybridCLR 8.13.0 和 il2cpp_plus v2022-8.11.0。
+
+最终 runtime tree SHA-256：
+`5A65E4BB29566BE5F10491D98355EC3382F0A00910730E62D07B1AF2D14F3639`。
+排除声明的 generator inputs 后，927个 native 文件 canonical SHA-256：
+`21A8D9B6707FADFDD3802238AE587DDC86059C507B65CD2A4632D8FD275F1243`。
+完整最终 package 重拼装与正式 native gate 的运行时 tree 相同；两个不同 manifest
+保留自己的 package identity 和哈希，没有互相重标。
+
+## 已完成的验证
+
+- 旧 opt6 上新增 native 回归失败3项：泛型定义发布前状态、装箱反射选择、旧箱拒绝。
+- 中间候选新增 generic vtable 负例失败1项，证明 flag-only preparation 不得清空桥接
+  尚未产生的 vtable；最终版本修复。
+- 最终 Unity2022 真 headers compile/CTest 通过，FGS=true，mergeReady=true，
+  surrogateExternalHeadersUsed=false。
+- 最终共享 HybridCLR + 团结正式维护线 52968ad6 的真 headers compile/CTest 通过。
+  native test 缺少带 Il2CppMemLabel 的 calloc stub 已补齐。没有团结 Player 资格声明。
+- Unity2021 正式维护线 10cbacd0 + 此共享 opt6 runtime 编译未通过：既有
+  Atomic::LoadPointerAcquire、Class::SetupVTable 等 hook/API 缺失。实际 Editor headers
+  为2021.3.45f2，无 surrogate。保持未完成门禁，不通过 surrogate 或升级 upstream
+  规避，也不把 Unity2022 结果外推为 Unity2021 结果。
+- 最终候选 package 安装身份/拒绝/schema suite 30项通过。
+- 最终两个独立 Windows Base 完整四阶段构建、原始运行和 no-op 资源运行通过。
+  每份 ordinary guard coverage 无遗漏，具体数量锁定在对应报告。
+
+两个最终 Base ID：
+
+- eea608bded43364b781592e3779fb51fc1765f7381da2a3d02110d84d9787769
+- 8810b0547e60932d850f6e0054245e2a136d189dca9cc380d6d5ccfd97e179d6
+
+## Player 回归
+
+最终两个新 Base 各自通过：
+
+- 原始失败 Current 的精确字节重放：两个 Player 完整序列通过，旧资源快照拒绝、
+  恢复和共享资源运行均通过。
+- 扩展 Current：在原47项顺序前增加 interface MethodInfo、具体 MethodInfo、
+  `Current` 异常、旧 box 拒绝和 8 线程重复泛型触达；两个 Player 均通过。
+- 新增日志明确记录 `boxed-interface-reflection`、`boxed-concrete-reflection`、
+  `old-box-interface-and-concrete-rejection` 和
+  `boxed-reflection-and-concurrent-generic-touch`。
+
+最终工作流均返回 `passed=true`、`stage=complete`，每个 Base 的 GameAssembly 保持
+自己的哈希，未修改归档 Player。对应产物为 `exact-repro-final-01` 和
+`reflection-final-01`。
+
+## 证据与剩余门禁
+
+产物根：`F:/hybridclr_artifacts/dhe-opt6-review-fixes`。native-final-02、
+runtime-final-02、base-final-01/02、package-tests-final-01 属于最终组合。native-red、
+generic-vtable-red、base-01/02/03、reflection-01 属于定位和中间候选，不写成最终
+提交通过数据。第一份 Base 因 fixture 中 Payload 重名编译失败；修复在 Lab 源码，
+重新建立新项目。初始矩阵目录缺真实 external headers 的相对布局，重新完整拷贝
+各自 Editor external 后执行。所有失败日志保留。
+
+还缺 Unity2021 配套 hook、该反射修复的团结 Player/接入 hook、Android/ARM64、
+iOS/macOS、race detector/ARM64 并发、性能/PSS/尾延迟和正式 Release 资格。
+
+回滚候选使用父提交和匹配的重新构建 Base，不混装源码/版本身份。修复需要新的
+native Base，旧 opt6 Player 无法通过仅发 Current 资源获得修复。业务资源回退需
+选择与不可变 Base 匹配的归档资源并启动新进程。正式 opt6 tag 保持原身份。
+
+本轮四个候选工作树以提交冻结，无新增 stash；正式 repos 保持原分支和原 tag。
