@@ -1,7 +1,7 @@
 {
   "schemaVersion": 1,
   "format": "hybridclr.dhe-opt6-review-fixes-evidence.json",
-  "status": "windows-player-regression-passed-conditional-release",
+  "status": "unity2022-baseline-passed-tuanjie-follow-up",
   "releaseReady": false,
   "source": {
     "hybridclr": { "commit": "a4807e563c0cb245519a44c6ea7cc633246dd337", "branch": "optimize/dhe-opt6-review-fixes-v8.13.0" },
@@ -12,7 +12,7 @@
   "checks": {
     "unity2022NativeCompileCtest": true,
     "tuanjie2022NativeCompileCtest": true,
-    "unity2021NativeCompileCtest": false,
+    "unity2021NativeCompileCtest": null,
     "packageInstallationChecks": 30,
     "originalCurrentPlayerBases": 2,
     "originalCurrentReferenceDifferences": 0,
@@ -30,8 +30,7 @@
     "packageTests": "F:/hybridclr_artifacts/dhe-opt6-review-fixes/package-tests-final-01/result.json"
   },
   "remainingGates": [
-    "Unity2021 needs its matching physical receiver/runtime hook line; current shared candidate does not compile against the real 2021 headers.",
-    "Tuanjie has native compile/CTest only; no Tuanjie Player or device qualification.",
+    "Tuanjie still needs the same implementation migrated to its maintained line, followed by Player and device qualification.",
     "Android/ARM64/iOS/macOS, race detector/ARM64 concurrency, performance, memory and P99 are unverified.",
     "No formal runtime tag or package release promotion is authorized by this evidence."
   ]

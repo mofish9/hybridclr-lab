@@ -1,6 +1,9 @@
 # opt6 review 修复与验证
 
-日期：2026-10-03。状态：源码候选；最终 Windows Player 回归通过，正式发布门禁仍未齐全。
+日期：2026-10-03。状态：Unity2022 基线源码候选；最终 Windows Player 回归通过，团结迁移和正式发布门禁仍未完成。
+
+本轮验收范围以 Unity2022 为基准。Unity2021 不属于当前 DHE 方案范围；团结版本待 Unity2022
+基线确认后，按同一实现和验证流程单独迁移、编译并做 Player/设备验证。
 
 ## 实现与边界
 
@@ -47,12 +50,9 @@ commit pin，验证使用 InstallFromLocal。它不是远端 InstallerDefault �
   尚未产生的 vtable；最终版本修复。
 - 最终 Unity2022 真 headers compile/CTest 通过，FGS=true，mergeReady=true，
   surrogateExternalHeadersUsed=false。
-- 最终共享 HybridCLR + 团结正式维护线 52968ad6 的真 headers compile/CTest 通过。
-  native test 缺少带 Il2CppMemLabel 的 calloc stub 已补齐。没有团结 Player 资格声明。
-- Unity2021 正式维护线 10cbacd0 + 此共享 opt6 runtime 编译未通过：既有
-  Atomic::LoadPointerAcquire、Class::SetupVTable 等 hook/API 缺失。实际 Editor headers
-  为2021.3.45f2，无 surrogate。保持未完成门禁，不通过 surrogate 或升级 upstream
-  规避，也不把 Unity2022 结果外推为 Unity2021 结果。
+- 团结真实 headers compile/CTest 的探索性结果保留在产物中，但不纳入本轮 Unity2022
+  基线结论；团结版本仍需在 Unity2022 基线确认后单独迁移和验证，没有 Player 资格声明。
+- Unity2021 按本轮范围明确排除，不纳入当前方案结论，也不使用 Unity2022 结果推断 Unity2021。
 - 最终候选 package 安装身份/拒绝/schema suite 30项通过。
 - 最终两个独立 Windows Base 完整四阶段构建、原始运行和 no-op 资源运行通过。
   每份 ordinary guard coverage 无遗漏，具体数量锁定在对应报告。
@@ -87,8 +87,8 @@ generic-vtable-red、base-01/02/03、reflection-01 属于定位和中间候选�
 重新建立新项目。初始矩阵目录缺真实 external headers 的相对布局，重新完整拷贝
 各自 Editor external 后执行。所有失败日志保留。
 
-还缺 Unity2021 配套 hook、该反射修复的团结 Player/接入 hook、Android/ARM64、
-iOS/macOS、race detector/ARM64 并发、性能/PSS/尾延迟和正式 Release 资格。
+还缺团结版本的同源迁移、Player/接入和设备验证，以及 Android/ARM64、iOS/macOS、
+race detector/ARM64 并发、性能/PSS/尾延迟和正式 Release 资格。
 
 回滚候选使用父提交和匹配的重新构建 Base，不混装源码/版本身份。修复需要新的
 native Base，旧 opt6 Player 无法通过仅发 Current 资源获得修复。业务资源回退需
