@@ -1,6 +1,6 @@
-# opt6 review 修复与验证
+# opt7 Unity2022 基线修复与验证
 
-日期：2026-10-03。状态：Unity2022 基线源码候选；最终 Windows Player 回归通过，团结迁移和正式发布门禁仍未完成。
+日期：2026-10-04。状态：Unity2022 opt7 正式维护线已锁定；Windows Player 回归通过，Android 和正式 Release 门禁仍未完成。
 
 本轮验收范围以 Unity2022 为基准。Unity2021 不属于当前 DHE 方案范围；团结版本待 Unity2022
 基线确认后，按同一实现和验证流程单独迁移、编译并做 Player/设备验证。
@@ -26,15 +26,15 @@
 
 | 组件 | 候选分支 | commit |
 |---|---|---|
-| HybridCLR | optimize/dhe-opt6-review-fixes-v8.13.0 | a4807e563c0cb245519a44c6ea7cc633246dd337 |
-| Unity2022 IL2CPP | optimize/dhe-opt6-review-fixes-unity2022-v8.11.0 | a1ec0324a8a58cb8e175c7b86665d70b5afae57e |
-| package 验证组合 | optimize/dhe-opt6-review-fixes-package-v8.13.0 | 85eaa246356becb83a02174201bc7626b34429f9 |
-| Lab 构建/回归输入冻结点 | optimize/dhe-opt6-review-fixes-lab-v8.13.0 | 6403d74fc9fd017c857f256948839ad5828609a0 |
+| HybridCLR | optimize/v8.13.0 / `v8.13.0-opt7` | a4807e563c0cb245519a44c6ea7cc633246dd337 |
+| Unity2022 IL2CPP | optimize/unity2022-v8.11.0 / `v2022-8.11.0-opt7` | a1ec0324a8a58cb8e175c7b86665d70b5afae57e |
+| package | optimize/v8.13.0 | bf62316c5dd7b6f83c16ef5f8d0fa1cda5f52fbf |
+| Lab | optimize/dhe-release-lab-v8.13.0 | 本次锁定提交 |
 
-package 分支只提供本地候选安装身份和重建的 Exploratory bundle；Data~ 用精确候选
-commit pin，验证使用 InstallFromLocal。它不是远端 InstallerDefault 可消费的正式
-迁移包。没有创建 package tag，没有创建/移动 runtime tag，也没有推送或合入正式
-维护线。Unity2022 上游仍为 package/HybridCLR 8.13.0 和 il2cpp_plus v2022-8.11.0。
+Package 使用 Unity2022 两个 opt7 runtime tag，bundled tool 已在 package commit
+bf62316 上以 Exploratory 模式重建并通过 `verify-package`。Package 本身不创建 tag。
+现有 Windows Player 证据的 Package 输入仍是 85eaa24；opt7 Package 只重锁 runtime
+tag 并重建工具分发，Android/设备门禁需要使用 bf62316 重新验证。
 
 最终 runtime tree SHA-256：
 `5A65E4BB29566BE5F10491D98355EC3382F0A00910730E62D07B1AF2D14F3639`。
@@ -92,6 +92,8 @@ race detector/ARM64 并发、性能/PSS/尾延迟和正式 Release 资格。
 
 回滚候选使用父提交和匹配的重新构建 Base，不混装源码/版本身份。修复需要新的
 native Base，旧 opt6 Player 无法通过仅发 Current 资源获得修复。业务资源回退需
-选择与不可变 Base 匹配的归档资源并启动新进程。正式 opt6 tag 保持原身份。
+选择与不可变 Base 匹配的归档资源并启动新进程。`v8.13.0-opt6` 和
+`v2022-8.11.0-opt6` 保持原身份，可按对应父提交回滚。
 
-本轮四个候选工作树以提交冻结，无新增 stash；正式 repos 保持原分支和原 tag。
+本轮 runtime、package 和 lab 工作树以提交冻结，无新增 stash；opt7 runtime tag 已建立，
+正式 repos 的工作树保持 clean。

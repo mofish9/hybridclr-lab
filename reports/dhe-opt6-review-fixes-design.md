@@ -17,9 +17,11 @@ publication, restore snapshots on failed registration, and use acquire-loaded
 interpData with no guard-time flag mutation. No new cache or lock order.
 
 Validate native tests and real Editor headers, managed reference, and freshly
-built Unity2022 Windows Players on committed candidate sources. Attempt the
-Unity2021 and Tuanjie real-header native profiles using their maintenance hooks;
-do not extrapolate Windows to ARM64. No throughput, memory or P99 claim. These
-remain device/release gates. Roll back to the parent runtime source and a Base
-built from the matching combination, or select an archived compatible resource
-in a fresh process. Do not relabel old Player evidence as this candidate.
+built Unity2022 Windows Players on committed sources. Unity2021 is out of scope
+for this opt7 baseline. Defer the Tuanjie implementation until the Unity2022
+baseline is accepted, then repeat the same source, native, Player and device
+workflow. Do not extrapolate Windows to ARM64. No throughput, memory or P99
+claim. These remain device/release gates. Roll back to the parent runtime
+source and a Base built from the matching combination, or select an archived
+compatible resource in a fresh process. Do not relabel old Player evidence as
+this candidate.
