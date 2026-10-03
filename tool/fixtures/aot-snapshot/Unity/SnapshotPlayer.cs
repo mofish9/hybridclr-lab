@@ -7,6 +7,7 @@ namespace HybridCLR.Lab.Snapshot
 {
     public static class SnapshotPlayer
     {
+        public static object OldBoxedEnumerator;
         [Serializable] private sealed class Plan { public Record[] assemblies; }
         [Serializable] private sealed class Record { public string assemblyName; public string current; }
         [Serializable] private sealed class Result
@@ -60,6 +61,9 @@ namespace HybridCLR.Lab.Snapshot
             try
             {
                 var identity = DheBuildIdentity.Create();
+                // Capture genuine Base storage before publication for boxed-reflection negatives.
+                OldBoxedEnumerator = ((System.Collections.IEnumerable)
+                    new System.Collections.Generic.List<HybridCLR.Lab.ValueLayout.Payload>()).GetEnumerator();
                 result.baseId = identity.BaseId; result.aotAnalysisSnapshotSha256 = identity.AotAnalysisSnapshotSha256;
                 var unityType = typeof(ValueLayout.Factory).Assembly.GetType("HybridCLR.Lab.UnityCases.EvolvingBehaviour");
                 if (unityType != null) result.unityBaseDelta = (int)unityType.GetField("Delta", System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.Static).GetRawConstantValue();
