@@ -224,6 +224,11 @@ namespace utils
         return std::malloc(size);
     }
 
+    void* Memory::Calloc(size_t count, size_t size, Il2CppMemLabel)
+    {
+        return std::calloc(count, size);
+    }
+
     void Memory::Free(void* memory, Il2CppMemLabel)
     {
         std::free(memory);
