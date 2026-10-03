@@ -1240,6 +1240,7 @@ namespace
         klass->genericContainerHandle = reinterpret_cast<Il2CppMetadataGenericContainerHandle>(&genericContainerMarker);
         executionClass->genericContainerHandle = klass->genericContainerHandle;
         CHECK(hybridclr::dhe::PrepareAndRegisterMetaVersions({ frozenRegistration }));
+        CHECK(physicalCurrent.isInterpterImpl); // Ready before a generic lookup can publish an instance.
         const Il2CppType* arguments[] = { &scalarType };
         Il2CppGenericInst inst{}; inst.type_argc = 1; inst.type_argv = arguments;
         Il2CppGenericMethod generic{}; generic.methodDefinition = &changed; generic.context.class_inst = &inst;
@@ -1304,6 +1305,18 @@ namespace
         CHECK(hybridclr::dhe::ResolveInterpreterMethod(&closed) == &physicalCurrent);
         arguments[0] = &unresolved;
         CHECK(!hybridclr::dhe::CanEnterWithBaseAbi(&closed));
+        std::atomic<int> genericReadFailures{ 0 };
+        std::array<std::thread, 8> genericReaders;
+        for (auto& reader : genericReaders)
+            reader = std::thread([&]() {
+                for (int sample = 0; sample < 1000; ++sample)
+                    if (hybridclr::dhe::ResolveCurrentExecutionMethod(&closed) != &physicalCurrent ||
+                        hybridclr::dhe::ResolveInterpreterMethod(&closed) != &physicalCurrent ||
+                        !physicalCurrent.isInterpterImpl)
+                        genericReadFailures.fetch_add(1, std::memory_order_relaxed);
+            });
+        for (auto& reader : genericReaders) reader.join();
+        CHECK(genericReadFailures.load(std::memory_order_relaxed) == 0);
         hybridclr::dhe::ResetForTests();
         physicalCurrent.isInterpterImpl = false;
         physicalCurrent.token = changed.token;
@@ -1606,6 +1619,15 @@ namespace
         klass->generic_class = nullptr;
         hybridclr::native_test::CaptureVmExceptions(false);
         executionClass->byval_arg.valuetype = klass->byval_arg.valuetype = unrelatedClass->byval_arg.valuetype = 1;
+        CHECK(hybridclr::dhe::ResolveCurrentReceiverMethod(&changed, &unrelatedReceiver) == &physicalCurrent);
+        CHECK(hybridclr::dhe::ResolveCurrentReceiverMethod(&changed, &oldReceiver) == &changed);
+        CHECK(hybridclr::dhe::ResolveCurrentReceiverMethod(&physicalCurrent, &unrelatedReceiver) == &physicalCurrent);
+        hybridclr::native_test::CaptureVmExceptions(true);
+        bool rejectedOldBox = false;
+        try { hybridclr::dhe::ResolveCurrentReceiverMethod(&physicalCurrent, &oldReceiver); }
+        catch (const hybridclr::native_test::RaisedVmException&) { rejectedOldBox = true; }
+        CHECK(rejectedOldBox);
+        hybridclr::native_test::CaptureVmExceptions(false);
         CHECK(hybridclr::dhe::ResolveInterpreterVirtualMethod(&changed, &unrelatedReceiver, &changed) == &physicalCurrent);
         CHECK(hybridclr::dhe::ResolveInterpreterVirtualMethod(&changed, &oldReceiver, &changed) == &changed);
         CHECK(hybridclr::dhe::ResolveNativeReferenceInvokeMethod(&changed, &unrelatedReceiver) == &changed);
