@@ -2,7 +2,8 @@ param(
     [Parameter(Mandatory=$true)][string]$BaselineProof,
     [Parameter(Mandatory=$true)][string]$CandidateProof,
     [Parameter(Mandatory=$true)][string]$OutputRoot,
-    [int]$Pairs = 10
+    [int]$Pairs = 10,
+    [int]$ExpectedRevision = 61
 )
 $ErrorActionPreference = 'Stop'
 if ($Pairs -lt 3 -or (Test-Path -LiteralPath $OutputRoot)) { throw 'Use at least 3 pairs and a new output directory.' }
@@ -29,7 +30,7 @@ foreach ($pair in 0..($Pairs-1)) {
         $start = [Diagnostics.ProcessStartInfo]::new((Join-Path $proof 'base/player/Snapshot.exe'))
         $start.UseShellExecute = $false; $start.CreateNoWindow = $true; $start.WindowStyle = 'Hidden'
         foreach ($arg in @('-batchmode','-nographics','-snapshotResult',($prefix+'.correctness.json'),
-            '-expectedRevision','41','-expectedAssemblies',([string]$identity.assemblies.Count),
+            '-expectedRevision',([string]$ExpectedRevision),'-expectedAssemblies',([string]$identity.assemblies.Count),
             '-dhePerformanceResult',$prefix,'-logFile',($prefix+'.log'))) { $start.ArgumentList.Add($arg) }
         $process = [Diagnostics.Process]::Start($start)
         $runId = $process.Id
