@@ -90,6 +90,7 @@ if (args.Length > 0 && args[0] == "frozen-resource-binding") return FrozenResour
 if (args.Length > 0 && args[0] == "frozen-admission-policy") return FrozenAdmissionPolicy.Run(args.Skip(1).ToArray());
 if (args.Length > 0 && args[0] == "boxed-enumerator-current") return BoxedEnumeratorWorkflow.Compile(args.Skip(1).ToArray());
 if (args.Length > 0 && args[0] == "review-fixes-current") return ReviewFixesCurrent.Run(args.Skip(1).ToArray());
+if (args.Length == 3 && args[0] == "complete-frozen-entry") return FrozenEntryWorkflow.Verify(args[1], args[2]);
 if (args.Length > 0 && args[0] == "physical-receiver-capability") return PhysicalReceiverCapabilityTests.Run(args.Skip(1).ToArray());
 if (args.Length > 0 && args[0] == "frozen-resource-workflow") return FrozenResourceWorkflow.Run(args.Skip(1).ToArray());
 if (args.Length > 0 && args[0] == "frozen-resource-audit") return FrozenResourceAudit.Run(args.Skip(1).ToArray());
