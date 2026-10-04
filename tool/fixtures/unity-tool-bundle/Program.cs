@@ -51,7 +51,7 @@ Require("ordinary-version-skips-bundle-inventory", DheToolCommand.Run("version")
 Reject("explicit-verification-rejects-extra-source", () => DheToolCommand.Run("verify-package"), "Unexpected files"); File.Delete(extra);
 string target = Path.Combine(copied, "dnlib.dll"); byte[] original = File.ReadAllBytes(target);
 byte[] changed = (byte[])original.Clone(); changed[changed.Length / 2] ^= 1; File.WriteAllBytes(target, changed);
-Reject("explicit-verification-rejects-binary-tamper", () => DheToolCommand.Run("verify-package"), "Missing or damaged"); File.WriteAllBytes(target, original);
+Reject("explicit-verification-rejects-binary-tamper", () => DheToolCommand.Run("verify-package"), "hash mismatch"); File.WriteAllBytes(target, original);
 File.Move(target, target + ".saved");
 Reject("explicit-verification-rejects-missing-dependency", () => DheToolCommand.Run("verify-package"), "Missing or damaged"); File.Move(target + ".saved", target);
 // Exercise CLI policy too; bypassing the Editor wrapper must not expose Lab commands.
