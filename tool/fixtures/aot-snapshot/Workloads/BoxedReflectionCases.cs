@@ -33,8 +33,9 @@ namespace HybridCLR.Lab.Review
                 Console.WriteLine("DHE review old-box selection: interface=" + HybridCLR.RuntimeApi.IsDifferentialMethodChanged(move) +
                     ", current-concrete=" + HybridCLR.RuntimeApi.IsDifferentialMethodChanged(concrete) +
                     ", old-concrete=" + HybridCLR.RuntimeApi.IsDifferentialMethodChanged(old.GetType().GetMethod("MoveNext")));
-                RequireRejected(move, old);
-                RequireRejected(concrete, old);
+                bool currentSelected = HybridCLR.RuntimeApi.IsDifferentialMethodChanged(concrete);
+                RequireRejected(move, old, currentSelected);
+                RequireRejected(concrete, old, currentSelected);
                 Console.WriteLine("DHE review passed: old-box-interface-and-concrete-rejection");
             }
 
@@ -81,12 +82,13 @@ namespace HybridCLR.Lab.Review
             throw new InvalidOperationException("Reflected invalid Current did not preserve its exception.");
         }
 
-        private static void RequireRejected(MethodInfo method, object receiver)
+        private static void RequireRejected(MethodInfo method, object receiver, bool currentSelected)
         {
             try { method.Invoke(receiver, null); }
             catch (TargetException) { return; }
             catch (TargetInvocationException error) when (error.InnerException is ExecutionEngineException) { return; }
-            throw new InvalidOperationException("Reflection admitted an old physical box.");
+            throw new InvalidOperationException("Reflection admitted an old physical box. currentConcreteSelected=" + currentSelected +
+                ", invokedSelected=" + HybridCLR.RuntimeApi.IsDifferentialMethodChanged(method) + ", owner=" + method.DeclaringType);
         }
     }
 }
