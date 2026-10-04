@@ -1,0 +1,194 @@
+{
+  "release": "opt8",
+  "generatedAtUtc": "2026-10-04T10:38:19.7615702Z",
+  "scope": "Unity 2022.3.62f3 Windows x64 conditional validation",
+  "releaseReady": false,
+  "mode": "Exploratory",
+  "artifactRoot": "F:/hybridclr_artifacts/dhe-opt8",
+  "labValidationCommit": "3cbb3c096832ad416991bd69f9d1d986894dd14d",
+  "repositories": {
+    "hybridclr": {
+      "branch": "optimize/v8.13.0",
+      "commit": "9c607a3c3d45f88ee83ff9dc5bb0f5ad12c57071",
+      "tag": "v8.13.0-opt8",
+      "tagObject": "b3243e0397278fe618865dac7b24e29cbdedda5a"
+    },
+    "il2cpp_plus": {
+      "branch": "optimize/unity2022-v8.11.0",
+      "commit": "e426adc57c283865126423b169051558b339388c",
+      "tag": "v2022-8.11.0-opt8",
+      "tagObject": "52c537309db0d671895fee5013a33fc25e199211"
+    },
+    "hybridclr_unity": {
+      "branch": "optimize/v8.13.0",
+      "commit": "f2946d5ba35a879724b76afd857176feb1a4adca",
+      "tree": "c96190e1dc4b3e2f6bc6a6d44baed29be9a9b645",
+      "canonicalTreeSha256": "27B75F680A25205402330E535E5A5EF039E2056F7FA83881886BD0F853813540"
+    }
+  },
+  "bundle": {
+    "sourceCommit": "62d8d39401fac3cedbdcc4e6aa7aaaeb34d2474c",
+    "sourceTree": "106d0681a871f8eefb8d28c1bdecd24cf1b0563b",
+    "packageId": "60b4e30f86f95c2d03f67bdf3590fe3af6b1794e159bde429bb2d2e26101100e",
+    "fileCount": 83,
+    "mode": "Exploratory",
+    "releaseReady": false
+  },
+  "player": {
+    "runtimeContract": "dhe-runtime-v35",
+    "target": "StandaloneWindows64",
+    "playerSha256": "143DD3C6A93A45819A98E3CCA8FD1535B461CDF860C927D955CA54815FAF5D7B",
+    "gameAssemblySha256": "8528ED3234FC879DF0DCDE615714FE263B1C64AAB14F7F36B27953BDAC6BA19B",
+    "identitySha256": "0AE2D4AD848F62C28DD8DA56FEB514C8F0CDB8BBA11DAB9823CA4F83380D558A",
+    "snapshotManifestSha256": "7ef810d89e4436e5f849d574de76fdc8468e8a210961818128d432fb3af02f3c",
+    "ordinaryAotCount": 40
+  },
+  "export": {
+    "passed": true,
+    "commit": "f2946d5ba35a879724b76afd857176feb1a4adca",
+    "tree": "c96190e1dc4b3e2f6bc6a6d44baed29be9a9b645",
+    "zipPath": "F:/hybridclr_artifacts/dhe-opt8/hybridclr-unity-8.13.0-opt8.zip",
+    "zipSha256": "126EE0DE2BB8FB37EECCA3047456E00D24DD89F3306E9299C8C5173B8845067A",
+    "trackedFileCount": 570,
+    "toolFileCount": 83,
+    "packageId": "60b4e30f86f95c2d03f67bdf3590fe3af6b1794e159bde429bb2d2e26101100e",
+    "toolSourceCommit": "62d8d39401fac3cedbdcc4e6aa7aaaeb34d2474c",
+    "mode": "Exploratory",
+    "releaseReady": false,
+    "ignoredBuildOutputsAbsent": true,
+    "sourceLockAbsent": true,
+    "duplicateRuntimeReleaseRecordAbsent": true
+  },
+  "evidence": [
+    {
+      "path": "runtime-final/DHE-Unity2022/runtime-manifest.json",
+      "sha256": "504A79A30C5D414409A97D1813E5AB494714BD87429BA0552AB425B6B86A34B5"
+    },
+    {
+      "path": "native-production/DHE-Unity2022/native-gate.json",
+      "sha256": "C659DE34B87CDD6E2B86EDC72B6C3E2576006FBE8E9B74D9BDB69DF7014F272D",
+      "passed": true,
+      "mergeReady": true,
+      "surrogateExternalHeadersUsed": false
+    },
+    {
+      "path": "native-diagnostic/Testing/Temporary/LastTest.log",
+      "sha256": "EB53DADB8DAE4E808FFB6755FE20387C7B3C946B81198C9138F6AC3403E0EBA9",
+      "passed": true
+    },
+    {
+      "path": "managed-result.json",
+      "sha256": "2513A809EC4BC542C140F68DB04CDF56546E680E102D36F665B07D1D59EBACED",
+      "passed": true,
+      "scope": "Package resource validation and native argument selection on .NET host; native calls are recorded, not executed",
+      "caseCount": 134
+    },
+    {
+      "path": "qualification-checks/result.json",
+      "sha256": "A3226C10EA8516908774A2409082AF2224007C9DA0C0AA2054FAD85E9B1FCFAE",
+      "passed": true,
+      "scope": "compiled qualification argument builder and actual runtime contract resolver",
+      "checkCount": 8
+    },
+    {
+      "path": "provenance-checks/result.json",
+      "sha256": "827C65776DEA0E39E335065EDF8C9B9FB2552A4D224C88CA3D4A7D19E13AFB94",
+      "passed": true,
+      "scope": "Targeted preflight/contract/authorization regressions; not full Release qualification",
+      "checkCount": 19
+    },
+    {
+      "path": "default-flow-checks/result.json",
+      "sha256": "F4801600B8111383C662A5204183ABC92B048FBF6D26CDE91B595F5FB4EC67C8",
+      "passed": true,
+      "checkCount": 10
+    },
+    {
+      "path": "bundle-checks-final/result.json",
+      "sha256": "9F765D08723142EC59C9E65A46C1F5692805139D1281B93273E808F7D2ACB024",
+      "passed": true,
+      "checkCount": 27
+    },
+    {
+      "path": "publication-checks/result.json",
+      "sha256": "DC810703B20D9E341162384054057AAE72E7D5DEA926F3B5C592CA5FA6833B6D",
+      "passed": true,
+      "scope": "Rejected binary publications exercise the same complete evidence validator used by source publication; no Release artifact is certified by this fixture",
+      "checkCount": 6
+    },
+    {
+      "path": "player-01/result.json",
+      "sha256": "2DB80E6CB8D66FDB78B7EEE582561D759928E418451AE5CF4F10B521396F58C4",
+      "passed": true,
+      "scope": "Unity2022 package Base phases, final snapshot/native validation and generated no-op resource loaded by the same immutable Player; not layout resource release qualification"
+    },
+    {
+      "path": "player-differential.json",
+      "sha256": "B07E5934B79A6BD3B1CB90FA8A477022A1C94C7F82B7AA62AA4181EC3B0AACF4",
+      "passed": true,
+      "scope": "Exact opt8 Base/no-op fixture records; not whole project coverage",
+      "referenceCount": 35,
+      "candidateCount": 35,
+      "differentialCount": 0
+    },
+    {
+      "path": "current-player-review-checks.json",
+      "sha256": "A5DF2D726275CCC6EB64BF4F55C14693E20C738776F7D95CE334E145BAC1287B",
+      "passed": true,
+      "scope": "Current Unity 2022 Windows Player, same immutable binary, no-op and two-field layout evolution, before/after load production checksums; one process per variant, not performance qualification or no-DHE comparison",
+      "diagnostics": false,
+      "smokeIncluded": false
+    },
+    {
+      "path": "no-op-final.correctness.json",
+      "sha256": "3FE01F5D1468C84E0C729E103C3D5AADBFEB8CB96CBCB9A6B9CF1F9228B1FE82",
+      "passed": true
+    },
+    {
+      "path": "no-op-final.before-load.json",
+      "sha256": "68B38D9966292408EA833E56D130CC23845194BDEC4C5D447B7E2CFF0887E2BB",
+      "passed": true,
+      "diagnostics": false,
+      "smokeIncluded": false
+    },
+    {
+      "path": "no-op-final.after-load.json",
+      "sha256": "2225FC9F2A0CEA0BC82605C852754F08F5CA157506DB9204A39814E16C431C7B",
+      "passed": true,
+      "diagnostics": false,
+      "smokeIncluded": false
+    },
+    {
+      "path": "changed-layout-final.correctness.json",
+      "sha256": "3AA36214F5C9C7093727E327DC8E2488AD4ADB9E330D0792CEF5CA1DAC7E8829",
+      "passed": true
+    },
+    {
+      "path": "changed-layout-final.before-load.json",
+      "sha256": "EAD1BAC4C0CA39255CF5FF334F4DB4EB61B1BEC98A4FE66E0C7A445698216A47",
+      "passed": true,
+      "diagnostics": false,
+      "smokeIncluded": false
+    },
+    {
+      "path": "changed-layout-final.after-load.json",
+      "sha256": "14E0B87BAE3C233E5420947E9FD5B1143398C82A291A5F8ACECFAD246300DA1B",
+      "passed": true,
+      "diagnostics": false,
+      "smokeIncluded": false
+    },
+    {
+      "path": "export-audit.json",
+      "sha256": "243B35B0D02FD9D429239D983EA51E6D11E1CC4BA180F94411606D5955C7995C",
+      "passed": true
+    }
+  ],
+  "pendingGates": [
+    "Actual project correctness",
+    "Android APK ARM64 correctness and memory/temperature/weak-core data",
+    "Uninstrumented no-DHE Player comparison",
+    "End-to-end/steady-state/first-touch performance",
+    "P99 with at least 100 independent process IDs",
+    "Complete Release tool certification"
+  ]
+}
