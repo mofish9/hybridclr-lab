@@ -47,12 +47,13 @@ using (var child = Process.Start(start))
     Require("actual-process-argument-roundtrip", child.ExitCode == 0 && JsonSerializer.Deserialize<string[]>(returned).SequenceEqual(special));
 }
 string extra = Path.Combine(copied, "unexpected.cs"); File.WriteAllText(extra, "extra");
-Reject("extra-source-file-rejected", () => DheToolCommand.Run("version"), "Unexpected files"); File.Delete(extra);
+Require("ordinary-version-skips-bundle-inventory", DheToolCommand.Run("version").Contains("packageId="));
+Reject("explicit-verification-rejects-extra-source", () => DheToolCommand.Run("verify-package"), "Unexpected files"); File.Delete(extra);
 string target = Path.Combine(copied, "dnlib.dll"); byte[] original = File.ReadAllBytes(target);
 byte[] changed = (byte[])original.Clone(); changed[changed.Length / 2] ^= 1; File.WriteAllBytes(target, changed);
-Reject("binary-tamper-before-launch", () => DheToolCommand.Run("version"), "hash mismatch"); File.WriteAllBytes(target, original);
+Reject("explicit-verification-rejects-binary-tamper", () => DheToolCommand.Run("verify-package"), "Missing or damaged"); File.WriteAllBytes(target, original);
 File.Move(target, target + ".saved");
-Reject("missing-dependency-before-launch", () => DheToolCommand.Run("version"), "Missing or damaged"); File.Move(target + ".saved", target);
+Reject("explicit-verification-rejects-missing-dependency", () => DheToolCommand.Run("verify-package"), "Missing or damaged"); File.Move(target + ".saved", target);
 // Exercise CLI policy too; bypassing the Editor wrapper must not expose Lab commands.
 var policy = new ProcessStartInfo(DheToolCommand.ResolveDotnetHost()) { UseShellExecute = false, RedirectStandardError = true };
 policy.ArgumentList.Add(Path.Combine(copied, "HybridCLR.DheTool.dll")); policy.ArgumentList.Add("publish");
