@@ -1,6 +1,7 @@
 #include <algorithm>
 #include <array>
 #include <atomic>
+#include <chrono>
 #include <cstddef>
 #include <cstdint>
 #include <cstdlib>
@@ -21,6 +22,10 @@
 #include "hybridclr/DheThreadCache.h"
 #include "hybridclr/DheInvokeBuffer.h"
 #define HYBRIDCLR_LAB_HAS_DHE_PERFORMANCE_CACHE 1
+#endif
+#if __has_include("hybridclr/DheAotGuardCache.h")
+#include "hybridclr/DheAotGuardCache.h"
+#define HYBRIDCLR_LAB_HAS_AOT_GUARD_CACHE 1
 #endif
 #define HYBRIDCLR_LAB_DHE_ENABLED 1
 #else
@@ -940,6 +945,56 @@ namespace
         CHECK(hybridclr::dhe::ResolveAotGuardMethodByToken(assembly.aname.name, 0x0600ffffu) == nullptr);
         CHECK(hybridclr::native_test::GetDheResolverEnumerationCount() == publishedGuardQueries);
 
+        // Guard keys must use name contents, not the address of a generated
+        // literal or a caller buffer. Exercise cached misses as well as hits.
+        std::string copiedGuardName(assembly.aname.name);
+        CHECK(hybridclr::dhe::ResolveAotGuardMethodByToken(copiedGuardName.c_str(), changed.token) == &changed);
+        copiedGuardName = "Unregistered";
+        CHECK(hybridclr::dhe::ResolveAotGuardMethodByToken(copiedGuardName.c_str(), changed.token) == nullptr);
+        copiedGuardName = assembly.aname.name;
+        CHECK(hybridclr::dhe::ResolveAotGuardMethodByToken(copiedGuardName.c_str(), changed.token) == &changed);
+
+        Il2CppAssembly laterAssembly{};
+        Il2CppImage laterImage{};
+        Il2CppClass* laterClass = static_cast<Il2CppClass*>(std::calloc(1, sizeof(Il2CppClass)));
+        CHECK(laterClass != nullptr);
+        if (laterClass)
+        {
+            laterAssembly.aname.name = "DheLaterGuardAssembly";
+            laterAssembly.image = &laterImage;
+            laterImage.assembly = &laterAssembly;
+            laterImage.name = "DheLaterGuardAssembly.dll";
+            laterImage.nameNoExt = laterAssembly.aname.name;
+            laterClass->image = &laterImage;
+            laterClass->name = "LaterGuardType";
+            laterClass->namespaze = "";
+            laterClass->token = klass->token;
+            MethodInfo laterMethod{};
+            laterMethod.klass = laterClass;
+            laterMethod.token = changed.token;
+            laterMethod.methodPointerCallByInterp = reinterpret_cast<Il2CppMethodPointer>(InterpreterProbeMethod);
+            const MethodInfo* laterMethods[] = { &laterMethod };
+            laterClass->methods = laterMethods;
+            laterClass->method_count = 1;
+            auto laterBase = baseMetaVersion, laterCurrent = currentMetaVersion;
+            laterBase.assemblyName = laterCurrent.assemblyName = laterAssembly.aname.name;
+            for (int repeat = 0; repeat < 8; ++repeat)
+                CHECK(hybridclr::dhe::ResolveAotGuardMethodByToken(laterAssembly.aname.name, laterMethod.token) == nullptr);
+            hybridclr::native_test::ConfigureDheResolver(&laterAssembly, &laterImage, laterClass);
+            CHECK(hybridclr::dhe::PrepareAndRegisterMetaVersion(&laterAssembly, laterBase, laterCurrent));
+            CHECK(hybridclr::dhe::ResolveAotGuardMethodByToken(laterAssembly.aname.name, laterMethod.token) == &laterMethod);
+            CHECK(hybridclr::dhe::ResolveAotGuardMethodByToken(assembly.aname.name, changed.token) == &changed);
+            // Remove this short-lived fixture while keeping the original
+            // registry suite's input metadata alive for its remaining checks.
+            hybridclr::dhe::ResetForTests();
+            hybridclr::native_test::ConfigureDheResolver(&assembly, &image, klass);
+            CHECK(hybridclr::dhe::RegisterLogicalMethodMapping(&assembly, &reorderedCurrentChanged, &changed));
+            CHECK(hybridclr::dhe::RegisterLogicalMethodMapping(&assembly, &reorderedCurrentUnchanged, &unchanged));
+            CHECK(hybridclr::dhe::PrepareAndRegisterMetaVersion(&assembly, baseMetaVersion, currentMetaVersion));
+            std::free(laterClass);
+        }
+
+        const uint64_t postRegistrationGuardQueries = hybridclr::native_test::GetDheResolverEnumerationCount();
         std::atomic<int> lookupFailures{ 0 };
         std::vector<std::thread> lookupThreads;
         for (int threadIndex = 0; threadIndex < 4; ++threadIndex)
@@ -963,7 +1018,7 @@ namespace
             thread.join();
         }
         CHECK(lookupFailures.load(std::memory_order_relaxed) == 0);
-        CHECK(hybridclr::native_test::GetDheResolverEnumerationCount() == publishedGuardQueries);
+        CHECK(hybridclr::native_test::GetDheResolverEnumerationCount() == postRegistrationGuardQueries);
         CHECK(GeneratedLikeDheEntry(1, &changed) == 101);
         CHECK(GeneratedLikeDheEntry(2, &unchanged) == 4);
 
@@ -2847,6 +2902,24 @@ static void TestDhePublicationCacheAndBuffers()
 {
 #if HYBRIDCLR_LAB_HAS_DHE_PERFORMANCE_CACHE
     using namespace hybridclr::dhe;
+#if HYBRIDCLR_LAB_HAS_AOT_GUARD_CACHE
+    AotGuardCache<int, 1> guardCache;
+    int epochOwner, nextEpochOwner;
+    char buffer[32] = "Assembly.One";
+    int guardResult = -1;
+    guardCache.Put(&epochOwner, buffer, 0x06000001, 0);
+    std::strcpy(buffer, "Assembly.Two");
+    CHECK(!guardCache.TryGet(&epochOwner, buffer, 0x06000001, guardResult));
+    std::string sameName("Assembly.One");
+    CHECK(guardCache.TryGet(&epochOwner, sameName.c_str(), 0x06000001, guardResult) && guardResult == 0);
+    CHECK(!guardCache.TryGet(&nextEpochOwner, sameName.c_str(), 0x06000001, guardResult));
+    CHECK(!guardCache.TryGet(&epochOwner, sameName.c_str(), 0x06000002, guardResult));
+    guardCache.Put(&epochOwner, "Assembly.Two", 0x06000001, 7);
+    CHECK(!guardCache.TryGet(&epochOwner, sameName.c_str(), 0x06000001, guardResult));
+    CHECK(guardCache.TryGet(&epochOwner, buffer, 0x06000001, guardResult) && guardResult == 7);
+#else
+    CHECK(false && "DHE name-content guard cache is missing");
+#endif
     ThreadCache<int, uint64_t, 1> cache;
     int owner, other, context, result = -1;
     CHECK(!cache.TryGet(1, &owner, nullptr, 2, result));
@@ -2895,9 +2968,95 @@ static void TestDhePublicationCacheAndBuffers()
 }
 #endif
 
-int main()
+#if HYBRIDCLR_LAB_DHE_ENABLED
+static int RunDheGuardLookupBenchmark()
+{
+    using namespace hybridclr::dhe;
+    ResetForTests();
+    constexpr int iterations = 1000000;
+    constexpr size_t assemblyCount = 40;
+    std::vector<std::string> names;
+    names.reserve(assemblyCount);
+    for (size_t index = 0; index < assemblyCount; ++index)
+        names.push_back("DheGuardBenchAssembly_" + std::to_string(index));
+    std::vector<Il2CppAssembly> assemblies(assemblyCount);
+    std::vector<Il2CppImage> images(assemblyCount);
+    std::vector<MethodInfo> methods(assemblyCount);
+    std::vector<const MethodInfo*> methodPointers(assemblyCount);
+    std::vector<Il2CppClass*> classes(assemblyCount);
+    bool passed = !DispatchDiagnosticsEnabled();
+    bool first = true;
+    std::cout << "{\"scope\":\"native guard lookup with real Unity headers and native test metadata stubs; not whole Player performance\",\"diagnostics\":"
+        << (DispatchDiagnosticsEnabled() ? "true" : "false") << ",\"samples\":[";
+    auto measure = [&](int published, const char* kind) {
+        const bool alternating = std::strcmp(kind, "alternating-assemblies") == 0;
+        const bool unknown = std::strcmp(kind, "unknown-assembly") == 0;
+        const bool unchanged = std::strcmp(kind, "unchanged-token") == 0;
+        auto query = [&](int iteration) {
+            size_t index = alternating ? iteration % published : 0;
+            const char* name = unknown ? "Unknown.GuardBenchAssembly" : names[index].c_str();
+            uint32_t token = unchanged ? 0x06000002u : 0x06000001u;
+            return ResolveAotGuardMethodByToken(name, token);
+        };
+        const MethodInfo* volatile sink = nullptr;
+        for (int index = 0; index < 2000; ++index) sink = query(index);
+        int errors = 0;
+        auto start = std::chrono::steady_clock::now();
+        for (int index = 0; index < iterations; ++index)
+        {
+            const MethodInfo* actual = query(index);
+            size_t selected = alternating ? index % published : 0;
+            const MethodInfo* expected = published && !unknown && !unchanged
+                ? &methods[selected] : nullptr;
+            errors += actual != expected;
+            sink = actual;
+        }
+        (void)sink;
+        auto ns = std::chrono::duration_cast<std::chrono::nanoseconds>(std::chrono::steady_clock::now() - start).count();
+        passed &= errors == 0;
+        if (!first) std::cout << ',';
+        first = false;
+        std::cout << "{\"assemblies\":" << published << ",\"kind\":\"" << kind
+            << "\",\"iterations\":" << iterations << ",\"nanoseconds\":" << ns << ",\"errors\":" << errors << '}';
+    };
+    measure(0, "unknown-assembly");
+    for (size_t index = 0; index < assemblyCount; ++index)
+    {
+        auto& assembly = assemblies[index]; auto& image = images[index]; auto& method = methods[index];
+        classes[index] = static_cast<Il2CppClass*>(std::calloc(1, sizeof(Il2CppClass)));
+        if (!classes[index]) return 2;
+        auto* klass = classes[index];
+        assembly.aname.name = names[index].c_str(); assembly.image = &image;
+        image.assembly = &assembly; image.name = names[index].c_str(); image.nameNoExt = assembly.aname.name;
+        klass->image = &image; klass->name = "GuardBenchType"; klass->namespaze = ""; klass->token = 0x02000001;
+        method.klass = klass; method.token = 0x06000001;
+        method.methodPointerCallByInterp = reinterpret_cast<Il2CppMethodPointer>(InterpreterProbeMethod);
+        methodPointers[index] = &method; klass->methods = &methodPointers[index]; klass->method_count = 1;
+        hybridclr::native_test::ConfigureDheResolver(&assembly, &image, klass);
+        MetaVersionData before, after; before.assemblyName = after.assemblyName = names[index];
+        MetaVersionType type; type.stableId.fill(1); type.version.fill(2); type.token = klass->token;
+        before.types.push_back(type); after.types.push_back(type);
+        MetaVersionMethod entry; entry.stableId.fill(3); entry.version.fill(4); entry.declaringTypeStableId = type.stableId;
+        entry.token = method.token; entry.flags = 8;
+        before.methods.push_back(entry); entry.version.fill(5); after.methods.push_back(entry);
+        if (!PrepareAndRegisterMetaVersion(&assembly, before, after)) return 3;
+        if (index == 0 || index == 3 || index == 39)
+            for (const char* kind : { "changed-token", "unchanged-token", "unknown-assembly", "alternating-assemblies" })
+                measure(static_cast<int>(index + 1), kind);
+    }
+    ResetForTests();
+    for (auto* klass : classes) std::free(klass);
+    std::cout << "],\"passed\":" << (passed ? "true" : "false") << "}\n";
+    return passed ? 0 : 1;
+}
+#endif
+
+int main(int argc, char** argv)
 {
     std::cout.setf(std::ios::unitbuf);
+#if HYBRIDCLR_LAB_DHE_ENABLED
+    if (argc == 2 && std::strcmp(argv[1], "--guard-benchmark") == 0) return RunDheGuardLookupBenchmark();
+#endif
 #if defined(HYBRIDCLR_DHE_HAS_REFERENCE_INTERFACE_QUERY)
     TestDheReferenceInterfaceQuery();
 #endif
