@@ -131,3 +131,29 @@ Unity 2021/团结本轮延期，不把本轮 Unity 2022 数据外推过去。
 IL2CPP a1ec032 / v2022-8.11.0-opt7，正常 Install 并重建 v34 Base。
 现有固定 Base 上的资源回滚只能使用兼容归档且重启进程；不要替换旧 Player 的原生 DLL，
 不要给旧 build identity 改写 v35，也不要混合候选 runtime 与旧 package。
+
+## 正确性续审（2026-10-04）
+
+继续审查 runtime 9c607a3 / package 7a0ad49，未发现新增的、可复现的正确性阻断问题。
+本节记录源码审查和已有当前身份证据的核对，不将其表述为新构建或新性能验收。
+
+- guard 小集合扫描与大集合索引都使用 Base token 和 changed token 集合；删除方法仍交给
+  既有 resolver 抛 MissingMethod，forced Current execution 即使 IL body 未变也会进入 changed 集合。
+  索引指向新快照内的 state，不复制指向旧快照的索引。重哈希不使 unordered_map 节点引用失效。
+- 非 inflated 方法才缓存方法/ABI 判断；closed generic、byref、值类型的具体物理布局判断仍实时执行。
+  虚调用按 receiver + declaration/slot、接口调用按 receiver + interface + slot 区分，负结果也含 epoch。
+  metadata backing 不由 TLS 持有/释放，cache eviction 不使返回的 InvokeData 引用悬空。
+- 反射 type 调用链传入 class 的 byval/this type 或 metadata pool 中的稳定 type。
+  未发现以可复用栈临时 Il2CppType 调用该缓存的正常路径，未为假设场景增加新检查。
+- supplemental field registration 的全部写路径都更新 release version；缓存只保存槽位和
+  metadata layout，实际 managed cell/object 继续经原 GC rooting、write barrier 和对象锁获取。
+- InvokeBuffer 的零参数、内联/溢出和重入语义保持一致；解释器依据参数描述与实际 slot 数复制，
+  不依赖 zero-size vector.data() 是否为 null。没有把调用帧或返回存储缓存到 TLS。
+- tracked batch 在 finally 中记录 touched/committed；成功后的再次准入失败不清 committed 位。
+  phase 2 的确切输入重试保留数据，phase >=3 才释放冻结源，初始化失败仍保留已发布程序集并要求重启。
+
+重新核对 native gate 与 runtime manifest SHA、当前 Lab lock SHA、源码提交、134 managed cases、
+35-record differential=0，以及 no-op/layout 两种 Player 的 before/after checksum 与原生文件 SHA，
+均匹配当前身份。Player 的既有 35 条记录覆盖递归初始化、失败初始化不重复执行、8 线程首次触达、
+generic 初始化、静态值复制/byref、反射读写、GC 后值保持和邻接字段。
+本轮继续保持已有 v35 候选，不新增运行时防御检查、安装验证或重复版本记录。
