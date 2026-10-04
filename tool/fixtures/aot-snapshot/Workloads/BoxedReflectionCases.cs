@@ -34,7 +34,9 @@ namespace HybridCLR.Lab.Review
                     ", current-concrete=" + HybridCLR.RuntimeApi.IsDifferentialMethodChanged(concrete) +
                     ", old-concrete=" + HybridCLR.RuntimeApi.IsDifferentialMethodChanged(old.GetType().GetMethod("MoveNext")));
                 bool currentSelected = HybridCLR.RuntimeApi.IsDifferentialMethodChanged(concrete);
-                RequireRejected(move, old, currentSelected);
+                if (currentSelected) RequireRejected(move, old, currentSelected);
+                else if ((bool)move.Invoke(old, null))
+                    throw new InvalidOperationException("Unselected Base enumerator did not retain its empty result.");
                 RequireRejected(concrete, old, currentSelected);
                 Console.WriteLine("DHE review passed: old-box-interface-and-concrete-rejection");
             }
