@@ -107,9 +107,10 @@ namespace HybridCLR.Lab.Editor
             File.WriteAllText(Path.Combine(recoveryRoot, "result.json"), JsonUtility.ToJson(result, true));
             if (!result.passed) throw new InvalidOperationException("Package lifecycle recovery checks failed.");
         }
-        private static DheProjectWorkflowAdapter Adapter(bool completeCoverage = false) => new DheProjectWorkflowAdapter
+        private static DheProjectWorkflowAdapter Adapter(bool completeCoverage = false)
         {
-            EnableDispatchDiagnostics = Environment.GetEnvironmentVariable("DHE_TEST_DISPATCH_DIAGNOSTICS") == "1",
+            var adapter = new DheProjectWorkflowAdapter
+        {
             ProjectRoot = Directory.GetParent(Application.dataPath).FullName,
             Workflow = "aot-snapshot-package-workflow",
             BuildIdentityAssetPath = "Assets/SnapshotIdentity.cs",
@@ -128,6 +129,12 @@ namespace HybridCLR.Lab.Editor
             AdditionalGuardMvJsonPaths = OrdinaryGuardMvJsonPaths(),
             GuardOrdinaryAotMethods = completeCoverage || GuardAllOrdinaryAot(),
         };
+            bool diagnostics = Environment.GetEnvironmentVariable("DHE_TEST_DISPATCH_DIAGNOSTICS") == "1";
+            var field = typeof(DheProjectWorkflowAdapter).GetField("EnableDispatchDiagnostics");
+            if (diagnostics && field == null) throw new InvalidOperationException("Package has no explicit diagnostic build option.");
+            field?.SetValue(adapter, diagnostics);
+            return adapter;
+        }
 
         private static string[] OrdinaryGuardMvJsonPaths()
         {
