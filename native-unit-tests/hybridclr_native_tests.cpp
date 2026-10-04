@@ -2969,6 +2969,51 @@ static void TestDhePublicationCacheAndBuffers()
 #endif
 
 #if HYBRIDCLR_LAB_DHE_ENABLED
+static void TestDheIndexedGuardPublication()
+{
+    using namespace hybridclr::dhe;
+    ResetForTests();
+    std::array<std::string, 6> names;
+    std::array<Il2CppAssembly, 6> assemblies{};
+    std::array<Il2CppImage, 6> images{};
+    std::array<MethodInfo, 6> methods{};
+    std::array<const MethodInfo*, 6> methodPointers{};
+    std::array<Il2CppClass*, 6> classes{};
+    for (size_t index = 0; index < names.size(); ++index)
+    {
+        names[index] = "DheIndexedGuard_" + std::to_string(index);
+        auto& assembly = assemblies[index]; auto& image = images[index]; auto& method = methods[index];
+        classes[index] = static_cast<Il2CppClass*>(std::calloc(1, sizeof(Il2CppClass)));
+        CHECK(classes[index] != nullptr);
+        if (!classes[index]) break;
+        auto* klass = classes[index];
+        assembly.aname.name = names[index].c_str(); assembly.image = &image;
+        image.assembly = &assembly; image.name = names[index].c_str(); image.nameNoExt = assembly.aname.name;
+        klass->image = &image; klass->name = "IndexedGuardType"; klass->namespaze = ""; klass->token = 0x02000001;
+        method.klass = klass; method.token = 0x06000001;
+        method.methodPointerCallByInterp = reinterpret_cast<Il2CppMethodPointer>(InterpreterProbeMethod);
+        methodPointers[index] = &method; klass->methods = &methodPointers[index]; klass->method_count = 1;
+        // At five published assemblies this is a cached negative decision.
+        for (int repeat = 0; repeat < 2; ++repeat)
+            CHECK(ResolveAotGuardMethodByToken(names[index].c_str(), method.token) == nullptr);
+        hybridclr::native_test::ConfigureDheResolver(&assembly, &image, klass);
+        MetaVersionData before, after; before.assemblyName = after.assemblyName = names[index];
+        MetaVersionType type; type.stableId.fill(1); type.version.fill(2); type.token = klass->token;
+        before.types.push_back(type); after.types.push_back(type);
+        MetaVersionMethod entry; entry.stableId.fill(3); entry.version.fill(4); entry.declaringTypeStableId = type.stableId;
+        entry.token = method.token; entry.flags = 8;
+        before.methods.push_back(entry); entry.version.fill(5); after.methods.push_back(entry);
+        CHECK(PrepareAndRegisterMetaVersion(&assembly, before, after));
+        const auto queries = hybridclr::native_test::GetDheResolverEnumerationCount();
+        CHECK(ResolveAotGuardMethodByToken(names[index].c_str(), method.token) == &method);
+        CHECK(ResolveAotGuardMethodByToken(names[0].c_str(), methods[0].token) == &methods[0]);
+        CHECK(ResolveAotGuardMethodByToken(names[0].c_str(), 0x06000002) == nullptr);
+        CHECK(hybridclr::native_test::GetDheResolverEnumerationCount() == queries);
+    }
+    ResetForTests();
+    for (auto* klass : classes) std::free(klass);
+}
+
 static int RunDheGuardLookupBenchmark()
 {
     using namespace hybridclr::dhe;
@@ -3056,6 +3101,7 @@ int main(int argc, char** argv)
     std::cout.setf(std::ios::unitbuf);
 #if HYBRIDCLR_LAB_DHE_ENABLED
     if (argc == 2 && std::strcmp(argv[1], "--guard-benchmark") == 0) return RunDheGuardLookupBenchmark();
+    TestDheIndexedGuardPublication();
 #endif
 #if defined(HYBRIDCLR_DHE_HAS_REFERENCE_INTERFACE_QUERY)
     TestDheReferenceInterfaceQuery();
