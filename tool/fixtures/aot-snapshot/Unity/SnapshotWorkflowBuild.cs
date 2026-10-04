@@ -109,6 +109,7 @@ namespace HybridCLR.Lab.Editor
         }
         private static DheProjectWorkflowAdapter Adapter(bool completeCoverage = false) => new DheProjectWorkflowAdapter
         {
+            EnableDispatchDiagnostics = Environment.GetEnvironmentVariable("DHE_TEST_DISPATCH_DIAGNOSTICS") == "1",
             ProjectRoot = Directory.GetParent(Application.dataPath).FullName,
             Workflow = "aot-snapshot-package-workflow",
             BuildIdentityAssetPath = "Assets/SnapshotIdentity.cs",

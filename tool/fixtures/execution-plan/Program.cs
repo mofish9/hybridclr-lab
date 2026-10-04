@@ -472,6 +472,9 @@ if (conditionalFixture != null)
     { AddFrozen(m, v, p, provider); AddMutableConditional(m, v, p, provider); }, true);
     cases["frozen-and-mutable-conditional-native-arguments"] = ConditionalForwarded(1) &&
         RuntimeApi.LastConditional[0].SequenceEqual(new[] { frozenToken });
+    cases["committed-frozen-source-bytes-released"] = new[] { "FrozenAotSourceBytes", "FrozenAotBaseMetaVersionBytes" }
+        .All(name => ((System.Collections.IDictionary)typeof(DheRuntime).GetField(name, BindingFlags.NonPublic | BindingFlags.Static)
+            .GetValue(null)).Count == 0);
     RunCase("mutable-conditional-runtime-plan-tamper", 0, (m, v, p, provider) => {
         AddMutableConditional(m, v, p, provider);
         var value = p["baseSelections"][0]["assemblyModes"].AsArray()
@@ -540,7 +543,7 @@ cases["new-method-is-not-a-base-entry"] = !staticCompilation.Plans[addedSnapshot
 // Public lifecycle assertions inspect optional APIs by reflection so the same
 // tests can demonstrate failures against the archived preceding package source.
 object PublicState(string name) => typeof(DheRuntime).GetProperty(name, BindingFlags.Public | BindingFlags.Static)?.GetValue(null);
-Provider InitializeRecoveryResource()
+Provider InitializeRecoveryResource(bool enableProbes = false)
 {
     RuntimeApi.SimulateNewProcess();
     var provider = providers[0].Copy(); var manifest = Clone(manifestDocument);
@@ -549,11 +552,19 @@ Provider InitializeRecoveryResource()
     manifest["validationSha256"] = Hash(provider.Bytes[assets + "validation.json"]);
     manifest["runtimePlanSha256"] = Hash(provider.Bytes[assets + "dhe-runtime-plan.json"]);
     provider.Bytes[manifestPath] = Encoding.UTF8.GetBytes(manifest.ToJsonString());
-    if (!DheRuntime.InitializeFromResourceUpdate(provider, identities[0], manifestPath, out string error, assets))
+    if (!DheRuntime.InitializeFromResourceUpdate(provider, identities[0], manifestPath, out string error, assets, enableProbes))
         throw new InvalidOperationException(error);
     return provider;
 }
 bool ResetRejected() { try { DheRuntime.Reset(); return false; } catch (InvalidOperationException) { return true; } }
+byte[][] RetainedCurrentPayloads() => ((System.Collections.IDictionary)typeof(DheRuntime)
+    .GetField("Artifacts", BindingFlags.NonPublic | BindingFlags.Static).GetValue(null)).Values
+    .Cast<object>().Select(row => (byte[])row.GetType().GetField("Current").GetValue(row)).ToArray();
+{
+    InitializeRecoveryResource();
+    cases["production-probe-rejected-before-native-effects"] = !DheRuntime.RunTransactionProbe(out _) && RuntimeApi.Calls == 0 &&
+        PublicState("LoadState")?.ToString() == "NotLoaded";
+}
 foreach (int phase in new[] { 1, 3 })
 {
     var provider = InitializeRecoveryResource(); string[] names = DheRuntime.PlannedAssemblyNames;
@@ -564,6 +575,7 @@ foreach (int phase in new[] { 1, 3 })
     cases[prefix + "correct-outcome"] = !accepted && code.ToString() == (phase == 3 ? "DHE_INITIALIZATION_FAILED" : "DHE_RESTART_REQUIRED");
     cases[prefix + "restart-state"] = PublicState("RestartRequired") is true && PublicState("LoadState")?.ToString() == "RestartRequired";
     cases[prefix + "confirmed-commit"] = Equals(PublicState("MetadataCommitted"), phase == 3);
+    cases[prefix + "production-does-not-retain-current"] = RetainedCurrentPayloads().All(bytes => bytes == null);
     cases[prefix + "original-exception"] = error.Contains("DHE deliberate public module failure") && Equals(PublicState("LastLoadError"), error);
     cases[prefix + "published-set-visible-before-reset-attempt"] = phase == 3 ? DheRuntime.LoadedAssemblyNames.SequenceEqual(names) : DheRuntime.LoadedAssemblyNames.Length == 0;
     cases[prefix + "reset-rejected"] = ResetRejected();
@@ -597,6 +609,7 @@ foreach (int phase in new[] { 1, 3 })
     };
     cases["public-corrected-native-retry-succeeds"] = DheRuntime.LoadCurrentAssemblyImages(names, dlls, out _, out _) &&
         PublicState("LoadState")?.ToString() == "Ready" && PublicState("MetadataCommitted") is true && PublicState("RestartRequired") is false;
+    cases["production-success-does-not-retain-current"] = RetainedCurrentPayloads().All(bytes => bytes == null);
     cases["public-loaded-snapshot-visible-before-reset-attempt"] = DheRuntime.LoadedAssemblyNames.SequenceEqual(names);
     string[] loadedCopy = DheRuntime.LoadedAssemblyNames;
     if (loadedCopy.Length != 0) loadedCopy[0] = "caller-mutated-loaded-status";
@@ -608,6 +621,18 @@ foreach (int phase in new[] { 1, 3 })
     int count = RuntimeApi.Calls;
     cases["public-success-does-not-reload-native-graph"] = !DheRuntime.LoadCurrentAssemblyImages(names, dlls, out _, out _) &&
         RuntimeApi.Calls == count && PublicState("LoadState")?.ToString() == "Ready" && PublicState("MetadataCommitted") is true;
+}
+{
+    var provider = InitializeRecoveryResource(enableProbes: true); string[] names = DheRuntime.PlannedAssemblyNames;
+    byte[][] dlls = names.Select(name => provider.Bytes[assets + name + ".dll.bytes"]).ToArray();
+    RuntimeApi.RejectFirstCall = true;
+    cases["diagnostic-load-succeeds"] = DheRuntime.LoadCurrentAssemblyImages(names, dlls, out _, out _);
+    byte[][] retained = RetainedCurrentPayloads();
+    cases["diagnostic-current-defensive-ownership"] = retained.All(bytes => bytes != null &&
+        dlls.Any(input => !ReferenceEquals(input, bytes) && input.SequenceEqual(bytes)));
+    byte[] retainedFirst = retained.First(); byte original = retainedFirst[0];
+    foreach (byte[] input in dlls) input[0] ^= 0xff;
+    cases["diagnostic-current-survives-caller-mutation"] = retainedFirst[0] == original;
 }
 Directory.CreateDirectory(Path.GetDirectoryName(output));
 string packageRoot = Assembly.GetExecutingAssembly().GetCustomAttributes<AssemblyMetadataAttribute>()

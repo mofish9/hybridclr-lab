@@ -48,6 +48,7 @@ namespace HybridCLR
         public static int NextPhase = 4;
         public static LoadImageErrorCode NextCode = LoadImageErrorCode.OK;
         public static bool ThrowOnCall;
+        public static bool RejectFirstCall;
         public static Action OnCall;
         // Existing argument-selection cases simulate separate native processes.
         // This fixture-only reset never exists in the package or Player.
@@ -56,7 +57,7 @@ namespace HybridCLR
             foreach (string field in new[] { "loadBusy", "nativeTouched", "metadataCommitted", "loadState", "nativeLoadPhase" })
                 typeof(DheRuntime).GetField(field, BindingFlags.NonPublic | BindingFlags.Static)?.SetValue(null, 0);
             DheRuntime.Reset(); Calls = 0; LastTypes = LastMethods = null;
-            NextPhase = 4; NextCode = LoadImageErrorCode.OK; ThrowOnCall = false; OnCall = null;
+            NextPhase = 4; NextCode = LoadImageErrorCode.OK; ThrowOnCall = RejectFirstCall = false; OnCall = null;
         }
         public static LoadImageErrorCode LoadDifferentialHybridAssemblyBatchWithPhase(
             byte[][] dlls, byte[][] before, byte[][] after, uint[][] types, uint[][] methods,
@@ -65,6 +66,7 @@ namespace HybridCLR
             Calls++; LastTypes = types.All(row => row == null) ? null : types;
             LastMethods = methods.All(row => row == null) ? null : methods;
             LastConditional = conditional; LastSourceKinds = sourceKinds;
+            if (RejectFirstCall && Calls == 1) { phase = 2; return LoadImageErrorCode.DHE_MV_REGISTRATION_FAILED; }
             phase = NextPhase; OnCall?.Invoke();
             if (ThrowOnCall) throw new TypeInitializationException("<Module>", new InvalidOperationException("DHE deliberate public module failure"));
             return NextCode;

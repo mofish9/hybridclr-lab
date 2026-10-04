@@ -6,6 +6,7 @@ set(HYBRIDCLR_TEST_SOURCE_ROOT "${HYBRIDCLR_RUNTIME_ROOT}/hybridclr" CACHE PATH 
 set(HYBRIDCLR_TEST_UNITY_VERSION 20220362 CACHE STRING "Numeric Unity compatibility version")
 set(HYBRIDCLR_TEST_TUANJIE_VERSION 11000 CACHE STRING "Numeric Tuanjie version, or zero for Unity")
 set(HYBRIDCLR_TEST_FULL_GENERIC_SHARING 0 CACHE BOOL "Build tests for the full generic sharing bridge")
+option(HYBRIDCLR_TEST_DHE_DIAGNOSTICS "Collect DHE counters in this diagnostic test build" OFF)
 set(IL2CPP_BASELIB_INCLUDE "C:/Program Files/Tuanjie/Hub/Editor/2022.3.62t12/Editor/Data/il2cpp/external/baselib/Include" CACHE PATH "Engine baselib headers")
 set(IL2CPP_BASELIB_PLATFORM_INCLUDE "C:/Program Files/Tuanjie/Hub/Editor/2022.3.62t12/Editor/Data/il2cpp/external/baselib/Platforms/Windows/Include" CACHE PATH "Engine Windows baselib headers")
 set(IL2CPP_EXTERNAL "${CMAKE_CURRENT_LIST_DIR}/../staging/runtime/Baseline-Clean/external" CACHE PATH "Engine il2cpp external headers")
@@ -140,6 +141,7 @@ function(configure_hybridclr_target target)
         HYBRIDCLR_UNITY_2019_OR_NEW=1
         HYBRIDCLR_UNITY_2020_OR_NEW=1
         BASELIB_INLINE_NAMESPACE=il2cpp_baselib
+        HYBRIDCLR_DHE_DIAGNOSTICS=$<BOOL:${HYBRIDCLR_TEST_DHE_DIAGNOSTICS}>
     )
 
     if (HYBRIDCLR_TEST_UNITY_VERSION GREATER_EQUAL 20210000)

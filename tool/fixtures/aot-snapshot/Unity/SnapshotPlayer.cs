@@ -67,6 +67,7 @@ namespace HybridCLR.Lab.Snapshot
                 var baseList = typeof(System.Collections.Generic.List<>).MakeGenericType(basePayload);
                 OldBoxedEnumerator = ((System.Collections.IEnumerable)Activator.CreateInstance(baseList)).GetEnumerator();
                 result.baseId = identity.BaseId; result.aotAnalysisSnapshotSha256 = identity.AotAnalysisSnapshotSha256;
+                DhePerformanceProbe.RunIfRequested("before-load");
                 var unityType = typeof(ValueLayout.Factory).Assembly.GetType("HybridCLR.Lab.UnityCases.EvolvingBehaviour");
                 if (unityType != null) result.unityBaseDelta = (int)unityType.GetField("Delta", System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.Static).GetRawConstantValue();
                 UnityReferenceCachePlayer referenceCache = Array.IndexOf(args, "-unityReferenceCacheProbe") >= 0
@@ -202,6 +203,7 @@ namespace HybridCLR.Lab.Snapshot
                     result.sentinel == 5 &&
                     !RuntimeApi.IsDifferentialMethodChanged(typeof(ValueLayout.Factory).GetMethod("UnchangedRevision"));
                 result.stage = "complete";
+                if (result.passed) DhePerformanceProbe.RunIfRequested("after-load");
                 if (Array.IndexOf(args, "-virtualSignatureNoopProbe") >= 0)
                 {
                     if (!result.passed) throw new InvalidOperationException("Base business entry failed before virtual no-op validation.");

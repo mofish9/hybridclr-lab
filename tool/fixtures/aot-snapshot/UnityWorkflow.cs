@@ -51,6 +51,7 @@ internal static class UnityWorkflow
         // project/bootstrap configuration from the earlier storage probe.
         File.Delete(Path.Combine(project, "Assets/CurrentStorageRuntime.cs"));
         foreach (var pair in new[] { ("SnapshotPlayer.cs", "Assets"), ("PublicLoadFailurePlayer.cs", "Assets"),
+            ("DhePerformanceProbe.cs", "Assets"),
             ("PublicPrecommitPlayer.cs", "Assets"), ("PublicPreparationPlayer.cs", "Assets"),
             ("UnitySerializationRoots.cs", "Assets"), ("UnityReferenceCachePlayer.cs", "Assets"), ("UnityMethodDeclarationCache.cs", "Assets"),
             ("UnityDeclarationParameterCache.cs", "Assets"),

@@ -17,6 +17,11 @@
 #include "vm/MetadataCache.h"
 #if __has_include("hybridclr/DheRuntime.h")
 #include "hybridclr/DheRuntime.h"
+#if __has_include("hybridclr/DheThreadCache.h")
+#include "hybridclr/DheThreadCache.h"
+#include "hybridclr/DheInvokeBuffer.h"
+#define HYBRIDCLR_LAB_HAS_DHE_PERFORMANCE_CACHE 1
+#endif
 #define HYBRIDCLR_LAB_DHE_ENABLED 1
 #else
 #define HYBRIDCLR_LAB_DHE_ENABLED 0
@@ -1137,6 +1142,21 @@ namespace
 		hybridclr::dhe::ResetForTests();
 		changed.isInterpterImpl = false;
 		secondChanged.isInterpterImpl = false;
+
+#if defined(HYBRIDCLR_DHE_HAS_PUBLICATION_IDENTITY)
+        CHECK(hybridclr::dhe::GetPublicationIdentity() == nullptr);
+        CHECK(hybridclr::dhe::PrepareAndRegisterMetaVersion(&assembly, baseMetaVersion, currentMetaVersion));
+        const void* firstPublication = hybridclr::dhe::GetPublicationIdentity();
+        CHECK(firstPublication != nullptr);
+        for (int i = 0; i < 4; ++i) CHECK(!hybridclr::dhe::IsChangedMethod(&secondChanged));
+        CHECK(hybridclr::dhe::PrepareAndRegisterMetaVersion(&secondAssembly, secondBaseMetaVersion, secondCurrentMetaVersion));
+        CHECK(hybridclr::dhe::GetPublicationIdentity() != firstPublication);
+        CHECK(hybridclr::dhe::IsChangedMethod(&secondChanged)); // Cached miss expires.
+        CHECK(hybridclr::dhe::IsChangedMethod(&changed));
+        hybridclr::dhe::ResetForTests();
+        CHECK(!hybridclr::dhe::IsChangedMethod(&changed)); // Cached hit expires.
+        changed.isInterpterImpl = secondChanged.isInterpterImpl = false;
+#endif
 
 #if defined(HYBRIDCLR_DHE_HAS_INTERPRETER_BATCH)
         Il2CppAssembly addedAssembly{};
@@ -2795,6 +2815,86 @@ static void TestDheReferenceInterfaceQuery()
 }
 #endif
 
+#if HYBRIDCLR_LAB_DHE_ENABLED
+static void TestDheCounterBuildMode()
+{
+    using namespace hybridclr::dhe;
+    ResetDispatchCounters();
+    std::vector<std::thread> threads;
+    for (int thread = 0; thread < 8; ++thread)
+        threads.emplace_back([] {
+            for (int iteration = 0; iteration < 1000; ++iteration)
+            {
+                RecordAotEntry(); RecordInterpreterEntry(); RecordAotBridgeCall();
+            }
+        });
+    for (auto& thread : threads) thread.join();
+#if HYBRIDCLR_DHE_DIAGNOSTICS
+    CHECK(GetAotEntryCount() == 8000);
+    CHECK(GetInterpreterEntryCount() == 8000);
+    CHECK(GetAotBridgeCallCount() == 8000);
+#else
+    CHECK(GetAotEntryCount() == 0);
+    CHECK(GetInterpreterEntryCount() == 0);
+    CHECK(GetAotBridgeCallCount() == 0);
+#endif
+    ResetDispatchCounters();
+    CHECK(GetAotEntryCount() == 0 && GetInterpreterEntryCount() == 0 && GetAotBridgeCallCount() == 0);
+    std::cout << "DHE production/diagnostic counter and concurrent reset checks passed\n";
+}
+
+static void TestDhePublicationCacheAndBuffers()
+{
+#if HYBRIDCLR_LAB_HAS_DHE_PERFORMANCE_CACHE
+    using namespace hybridclr::dhe;
+    ThreadCache<int, uint64_t, 1> cache;
+    int owner, other, context, result = -1;
+    CHECK(!cache.TryGet(1, &owner, nullptr, 2, result));
+    cache.Put(1, &owner, nullptr, 2, 0); // Cached negative mapping.
+    CHECK(cache.TryGet(1, &owner, nullptr, 2, result) && result == 0);
+    CHECK(!cache.TryGet(2, &owner, nullptr, 2, result)); // Publication invalidates misses.
+    cache.Put(2, &owner, &context, 2, 9);
+    CHECK(cache.TryGet(2, &owner, &context, 2, result) && result == 9);
+    CHECK(!cache.TryGet(2, &owner, nullptr, 2, result));
+    CHECK(!cache.TryGet(2, &owner, &context, 3, result));
+    cache.Put(2, &other, nullptr, 2, 7); // Force eviction; never alias another key.
+    CHECK(!cache.TryGet(2, &owner, &context, 2, result));
+    CHECK(cache.TryGet(2, &other, nullptr, 2, result) && result == 7);
+
+    std::atomic<int> failures{0};
+    std::vector<std::thread> threads;
+    for (int thread = 0; thread < 8; ++thread)
+        threads.emplace_back([&, thread] {
+            thread_local ThreadCache<int, uint64_t> local;
+            for (uint64_t epoch = 1; epoch < 100; ++epoch)
+            {
+                int value;
+                if (local.TryGet(epoch, &owner, nullptr, 0, value)) ++failures;
+                local.Put(epoch, &owner, nullptr, 0, thread);
+                if (!local.TryGet(epoch, &owner, nullptr, 0, value) || value != thread) ++failures;
+            }
+        });
+    for (auto& thread : threads) thread.join();
+    CHECK(failures == 0);
+    for (size_t size : { size_t(0), size_t(1), size_t(32), size_t(33), size_t(1024) })
+    {
+        InvokeBuffer<uint64_t> outer(size);
+        CHECK(outer.UsesInlineStorage() == (size <= 32));
+        for (size_t index = 0; index < size; ++index)
+        {
+            CHECK(outer[index] == 0);
+            outer[index] = index + 1;
+        }
+        InvokeBuffer<uint64_t> nested(size);
+        for (size_t index = 0; index < size; ++index)
+            CHECK(nested[index] == 0 && outer[index] == index + 1);
+    }
+#else
+    CHECK(false && "DHE bounded publication cache and invoke buffer are missing");
+#endif
+}
+#endif
+
 int main()
 {
     std::cout.setf(std::ios::unitbuf);
@@ -2891,6 +2991,8 @@ int main()
 #if HYBRIDCLR_LAB_DHE_ENABLED
     TestDheCurrentImagePlan();
     TestDheMethodRegistry();
+    TestDheCounterBuildMode();
+    TestDhePublicationCacheAndBuffers();
 #endif
     TestOpcodeDecode();
     TestTemporaryMemoryArena();
