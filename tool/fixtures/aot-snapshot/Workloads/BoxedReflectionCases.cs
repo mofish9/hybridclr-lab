@@ -30,6 +30,9 @@ namespace HybridCLR.Lab.Review
                 var old = assembly.GetType("HybridCLR.Lab.Snapshot.SnapshotPlayer")
                     .GetField("OldBoxedEnumerator").GetValue(null);
                 if (old == null) throw new InvalidOperationException("Missing old-box negative control.");
+                Console.WriteLine("DHE review old-box selection: interface=" + HybridCLR.RuntimeApi.IsDifferentialMethodChanged(move) +
+                    ", current-concrete=" + HybridCLR.RuntimeApi.IsDifferentialMethodChanged(concrete) +
+                    ", old-concrete=" + HybridCLR.RuntimeApi.IsDifferentialMethodChanged(old.GetType().GetMethod("MoveNext")));
                 RequireRejected(move, old);
                 RequireRejected(concrete, old);
                 Console.WriteLine("DHE review passed: old-box-interface-and-concrete-rejection");
