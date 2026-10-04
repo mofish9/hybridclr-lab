@@ -2972,6 +2972,7 @@ static void TestDhePublicationCacheAndBuffers()
 static void TestDheIndexedGuardPublication()
 {
     using namespace hybridclr::dhe;
+    hybridclr::native_test::ClearDheResolver();
     ResetForTests();
     std::array<std::string, 6> names;
     std::array<Il2CppAssembly, 6> assemblies{};
@@ -3011,6 +3012,7 @@ static void TestDheIndexedGuardPublication()
         CHECK(hybridclr::native_test::GetDheResolverEnumerationCount() == queries);
     }
     ResetForTests();
+    hybridclr::native_test::ClearDheResolver();
     for (auto* klass : classes) std::free(klass);
 }
 
