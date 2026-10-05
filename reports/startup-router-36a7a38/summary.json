@@ -1,0 +1,2098 @@
+{
+  "format": "hybridclr.startup-windows-router-report.v1",
+  "passed": true,
+  "generatedAtUtc": "2026-10-05T17:59:17.4602221Z",
+  "scope": "one-native-executable-one-unityplayer-startup-bound-backend",
+  "engine": "Unity2022.3.62f3",
+  "currentSha256": "630ec03ceb57399ec34708aea405f781aa27bfc1f313f2b6ad8a5132a784884d",
+  "referenceCaseCount": 10,
+  "differential": 0,
+  "independentPlayerProcesses": 8,
+  "singleExecutable": true,
+  "unselectedBackendLoaded": false,
+  "selectedMetadataMismatchRejectedBeforeUnity": true,
+  "corruptSelectionRejectedBeforeUnity": true,
+  "windowsManagedOnlyConditionalPass": true,
+  "productionReady": false,
+  "androidQualified": false,
+  "iosQualified": false,
+  "webglPlayerQualified": false,
+  "otherEngineMatrixQualified": false,
+  "performanceClaim": false,
+  "fixtureCommit": "cec4864d76b3f7393ceb474496e3c713c8bba68c",
+  "fixtureSha256": "a97cf024077e77dee62291e73e6c05a86ae95132ae963d31a64ee90f39313417",
+  "managedApiSha256": "84e35a3e979595174cdafd8b8571f4823327fe05c020e8a547dacf315ab2d2cd",
+  "pairManifestSha256": "256bd3554f0a50d403e27b6e89cee79bf80bf758e67c5c7c0ce0fd37c9272984",
+  "pairManifest": {
+    "format": "hybridclr.startup-windows-router.v1",
+    "scope": "windows-startup-router-v1",
+    "defaultMode": 1,
+    "recordVersion": 2,
+    "engine": "Unity2022.3.62f3",
+    "packageCommit": "36a7a38c0a947b926f82522a7441ca4ae23d80a0",
+    "packageSourceSha256": {
+      "CMakeLists.txt": "c9f1a4f6ae235a2afe22a6cffa03a4a4f0828837f057f6ca73d47b44a26a997b",
+      "Router.cpp": "0b224d0f2abdbb1b5c555945ff753ef21ecbc17618afa7254c641a1353b255a3",
+      "Store.cpp": "423fac25cf27ff5b3654cc6efd6cfc78a8962bac405638d81a6a83fe3c2ba33c",
+      "Store.h": "a65228d8643be1d835098280408bcb357a75c543b8720d0936ee99b72cf47fe4",
+      "StoreTests.cpp": "6d17e56c8877a9a8b4c11760f07ad18a468836d67e61164012a5d3a752658f1a",
+      "WindowsHost.cpp": "a69be661bfe6747da5f3a1264279ff16a63f8a232f408526e36c8f089b78ba57",
+      "Package-Windows.ps1": "11b4c63cc47b3e301712921cd8f81c1b248ea87b0c3087e546f8a56be77b528e"
+    },
+    "backendSourceIdentities": {
+      "DHE": {
+        "il2cpp_plus": "e426adc57c283865126423b169051558b339388c",
+        "hybridclr_unity": "f2946d5ba35a879724b76afd857176feb1a4adca",
+        "hybridclr": "9c607a3c3d45f88ee83ff9dc5bb0f5ad12c57071"
+      },
+      "LegacyInterpreter": {
+        "il2cpp_plus": "bf15337e189ae7da5876aa51c9b896a36c52a155",
+        "hybridclr_unity": "ac0fdc5c6363a1b6323d017e068c536dd22127dc",
+        "hybridclr": "f40c6f08ccd0391ad9285276b4cc21ada3a180ab"
+      }
+    },
+    "profile": [
+      {
+        "mode": "DHE",
+        "binary": "profiles/DHE/Backend.dll",
+        "binaryHash": "e61a245a23f66ca218eea92cd0c1c9554e063d5b07a840fa7b6b6459404236da",
+        "metadata": "profiles/DHE/il2cpp_data/Metadata/global-metadata.dat",
+        "metadataHash": "ba121423c3c2ee9d17dfff75b659d7f65efb09a2d654cb3fd91e8612074d5053",
+        "dataDirectory": "profiles/DHE/il2cpp_data"
+      },
+      {
+        "mode": "LegacyInterpreter",
+        "binary": "profiles/LegacyInterpreter/Backend.dll",
+        "binaryHash": "09118b6104de36ede7c1319916cb92f4aae49567dc928fbebdcf429c67821ea3",
+        "metadata": "profiles/LegacyInterpreter/il2cpp_data/Metadata/global-metadata.dat",
+        "metadataHash": "6d41a863c5e2cdba1caf79da84ca0a72329844461b02130d4267d008cc293dda",
+        "dataDirectory": "profiles/LegacyInterpreter/il2cpp_data"
+      }
+    ],
+    "exportedEntryCount": 386,
+    "exports": [
+      {
+        "ordinal": 1,
+        "rva": "00235610",
+        "name": "BrotliDecoderCreateInstance"
+      },
+      {
+        "ordinal": 2,
+        "rva": "002356B0",
+        "name": "BrotliDecoderDecompress"
+      },
+      {
+        "ordinal": 3,
+        "rva": "00235780",
+        "name": "BrotliDecoderDecompressStream"
+      },
+      {
+        "ordinal": 4,
+        "rva": "00236AA0",
+        "name": "BrotliDecoderDestroyInstance"
+      },
+      {
+        "ordinal": 5,
+        "rva": "00236AE0",
+        "name": "BrotliDecoderIsFinished"
+      },
+      {
+        "ordinal": 6,
+        "rva": "001173B0",
+        "name": "BrotliEncoderCompress"
+      },
+      {
+        "ordinal": 7,
+        "rva": "00118280",
+        "name": "BrotliEncoderCompressStream"
+      },
+      {
+        "ordinal": 8,
+        "rva": "001189E0",
+        "name": "BrotliEncoderCreateInstance"
+      },
+      {
+        "ordinal": 9,
+        "rva": "00118B90",
+        "name": "BrotliEncoderDestroyInstance"
+      },
+      {
+        "ordinal": 10,
+        "rva": "00118CA0",
+        "name": "BrotliEncoderHasMoreOutput"
+      },
+      {
+        "ordinal": 11,
+        "rva": "00118CB0",
+        "name": "BrotliEncoderSetParameter"
+      },
+      {
+        "ordinal": 12,
+        "rva": "000D0A20",
+        "name": "CloseNLSocket"
+      },
+      {
+        "ordinal": 13,
+        "rva": "000D0A40",
+        "name": "CloseZStream"
+      },
+      {
+        "ordinal": 14,
+        "rva": "000D0AF0",
+        "name": "CreateNLSocket"
+      },
+      {
+        "ordinal": 15,
+        "rva": "000D0B10",
+        "name": "CreateZStream"
+      },
+      {
+        "ordinal": 16,
+        "rva": "001A2DE0",
+        "name": "DllCanUnloadNow"
+      },
+      {
+        "ordinal": 17,
+        "rva": "001A2DF0",
+        "name": "DllGetActivationFactory"
+      },
+      {
+        "ordinal": 18,
+        "rva": "000D0C50",
+        "name": "Flush"
+      },
+      {
+        "ordinal": 19,
+        "rva": "00176B10",
+        "name": "GlobalizationNative_GetTimeZoneDisplayName"
+      },
+      {
+        "ordinal": 20,
+        "rva": "000D0CA0",
+        "name": "ReadEvents"
+      },
+      {
+        "ordinal": 21,
+        "rva": "000D0CC0",
+        "name": "ReadZStream"
+      },
+      {
+        "ordinal": 22,
+        "rva": "00176B30",
+        "name": "SystemNative_FStat2"
+      },
+      {
+        "ordinal": 23,
+        "rva": "00176B50",
+        "name": "SystemNative_UTime"
+      },
+      {
+        "ordinal": 24,
+        "rva": "000D0DB0",
+        "name": "WriteZStream"
+      },
+      {
+        "ordinal": 25,
+        "rva": "0014D220",
+        "name": "il2cpp_add_internal_call"
+      },
+      {
+        "ordinal": 26,
+        "rva": "0014D230",
+        "name": "il2cpp_alloc"
+      },
+      {
+        "ordinal": 27,
+        "rva": "0008BA10",
+        "name": "il2cpp_allocation_granularity"
+      },
+      {
+        "ordinal": 28,
+        "rva": "0014D240",
+        "name": "il2cpp_array_class_get"
+      },
+      {
+        "ordinal": 29,
+        "rva": "0014D250",
+        "name": "il2cpp_array_element_size"
+      },
+      {
+        "ordinal": 30,
+        "rva": "0014D260",
+        "name": "il2cpp_array_get_byte_length"
+      },
+      {
+        "ordinal": 31,
+        "rva": "0014D270",
+        "name": "il2cpp_array_length"
+      },
+      {
+        "ordinal": 32,
+        "rva": "0014D280",
+        "name": "il2cpp_array_new"
+      },
+      {
+        "ordinal": 33,
+        "rva": "0014D290",
+        "name": "il2cpp_array_new_full"
+      },
+      {
+        "ordinal": 34,
+        "rva": "0014D2A0",
+        "name": "il2cpp_array_new_specific"
+      },
+      {
+        "ordinal": 35,
+        "rva": "0014D2B0",
+        "name": "il2cpp_array_object_header_size"
+      },
+      {
+        "ordinal": 36,
+        "rva": "001022C0",
+        "name": "il2cpp_assembly_get_image"
+      },
+      {
+        "ordinal": 37,
+        "rva": "0014D2C0",
+        "name": "il2cpp_bounded_array_class_get"
+      },
+      {
+        "ordinal": 38,
+        "rva": "0014D2D0",
+        "name": "il2cpp_capture_memory_snapshot"
+      },
+      {
+        "ordinal": 39,
+        "rva": "0014D2E0",
+        "name": "il2cpp_class_array_element_size"
+      },
+      {
+        "ordinal": 40,
+        "rva": "0014D2F0",
+        "name": "il2cpp_class_enum_basetype"
+      },
+      {
+        "ordinal": 41,
+        "rva": "0014D300",
+        "name": "il2cpp_class_for_each"
+      },
+      {
+        "ordinal": 42,
+        "rva": "0014D310",
+        "name": "il2cpp_class_from_il2cpp_type"
+      },
+      {
+        "ordinal": 43,
+        "rva": "0014D330",
+        "name": "il2cpp_class_from_name"
+      },
+      {
+        "ordinal": 44,
+        "rva": "0014D350",
+        "name": "il2cpp_class_from_system_type"
+      },
+      {
+        "ordinal": 45,
+        "rva": "0014D370",
+        "name": "il2cpp_class_from_type"
+      },
+      {
+        "ordinal": 46,
+        "rva": "0014D380",
+        "name": "il2cpp_class_get_assemblyname"
+      },
+      {
+        "ordinal": 47,
+        "rva": "0014D390",
+        "name": "il2cpp_class_get_bitmap"
+      },
+      {
+        "ordinal": 48,
+        "rva": "0014D3B0",
+        "name": "il2cpp_class_get_bitmap_size"
+      },
+      {
+        "ordinal": 49,
+        "rva": "0014D3C0",
+        "name": "il2cpp_class_get_data_size"
+      },
+      {
+        "ordinal": 50,
+        "rva": "0014D3D0",
+        "name": "il2cpp_class_get_declaring_type"
+      },
+      {
+        "ordinal": 51,
+        "rva": "0014D3E0",
+        "name": "il2cpp_class_get_element_class"
+      },
+      {
+        "ordinal": 52,
+        "rva": "0014D400",
+        "name": "il2cpp_class_get_events"
+      },
+      {
+        "ordinal": 53,
+        "rva": "0014D410",
+        "name": "il2cpp_class_get_field_from_name"
+      },
+      {
+        "ordinal": 54,
+        "rva": "0014D420",
+        "name": "il2cpp_class_get_fields"
+      },
+      {
+        "ordinal": 55,
+        "rva": "0014D430",
+        "name": "il2cpp_class_get_flags"
+      },
+      {
+        "ordinal": 56,
+        "rva": "0014D440",
+        "name": "il2cpp_class_get_image"
+      },
+      {
+        "ordinal": 57,
+        "rva": "0014D460",
+        "name": "il2cpp_class_get_interfaces"
+      },
+      {
+        "ordinal": 58,
+        "rva": "0014D4B0",
+        "name": "il2cpp_class_get_method_from_name"
+      },
+      {
+        "ordinal": 59,
+        "rva": "0014D4C0",
+        "name": "il2cpp_class_get_methods"
+      },
+      {
+        "ordinal": 60,
+        "rva": "0014D4D0",
+        "name": "il2cpp_class_get_name"
+      },
+      {
+        "ordinal": 61,
+        "rva": "0014D4E0",
+        "name": "il2cpp_class_get_namespace"
+      },
+      {
+        "ordinal": 62,
+        "rva": "0014D4F0",
+        "name": "il2cpp_class_get_nested_types"
+      },
+      {
+        "ordinal": 63,
+        "rva": "0014D500",
+        "name": "il2cpp_class_get_parent"
+      },
+      {
+        "ordinal": 64,
+        "rva": "0014D520",
+        "name": "il2cpp_class_get_properties"
+      },
+      {
+        "ordinal": 65,
+        "rva": "0014D530",
+        "name": "il2cpp_class_get_property_from_name"
+      },
+      {
+        "ordinal": 66,
+        "rva": "0014D540",
+        "name": "il2cpp_class_get_rank"
+      },
+      {
+        "ordinal": 67,
+        "rva": "00003DB0",
+        "name": "il2cpp_class_get_static_field_data"
+      },
+      {
+        "ordinal": 68,
+        "rva": "0014D550",
+        "name": "il2cpp_class_get_type"
+      },
+      {
+        "ordinal": 69,
+        "rva": "0014D560",
+        "name": "il2cpp_class_get_type_token"
+      },
+      {
+        "ordinal": 70,
+        "rva": "0014D570",
+        "name": "il2cpp_class_get_userdata_offset"
+      },
+      {
+        "ordinal": 71,
+        "rva": "0014D580",
+        "name": "il2cpp_class_has_attribute"
+      },
+      {
+        "ordinal": 72,
+        "rva": "0014D590",
+        "name": "il2cpp_class_has_parent"
+      },
+      {
+        "ordinal": 73,
+        "rva": "0014D5D0",
+        "name": "il2cpp_class_has_references"
+      },
+      {
+        "ordinal": 74,
+        "rva": "0014D5E0",
+        "name": "il2cpp_class_instance_size"
+      },
+      {
+        "ordinal": 75,
+        "rva": "0014D5F0",
+        "name": "il2cpp_class_is_abstract"
+      },
+      {
+        "ordinal": 76,
+        "rva": "0014D600",
+        "name": "il2cpp_class_is_assignable_from"
+      },
+      {
+        "ordinal": 77,
+        "rva": "0014D640",
+        "name": "il2cpp_class_is_blittable"
+      },
+      {
+        "ordinal": 78,
+        "rva": "0014D650",
+        "name": "il2cpp_class_is_enum"
+      },
+      {
+        "ordinal": 79,
+        "rva": "0014D660",
+        "name": "il2cpp_class_is_generic"
+      },
+      {
+        "ordinal": 80,
+        "rva": "0014D670",
+        "name": "il2cpp_class_is_inflated"
+      },
+      {
+        "ordinal": 81,
+        "rva": "0014D680",
+        "name": "il2cpp_class_is_inited"
+      },
+      {
+        "ordinal": 82,
+        "rva": "0014D690",
+        "name": "il2cpp_class_is_interface"
+      },
+      {
+        "ordinal": 83,
+        "rva": "0014D6B0",
+        "name": "il2cpp_class_is_subclass_of"
+      },
+      {
+        "ordinal": 84,
+        "rva": "00003D60",
+        "name": "il2cpp_class_is_valuetype"
+      },
+      {
+        "ordinal": 85,
+        "rva": "0014D700",
+        "name": "il2cpp_class_num_fields"
+      },
+      {
+        "ordinal": 86,
+        "rva": "0014D710",
+        "name": "il2cpp_class_set_userdata"
+      },
+      {
+        "ordinal": 87,
+        "rva": "0014D720",
+        "name": "il2cpp_class_value_size"
+      },
+      {
+        "ordinal": 88,
+        "rva": "0014D730",
+        "name": "il2cpp_current_thread_get_frame_at"
+      },
+      {
+        "ordinal": 89,
+        "rva": "0014D740",
+        "name": "il2cpp_current_thread_get_stack_depth"
+      },
+      {
+        "ordinal": 90,
+        "rva": "0014D760",
+        "name": "il2cpp_current_thread_get_top_frame"
+      },
+      {
+        "ordinal": 91,
+        "rva": "0014D770",
+        "name": "il2cpp_current_thread_walk_frame_stack"
+      },
+      {
+        "ordinal": 92,
+        "rva": "0014D780",
+        "name": "il2cpp_custom_attrs_construct"
+      },
+      {
+        "ordinal": 93,
+        "rva": "00004020",
+        "name": "il2cpp_custom_attrs_free"
+      },
+      {
+        "ordinal": 94,
+        "rva": "0014D790",
+        "name": "il2cpp_custom_attrs_from_class"
+      },
+      {
+        "ordinal": 95,
+        "rva": "0014D7A0",
+        "name": "il2cpp_custom_attrs_from_field"
+      },
+      {
+        "ordinal": 96,
+        "rva": "0014D7B0",
+        "name": "il2cpp_custom_attrs_from_method"
+      },
+      {
+        "ordinal": 97,
+        "rva": "0014D7C0",
+        "name": "il2cpp_custom_attrs_get_attr"
+      },
+      {
+        "ordinal": 98,
+        "rva": "0014D7D0",
+        "name": "il2cpp_custom_attrs_has_attr"
+      },
+      {
+        "ordinal": 99,
+        "rva": "0014D7E0",
+        "name": "il2cpp_debug_get_method_info"
+      },
+      {
+        "ordinal": 100,
+        "rva": "00004020",
+        "name": "il2cpp_debugger_set_agent_options"
+      },
+      {
+        "ordinal": 101,
+        "rva": "0014D7F0",
+        "name": "il2cpp_domain_assembly_open"
+      },
+      {
+        "ordinal": 102,
+        "rva": "0014D800",
+        "name": "il2cpp_domain_get"
+      },
+      {
+        "ordinal": 103,
+        "rva": "0014D810",
+        "name": "il2cpp_domain_get_assemblies"
+      },
+      {
+        "ordinal": 104,
+        "rva": "0014D840",
+        "name": "il2cpp_exception_from_name_msg"
+      },
+      {
+        "ordinal": 105,
+        "rva": "0014D850",
+        "name": "il2cpp_field_get_flags"
+      },
+      {
+        "ordinal": 106,
+        "rva": "001022C0",
+        "name": "il2cpp_field_get_name"
+      },
+      {
+        "ordinal": 107,
+        "rva": "0014D860",
+        "name": "il2cpp_field_get_offset"
+      },
+      {
+        "ordinal": 108,
+        "rva": "0014D870",
+        "name": "il2cpp_field_get_parent"
+      },
+      {
+        "ordinal": 109,
+        "rva": "0014D880",
+        "name": "il2cpp_field_get_type"
+      },
+      {
+        "ordinal": 110,
+        "rva": "0014D890",
+        "name": "il2cpp_field_get_value"
+      },
+      {
+        "ordinal": 111,
+        "rva": "0014D8A0",
+        "name": "il2cpp_field_get_value_object"
+      },
+      {
+        "ordinal": 112,
+        "rva": "0014D8B0",
+        "name": "il2cpp_field_has_attribute"
+      },
+      {
+        "ordinal": 113,
+        "rva": "0014D8C0",
+        "name": "il2cpp_field_is_literal"
+      },
+      {
+        "ordinal": 114,
+        "rva": "0014D8D0",
+        "name": "il2cpp_field_set_value"
+      },
+      {
+        "ordinal": 115,
+        "rva": "0014D8E0",
+        "name": "il2cpp_field_set_value_object"
+      },
+      {
+        "ordinal": 116,
+        "rva": "0014D8F0",
+        "name": "il2cpp_field_static_get_value"
+      },
+      {
+        "ordinal": 117,
+        "rva": "0014D900",
+        "name": "il2cpp_field_static_set_value"
+      },
+      {
+        "ordinal": 118,
+        "rva": "0014D910",
+        "name": "il2cpp_format_exception"
+      },
+      {
+        "ordinal": 119,
+        "rva": "0014D9B0",
+        "name": "il2cpp_format_stack_trace"
+      },
+      {
+        "ordinal": 120,
+        "rva": "0014DA50",
+        "name": "il2cpp_free"
+      },
+      {
+        "ordinal": 121,
+        "rva": "0014DA60",
+        "name": "il2cpp_free_captured_memory_snapshot"
+      },
+      {
+        "ordinal": 122,
+        "rva": "0014DA70",
+        "name": "il2cpp_gc_alloc_fixed"
+      },
+      {
+        "ordinal": 123,
+        "rva": "0014DA80",
+        "name": "il2cpp_gc_collect"
+      },
+      {
+        "ordinal": 124,
+        "rva": "0014DA90",
+        "name": "il2cpp_gc_collect_a_little"
+      },
+      {
+        "ordinal": 125,
+        "rva": "0014DAA0",
+        "name": "il2cpp_gc_disable"
+      },
+      {
+        "ordinal": 126,
+        "rva": "0014DAB0",
+        "name": "il2cpp_gc_enable"
+      },
+      {
+        "ordinal": 127,
+        "rva": "0014DAC0",
+        "name": "il2cpp_gc_foreach_heap"
+      },
+      {
+        "ordinal": 128,
+        "rva": "0014DAF0",
+        "name": "il2cpp_gc_free_fixed"
+      },
+      {
+        "ordinal": 129,
+        "rva": "0014DB00",
+        "name": "il2cpp_gc_get_heap_size"
+      },
+      {
+        "ordinal": 130,
+        "rva": "0014DB10",
+        "name": "il2cpp_gc_get_max_time_slice_ns"
+      },
+      {
+        "ordinal": 131,
+        "rva": "0014DB20",
+        "name": "il2cpp_gc_get_used_size"
+      },
+      {
+        "ordinal": 132,
+        "rva": "0007B900",
+        "name": "il2cpp_gc_has_strict_wbarriers"
+      },
+      {
+        "ordinal": 133,
+        "rva": "0014DB30",
+        "name": "il2cpp_gc_is_disabled"
+      },
+      {
+        "ordinal": 134,
+        "rva": "0014DB40",
+        "name": "il2cpp_gc_is_incremental"
+      },
+      {
+        "ordinal": 135,
+        "rva": "00004020",
+        "name": "il2cpp_gc_set_external_allocation_tracker"
+      },
+      {
+        "ordinal": 136,
+        "rva": "00004020",
+        "name": "il2cpp_gc_set_external_wbarrier_tracker"
+      },
+      {
+        "ordinal": 137,
+        "rva": "0014DB50",
+        "name": "il2cpp_gc_set_max_time_slice_ns"
+      },
+      {
+        "ordinal": 138,
+        "rva": "0014DB60",
+        "name": "il2cpp_gc_set_mode"
+      },
+      {
+        "ordinal": 139,
+        "rva": "0014DB70",
+        "name": "il2cpp_gc_start_incremental_collection"
+      },
+      {
+        "ordinal": 140,
+        "rva": "0014DB80",
+        "name": "il2cpp_gc_wbarrier_set_field"
+      },
+      {
+        "ordinal": 141,
+        "rva": "0014DB90",
+        "name": "il2cpp_gchandle_foreach_get_target"
+      },
+      {
+        "ordinal": 142,
+        "rva": "0014DBC0",
+        "name": "il2cpp_gchandle_free"
+      },
+      {
+        "ordinal": 143,
+        "rva": "0014DBD0",
+        "name": "il2cpp_gchandle_get_target"
+      },
+      {
+        "ordinal": 144,
+        "rva": "0014DBE0",
+        "name": "il2cpp_gchandle_new"
+      },
+      {
+        "ordinal": 145,
+        "rva": "0014DBF0",
+        "name": "il2cpp_gchandle_new_weakref"
+      },
+      {
+        "ordinal": 146,
+        "rva": "0014DC20",
+        "name": "il2cpp_get_corlib"
+      },
+      {
+        "ordinal": 147,
+        "rva": "0014DC30",
+        "name": "il2cpp_get_exception_argument_null"
+      },
+      {
+        "ordinal": 148,
+        "rva": "0014D4D0",
+        "name": "il2cpp_image_get_assembly"
+      },
+      {
+        "ordinal": 149,
+        "rva": "0014DC40",
+        "name": "il2cpp_image_get_class"
+      },
+      {
+        "ordinal": 150,
+        "rva": "0014DC50",
+        "name": "il2cpp_image_get_class_count"
+      },
+      {
+        "ordinal": 151,
+        "rva": "0014DC60",
+        "name": "il2cpp_image_get_entry_point"
+      },
+      {
+        "ordinal": 152,
+        "rva": "001022C0",
+        "name": "il2cpp_image_get_filename"
+      },
+      {
+        "ordinal": 153,
+        "rva": "001022C0",
+        "name": "il2cpp_image_get_name"
+      },
+      {
+        "ordinal": 154,
+        "rva": "0014DC70",
+        "name": "il2cpp_init"
+      },
+      {
+        "ordinal": 155,
+        "rva": "0014DCA0",
+        "name": "il2cpp_init_utf16"
+      },
+      {
+        "ordinal": 156,
+        "rva": "0014DD40",
+        "name": "il2cpp_is_debugger_attached"
+      },
+      {
+        "ordinal": 157,
+        "rva": "0014DD50",
+        "name": "il2cpp_is_vm_thread"
+      },
+      {
+        "ordinal": 158,
+        "rva": "0014DD60",
+        "name": "il2cpp_memory_pool_get_region_size"
+      },
+      {
+        "ordinal": 159,
+        "rva": "0014DD70",
+        "name": "il2cpp_memory_pool_set_region_size"
+      },
+      {
+        "ordinal": 160,
+        "rva": "0014DD80",
+        "name": "il2cpp_method_get_class"
+      },
+      {
+        "ordinal": 161,
+        "rva": "0014DD80",
+        "name": "il2cpp_method_get_declaring_type"
+      },
+      {
+        "ordinal": 162,
+        "rva": "0014DD90",
+        "name": "il2cpp_method_get_flags"
+      },
+      {
+        "ordinal": 163,
+        "rva": "0014D4D0",
+        "name": "il2cpp_method_get_from_reflection"
+      },
+      {
+        "ordinal": 164,
+        "rva": "0014D4E0",
+        "name": "il2cpp_method_get_name"
+      },
+      {
+        "ordinal": 165,
+        "rva": "0014DDC0",
+        "name": "il2cpp_method_get_object"
+      },
+      {
+        "ordinal": 166,
+        "rva": "0014DDD0",
+        "name": "il2cpp_method_get_param"
+      },
+      {
+        "ordinal": 167,
+        "rva": "0014DDE0",
+        "name": "il2cpp_method_get_param_count"
+      },
+      {
+        "ordinal": 168,
+        "rva": "0014DDF0",
+        "name": "il2cpp_method_get_param_name"
+      },
+      {
+        "ordinal": 169,
+        "rva": "0014DE00",
+        "name": "il2cpp_method_get_return_type"
+      },
+      {
+        "ordinal": 170,
+        "rva": "0014DE10",
+        "name": "il2cpp_method_get_token"
+      },
+      {
+        "ordinal": 171,
+        "rva": "0014DE20",
+        "name": "il2cpp_method_has_attribute"
+      },
+      {
+        "ordinal": 172,
+        "rva": "0014DE30",
+        "name": "il2cpp_method_is_generic"
+      },
+      {
+        "ordinal": 173,
+        "rva": "0014DE40",
+        "name": "il2cpp_method_is_inflated"
+      },
+      {
+        "ordinal": 174,
+        "rva": "0014DE50",
+        "name": "il2cpp_method_is_instance"
+      },
+      {
+        "ordinal": 175,
+        "rva": "0014DE60",
+        "name": "il2cpp_monitor_enter"
+      },
+      {
+        "ordinal": 176,
+        "rva": "0014DE70",
+        "name": "il2cpp_monitor_exit"
+      },
+      {
+        "ordinal": 177,
+        "rva": "0014DE80",
+        "name": "il2cpp_monitor_pulse"
+      },
+      {
+        "ordinal": 178,
+        "rva": "0014DE90",
+        "name": "il2cpp_monitor_pulse_all"
+      },
+      {
+        "ordinal": 179,
+        "rva": "0014DEA0",
+        "name": "il2cpp_monitor_try_enter"
+      },
+      {
+        "ordinal": 180,
+        "rva": "0014DEB0",
+        "name": "il2cpp_monitor_try_wait"
+      },
+      {
+        "ordinal": 181,
+        "rva": "0014DEC0",
+        "name": "il2cpp_monitor_wait"
+      },
+      {
+        "ordinal": 182,
+        "rva": "0014DED0",
+        "name": "il2cpp_native_stack_trace"
+      },
+      {
+        "ordinal": 183,
+        "rva": "001022C0",
+        "name": "il2cpp_object_get_class"
+      },
+      {
+        "ordinal": 184,
+        "rva": "0014DFA0",
+        "name": "il2cpp_object_get_size"
+      },
+      {
+        "ordinal": 185,
+        "rva": "0014DFB0",
+        "name": "il2cpp_object_get_virtual_method"
+      },
+      {
+        "ordinal": 186,
+        "rva": "0008BA10",
+        "name": "il2cpp_object_header_size"
+      },
+      {
+        "ordinal": 187,
+        "rva": "0014DFC0",
+        "name": "il2cpp_object_new"
+      },
+      {
+        "ordinal": 188,
+        "rva": "0014DFE0",
+        "name": "il2cpp_object_unbox"
+      },
+      {
+        "ordinal": 189,
+        "rva": "0008BA10",
+        "name": "il2cpp_offset_of_array_bounds_in_array_object_header"
+      },
+      {
+        "ordinal": 190,
+        "rva": "0014DFF0",
+        "name": "il2cpp_offset_of_array_length_in_array_object_header"
+      },
+      {
+        "ordinal": 191,
+        "rva": "0014E000",
+        "name": "il2cpp_override_stack_backtrace"
+      },
+      {
+        "ordinal": 192,
+        "rva": "0014E010",
+        "name": "il2cpp_profiler_install"
+      },
+      {
+        "ordinal": 193,
+        "rva": "0014E020",
+        "name": "il2cpp_profiler_install_allocation"
+      },
+      {
+        "ordinal": 194,
+        "rva": "0014E030",
+        "name": "il2cpp_profiler_install_enter_leave"
+      },
+      {
+        "ordinal": 195,
+        "rva": "0014E040",
+        "name": "il2cpp_profiler_install_fileio"
+      },
+      {
+        "ordinal": 196,
+        "rva": "0014E050",
+        "name": "il2cpp_profiler_install_gc"
+      },
+      {
+        "ordinal": 197,
+        "rva": "0014E060",
+        "name": "il2cpp_profiler_install_thread"
+      },
+      {
+        "ordinal": 198,
+        "rva": "0014E070",
+        "name": "il2cpp_profiler_set_events"
+      },
+      {
+        "ordinal": 199,
+        "rva": "0014E080",
+        "name": "il2cpp_property_get_flags"
+      },
+      {
+        "ordinal": 200,
+        "rva": "0014D4D0",
+        "name": "il2cpp_property_get_get_method"
+      },
+      {
+        "ordinal": 201,
+        "rva": "0014D880",
+        "name": "il2cpp_property_get_name"
+      },
+      {
+        "ordinal": 202,
+        "rva": "001022C0",
+        "name": "il2cpp_property_get_parent"
+      },
+      {
+        "ordinal": 203,
+        "rva": "0014D4E0",
+        "name": "il2cpp_property_get_set_method"
+      },
+      {
+        "ordinal": 204,
+        "rva": "0014E090",
+        "name": "il2cpp_raise_exception"
+      },
+      {
+        "ordinal": 205,
+        "rva": "00004020",
+        "name": "il2cpp_register_debugger_agent_transport"
+      },
+      {
+        "ordinal": 206,
+        "rva": "0014E0A0",
+        "name": "il2cpp_register_log_callback"
+      },
+      {
+        "ordinal": 207,
+        "rva": "0014E0B0",
+        "name": "il2cpp_resolve_icall"
+      },
+      {
+        "ordinal": 208,
+        "rva": "0014E0C0",
+        "name": "il2cpp_runtime_class_init"
+      },
+      {
+        "ordinal": 209,
+        "rva": "0014E0D0",
+        "name": "il2cpp_runtime_invoke"
+      },
+      {
+        "ordinal": 210,
+        "rva": "0014E0E0",
+        "name": "il2cpp_runtime_invoke_convert_args"
+      },
+      {
+        "ordinal": 211,
+        "rva": "0014E0F0",
+        "name": "il2cpp_runtime_object_init"
+      },
+      {
+        "ordinal": 212,
+        "rva": "0014E100",
+        "name": "il2cpp_runtime_object_init_exception"
+      },
+      {
+        "ordinal": 213,
+        "rva": "0014E110",
+        "name": "il2cpp_runtime_unhandled_exception_policy_set"
+      },
+      {
+        "ordinal": 214,
+        "rva": "0014E120",
+        "name": "il2cpp_set_commandline_arguments"
+      },
+      {
+        "ordinal": 215,
+        "rva": "0014E130",
+        "name": "il2cpp_set_commandline_arguments_utf16"
+      },
+      {
+        "ordinal": 216,
+        "rva": "0014E140",
+        "name": "il2cpp_set_config"
+      },
+      {
+        "ordinal": 217,
+        "rva": "0014E150",
+        "name": "il2cpp_set_config_dir"
+      },
+      {
+        "ordinal": 218,
+        "rva": "0014E160",
+        "name": "il2cpp_set_config_utf16"
+      },
+      {
+        "ordinal": 219,
+        "rva": "0014E170",
+        "name": "il2cpp_set_data_dir"
+      },
+      {
+        "ordinal": 220,
+        "rva": "0014E180",
+        "name": "il2cpp_set_default_thread_affinity"
+      },
+      {
+        "ordinal": 221,
+        "rva": "0014E190",
+        "name": "il2cpp_set_find_plugin_callback"
+      },
+      {
+        "ordinal": 222,
+        "rva": "0014E1A0",
+        "name": "il2cpp_set_memory_callbacks"
+      },
+      {
+        "ordinal": 223,
+        "rva": "0014E1B0",
+        "name": "il2cpp_set_temp_dir"
+      },
+      {
+        "ordinal": 224,
+        "rva": "0014E1C0",
+        "name": "il2cpp_shutdown"
+      },
+      {
+        "ordinal": 225,
+        "rva": "0014E1D0",
+        "name": "il2cpp_start_gc_world"
+      },
+      {
+        "ordinal": 226,
+        "rva": "0014E1E0",
+        "name": "il2cpp_stats_dump_to_file"
+      },
+      {
+        "ordinal": 227,
+        "rva": "0014E440",
+        "name": "il2cpp_stats_get_value"
+      },
+      {
+        "ordinal": 228,
+        "rva": "0014E4D0",
+        "name": "il2cpp_stop_gc_world"
+      },
+      {
+        "ordinal": 229,
+        "rva": "0014E4E0",
+        "name": "il2cpp_string_chars"
+      },
+      {
+        "ordinal": 230,
+        "rva": "0014E4F0",
+        "name": "il2cpp_string_intern"
+      },
+      {
+        "ordinal": 231,
+        "rva": "0014E500",
+        "name": "il2cpp_string_is_interned"
+      },
+      {
+        "ordinal": 232,
+        "rva": "0014E510",
+        "name": "il2cpp_string_length"
+      },
+      {
+        "ordinal": 233,
+        "rva": "0014E520",
+        "name": "il2cpp_string_new"
+      },
+      {
+        "ordinal": 234,
+        "rva": "0014E530",
+        "name": "il2cpp_string_new_len"
+      },
+      {
+        "ordinal": 235,
+        "rva": "0014E540",
+        "name": "il2cpp_string_new_utf16"
+      },
+      {
+        "ordinal": 236,
+        "rva": "0014E520",
+        "name": "il2cpp_string_new_wrapper"
+      },
+      {
+        "ordinal": 237,
+        "rva": "0014E550",
+        "name": "il2cpp_thread_attach"
+      },
+      {
+        "ordinal": 238,
+        "rva": "0014E560",
+        "name": "il2cpp_thread_current"
+      },
+      {
+        "ordinal": 239,
+        "rva": "0014E570",
+        "name": "il2cpp_thread_detach"
+      },
+      {
+        "ordinal": 240,
+        "rva": "0014E580",
+        "name": "il2cpp_thread_get_all_attached_threads"
+      },
+      {
+        "ordinal": 241,
+        "rva": "0014E590",
+        "name": "il2cpp_thread_get_frame_at"
+      },
+      {
+        "ordinal": 242,
+        "rva": "0014E5A0",
+        "name": "il2cpp_thread_get_stack_depth"
+      },
+      {
+        "ordinal": 243,
+        "rva": "0014E5B0",
+        "name": "il2cpp_thread_get_top_frame"
+      },
+      {
+        "ordinal": 244,
+        "rva": "0014E5C0",
+        "name": "il2cpp_thread_walk_frame_stack"
+      },
+      {
+        "ordinal": 245,
+        "rva": "0014E5D0",
+        "name": "il2cpp_type_equals"
+      },
+      {
+        "ordinal": 246,
+        "rva": "0014E5E0",
+        "name": "il2cpp_type_get_assembly_qualified_name"
+      },
+      {
+        "ordinal": 247,
+        "rva": "0014E690",
+        "name": "il2cpp_type_get_attrs"
+      },
+      {
+        "ordinal": 248,
+        "rva": "0014E6A0",
+        "name": "il2cpp_type_get_class_or_element_class"
+      },
+      {
+        "ordinal": 249,
+        "rva": "0014E6C0",
+        "name": "il2cpp_type_get_name"
+      },
+      {
+        "ordinal": 250,
+        "rva": "0014E770",
+        "name": "il2cpp_type_get_name_chunked"
+      },
+      {
+        "ordinal": 251,
+        "rva": "0014E780",
+        "name": "il2cpp_type_get_object"
+      },
+      {
+        "ordinal": 252,
+        "rva": "0014E790",
+        "name": "il2cpp_type_get_reflection_name"
+      },
+      {
+        "ordinal": 253,
+        "rva": "0014E840",
+        "name": "il2cpp_type_get_type"
+      },
+      {
+        "ordinal": 254,
+        "rva": "0014E850",
+        "name": "il2cpp_type_is_byref"
+      },
+      {
+        "ordinal": 255,
+        "rva": "0014E860",
+        "name": "il2cpp_type_is_pointer_type"
+      },
+      {
+        "ordinal": 256,
+        "rva": "0014E870",
+        "name": "il2cpp_type_is_static"
+      },
+      {
+        "ordinal": 257,
+        "rva": "0014E880",
+        "name": "il2cpp_unhandled_exception"
+      },
+      {
+        "ordinal": 258,
+        "rva": "0014E890",
+        "name": "il2cpp_unity_install_unitytls_interface"
+      },
+      {
+        "ordinal": 259,
+        "rva": "0014E8A0",
+        "name": "il2cpp_unity_liveness_allocate_struct"
+      },
+      {
+        "ordinal": 260,
+        "rva": "0014E8B0",
+        "name": "il2cpp_unity_liveness_calculation_from_root"
+      },
+      {
+        "ordinal": 261,
+        "rva": "0014E8C0",
+        "name": "il2cpp_unity_liveness_calculation_from_statics"
+      },
+      {
+        "ordinal": 262,
+        "rva": "0014E8D0",
+        "name": "il2cpp_unity_liveness_finalize"
+      },
+      {
+        "ordinal": 263,
+        "rva": "0014E8E0",
+        "name": "il2cpp_unity_liveness_free_struct"
+      },
+      {
+        "ordinal": 264,
+        "rva": "0014E8F0",
+        "name": "il2cpp_unity_set_android_network_up_state_func"
+      },
+      {
+        "ordinal": 265,
+        "rva": "0014E900",
+        "name": "il2cpp_value_box"
+      },
+      {
+        "ordinal": 266,
+        "rva": "00087BF0",
+        "name": "jinfo_get_method"
+      },
+      {
+        "ordinal": 267,
+        "rva": "000983F0",
+        "name": "mini_get_interp_callbacks"
+      },
+      {
+        "ordinal": 268,
+        "rva": "000983F0",
+        "name": "mini_jit_info_table_find"
+      },
+      {
+        "ordinal": 269,
+        "rva": "00004020",
+        "name": "mono_arch_clear_breakpoint"
+      },
+      {
+        "ordinal": 270,
+        "rva": "000983F0",
+        "name": "mono_arch_context_get_int_reg"
+      },
+      {
+        "ordinal": 271,
+        "rva": "00004020",
+        "name": "mono_arch_context_set_int_reg"
+      },
+      {
+        "ordinal": 272,
+        "rva": "00004020",
+        "name": "mono_arch_set_breakpoint"
+      },
+      {
+        "ordinal": 273,
+        "rva": "00004020",
+        "name": "mono_arch_setup_resume_sighandler_ctx"
+      },
+      {
+        "ordinal": 274,
+        "rva": "00004020",
+        "name": "mono_arch_skip_breakpoint"
+      },
+      {
+        "ordinal": 275,
+        "rva": "00004020",
+        "name": "mono_arch_skip_single_step"
+      },
+      {
+        "ordinal": 276,
+        "rva": "00004020",
+        "name": "mono_arch_start_single_stepping"
+      },
+      {
+        "ordinal": 277,
+        "rva": "00004020",
+        "name": "mono_arch_stop_single_stepping"
+      },
+      {
+        "ordinal": 278,
+        "rva": "0014E910",
+        "name": "mono_array_element_size"
+      },
+      {
+        "ordinal": 279,
+        "rva": "000983F0",
+        "name": "mono_array_length"
+      },
+      {
+        "ordinal": 280,
+        "rva": "0014E920",
+        "name": "mono_class_get_byref_type"
+      },
+      {
+        "ordinal": 281,
+        "rva": "000983F0",
+        "name": "mono_class_get_checked"
+      },
+      {
+        "ordinal": 282,
+        "rva": "0014E930",
+        "name": "mono_class_get_context"
+      },
+      {
+        "ordinal": 283,
+        "rva": "0014D3E0",
+        "name": "mono_class_get_element_class"
+      },
+      {
+        "ordinal": 284,
+        "rva": "0014D430",
+        "name": "mono_class_get_flags"
+      },
+      {
+        "ordinal": 285,
+        "rva": "0014D440",
+        "name": "mono_class_get_image"
+      },
+      {
+        "ordinal": 286,
+        "rva": "0014D460",
+        "name": "mono_class_get_interfaces"
+      },
+      {
+        "ordinal": 287,
+        "rva": "0014D4C0",
+        "name": "mono_class_get_methods"
+      },
+      {
+        "ordinal": 288,
+        "rva": "0014D4D0",
+        "name": "mono_class_get_name"
+      },
+      {
+        "ordinal": 289,
+        "rva": "0014D4E0",
+        "name": "mono_class_get_namespace"
+      },
+      {
+        "ordinal": 290,
+        "rva": "0014E940",
+        "name": "mono_class_get_nested_types"
+      },
+      {
+        "ordinal": 291,
+        "rva": "0014D500",
+        "name": "mono_class_get_parent"
+      },
+      {
+        "ordinal": 292,
+        "rva": "0014D520",
+        "name": "mono_class_get_properties"
+      },
+      {
+        "ordinal": 293,
+        "rva": "0014D540",
+        "name": "mono_class_get_rank"
+      },
+      {
+        "ordinal": 294,
+        "rva": "0014D550",
+        "name": "mono_class_get_type"
+      },
+      {
+        "ordinal": 295,
+        "rva": "0014D560",
+        "name": "mono_class_get_type_token"
+      },
+      {
+        "ordinal": 296,
+        "rva": "0014E950",
+        "name": "mono_class_has_parent"
+      },
+      {
+        "ordinal": 297,
+        "rva": "0014E970",
+        "name": "mono_class_instance_size"
+      },
+      {
+        "ordinal": 298,
+        "rva": "0014E990",
+        "name": "mono_class_is_enum"
+      },
+      {
+        "ordinal": 299,
+        "rva": "00003D60",
+        "name": "mono_class_is_valuetype"
+      },
+      {
+        "ordinal": 300,
+        "rva": "0014D700",
+        "name": "mono_class_num_fields"
+      },
+      {
+        "ordinal": 301,
+        "rva": "0014E9A0",
+        "name": "mono_class_num_methods"
+      },
+      {
+        "ordinal": 302,
+        "rva": "0014E9B0",
+        "name": "mono_class_num_properties"
+      },
+      {
+        "ordinal": 303,
+        "rva": "0014D720",
+        "name": "mono_class_value_size"
+      },
+      {
+        "ordinal": 304,
+        "rva": "000983F0",
+        "name": "mono_debug_find_method"
+      },
+      {
+        "ordinal": 305,
+        "rva": "00004020",
+        "name": "mono_debug_free_locals"
+      },
+      {
+        "ordinal": 306,
+        "rva": "000983F0",
+        "name": "mono_debug_il_offset_from_address"
+      },
+      {
+        "ordinal": 307,
+        "rva": "000983F0",
+        "name": "mono_debug_lookup_locals"
+      },
+      {
+        "ordinal": 308,
+        "rva": "0014E9C0",
+        "name": "mono_domain_foreach"
+      },
+      {
+        "ordinal": 309,
+        "rva": "0014D800",
+        "name": "mono_domain_get"
+      },
+      {
+        "ordinal": 310,
+        "rva": "0014E9F0",
+        "name": "mono_domain_get_assemblies_iter"
+      },
+      {
+        "ordinal": 311,
+        "rva": "0014EAA0",
+        "name": "mono_domain_get_corlib"
+      },
+      {
+        "ordinal": 312,
+        "rva": "000983F0",
+        "name": "mono_domain_is_unloading"
+      },
+      {
+        "ordinal": 313,
+        "rva": "0014EAB0",
+        "name": "mono_environment_exitcode_get"
+      },
+      {
+        "ordinal": 314,
+        "rva": "0014EAC0",
+        "name": "mono_environment_exitcode_set"
+      },
+      {
+        "ordinal": 315,
+        "rva": "001022C0",
+        "name": "mono_field_get_name"
+      },
+      {
+        "ordinal": 316,
+        "rva": "0014D860",
+        "name": "mono_field_get_offset"
+      },
+      {
+        "ordinal": 317,
+        "rva": "0014D870",
+        "name": "mono_field_get_parent"
+      },
+      {
+        "ordinal": 318,
+        "rva": "0014D880",
+        "name": "mono_field_get_type"
+      },
+      {
+        "ordinal": 319,
+        "rva": "00004020",
+        "name": "mono_field_set_value"
+      },
+      {
+        "ordinal": 320,
+        "rva": "000983F0",
+        "name": "mono_find_prev_seq_point_for_native_offset"
+      },
+      {
+        "ordinal": 321,
+        "rva": "0014EAD0",
+        "name": "mono_free_method_signatures"
+      },
+      {
+        "ordinal": 322,
+        "rva": "0014EB20",
+        "name": "mono_gc_register_root"
+      },
+      {
+        "ordinal": 323,
+        "rva": "0014EB40",
+        "name": "mono_get_byte_class"
+      },
+      {
+        "ordinal": 324,
+        "rva": "000983F0",
+        "name": "mono_get_lmf_addr"
+      },
+      {
+        "ordinal": 325,
+        "rva": "0014D800",
+        "name": "mono_get_root_domain"
+      },
+      {
+        "ordinal": 326,
+        "rva": "0014EB50",
+        "name": "mono_get_runtime_build_info"
+      },
+      {
+        "ordinal": 327,
+        "rva": "0014EB60",
+        "name": "mono_get_string_class"
+      },
+      {
+        "ordinal": 328,
+        "rva": "0014D4D0",
+        "name": "mono_image_get_assembly"
+      },
+      {
+        "ordinal": 329,
+        "rva": "0014EB70",
+        "name": "mono_image_get_entry_point"
+      },
+      {
+        "ordinal": 330,
+        "rva": "001022C0",
+        "name": "mono_image_get_filename"
+      },
+      {
+        "ordinal": 331,
+        "rva": "0014EB90",
+        "name": "mono_image_get_guid"
+      },
+      {
+        "ordinal": 332,
+        "rva": "001022C0",
+        "name": "mono_image_get_name"
+      },
+      {
+        "ordinal": 333,
+        "rva": "000983F0",
+        "name": "mono_image_is_dynamic"
+      },
+      {
+        "ordinal": 334,
+        "rva": "000983F0",
+        "name": "mono_jit_find_compiled_method_with_jit_info"
+      },
+      {
+        "ordinal": 335,
+        "rva": "000983F0",
+        "name": "mono_jit_info_get_method"
+      },
+      {
+        "ordinal": 336,
+        "rva": "000983F0",
+        "name": "mono_jit_info_table_find"
+      },
+      {
+        "ordinal": 337,
+        "rva": "000983F0",
+        "name": "mono_marshal_method_from_wrapper"
+      },
+      {
+        "ordinal": 338,
+        "rva": "0014DA50",
+        "name": "mono_metadata_free_mh"
+      },
+      {
+        "ordinal": 339,
+        "rva": "0014EBA0",
+        "name": "mono_metadata_generic_class_is_valuetype"
+      },
+      {
+        "ordinal": 340,
+        "rva": "0014EBB0",
+        "name": "mono_method_full_name"
+      },
+      {
+        "ordinal": 341,
+        "rva": "0014DD80",
+        "name": "mono_method_get_class"
+      },
+      {
+        "ordinal": 342,
+        "rva": "0014EBC0",
+        "name": "mono_method_get_context"
+      },
+      {
+        "ordinal": 343,
+        "rva": "000983F0",
+        "name": "mono_method_get_declaring_generic_method"
+      },
+      {
+        "ordinal": 344,
+        "rva": "0014DD90",
+        "name": "mono_method_get_flags"
+      },
+      {
+        "ordinal": 345,
+        "rva": "0014EBE0",
+        "name": "mono_method_get_generic_container"
+      },
+      {
+        "ordinal": 346,
+        "rva": "000983F0",
+        "name": "mono_method_get_header_checked"
+      },
+      {
+        "ordinal": 347,
+        "rva": "0014D4E0",
+        "name": "mono_method_get_name"
+      },
+      {
+        "ordinal": 348,
+        "rva": "0014EC00",
+        "name": "mono_method_get_param_names"
+      },
+      {
+        "ordinal": 349,
+        "rva": "0014DE10",
+        "name": "mono_method_get_token"
+      },
+      {
+        "ordinal": 350,
+        "rva": "0014DE30",
+        "name": "mono_method_is_generic"
+      },
+      {
+        "ordinal": 351,
+        "rva": "0014DE40",
+        "name": "mono_method_is_inflated"
+      },
+      {
+        "ordinal": 352,
+        "rva": "0014EC60",
+        "name": "mono_object_get_type"
+      },
+      {
+        "ordinal": 353,
+        "rva": "0014DFE0",
+        "name": "mono_object_unbox_internal"
+      },
+      {
+        "ordinal": 354,
+        "rva": "00004020",
+        "name": "mono_pal_init"
+      },
+      {
+        "ordinal": 355,
+        "rva": "0014D4D0",
+        "name": "mono_property_get_get_method"
+      },
+      {
+        "ordinal": 356,
+        "rva": "0014D880",
+        "name": "mono_property_get_name"
+      },
+      {
+        "ordinal": 357,
+        "rva": "001022C0",
+        "name": "mono_property_get_parent"
+      },
+      {
+        "ordinal": 358,
+        "rva": "0014D4E0",
+        "name": "mono_property_get_set_method"
+      },
+      {
+        "ordinal": 359,
+        "rva": "00004020",
+        "name": "mono_restore_context"
+      },
+      {
+        "ordinal": 360,
+        "rva": "0014EC70",
+        "name": "mono_runtime_is_shutting_down"
+      },
+      {
+        "ordinal": 361,
+        "rva": "0014E1C0",
+        "name": "mono_runtime_quit"
+      },
+      {
+        "ordinal": 362,
+        "rva": "00004020",
+        "name": "mono_set_is_debugger_attached"
+      },
+      {
+        "ordinal": 363,
+        "rva": "00004020",
+        "name": "mono_set_lmf"
+      },
+      {
+        "ordinal": 364,
+        "rva": "0014EC90",
+        "name": "mono_string_chars"
+      },
+      {
+        "ordinal": 365,
+        "rva": "0014ECA0",
+        "name": "mono_string_free"
+      },
+      {
+        "ordinal": 366,
+        "rva": "00004040",
+        "name": "mono_string_length"
+      },
+      {
+        "ordinal": 367,
+        "rva": "0014ECB0",
+        "name": "mono_string_new"
+      },
+      {
+        "ordinal": 368,
+        "rva": "0014E550",
+        "name": "mono_thread_attach"
+      },
+      {
+        "ordinal": 369,
+        "rva": "0014E560",
+        "name": "mono_thread_current"
+      },
+      {
+        "ordinal": 370,
+        "rva": "0014E570",
+        "name": "mono_thread_detach"
+      },
+      {
+        "ordinal": 371,
+        "rva": "0014ECC0",
+        "name": "mono_thread_get_main"
+      },
+      {
+        "ordinal": 372,
+        "rva": "0014ECD0",
+        "name": "mono_thread_set_name"
+      },
+      {
+        "ordinal": 373,
+        "rva": "000983F0",
+        "name": "mono_thread_state_init_from_current"
+      },
+      {
+        "ordinal": 374,
+        "rva": "000983F0",
+        "name": "mono_thread_state_init_from_monoctx"
+      },
+      {
+        "ordinal": 375,
+        "rva": "00004020",
+        "name": "mono_thread_suspend_all_other_threads"
+      },
+      {
+        "ordinal": 376,
+        "rva": "0014ED00",
+        "name": "mono_type_full_name"
+      },
+      {
+        "ordinal": 377,
+        "rva": "0014ED90",
+        "name": "mono_type_generic_inst_is_valuetype"
+      },
+      {
+        "ordinal": 378,
+        "rva": "0014E690",
+        "name": "mono_type_get_attrs"
+      },
+      {
+        "ordinal": 379,
+        "rva": "0014EDB0",
+        "name": "mono_type_get_class"
+      },
+      {
+        "ordinal": 380,
+        "rva": "0014EDC0",
+        "name": "mono_type_get_name_full"
+      },
+      {
+        "ordinal": 381,
+        "rva": "0014E840",
+        "name": "mono_type_get_type"
+      },
+      {
+        "ordinal": 382,
+        "rva": "0014EE50",
+        "name": "mono_type_is_byref"
+      },
+      {
+        "ordinal": 383,
+        "rva": "0014EE60",
+        "name": "mono_type_is_generic_parameter"
+      },
+      {
+        "ordinal": 384,
+        "rva": "0014EE80",
+        "name": "mono_type_is_reference"
+      },
+      {
+        "ordinal": 385,
+        "rva": "0014EEB0",
+        "name": "mono_type_is_struct"
+      },
+      {
+        "ordinal": 386,
+        "rva": "0014EED0",
+        "name": "mono_type_size"
+      }
+    ],
+    "hostSha256": "793903ed2a0d55b53590f73910e7cd38dbae713d74f7cab6e82bca5b19992f90",
+    "routerSha256": "2be21e09b350b222232cb5bc7580926e6fa8e9e3eee6a4feecb6e7f872ad1b5f",
+    "unityPlayerSha256": "15c7d26aaee4d0225bb40658f26a72f8251f5f049a8f304cd5159245247aafa3",
+    "sharedUnityDataProfile": "LegacyInterpreter",
+    "unityAssetCompatibility": "pending-managed-only-candidate",
+    "productionReady": false,
+    "currentSha256": "630ec03ceb57399ec34708aea405f781aa27bfc1f313f2b6ad8a5132a784884d",
+    "fixtureCommit": "cec4864d76b3f7393ceb474496e3c713c8bba68c",
+    "fixtureSha256": "a97cf024077e77dee62291e73e6c05a86ae95132ae963d31a64ee90f39313417",
+    "managedApiSha256": "84e35a3e979595174cdafd8b8571f4823327fe05c020e8a547dacf315ab2d2cd"
+  },
+  "cases": [
+    {
+      "committedGeneration": 1,
+      "name": "01-default-save-legacy",
+      "selectedGeneration": 0,
+      "pid": 26352,
+      "backendMask": 1,
+      "expectedFailure": false,
+      "mode": "DHE",
+      "caseCount": 10
+    },
+    {
+      "committedGeneration": 0,
+      "name": "02-restarted-legacy",
+      "selectedGeneration": 1,
+      "pid": 39444,
+      "backendMask": 2,
+      "expectedFailure": false,
+      "mode": "LegacyInterpreter",
+      "caseCount": 10
+    },
+    {
+      "committedGeneration": 0,
+      "name": "03-sticky-legacy",
+      "selectedGeneration": 1,
+      "pid": 81116,
+      "backendMask": 2,
+      "expectedFailure": false,
+      "mode": "LegacyInterpreter",
+      "caseCount": 10
+    },
+    {
+      "committedGeneration": 2,
+      "name": "04-save-dhe",
+      "selectedGeneration": 1,
+      "pid": 70344,
+      "backendMask": 2,
+      "expectedFailure": false,
+      "mode": "LegacyInterpreter",
+      "caseCount": 10
+    },
+    {
+      "committedGeneration": 3,
+      "name": "05-dhe-fault-save-legacy",
+      "selectedGeneration": 2,
+      "pid": 39256,
+      "backendMask": 1,
+      "expectedFailure": true,
+      "mode": "DHE",
+      "caseCount": 0
+    },
+    {
+      "committedGeneration": 0,
+      "name": "06-legacy-with-bad-dhe-input",
+      "selectedGeneration": 3,
+      "pid": 9684,
+      "backendMask": 2,
+      "expectedFailure": false,
+      "mode": "LegacyInterpreter",
+      "caseCount": 10
+    },
+    {
+      "committedGeneration": 4,
+      "name": "07-clear-tombstone",
+      "selectedGeneration": 3,
+      "pid": 68476,
+      "backendMask": 2,
+      "expectedFailure": false,
+      "mode": "LegacyInterpreter",
+      "caseCount": 10
+    },
+    {
+      "committedGeneration": 0,
+      "name": "08-restarted-default",
+      "selectedGeneration": 4,
+      "pid": 57176,
+      "backendMask": 1,
+      "expectedFailure": false,
+      "mode": "DHE",
+      "caseCount": 10
+    }
+  ]
+}

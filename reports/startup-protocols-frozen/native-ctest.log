@@ -1,0 +1,19 @@
+Start testing: Oct 06 01:59 中国标准时间
+----------------------------------------------------------
+1/1 Testing: startup_store_correctness
+1/1 Test: startup_store_correctness
+Command: "C:/hybridclr_optimize/worktrees/lab-dhe-startup-fallback-v1/artifacts/startup-router-frozen/native-build/Release/startup_store_tests.exe"
+Directory: C:/hybridclr_optimize/worktrees/lab-dhe-startup-fallback-v1/artifacts/startup-router-frozen/native-build
+"startup_store_correctness" start time: Oct 06 01:59 中国标准时间
+Output:
+----------------------------------------------------------
+Startup protocol, tombstone, scope, corruption, interrupted write, 8 threads and 4 processes: passed
+<end of output>
+Test time =  12.04 sec
+----------------------------------------------------------
+Test Passed.
+"startup_store_correctness" end time: Oct 06 01:59 中国标准时间
+"startup_store_correctness" time elapsed: 00:00:12
+----------------------------------------------------------
+
+End testing: Oct 06 01:59 中国标准时间

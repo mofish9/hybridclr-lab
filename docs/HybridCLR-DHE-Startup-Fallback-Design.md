@@ -2,7 +2,7 @@
 
 日期：2026-10-05；更新：2026-10-06（Asia/Shanghai）
 
-状态：设计草案；Windows 双 Player 启动流程实验已通过。单可执行文件内的双后端切换、其他平台及性能仍未验证；见第 17 节和 Windows 实验报告。
+状态：库级源码候选；Windows 单原生 EXE 双后端的纯托管门禁已有条件通过。完整资源、其他平台及性能仍未验收；见 `HybridCLR-Startup-Implementation-Report.md`。第 17 节保留早期双 Player 实验的历史身份与范围。
 
 候选分支：`research/dhe-startup-fallback-v1`。本文件不是发布报告。
 
