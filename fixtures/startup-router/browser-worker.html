@@ -1,0 +1,6 @@
+<!doctype html><script type="module">
+import { IndexedDbStartupStore } from '/startup.mjs';
+const params=new URLSearchParams(location.search), token=params.get('token');
+try { const store=new IndexedDbStartupStore(params.get('name'),'browser-test'); for(let n=0;n<5;++n)await store.commit(2); parent.postMessage({token,ok:true},location.origin); }
+catch(error) { parent.postMessage({token,ok:false,error:String(error)},location.origin); }
+</script>

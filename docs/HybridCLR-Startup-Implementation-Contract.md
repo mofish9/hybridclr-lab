@@ -1,0 +1,15 @@
+# Startup implementation v1 candidate
+
+2026-10-06. This source candidate is separate from the frozen two-Player experiment.
+
+The observable contract is one immutable effective backend per process, selected before Unity/IL2CPP registration, and durable requests for the next process only. Primary gates are same Current SHA, zero differential, real non-DHE loading, no unselected native library loaded, corruption rejection, concurrency, and restart persistence. No performance claim is made; ordinary DHE execution must acquire no mode check. A startup-bound engine API trampoline adds an indirect jump and requires later performance measurement.
+
+Windows implementation: one native executable, one UnityPlayer, a GameAssembly export router, independently built DHE and non-DHE backend DLLs, and metadata matched to the selected backend. All actual backend exports (including compatibility/native exports outside DO_API) are inventoried and bound before UnityMain. Only the selected DLL is loaded. Native code and static registrations remain isolated by DLL. The initial Player gate covers managed hotfixes and a shared empty Unity scene; assets referring to hotfix script types remain an independent mandatory gate. Build data compatibility must not be inferred from this gate.
+
+The package owns managed API, standalone startup/store code, routing/packaging tools and browser host. Neither existing runtime repository needs method-path changes for this dynamic Windows integration. Windows 2021/Tuanjie and Android/iOS integration remain separate gates. Android needs APK/JNI loader integration, iOS needs static symbol isolation, WebGL uses a pre-createUnityInstance host. None is qualified by Windows.
+
+Record v2 is 88 bytes, little endian: HCLRST02 (8), version=2 (u32), requested mode (u32: 0 default tombstone, 1 DHE, 2 LegacyInterpreter), generation (u64, 1..2^53-1), scope SHA-256 (32), body SHA-256 (32). Missing record alone resolves to manifest default with generation 0. Corruption, scope mismatch and IO errors are explicit; no silent fallback. Reset is a tombstone commit and preserves monotonic generation. Checksum detects damage, not hostile modification.
+
+Native store holds an interprocess lock across read/validate/update, flushes a temporary file, and atomically replaces the record. Browser storage uses an IndexedDB read/compare/write transaction, resolving its promise on transaction completion. Browser eviction remains a platform limitation. Effective selection publishes a complete immutable snapshot with release/acquire; a prepare failure consumes the attempt and does not permit another backend in the process. Requests never modify that snapshot, and post-failure host requests remain possible once selection exists.
+
+Rollback: remove package startup API/tool commits and rebuild Base, or persist the prepackaged traditional mode and restart. Do not edit runtime tags or reuse old experimental evidence. Candidate commits and hashes must be included in new reports. No runtime tag, formal integration, or release claim is authorized by passing the first Windows gate.

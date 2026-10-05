@@ -1,0 +1,55 @@
+<!doctype html>
+<meta charset="utf-8">
+<title>HybridCLR startup browser protocol tests</title>
+<h1>HybridCLR startup protocol tests</h1>
+<button id="run">Run real IndexedDB tests</button>
+<pre id="result">Ready</pre>
+<script type="module">
+import { IndexedDbStartupStore, HybridStartupHost, encodeRecord, decodeRecord } from '/startup.mjs';
+const require = condition => { if (!condition) throw new Error('Assertion failed'); };
+const rejected = async (promise, status) => { try { await promise; } catch(error) { require(error.status === status); return; } throw new Error('Expected ' + status); };
+const profiles = { 1: { profileId:'dhe', loaderUrl:'/test-loader.js', config:{codeUrl:'/dhe.wasm',dataUrl:'/dhe.data',frameworkUrl:'/dhe.js'} }, 2: { profileId:'legacy',loaderUrl:'/test-loader.js', config:{codeUrl:'/legacy.wasm',dataUrl:'/legacy.data',frameworkUrl:'/legacy.js'} } };
+document.querySelector('#run').onclick = async () => {
+  const result = document.querySelector('#result'); result.textContent = 'Running';
+  const cases = [];
+  try {
+    const name = 'hclr-test-' + crypto.randomUUID(), scope='browser-test';
+    const store=new IndexedDbStartupStore(name,scope);
+    require((await store.read()).generation === 0); cases.push('missing-default');
+    const manifest={defaultMode:1,profiles}; const host=new HybridStartupHost(store,manifest);
+    manifest.profiles[1].config.codeUrl='/mutated.wasm';
+    const preparation=host.prepare(); await rejected(host.prepare(),'AlreadyPrepared');
+    require((await preparation).effectiveMode === 1); cases.push('concurrent-prepare-immutable');
+    const saved=await host.requestNextStartupMode(2); require(saved.restartRequired && saved.committedGeneration === 1 && host.selection.effectiveMode === 1);
+    const fresh=new HybridStartupHost(store,{defaultMode:1,profiles}); require((await fresh.prepare()).effectiveMode === 2); cases.push('next-instance-only');
+    await fresh.createInstance(document.createElement('canvas')); require(globalThis.testCreatedConfig.codeUrl === '/legacy.wasm');
+    await rejected(fresh.createInstance(document.createElement('canvas')),'AlreadyPrepared'); cases.push('single-selected-loader-with-test-double');
+    const cleared=await fresh.clearNextStartupMode(); require(cleared.restartRequired && cleared.committedGeneration === 2 && fresh.selection.effectiveMode === 2);
+    require((await store.read()).requestedMode === 0); cases.push('tombstone-preserves-generation');
+    await rejected(host.requestNextStartupMode(0),'InvalidMode');
+    await rejected(new IndexedDbStartupStore(name,'other-app').read(),'ScopeMismatch'); cases.push('scope-and-invalid-mode');
+    await Promise.all(Array.from({length:16},()=>new IndexedDbStartupStore(name,scope).commit(1)));
+    require((await store.read()).generation === 18); cases.push('concurrent-transactions');
+    const workers = Array.from({length:4},()=>new Promise((resolve,reject)=> {
+      const token=crypto.randomUUID(), frame=document.createElement('iframe'); frame.hidden=true;
+      const listen=event=> { if(event.origin!==location.origin || event.data?.token!==token)return; window.removeEventListener('message',listen); frame.remove(); event.data.ok ? resolve() : reject(new Error(event.data.error)); };
+      window.addEventListener('message',listen); frame.src='/browser-worker.html?name='+encodeURIComponent(name)+'&token='+token; document.body.appendChild(frame);
+    }));
+    await Promise.all(workers); require((await store.read()).generation===38); cases.push('four-independent-frame-stores');
+    const native=new Uint8Array(await (await fetch('/native-record.bin')).arrayBuffer());
+    const decoded=await decodeRecord('protocol-vector',native); require(decoded.requestedMode===2 && decoded.generation===1);
+    const js=await encodeRecord('protocol-vector',2,1); require(js.every((b,n)=>b===native[n]));
+    require((await fetch('/js-record.bin',{method:'POST',body:js})).ok); cases.push('native-js-byte-interoperability');
+    const bad=js.slice(); bad[12]^=1; await rejected(decodeRecord('protocol-vector',bad),'Corrupt');
+    await rejected(decodeRecord('protocol-vector',new Uint8Array(3)),'Corrupt'); cases.push('record-corruption');
+    const unavailable=new HybridStartupHost({read:async()=>{throw Object.assign(new Error(),{status:'IoError'});}}, {defaultMode:1,profiles});
+    await rejected(unavailable.prepare(),'IoError'); await rejected(unavailable.prepare(),'AlreadyPrepared'); cases.push('store-failure-no-reselect');
+    // Explicitly injected IO failure proves rejection propagation, not browser quota exhaustion.
+    const writeFailure=new HybridStartupHost({read:()=>store.read(),commit:async()=>{throw Object.assign(new Error(),{status:'QuotaExceeded'});}}, {defaultMode:1,profiles});
+    const beforeFailure=(await writeFailure.prepare()).effectiveMode; await rejected(writeFailure.requestNextStartupMode(2),'QuotaExceeded'); require(writeFailure.selection.effectiveMode===beforeFailure); cases.push('write-error-propagation');
+    const db=await store.open(); db.close(); await new Promise((resolve,reject)=> { const deletion=indexedDB.deleteDatabase(name); deletion.onsuccess=resolve; deletion.onerror=reject; });
+    const report={passed:true,scope:'real-browser-indexeddb-and-host-protocol-only',webglPlayerQualified:false,caseCount:cases.length,cases,userAgent:navigator.userAgent};
+    result.textContent=JSON.stringify(report,null,2); await fetch('/browser-report.json',{method:'POST',body:JSON.stringify(report)});
+  } catch(error) { result.textContent=JSON.stringify({passed:false,error:String(error),stack:error.stack,cases},null,2); }
+};
+</script>
