@@ -1,0 +1,173 @@
+{
+  "schemaVersion": 1,
+  "format": "hybridclr.startup-windows-flow-report.json",
+  "generatedAtUtc": "2026-10-05T17:02:09.9017881Z",
+  "passed": true,
+  "scope": "two-independent-windows-il2cpp-players-with-pre-unity-launcher",
+  "engine": "Unity2022.3.62f3",
+  "target": "StandaloneWindows64",
+  "currentSha256": "bbc6f6204fcb8659edefc058358a83bf50198e7fa985357e5433f64ae02cab51",
+  "referenceCaseCount": 10,
+  "differential": 0,
+  "independentPlayerProcessCount": 8,
+  "corruptSelectionRejectedBeforeLaunch": true,
+  "validatesSingleExecutableBackendSwitch": false,
+  "qualifiesAndroid": false,
+  "qualifiesWebGl": false,
+  "qualifiesIos": false,
+  "performanceClaim": false,
+  "dheDispatchDiagnostics": true,
+  "ordinaryAotGuards": false,
+  "fixtureCommit": "115bc81c9663d64c234e486b1924ea2986c3fc30",
+  "fixtureSourceSha256": {
+    "StartupControl.cs": "5b689394160d6934dcd802d38e23b310be976bd40cd2932af4dcdbc3050578df",
+    "PlayerRunner.cs": "09ce10aa10fcdcbbe75bc5f8effc9b9e27050d73f56b9c0daf83b355ad30681d",
+    "FixtureBuild.cs": "dc7a5505d87b52295c99b9043114d9a4bc6819d9ff9bcdc299ecd4ee4447bb99",
+    "Hotfix.cs": "c07bfbff74f4613e11b87f08542361f8c0f3395c877e620b3c1723cbafa51a80",
+    "Launcher.cs": "66aed6fb190379219afb8acb46751b1b22ba52a46c7ad75a34a9c8eb70e26b36",
+    "Launcher.csproj": "364acb09f6a9e33322c1467252992ff187bb82fbecfb8f8ee5e914b07e243516"
+  },
+  "pairManifestSha256": "5c532efba3ecb5e523d3e9d31659f24f93e1e27224b05d58ea504b0f559740b3",
+  "pairManifest": {
+    "format": "hybridclr.startup-windows-pair.json",
+    "scope": "two-independent-windows-il2cpp-players",
+    "fixtureCommit": "115bc81c9663d64c234e486b1924ea2986c3fc30",
+    "fixtureSourceSha256": {
+      "StartupControl.cs": "5b689394160d6934dcd802d38e23b310be976bd40cd2932af4dcdbc3050578df",
+      "PlayerRunner.cs": "09ce10aa10fcdcbbe75bc5f8effc9b9e27050d73f56b9c0daf83b355ad30681d",
+      "FixtureBuild.cs": "dc7a5505d87b52295c99b9043114d9a4bc6819d9ff9bcdc299ecd4ee4447bb99",
+      "Hotfix.cs": "c07bfbff74f4613e11b87f08542361f8c0f3395c877e620b3c1723cbafa51a80",
+      "Launcher.cs": "66aed6fb190379219afb8acb46751b1b22ba52a46c7ad75a34a9c8eb70e26b36",
+      "Launcher.csproj": "364acb09f6a9e33322c1467252992ff187bb82fbecfb8f8ee5e914b07e243516"
+    },
+    "engine": "Unity2022.3.62f3",
+    "il2cppCodeGeneration": "OptimizeSize",
+    "dheDispatchDiagnostics": true,
+    "ordinaryAotGuards": false,
+    "currentSha256": "bbc6f6204fcb8659edefc058358a83bf50198e7fa985357e5433f64ae02cab51",
+    "sourceIdentities": {
+      "DHE": {
+        "hybridclr": "9c607a3c3d45f88ee83ff9dc5bb0f5ad12c57071",
+        "hybridclr_unity": "f2946d5ba35a879724b76afd857176feb1a4adca",
+        "il2cpp_plus": "e426adc57c283865126423b169051558b339388c"
+      },
+      "LegacyInterpreter": {
+        "hybridclr": "f40c6f08ccd0391ad9285276b4cc21ada3a180ab",
+        "hybridclr_unity": "ac0fdc5c6363a1b6323d017e068c536dd22127dc",
+        "il2cpp_plus": "bf15337e189ae7da5876aa51c9b896a36c52a155"
+      }
+    },
+    "DHE": {
+      "gameAssemblyBytes": 21724672,
+      "player": "DHE/player/StartupPlayer.exe",
+      "metadata": "DHE/player/StartupPlayer_Data/il2cpp_data/Metadata/global-metadata.dat",
+      "playerSha256": "143dd3c6a93a45819a98e3cca8fd1535b461cdf860c927d955ca54815faf5d7b",
+      "metadataSha256": "edc00da78dc7b34e79a5c910d94ecdb758a6feef57ffe5b6b9c0c2a428cf8508",
+      "gameAssembly": "DHE/player/GameAssembly.dll",
+      "gameAssemblySha256": "0c50c45cb0de555ea6ba87545d68f1b6df0c879d06f69e3d9253741547483800"
+    },
+    "LegacyInterpreter": {
+      "gameAssemblyBytes": 7282176,
+      "player": "LegacyInterpreter/player/StartupPlayer.exe",
+      "metadata": "LegacyInterpreter/player/StartupPlayer_Data/il2cpp_data/Metadata/global-metadata.dat",
+      "playerSha256": "143dd3c6a93a45819a98e3cca8fd1535b461cdf860c927d955ca54815faf5d7b",
+      "metadataSha256": "5900dfbfb69dbe9b67af27c9af3be49c2a017fc10aaa6c3b28ba1716c4819e28",
+      "gameAssembly": "LegacyInterpreter/player/GameAssembly.dll",
+      "gameAssemblySha256": "c5d78c19aaacbcb37bc20cd595a85c46945bf65e0fe0e2c16f7521d6217a8c27"
+    }
+  },
+  "sourceIdentities": {
+    "DHE": {
+      "hybridclr": "9c607a3c3d45f88ee83ff9dc5bb0f5ad12c57071",
+      "hybridclr_unity": "f2946d5ba35a879724b76afd857176feb1a4adca",
+      "il2cpp_plus": "e426adc57c283865126423b169051558b339388c"
+    },
+    "LegacyInterpreter": {
+      "hybridclr": "f40c6f08ccd0391ad9285276b4cc21ada3a180ab",
+      "hybridclr_unity": "ac0fdc5c6363a1b6323d017e068c536dd22127dc",
+      "il2cpp_plus": "bf15337e189ae7da5876aa51c9b896a36c52a155"
+    }
+  },
+  "cases": [
+    {
+      "playerReport": "C:\\hybridclr_optimize\\worktrees\\lab-dhe-startup-fallback-v1\\reports\\startup-windows-115bc81\\01-default-dhe-request-legacy.json",
+      "caseCount": 10,
+      "pid": 118520,
+      "passed": true,
+      "currentSha256": "bbc6f6204fcb8659edefc058358a83bf50198e7fa985357e5433f64ae02cab51",
+      "mode": "DHE",
+      "expectedFailure": false,
+      "name": "01-default-dhe-request-legacy"
+    },
+    {
+      "playerReport": "C:\\hybridclr_optimize\\worktrees\\lab-dhe-startup-fallback-v1\\reports\\startup-windows-115bc81\\02-restarted-legacy.json",
+      "caseCount": 10,
+      "pid": 32512,
+      "passed": true,
+      "currentSha256": "bbc6f6204fcb8659edefc058358a83bf50198e7fa985357e5433f64ae02cab51",
+      "mode": "LegacyInterpreter",
+      "expectedFailure": false,
+      "name": "02-restarted-legacy"
+    },
+    {
+      "playerReport": "C:\\hybridclr_optimize\\worktrees\\lab-dhe-startup-fallback-v1\\reports\\startup-windows-115bc81\\03-legacy-choice-persists.json",
+      "caseCount": 10,
+      "pid": 35396,
+      "passed": true,
+      "currentSha256": "bbc6f6204fcb8659edefc058358a83bf50198e7fa985357e5433f64ae02cab51",
+      "mode": "LegacyInterpreter",
+      "expectedFailure": false,
+      "name": "03-legacy-choice-persists"
+    },
+    {
+      "playerReport": "C:\\hybridclr_optimize\\worktrees\\lab-dhe-startup-fallback-v1\\reports\\startup-windows-115bc81\\04-legacy-request-dhe.json",
+      "caseCount": 10,
+      "pid": 13208,
+      "passed": true,
+      "currentSha256": "bbc6f6204fcb8659edefc058358a83bf50198e7fa985357e5433f64ae02cab51",
+      "mode": "LegacyInterpreter",
+      "expectedFailure": false,
+      "name": "04-legacy-request-dhe"
+    },
+    {
+      "playerReport": "C:\\hybridclr_optimize\\worktrees\\lab-dhe-startup-fallback-v1\\reports\\startup-windows-115bc81\\05-restarted-dhe-fault-request-legacy.json",
+      "caseCount": 0,
+      "pid": 69512,
+      "passed": true,
+      "currentSha256": "bbc6f6204fcb8659edefc058358a83bf50198e7fa985357e5433f64ae02cab51",
+      "mode": "DHE",
+      "expectedFailure": true,
+      "name": "05-restarted-dhe-fault-request-legacy"
+    },
+    {
+      "playerReport": "C:\\hybridclr_optimize\\worktrees\\lab-dhe-startup-fallback-v1\\reports\\startup-windows-115bc81\\06-legacy-with-broken-dhe-mv.json",
+      "caseCount": 10,
+      "pid": 30976,
+      "passed": true,
+      "currentSha256": "bbc6f6204fcb8659edefc058358a83bf50198e7fa985357e5433f64ae02cab51",
+      "mode": "LegacyInterpreter",
+      "expectedFailure": false,
+      "name": "06-legacy-with-broken-dhe-mv"
+    },
+    {
+      "playerReport": "C:\\hybridclr_optimize\\worktrees\\lab-dhe-startup-fallback-v1\\reports\\startup-windows-115bc81\\07-legacy-clear-next-choice.json",
+      "caseCount": 10,
+      "pid": 116204,
+      "passed": true,
+      "currentSha256": "bbc6f6204fcb8659edefc058358a83bf50198e7fa985357e5433f64ae02cab51",
+      "mode": "LegacyInterpreter",
+      "expectedFailure": false,
+      "name": "07-legacy-clear-next-choice"
+    },
+    {
+      "playerReport": "C:\\hybridclr_optimize\\worktrees\\lab-dhe-startup-fallback-v1\\reports\\startup-windows-115bc81\\08-cleared-default-dhe.json",
+      "caseCount": 10,
+      "pid": 17612,
+      "passed": true,
+      "currentSha256": "bbc6f6204fcb8659edefc058358a83bf50198e7fa985357e5433f64ae02cab51",
+      "mode": "DHE",
+      "expectedFailure": false,
+      "name": "08-cleared-default-dhe"
+    }
+  ]
+}

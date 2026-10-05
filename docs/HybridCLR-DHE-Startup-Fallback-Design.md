@@ -2,7 +2,7 @@
 
 日期：2026-10-05；更新：2026-10-06（Asia/Shanghai）
 
-状态：设计草案；源码审计完成，链接、Player、设备与性能实验未执行。
+状态：设计草案；Windows 双 Player 启动流程实验已通过。单可执行文件内的双后端切换、其他平台及性能仍未验证；见第 17 节和 Windows 实验报告。
 
 候选分支：`research/dhe-startup-fallback-v1`。本文件不是发布报告。
 
@@ -202,9 +202,11 @@ iOS 完整符号隔离不仅是 C++ namespace：包含 `il2cpp_*`、全局数据
 
 按三引擎锁定官方 upstream + 当前 DHE + 非 DHE reference 精确身份。建立 public/private Unity API、预初始化、GC、native plugin、callback、生成代码及静态构造器清单。先定义 reference case，再实施选择控制层。
 
-### G1：Android / WebGL 首轮可行性，iOS 后续验证
+### G1：先验证 Windows 流程，再验证 Android / WebGL 接入
 
 用户于 2026-10-06 明确暂缺 iOS 环境，首轮验证 Android 和 WebGL。iOS 保留设计和后续独立门禁，不阻塞 Android/WebGL 候选研究；首轮结果不外推 iOS。
+
+用户随后要求先基于 Windows IL2CPP 验证流程。执行顺序调整为 G1a Windows 双 Player/pre-Unity launcher 流程实验，再执行 G1b Android/WebGL 实际封装。Windows 候选只证明其明示的进程级选择流程，不替代一个可执行文件内的双 GameAssembly 接入或其他平台。
 
 Android 首先验证同一个 APK 的启动选择、仅加载所选后端及 metadata 配对；WebGL 首先验证同一发布 manifest 的双 WASM profile 与共享 Current。使用极小普通 AOT bootstrap、稳定 contract 和一个 Current DLL，测 effective/profile identity、一次初始化、加载和退出，接着验证保存下一次选择及真正重启。需要目标真实 Editor、设备/浏览器实际产物；本草案未运行双后端 Player 实验。
 
@@ -242,6 +244,8 @@ Android/iOS 真机 correctness、尾延迟、内存、温度与弱核证据分�
 源码回滚以仓库级独立提交撤销及重新构建 Base 为边界；不能让某个 profile 的 metadata 与另一个版本代码混配。运营回滚通过 next-startup 接口选择已预置且已验收的 profile，重启后加载兼容 Current；不能撤销公共控制层自身的 native 缺陷。资源回滚到经过该双 profile 验收的归档 Current，必要时重启。
 
 ## 14. 本轮交付与待证结论
+
+本节保留初版设计时的审计结论；后续 Windows 实验状态见第 17 节。
 
 已完成：当前源码启动边界、AOT 注册/查找和 DHE 公共 hook 审计；架构否决项；强隔离目标；选择/持久化接口与状态机；各平台封装候选、独立验收与回滚边界。
 
@@ -295,3 +299,13 @@ Current 一次编译
 - 阅读团结 WebGL loader 模板，存在 `frameworkUrl`、`codeUrl`、`dataUrl` 配置；framework 下载从所选 URL 创建 script。说明 profile URL 选择存在研究切入点，不是 Unity 2022 双后端或共享业务资源正确性结果。
 
 上述仅为环境与加载入口预检查；G1 双后端实现、实际构建与运行未完成。Android 设备连接和 Unity 2022 WebGL 模块缺失分别影响真机与目标版本 WebGL 验证，不能写为通过。iOS 本轮明确延期。
+
+## 17. Windows 流程实验（2026-10-06）
+
+详见 `docs/HybridCLR-DHE-Startup-Windows-Experiment.md`。在冻结 fixture 提交 `115bc81c9663d64c234e486b1924ea2986c3fc30` 上，8 个 PID 唯一的实际 Windows IL2CPP Player 进程完成选择、重启、持久化、清除和 DHE 输入故障后的传统解释流程；7 个正常 workload 进程均为 10 cases、CLR differential=0，另一个为预期的 DHE 拒绝。损坏本地选择记录也已验证在启动 Player 前拒绝。
+
+两 Player 从同一发行目录启动，读取同一份 SHA-256 为 `bbc6f6204fcb8659edefc058358a83bf50198e7fa985357e5433f64ae02cab51` 的 Current DLL。传统端无热更 AOT assembly，使用非 DHE opt3 runtime 的普通 `Assembly.Load`；DHE 端验证改变方法选择解释、未改变方法保留 AOT。最终原始报告为 `reports/startup-windows-115bc81/summary.json`。
+
+选择发生在独立 .NET 启动器启动 Unity Player 之前；托管 `EffectiveMode` 来自该 Player 编译时固定的 profile，不能修改。持久化接口在 AOT Player 中真实执行；发现托管命名 Mutex 不受 IL2CPP 支持后，改为 Windows 原生 Mutex adapter 并重建两 Player。
+
+这是库侧契约的 Windows prototype，代码在 lab fixture 中，未迁入正式 runtime/package。它不证明单可执行文件内双 runtime、完整三引擎矩阵、全部 DHE 功能边界或 Unity 资源共用。实验 DHE 开启 dispatch diagnostics、关闭 ordinary AOT guards，限定纯 managed hotfix workload，不可当作生产等价性能或全边界验收。没有新的 runtime/package tag 或正式维护线改动。
