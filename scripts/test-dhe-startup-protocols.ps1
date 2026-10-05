@@ -12,6 +12,8 @@ New-Item -ItemType Directory -Path $ReportRoot | Out-Null
 function Check([string]$Operation){if($LASTEXITCODE -ne 0){throw "$Operation failed, exit $LASTEXITCODE"}}
 function Hash([string]$Path){(Get-FileHash -LiteralPath $Path).Hash.ToLowerInvariant()}
 $native=Join-Path $PairRoot 'native-build/Release/startup_store_tests.exe'
+$nativeLog=Join-Path $PairRoot 'native-build/Testing/Temporary/LastTest.log'
+if(-not (Test-Path -LiteralPath $nativeLog) -or (Get-Content -LiteralPath $nativeLog -Raw) -notmatch 'Test Passed\.'){throw 'Paired native CTest evidence is missing or failed.'}
 $vector=Join-Path $ReportRoot 'native-record.bin'
 & $native --vector $vector; Check 'Native vector generation'
 $java=Join-Path $EditorRoot 'Editor/Data/PlaybackEngines/AndroidPlayer/OpenJDK/bin/java.exe'
@@ -35,7 +37,7 @@ $core=Join-Path $EditorRoot 'Editor/Data/PlaybackEngines/windowsstandalonesuppor
 $report=[ordered]@{
     format='hybridclr.startup-cross-host-protocol-report.v1';passed=$true;generatedAtUtc=[DateTime]::UtcNow.ToString('o')
     packageCommit=(& git -C $PackageRoot rev-parse HEAD).Trim();fixtureCommit=(& git -C (Split-Path -Parent $PSScriptRoot) rev-parse HEAD).Trim()
-    nativeTestExeSha256=(Hash $native);nativeCTest='passed-see-paired-native-build-LastTest.log'
+    nativeTestExeSha256=(Hash $native);nativeCTest='passed-see-paired-native-build-LastTest.log';nativeCTestLogSha256=(Hash $nativeLog)
     javaSdkCompilation=$true;javaSdkJarSha256=(Hash $androidJar);javaAdapterSha256=(Hash $javaSource)
     byteRecordDifferential=0;recordSha256=(Hash $vector);nativeJavaBrowserEquivalent=$true
     browser=$browser;browserHostSha256=(Hash (Join-Path $PackageRoot 'Tools~/Startup/HybridStartupHost.mjs'))
