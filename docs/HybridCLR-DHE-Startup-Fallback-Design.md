@@ -1,6 +1,6 @@
 # DHE / 传统 HybridCLR 启动选择设计 v0.1
 
-日期：2026-10-05（Asia/Shanghai）
+日期：2026-10-05；更新：2026-10-06（Asia/Shanghai）
 
 状态：设计草案；源码审计完成，链接、Player、设备与性能实验未执行。
 
@@ -202,9 +202,11 @@ iOS 完整符号隔离不仅是 C++ namespace：包含 `il2cpp_*`、全局数据
 
 按三引擎锁定官方 upstream + 当前 DHE + 非 DHE reference 精确身份。建立 public/private Unity API、预初始化、GC、native plugin、callback、生成代码及静态构造器清单。先定义 reference case，再实施选择控制层。
 
-### G1：最难平台的链接可行性
+### G1：Android / WebGL 首轮可行性，iOS 后续验证
 
-并列验证 iOS 静态符号隔离最小工程与 WebGL 双 WASM 同发布 loader。Android/Windows 不能替代它们。先用极小普通 AOT bootstrap、稳定 contract 和一个 Current DLL，测 effective/profile identity、一次初始化、加载和退出。需要目标真实 Editor、macOS/Xcode、浏览器实际产物；本草案未运行这些实验。
+用户于 2026-10-06 明确暂缺 iOS 环境，首轮验证 Android 和 WebGL。iOS 保留设计和后续独立门禁，不阻塞 Android/WebGL 候选研究；首轮结果不外推 iOS。
+
+Android 首先验证同一个 APK 的启动选择、仅加载所选后端及 metadata 配对；WebGL 首先验证同一发布 manifest 的双 WASM profile 与共享 Current。使用极小普通 AOT bootstrap、稳定 contract 和一个 Current DLL，测 effective/profile identity、一次初始化、加载和退出，接着验证保存下一次选择及真正重启。需要目标真实 Editor、设备/浏览器实际产物；本草案未运行双后端 Player 实验。
 
 G1 未通过时不批量改造各 runtime，不发布同后端强制解释作为替代。可以优化封装方式或引擎接入，但必须保留强隔离验收条件。
 
@@ -245,4 +247,51 @@ Android/iOS 真机 correctness、尾延迟、内存、温度与弱核证据分�
 
 未完成：任何 runtime 实现、native 编译/CTest、Player、macOS/Xcode、WebGL 实际构建与启动、双后端链接、资源共用证明及性能/包体/内存测量。本轮不声明“有条件发布通过”，仅为待验证设计。
 
-最优先的不确定项是 iOS 引擎静态入口与双后端符号/状态隔离，以及 WebGL 两 profile 的 Unity data/资源兼容；接口设计可先稳定，但实现架构须以 G1 证据定案。
+首轮最优先的不确定项是 Android 引擎加载链与单 APK 双后端接入，以及 WebGL 两 profile 的 Unity data/资源兼容；接口设计可先稳定，但实现架构须以 G1 证据定案。iOS 静态入口、符号与状态隔离在环境具备后独立验证。
+
+## 15. 热更发布和维护成本
+
+目标是每个平台一份业务源码、一轮 Current 编译、一份业务 DLL/AssetBundle 内容、一次热更版本发布；两后端的 native 构建发生在 Base 制作时，不在每次资源热更时重新编译 native。
+
+```text
+Current 一次编译
+  + DHE 附属计划/MV及兼容校验
+  + 传统模式兼容校验
+  + 各后端所需的匹配 AOT metadata
+  -> 一个共享资源 envelope
+  -> 双模式验收通过
+  -> 一个发布版本
+```
+
+两模式各自的附属描述和 AOT metadata 可以不同，这不构成两份业务热更包。资源按内容 hash 去重；相同 DLL/bundle 不重复存储。AOT metadata 跟随其 Base 身份归档，支持内容寻址缓存，不要求每次热更重新下载未变化的 metadata；后端变化或兼容性需求变化时必须重新校验，不能无条件视为永久不变。
+
+| 成本面 | 增量与控制方式 |
+|---|---|
+| 游戏业务开发 | 仍维护一份代码；初次接入需清理不满足传统解释边界的 AOT 依赖和 DHE 专属调用 |
+| Base 构建 | 生成并锁定两后端，增加 native 构建、桥接/裁剪及集成验收；用单命令产出 PairManifest，禁止人工配对 |
+| 每次热更制作 | Current 一次编译，增加传统兼容性检查和双模式验证；MV/计划等描述由工具自动生成 |
+| 每次热更 QA | 两模式必须测试；有 B 个仍支持 Base、T 个目标平台时，最多形成约 2×B×T 条 correctness lane，各 lane 使用各自平台实际 Current；共享 reference 和并行 CI 可以减少等待，但不能删除门禁 |
+| 日常运营 | 保持单发布版本、单资源目录/manifest；增加按 Base 范围切模式及观测 mode/profileId 的能力，提示与重启仍由项目负责 |
+| 库维护 | 较高：DHE、传统后端、公共控制层与平台封装均需维护；普通解释器 bug 修复需审查是否同步两端，不能将 DHE 提交整批合入传统端 |
+| 包体/CDN | Android Base 多一套后端及可能专属 data，增量待测，不能声称整 APK 翻倍；WebGL 服务端保存两套 profile，客户端正常只下载所选套，首次改选会下载另一套所需文件 |
+| 客户端内存 | 不应初始化两个 heap，但映射、缓存和动态库副作用仍需测量，不以“只选一套”推断未选端零内存 |
+
+总体判断：运营流程增量较小，发布验收增量明确，库/构建工具初次开发和长期维护成本较高。现阶段不能给出工时、百分比、包体或内存收益承诺。
+
+若同一份业务资源无法同时满足两种类型体系，应修正共享 contract/资源兼容性或判定该资源不支持双模式，不以为两模式分别发布业务 DLL/bundle 来悄悄改变需求。已验证的传统后端可以锁定为稳定线，但稳定线不是无需测试或无需修 bug 的冻结副本。
+
+## 16. 首轮本机预检查（2026-10-06）
+
+可复现探测脚本为 `scripts/probe-dhe-startup-platforms.ps1`，本轮原始报告为 `reports/dhe-startup-platform-preflight-20261006.json`。报告显式使用 `scope=environment-and-loader-inspection-only`、`dualBackendGateStatus=not-run`，并记录实际库 SHA-256、加载符号及源码 HEAD。它不执行 APK 安装、数据清除或 Player 测试。
+
+```powershell
+./scripts/probe-dhe-startup-platforms.ps1 -WorkspaceRoot C:/hybridclr_optimize -Output reports/dhe-startup-platform-preflight-20261006.json
+```
+
+- Unity 2022.3.62f3：AndroidPlayer、SDK/NDK/ADB 可用；WebGLSupport 未安装。其本地官方 module manifest 指向同版本 WebGL installer，downloadSize=587745280 bytes、installedSize=2733865984 bytes；补模块不需要升级 Editor/upstream，本轮未下载安装。
+- Unity 2021.3.45f2、团结 2022.3.62t10/t12：存在 WebGLSupport，可用于各自 profile 的研究，不能替代 Unity 2022.3.62f3 的正式验证。
+- 调用 Unity 2022 ADB `devices -l` 未发现设备。无 Android 双后端真机 correctness/重启/内存或性能结果。没有安装 APK、清除设备数据或复用旧结果。
+- 实际读取 Unity 2022 Release ARM64 `libunity.so` 的 ELF：存在 `dlopen`、`dlsym` 未定义入口，没有 `libil2cpp.so` 的 DT_NEEDED 项；字符串含 `il2cpp_init`、`il2cpp_set_data_dir`。`libmain.so` 字符串含 `libil2cpp.so`、`libunity.so`。这是运行库加载入口研究证据，不足以证明双后端可替换或所有调用已覆盖。
+- 阅读团结 WebGL loader 模板，存在 `frameworkUrl`、`codeUrl`、`dataUrl` 配置；framework 下载从所选 URL 创建 script。说明 profile URL 选择存在研究切入点，不是 Unity 2022 双后端或共享业务资源正确性结果。
+
+上述仅为环境与加载入口预检查；G1 双后端实现、实际构建与运行未完成。Android 设备连接和 Unity 2022 WebGL 模块缺失分别影响真机与目标版本 WebGL 验证，不能写为通过。iOS 本轮明确延期。

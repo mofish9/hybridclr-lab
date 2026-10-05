@@ -1,0 +1,77 @@
+{
+  "schemaVersion": 1,
+  "format": "hybridclr.dhe-startup-platform-preflight.json",
+  "generatedAtUtc": "2026-10-05T16:17:11.8458275Z",
+  "scope": "environment-and-loader-inspection-only",
+  "dualBackendGateStatus": "not-run",
+  "sourceIdentities": {
+    "hybridclr": "9c607a3c3d45f88ee83ff9dc5bb0f5ad12c57071",
+    "il2cpp_plus": "e426adc57c283865126423b169051558b339388c",
+    "hybridclr_unity": "f2946d5ba35a879724b76afd857176feb1a4adca"
+  },
+  "android": {
+    "libraryInspection": {
+      "mainLibrary": "C:\\Program Files\\Unity\\Hub\\Editor\\2022.3.62f3\\Editor\\Data\\PlaybackEngines\\AndroidPlayer\\Variations\\il2cpp\\Release\\Libs\\arm64-v8a\\libmain.so",
+      "undefinedLoaderSymbols": [
+        "    76: 0000000000000000     0 FUNC    GLOBAL DEFAULT   UND dlopen@LIBC",
+        "    77: 0000000000000000     0 FUNC    GLOBAL DEFAULT   UND dlsym@LIBC"
+      ],
+      "unityRuntimeStrings": [
+        "il2cpp_init",
+        "il2cpp_set_data_dir"
+      ],
+      "dynamicLibraryEntries": [
+        "  0x0000000000000001 (NEEDED)       Shared library: [libandroid.so]",
+        "  0x0000000000000001 (NEEDED)       Shared library: [liblog.so]",
+        "  0x0000000000000001 (NEEDED)       Shared library: [libz.so]",
+        "  0x0000000000000001 (NEEDED)       Shared library: [libEGL.so]",
+        "  0x0000000000000001 (NEEDED)       Shared library: [libmediandk.so]",
+        "  0x0000000000000001 (NEEDED)       Shared library: [libm.so]",
+        "  0x0000000000000001 (NEEDED)       Shared library: [libdl.so]",
+        "  0x0000000000000001 (NEEDED)       Shared library: [libc.so]",
+        "  0x000000000000000e (SONAME)       Library soname: [libunity.so]"
+      ],
+      "mainLibrarySha256": "e6ee684092c38dd1f604c572506ada33238dd94fb0ac0220b06d4d82ead2cf31",
+      "unityLibrary": "C:\\Program Files\\Unity\\Hub\\Editor\\2022.3.62f3\\Editor\\Data\\PlaybackEngines\\AndroidPlayer\\Variations\\il2cpp\\Release\\Libs\\arm64-v8a\\libunity.so",
+      "unityLibrarySha256": "69e92df2e98dc260086e45e77a201df1d6f1759a146b7434667318da2cbbf5b6",
+      "mainLibraryStrings": [
+        "libil2cpp.so",
+        "libunity.so"
+      ]
+    },
+    "editorRoot": "C:\\Program Files\\Unity\\Hub\\Editor\\2022.3.62f3",
+    "readyDeviceCount": 0,
+    "adbPath": "C:\\Program Files\\Unity\\Hub\\Editor\\2022.3.62f3\\Editor\\Data\\PlaybackEngines\\AndroidPlayer\\SDK\\platform-tools\\adb.exe",
+    "adbDeviceRows": [],
+    "playerCorrectnessStatus": "not-run"
+  },
+  "webGl": {
+    "otherEditors": [
+      {
+        "webGlModulePresent": true,
+        "editorRoot": "C:/Program Files/Unity/Hub/Editor/2021.3.45f2"
+      },
+      {
+        "webGlModulePresent": true,
+        "editorRoot": "C:/Program Files/Tuanjie/Hub/Editor/2022.3.62t10"
+      },
+      {
+        "webGlModulePresent": true,
+        "editorRoot": "C:/Program Files/Tuanjie/Hub/Editor/2022.3.62t12"
+      }
+    ],
+    "otherEditorEvidenceCannotQualifyTarget": true,
+    "targetEditorRoot": "C:\\Program Files\\Unity\\Hub\\Editor\\2022.3.62f3",
+    "targetModulePresent": false,
+    "dualProfilePlayerStatus": "not-run",
+    "targetModuleInstaller": {
+      "downloadBytes": 587745280,
+      "url": "https://download.unity3d.com/download_unity/96770f904ca7/TargetSupportInstaller/UnitySetup-WebGL-Support-for-Editor-2022.3.62f3.exe",
+      "installedBytes": 2733865984
+    }
+  },
+  "ios": {
+    "status": "deferred-by-user",
+    "qualifiesIos": false
+  }
+}
