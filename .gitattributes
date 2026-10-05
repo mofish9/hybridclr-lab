@@ -1,0 +1,2 @@
+# Preserve the raw CTest log byte-for-byte: native encoding, CRLF, SHA evidence.
+reports/startup-protocols-frozen/native-ctest.log binary
