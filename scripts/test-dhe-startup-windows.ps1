@@ -14,6 +14,7 @@ $referencePath = Join-Path $ReportRoot 'reference.json'
 & $launcher --root $PairRoot --reference --report $referencePath
 if ($LASTEXITCODE -ne 0) { throw 'CLR reference failed.' }
 $reference = Get-Content -LiteralPath $referencePath -Raw | ConvertFrom-Json
+if ($reference.currentSha256 -ne $pair.currentSha256) { throw 'CLR reference Current identity differs from the pair.' }
 $results = [Collections.Generic.List[object]]::new()
 function Run-Case([string]$Name, [string]$ExpectedMode, [string[]]$Extra = @(), [bool]$ExpectedFailure = $false) {
     $report = Join-Path $ReportRoot "$Name.json"

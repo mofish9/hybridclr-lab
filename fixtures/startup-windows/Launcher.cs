@@ -28,7 +28,8 @@ static class Launcher
             string root = Path.GetFullPath(Required(args, "--root"));
             if (Array.IndexOf(args, "--reference") >= 0)
             {
-                var assembly = System.Reflection.Assembly.Load(File.ReadAllBytes(Path.Combine(root, "shared/StartupHotfix.dll")));
+                byte[] currentBytes = File.ReadAllBytes(Path.Combine(root, "shared/StartupHotfix.dll"));
+                var assembly = System.Reflection.Assembly.Load(currentBytes);
                 var entry = assembly.GetType("StartupHotfix.Entry", true);
                 int Invoke(string name, params object[] values) { return (int)entry.GetMethod(name).Invoke(null, values); }
                 var actual = new[] {
@@ -38,7 +39,10 @@ static class Launcher
                     (int)assembly.GetType("StartupHotfix.AddedType", true).GetField("Value").GetValue(
                         Activator.CreateInstance(assembly.GetType("StartupHotfix.AddedType", true)))
                 };
-                File.WriteAllText(Required(args, "--report"), JsonSerializer.Serialize(new { format = "hybridclr.startup-windows-reference.json", caseCount = actual.Length, actual }));
+                File.WriteAllText(Required(args, "--report"), JsonSerializer.Serialize(new {
+                    format = "hybridclr.startup-windows-reference.json", caseCount = actual.Length, actual,
+                    currentSha256 = StartupStore.Hex(StartupStore.Digest(currentBytes))
+                }));
                 return 0;
             }
             string storePath = Path.GetFullPath(Required(args, "--store"));
