@@ -1,7 +1,7 @@
 param(
     [string]$WorkspaceRoot='C:/hybridclr_optimize',
     [string]$OutputRoot=(Join-Path (Split-Path -Parent $PSScriptRoot) 'artifacts/ar1'),
-    [ValidateSet('Prepare','Candidate','Baseline','Reference','Package')][string]$Stage='Prepare',
+    [ValidateSet('Prepare','RefreshCandidate','Candidate','Baseline','Reference','Package')][string]$Stage='Prepare',
     [string]$EditorRoot='C:/Program Files/Unity/Hub/Editor/2022.3.62f3'
 )
 $ErrorActionPreference='Stop'
@@ -10,11 +10,32 @@ $labRoot=Split-Path -Parent $PSScriptRoot
 $fixture=Join-Path $labRoot 'fixtures/aot-mode-release'
 $helper=Join-Path $PSScriptRoot 'build-dhe-startup-windows.ps1'
 $dotnet='C:/Program Files/dotnet/dotnet.exe'
-if($Stage -eq 'Prepare') {
+if($Stage -eq 'Prepare' -or $Stage -eq 'RefreshCandidate') {
     $refs=@{}
     foreach($entry in @(@('hybridclr','hybridclr-aot-select-v1'),@('il2cpp_plus','il2cpp-aot-select-v1'),@('hybridclr_unity','hybridclr-unity-aot-select-v1'))) {
         $repo=Join-Path $WorkspaceRoot ('worktrees/'+$entry[1]);if(@(& git -C $repo status --porcelain).Count){throw "Commit $repo before export"}
         $refs[$entry[0]]=(& git -C $repo rev-parse HEAD).Trim()
+    }
+    if($Stage -eq 'RefreshCandidate') {
+        $sourceRoot=[IO.Path]::GetFullPath((Join-Path $OutputRoot 'candidate/sources/DHE'))
+        if(-not $sourceRoot.StartsWith($OutputRoot+[IO.Path]::DirectorySeparatorChar)){throw 'Source root outside build'}
+        $identityPath=Join-Path $OutputRoot 'candidate/source-identities.json'
+        $identities=Get-Content $identityPath -Raw | ConvertFrom-Json
+        foreach($name in @('hybridclr','il2cpp_plus','hybridclr_unity')) {
+            $source=Join-Path $sourceRoot $name
+            $archiveRoot=Join-Path $sourceRoot ($name+'.previous.'+$identities.DHE.$name.Substring(0,7))
+            if(Test-Path -LiteralPath $archiveRoot){throw 'Previous source snapshot already exists'}
+            Move-Item -LiteralPath $source -Destination $archiveRoot
+            New-Item -ItemType Directory -Path $source | Out-Null
+            & git -C (Join-Path $WorkspaceRoot "repos/$name") archive --format=tar "--output=$source.tar" $refs[$name]
+            if($LASTEXITCODE -ne 0){throw 'Archive failed'}
+            & tar -xf "$source.tar" -C $source
+            if($LASTEXITCODE -ne 0){throw 'Extract failed'}
+            $identities.DHE.$name=$refs[$name]
+        }
+        Copy-Item -LiteralPath "$sourceRoot/hybridclr/hybridclr" -Destination "$sourceRoot/il2cpp_plus/libil2cpp/hybridclr" -Recurse
+        $identities | ConvertTo-Json -Depth 5 | Set-Content -LiteralPath $identityPath -Encoding utf8
+        return
     }
     & $helper -WorkspaceRoot $WorkspaceRoot -OutputRoot (Join-Path $OutputRoot 'candidate') -EditorRoot $EditorRoot -Stage Prepare -DheHybridClrRef $refs.hybridclr -DheIl2CppRef $refs.il2cpp_plus -DhePackageRef $refs.hybridclr_unity -FixtureRootOverride $fixture -DheScriptingDefines STARTUP_MODE_SELECTION
     & $helper -WorkspaceRoot $WorkspaceRoot -OutputRoot (Join-Path $OutputRoot 'baseline') -EditorRoot $EditorRoot -Stage Prepare -DhePackageRef $refs.hybridclr_unity -FixtureRootOverride $fixture -Profiles DHE

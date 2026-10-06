@@ -3,6 +3,7 @@ using System.Diagnostics;
 using System.IO;
 using System.Linq;
 using System.Reflection;
+using System.Runtime.InteropServices;
 using System.Security.Cryptography;
 using System.Threading.Tasks;
 using UnityEngine;
@@ -24,6 +25,22 @@ namespace AotModeRelease
             public Sample[] samples;
         }
         static Result result;
+        // Windows Player fixture only; the library has no platform persistence or launcher code.
+        [StructLayout(LayoutKind.Sequential)]
+        struct MemoryCounters
+        {
+            public uint size, pageFaults;
+            public UIntPtr peakWorkingSet, workingSet, peakPaged, paged, peakNonPaged, nonPaged, pagefile, peakPagefile, privateBytes;
+        }
+        [DllImport("psapi.dll")]
+        [return: MarshalAs(UnmanagedType.Bool)]
+        static extern bool GetProcessMemoryInfo(IntPtr process, ref MemoryCounters counters, uint size);
+        static long PrivateBytes()
+        {
+            var counters=new MemoryCounters {size=(uint)Marshal.SizeOf(typeof(MemoryCounters))};
+            if(!GetProcessMemoryInfo(new IntPtr(-1),ref counters,counters.size))throw new Exception("Windows process memory query failed");
+            return checked((long)counters.privateBytes.ToUInt64());
+        }
         static bool IsCandidate
         {
             get {
@@ -67,7 +84,7 @@ namespace AotModeRelease
 #else
                 result.mode=2;
 #endif
-                result.privateBytesBefore=Process.GetCurrentProcess().PrivateMemorySize64;
+                result.privateBytesBefore=PrivateBytes();
                 var timer=Stopwatch.StartNew();
                 result.supplemental=(int)HybridCLR.RuntimeApi.LoadMetadataForAOTAssembly(support,HybridCLR.HomologousImageMode.SuperSet);
                 if(result.supplemental!=0)throw new Exception("Supplemental metadata failed: "+result.supplemental);
@@ -80,7 +97,7 @@ namespace AotModeRelease
                 result.differential=result.actual.Where((value,i)=>value!=Workload.Expected[i]).Count();
                 result.unityResult=(int)unityLoaded.GetType("StartupUnityHotfix.Entry",true).GetMethod("Run").Invoke(null,null);
                 result.firstEntryMilliseconds=timer.Elapsed.TotalMilliseconds;
-                result.privateBytesAfter=Process.GetCurrentProcess().PrivateMemorySize64;
+                result.privateBytesAfter=PrivateBytes();
                 result.visibleAfter=Visible();
                 result.identityMatches=Assembly.Load("StartupHotfix")==loaded &&
                     (Type)consumer.GetType("StartupConsumer.Entry",true).GetMethod("WorkerType").Invoke(null,null)==loaded.GetType("StartupHotfix.Worker",true);

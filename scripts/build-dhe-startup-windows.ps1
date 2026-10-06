@@ -120,6 +120,13 @@ if ($Stage -eq 'Prepare') {
     Write-Output "Prepared source-locked projects: $OutputRoot"
 } elseif ($Stage -eq 'DHE' -or $Stage -eq 'LegacyInterpreter') {
     $project = Join-Path $OutputRoot "projects/$Stage"
+    foreach ($name in @('PlayerRunner.cs','FixtureBuild.cs','StartupControl.cs','Workload.cs')) {
+        $source=Join-Path $fixtureRoot $name
+        if(Test-Path -LiteralPath $source) {
+            $area=if($name -eq 'FixtureBuild.cs'){'Editor'}else{'Runtime'}
+            Copy-Item -LiteralPath $source -Destination (Join-Path $project "Assets/$area/$name")
+        }
+    }
     if (-not $SkipInstall) { Invoke-Editor $project 'StartupWindowsFixture.FixtureBuild.Install' $Stage }
     Invoke-Editor $project 'StartupWindowsFixture.FixtureBuild.Build' $Stage
 } elseif ($Stage -eq 'Package') {
