@@ -38,6 +38,15 @@ namespace AotModeRelease
         [DllImport("psapi.dll")]
         [return: MarshalAs(UnmanagedType.Bool)]
         static extern bool GetProcessMemoryInfo(IntPtr process, ref MemoryCounters counters, uint size);
+        [DllImport("kernel32.dll")]
+        [return: MarshalAs(UnmanagedType.Bool)]
+        static extern bool GetProcessTimes(IntPtr process, out long creation, out long exit, out long kernel, out long user);
+        static double ProcessElapsedMilliseconds()
+        {
+            if(!GetProcessTimes(new IntPtr(-1),out long creation,out _,out _,out _))
+                throw new Exception("Windows process creation time query failed");
+            return (DateTime.UtcNow.ToFileTimeUtc()-creation)/10000.0;
+        }
         static long PrivateBytes()
         {
             var counters=new MemoryCounters {size=(uint)Marshal.SizeOf(typeof(MemoryCounters))};
@@ -107,7 +116,7 @@ namespace AotModeRelease
                 result.firstEntryMilliseconds=timer.Elapsed.TotalMilliseconds;
                 result.selectionToEntryMilliseconds=startupTimer.Elapsed.TotalMilliseconds;
                 // Windows fixture: include native initialization before the AOT callback.
-                result.processToEntryMilliseconds=(DateTime.UtcNow-Process.GetCurrentProcess().StartTime.ToUniversalTime()).TotalMilliseconds;
+                result.processToEntryMilliseconds=ProcessElapsedMilliseconds();
                 result.privateBytesAfter=PrivateBytes();
                 result.visibleAfter=Visible();
                 result.identityMatches=Assembly.Load("StartupHotfix")==loaded &&
