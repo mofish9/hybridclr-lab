@@ -32,6 +32,8 @@ Unity 的 assembly/class image 查询统一返回这一稳定句柄，内部 DHE
 
 执行指令循环没有新增模式分支。已有 DHE 扩展入口使用同一张选定表，热点仍有原子读取和间接调用，
 不能宣称零开销。功能关闭时保留原直接调用路径。进入 DHE 实现后的内部调用直接绑定，避免重复查表。
+生成到 deferred Base 方法中的 guard 也直接绑定 DHE 的解析/分派实现，因为这些 Base 方法
+只能在选定 DHE 后执行。普通 AOT 方法的 guard 仍使用选择表，它们在解释模式下也会运行。
 
 “启动入口+选择冻结”本身很小。完整 diff 较长的原因是已有 DHE 行为横跨类型、方法、字段、反射、
 虚调用等 83 个扩展入口，必须逐一隔离，才能避免解释模式仍落入 DHE 逻辑。
@@ -55,6 +57,11 @@ AotModeHooks 表与 inventory 大部分由生成器产生；MetadataModule/DheRu
 性能测量包括选择到首次入口，正常 DHE steady-state 和解释模式；旧报告只能作为旧提交证据。
 220 项完整托管套件分别验证核心库/BoundaryContracts 补充 metadata 开启和关闭。
 独立的启动 smoke 仍补充 StartupAotSupport，不能把这个组合称为整个进程完全没有补充 metadata。
+
+首轮完整 v2 性能采样未通过预先设定门限：DHE native 微基准 P50 +12.72%，虚调用 +5.35%；
+解释模式相对独立 opt3 的进程启动到入口约 +14.52 ms，虚调用微基准 +12.87%。
+证据保留在 E:/hclr/ar5/performance-*-100-qualified；旧候选 Player 和资源另存 before-direct-guards。
+direct guard 优化后的结果必须重测，不能继承上述构建的测量或把失败改写成通过。
 
 源码按 runtime、Unity 2022 hook、package、lab 独立提交。完成当前身份门禁后合入对应正式维护线，
 发布 runtime annotated tags，再更新 package 的 Unity 2022 清单与 lab lock；package 不打 opt tag。
