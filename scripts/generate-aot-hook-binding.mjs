@@ -32,6 +32,7 @@ const groups=[
 const hooks=[];
 // Inline only the hot VM boundaries; the selected table is still published once.
 const inlineRuntimeNames=new Set(['TryGetVirtualInvokeData','TryGetInterfaceInvokeData','ShouldDispatchToInterpreter']);
+const directMetadataTargets={TryGetVirtualInvokeData:'TryGetDheVirtualInvokeData',TryGetInterfaceInvokeData:'TryGetDheInterfaceInvokeData'};
 const unroute=s=>s.replace(/HCLR_AOT_IMPL\((\w+)\)/g,'$1').replace(/^[ \t]*HCLR_AOT_OBSERVE\("[^"\n]+"\);\n/gm,'');
 const sources=new Map(groups.map(g=>[g.cpp,unroute(read(g.cpp))]));
 const normalized=s=>s.replace(/\s+/g,' ').trim();
@@ -78,7 +79,7 @@ for(const h of hooks)cpp+=`    ${h.ret} (*${h.key})(${h.params.join(', ')});\n`;
 cpp+='};\n';
 for(const h of hooks)cpp+=`static ${h.ret} Legacy_${h.key}(${h.params.join(', ')}) { ${h.ret==='void'?'':`return ${h.fallback};`} }\n`;
 cpp+='static const HookTable legacyTable = {\n    2,\n'+hooks.map(h=>`    &Legacy_${h.key}`).join(',\n')+'\n};\n';
-cpp+='static const HookTable dheTable = {\n    1,\n'+hooks.map(h=>`    &${h.owner}DheImpl_${h.name}`).join(',\n')+'\n};\n';
+cpp+='static const HookTable dheTable = {\n    1,\n'+hooks.map(h=>h.group==='Runtime'&&directMetadataTargets[h.name]?`    &hybridclr::metadata::MetadataModule::DheImpl_${directMetadataTargets[h.name]}`:`    &${h.owner}DheImpl_${h.name}`).join(',\n')+'\n};\n';
 cpp+='static const HookTable unselectedTable = {\n    0,\n'+hooks.map(h=>`    &Legacy_${h.key}`).join(',\n')+'\n};\n';
 cpp+='static std::atomic<const HookTable*> selectedHooks{&unselectedTable};\nint BindMode(int mode) {\n    if (mode != 1 && mode != 2) return 2;\n    if (selectedHooks.load(std::memory_order_acquire)->mode) return 1;\n    selectedHooks.store(mode == 1 ? &dheTable : &legacyTable, std::memory_order_release);\n    return 0;\n}\nint GetMode() { return selectedHooks.load(std::memory_order_acquire)->mode; }\nstatic const HookTable& GetHooks() { return *selectedHooks.load(std::memory_order_acquire); }\n}}\n';
 for(const h of hooks)if(h.group!=='Runtime'||!inlineRuntimeNames.has(h.name))cpp+=`${h.ret} ${h.owner}${h.name}(${h.params.join(', ')}) { return hybridclr::startup::GetHooks().${h.key}(${h.args.join(', ')}); }\n`;
