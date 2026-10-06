@@ -80,6 +80,6 @@ for (const [side, profile, mode] of profiles) {
   }
 }
 assert(new Set(runs.map(r=>r.pid)).size===runs.length, 'PID reuse');
-const summary={passed:failures.length===0,scope:'Unity2022 Windows, existing full managed suite and cross-assembly VTable, both selection modes, with/without supplemental AOT metadata',build,runnerSha256:hash(fileURLToPath(import.meta.url)),goldenSha256:hash(goldenPath),manifestSha256:hash(manifestPath),reference,runs,failures};
+const summary={passed:failures.length===0,scope:'Unity2022 Windows, existing full managed suite and cross-assembly VTable, both selection modes, with/without core-library and BoundaryContracts supplemental metadata. The separate startup smoke suite always supplements StartupAotSupport.',build,runnerSha256:hash(fileURLToPath(import.meta.url)),goldenSha256:hash(goldenPath),manifestSha256:hash(manifestPath),reference,runs,failures};
 fs.writeFileSync(path.join(output,'summary.json'),JSON.stringify(summary,null,2));
 if (failures.length) throw Error(`${failures.length} full regression profiles failed; see ${output}`);

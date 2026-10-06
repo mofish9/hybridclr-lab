@@ -53,6 +53,8 @@ AotModeHooks 表与 inventory 大部分由生成器产生；MetadataModule/DheRu
 同一 candidate Player 分别选择两路，与固定 DHE opt8、独立传统 Player、CLR 对照。
 完整 Current DLL 和 bundle 身份锁定；功能开启/关闭编译及 Player 边界单独记录。
 性能测量包括选择到首次入口，正常 DHE steady-state 和解释模式；旧报告只能作为旧提交证据。
+220 项完整托管套件分别验证核心库/BoundaryContracts 补充 metadata 开启和关闭。
+独立的启动 smoke 仍补充 StartupAotSupport，不能把这个组合称为整个进程完全没有补充 metadata。
 
 源码按 runtime、Unity 2022 hook、package、lab 独立提交。完成当前身份门禁后合入对应正式维护线，
 发布 runtime annotated tags，再更新 package 的 Unity 2022 清单与 lab lock；package 不打 opt tag。
