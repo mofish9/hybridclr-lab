@@ -1,0 +1,48 @@
+{
+  "format": "hybridclr.aot-mode.candidate-lock.v1",
+  "createdAtUtc": "2026-10-06T05:19:19.884Z",
+  "labSourceCommit": "0fa922d3f216424b1ad7ac47a74ecaa56f896b05",
+  "sources": {
+    "il2cpp_plus": "9d3e7813bd6107e147709aca21e556b59d9560ea",
+    "hybridclr": "b2edce022a3eea0b9420f18fc5c448ded073b86c",
+    "hybridclr_unity": "cefc8fd7544d455be001f97559a39b6845099bb2"
+  },
+  "evidence": {
+    "build.json": {
+      "source": "C:\\hybridclr_optimize\\worktrees\\lab-aot-select-v1\\artifacts\\ar2\\build.json",
+      "sha256": "76e3549bdc4a65b00617ae71665c2f534a88e6bd5af836c7bb07455339bf40d3"
+    },
+    "correctness.json": {
+      "source": "C:\\hybridclr_optimize\\worktrees\\lab-aot-select-v1\\artifacts\\ar2\\correctness-targets\\summary.json",
+      "sha256": "2b286f7b9e8d3a90bc410af6dc01cb6616f1965fcc7f4591f932fdee3fcdcc1a"
+    },
+    "performance.json": {
+      "source": "C:\\hybridclr_optimize\\worktrees\\lab-aot-select-v1\\artifacts\\ar2\\performance-50-final\\summary.json",
+      "sha256": "959257855fd8e8a4327ce03eef1c9cee8c389681fd52d755e42c2313bd9bca97"
+    },
+    "native-unity2022.json": {
+      "source": "C:\\hybridclr_optimize\\worktrees\\lab-aot-select-v1\\artifacts\\ar2\\candidate\\native-gate.json",
+      "sha256": "cc8c736a4acab7cf0562e60f5895f68ae3d05c0107cb069f711268121062582e"
+    },
+    "native-other-engines.json": {
+      "source": "C:\\hybridclr_optimize\\worktrees\\lab-aot-select-v1\\artifacts\\amc8\\summary.json",
+      "sha256": "fcdbcf5212df0e107101c85a8bbb54363f54fa8cdbad64a049f862d7af767a17"
+    },
+    "dependency-validator.json": {
+      "source": "C:\\hybridclr_optimize\\worktrees\\lab-aot-select-v1\\artifacts\\aot-mode-validator\\validator-gate.json",
+      "sha256": "1d2368349bcc220eb2a9f9d82405c80c40e8846472f53a9c916b3c2f0cf86aea"
+    },
+    "asset-gate.json": {
+      "source": "C:\\hybridclr_optimize\\worktrees\\lab-aot-select-v1\\artifacts\\ar2\\candidate\\DHE\\asset-gate.json",
+      "sha256": "47ac4a7d9a204cb6ad2327d32fbcad8df8eb4ac9c062ff556f7c214614f8569f"
+    }
+  },
+  "windowsCorrectnessPassed": true,
+  "performanceRequiresReview": true,
+  "mergeReady": false,
+  "releaseReady": false,
+  "androidPlayerVerified": false,
+  "webglPlayerVerified": false,
+  "iosPlayerVerified": false,
+  "otherEngineSelectionVerified": false
+}

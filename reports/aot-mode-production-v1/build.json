@@ -1,0 +1,55 @@
+{
+  "format": "hybridclr.aot-mode.release-build.v1",
+  "engine": "Unity2022.3.62f3",
+  "fixtureCommit": "0fa922d3f216424b1ad7ac47a74ecaa56f896b05",
+  "diagnostics": false,
+  "ordinaryAotGuards": true,
+  "supplementalAotMetadata": true,
+  "payloads": {
+    "StartupUnityHotfix": "a99912a3fc28ca16d8e9f35e9f507a357324eaf61502617e069463991bcf5a5e",
+    "StartupConsumer": "cf2035d568e5f49aea895642693bb6b9638baf275ffefc8fd39e5f591d2975ad",
+    "StartupAotSupport": "4cd8d9cc33a30b99b4da15c0019f2482957f28de0c3adc67e96596faf0c66650",
+    "StartupHotfix": "51df03452f7323103f53a3cd44bd7e3050bd90962e913073fcfd249c9c68e80e"
+  },
+  "profiles": {
+    "candidate/DHE": {
+      "sources": {
+        "il2cpp_plus": "9d3e7813bd6107e147709aca21e556b59d9560ea",
+        "hybridclr": "b2edce022a3eea0b9420f18fc5c448ded073b86c",
+        "hybridclr_unity": "cefc8fd7544d455be001f97559a39b6845099bb2"
+      },
+      "gameAssemblySha256": "7a68cf1ad87daaabf08e40a7fe35a8f244c4d7e2bc2e74c4929cca55241de6ac",
+      "metadataSha256": "9b87d0128d48a78c2369c5d114a25560188ec12de80e74bfd0561c0fbf369e02"
+    },
+    "candidate/LegacyInterpreter": {
+      "sources": {
+        "il2cpp_plus": "bf15337e189ae7da5876aa51c9b896a36c52a155",
+        "hybridclr": "f40c6f08ccd0391ad9285276b4cc21ada3a180ab",
+        "hybridclr_unity": "ac0fdc5c6363a1b6323d017e068c536dd22127dc"
+      },
+      "gameAssemblySha256": "27751d55140e98b9c3d1aadd3bea28b6fb4a4846a509f8b838db70c6f7970309",
+      "metadataSha256": "a7da47f4895942f572209050156e4114df58818ae372adedba62bd10cbb78ddc"
+    },
+    "baseline/DHE": {
+      "sources": {
+        "il2cpp_plus": "e426adc57c283865126423b169051558b339388c",
+        "hybridclr": "9c607a3c3d45f88ee83ff9dc5bb0f5ad12c57071",
+        "hybridclr_unity": "cefc8fd7544d455be001f97559a39b6845099bb2"
+      },
+      "gameAssemblySha256": "f535a04956a27270665f5bae860289f08c3a237d3ba6c1a347aad7aa66bbbbe2",
+      "metadataSha256": "5f844553c92ca2a758a3e519267f0ac61cf3dc80a999a701749d17b92aeacd81"
+    }
+  },
+  "fixtureHashes": {
+    "PlayerRunner.cs": "495ebeff990333aa491a399f61838289216a2d716cfa4db1a2698e41eb323dae",
+    "Hotfix.cs": "16718731d16e179f2c6f26ea6e6c1cfdf0e084d556cfdcbca2671cb44e7cb112",
+    "Workload.cs": "b75b46e2b719a4f8fec6a560b44e5b1269a52a83d6665159f4ab9e1c1b98c1a2",
+    "UnityHotfix.cs": "29bae87c4259c30b4a306caa15a9f516a466fc998f3ad95b04daba1edbca2d57",
+    "Consumer.cs": "d5f37674d2360261e25c2ca092b835b0cebeea46b103ec93b81dfbb064bb4092",
+    "AotSupport.cs": "e67d7b352b9a52db8d9a20e1117de08212965ff8e0c34427f24f077d432800bb",
+    "FixtureBuild.cs": "45fb246f29394fc0be9d3ccc2651260eca226cd93ba513b4d14d08721283c0be",
+    "Reference.cs": "b4bd5d7b91e896fa6418568bef07c4b38d487749bed369bef36e5a5b609fa674",
+    "StartupControl.cs": "1f0c9318f639749fbbf1e29b2610ae7adff9446e7ee6b3b79318c1ee3c3fe9ad",
+    "Reference.csproj": "c7afa379794b4175df08dc15d023e5888fe4e858649f101a89676c146ea51847"
+  }
+}

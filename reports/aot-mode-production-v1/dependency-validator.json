@@ -1,0 +1,13 @@
+{
+  "fixtureSha256": "34e779adef73b52fdcd0976083a875094aeb7d51f4e598236d399ef17d1a5546",
+  "validatorSha256": "e69d954e20a30cd73d4b519548699a73f89f927c4501a4059c06a2b7fe5d6740",
+  "packageCommit": "cefc8fd7544d455be001f97559a39b6845099bb2",
+  "result": {
+    "passes": 7,
+    "staticReferenceRejected": true,
+    "startupTypeTokenRejected": true,
+    "hotfixToHotfixAllowed": true,
+    "dynamicUnityTypesAllowed": true,
+    "automaticStartupCallbackRejected": true
+  }
+}

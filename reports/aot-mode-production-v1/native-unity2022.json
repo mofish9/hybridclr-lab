@@ -1,0 +1,16 @@
+{
+  "sources": {
+    "il2cpp_plus": "9d3e7813bd6107e147709aca21e556b59d9560ea",
+    "hybridclr": "b2edce022a3eea0b9420f18fc5c448ded073b86c",
+    "hybridclr_unity": "cefc8fd7544d455be001f97559a39b6845099bb2"
+  },
+  "format": "hybridclr.aot-isolation-native.v2",
+  "engineExternal": "C:\\Program Files\\Unity\\Hub\\Editor\\2022.3.62f3\\Editor\\Data\\il2cpp\\external",
+  "ordinaryNativeCtest": true,
+  "surrogateExternalHeadersUsed": false,
+  "selectionEnabledCompile": true,
+  "labCommit": "24cd3c6976794ade938a6669c3e2a698c52c3d7a",
+  "engine": "Unity2022.3.62f3",
+  "startupBehaviorProvenByThisCtest": false,
+  "selectionDisabledCompile": true
+}

@@ -1,0 +1,30 @@
+{
+  "format": "hybridclr.aot-mode.compatibility.v1",
+  "passed": true,
+  "surrogateExternalHeadersUsed": false,
+  "profiles": [
+    {
+      "selectionEnabled": false,
+      "surrogateExternalHeadersUsed": false,
+      "compiled": true,
+      "profile": "Unity2021",
+      "external": "C:\\Program Files\\Unity\\Hub\\Editor\\2021.3.45f2\\Editor\\Data\\il2cpp\\external",
+      "il2cppCommit": "be0493c9c98a19007d130ec4a6ef07c1496caab6",
+      "hybridclrCommit": "b2edce022a3eea0b9420f18fc5c448ded073b86c",
+      "ctest": true
+    },
+    {
+      "selectionEnabled": false,
+      "surrogateExternalHeadersUsed": false,
+      "compiled": true,
+      "profile": "Tuanjie2022",
+      "external": "C:\\Program Files\\Tuanjie\\Hub\\Editor\\2022.3.62t12\\Editor\\Data\\il2cpp\\external",
+      "il2cppCommit": "52968ad6c88416f212d09d919b9a1b6afdc8a53b",
+      "hybridclrCommit": "b2edce022a3eea0b9420f18fc5c448ded073b86c",
+      "ctest": true
+    }
+  ],
+  "scope": "Feature-disabled compatibility with existing maintenance lines; active selection hooks require separate engine qualification.",
+  "mergeReady": false,
+  "labCommit": "24cd3c6976794ade938a6669c3e2a698c52c3d7a"
+}
