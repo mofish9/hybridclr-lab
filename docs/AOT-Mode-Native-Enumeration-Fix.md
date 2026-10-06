@@ -83,3 +83,20 @@ HybridCLR `4dc14f5` 只在 ShouldDispatchToInterpreter 加入 `!method` 提前�
 第二轮 ar8 使用该新 runtime 和同一个 IL2CPP 枚举修复。Current DLL 与 ar7 SHA 相同；
 opt8/opt3 对照直接复用 ar7 的 GameAssembly/global-metadata，并更换为 ar8 统一的测试 DLL。
 不继承旧 runtime 的性能通过结论；在新身份上重新执行功能与性能验收。
+
+## ar8 失败与 token 预筛
+
+ar8 的 correctness、native compile/CTest、场景拒绝均通过。功能关闭 BenchNative P50 为 -3.10%，
+但正常 DHE 的 BenchNative P50/P95 为 +11.64%/+10.09%，仍未通过；legacy 100 对中候选只有
+99 个不同 PID，也未达到独立进程门禁。ar8/performance-acceptance.json 保留 passed=false，
+不因兜底成本豁免而忽略证据资格。ar8 未被合入正式维护线或宣布准备完成。
+
+HybridCLR `906bed5` 在不可变 PublishedState 中新增 64 位 changedMethodTokenMask。
+每次发布复制旧快照的 mask，并 OR 入新程序集全部 changedMethodTokens 的低 6 位对应 bit。
+ResolveAotGuardMethodByToken 中，bit 未置位可直接返回空目标；bit 已置位仍使用原程序集名及
+完整 token 的精确查询。碰撞只影响命中预筛后的查询成本，不会误分派，空集也自然返回空目标。
+mask 在原 release 发布前写完；读者沿用原 acquire，不增加锁、计数、模式判断或平台代码。
+每个已存在的发布快照增加 8 字节；密集变更可能不具备预筛收益，但不会改变完整查询语义。
+
+第三轮 ar9 保留同一个 IL2CPP 枚举修复、同一 Current DLL 和同一 opt8/opt3 对照。
+三组性能各采 200 对，保留全部启动；没有降低至少 100 个不同 PID 的要求，也没有改数值门限。
