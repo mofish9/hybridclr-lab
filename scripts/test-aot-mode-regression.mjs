@@ -23,8 +23,16 @@ const goldenPath = path.join(lab, 'manifests/test-golden.json');
 const manifestPath = path.join(lab, 'manifests/test-manifest.json');
 const golden = read(goldenPath);
 const referencePath = path.join(output, 'reference.json');
-const referenceRun = spawnSync('C:/Program Files/dotnet/dotnet.exe', ['run', '--project', path.join(lab, 'runners/dotnet-reference/HybridCLR.ReferenceRunner.csproj'), '-c', 'Release', '-p:IncludeSourceRevisionInInformationalVersion=false', '--', '--manifest', manifestPath, '--golden', goldenPath, '--output', referencePath], {encoding:'utf8', windowsHide:true, timeout:180000});
-fs.writeFileSync(path.join(output,'reference.log'), (referenceRun.stdout||'')+(referenceRun.stderr||''));
+const referenceBin=path.join(output,'reference-bin');
+const referenceBuild=spawnSync('C:/Program Files/dotnet/dotnet.exe',['build',path.join(lab,'runners/dotnet-reference/HybridCLR.ReferenceRunner.csproj'),'-c','Release','-o',referenceBin,'-p:IncludeSourceRevisionInInformationalVersion=false'],{encoding:'utf8',windowsHide:true,timeout:180000});
+fs.writeFileSync(path.join(output,'reference-build.log'),(referenceBuild.stdout||'')+(referenceBuild.stderr||''));
+assert(referenceBuild.status===0,'CLR runner build failed');
+// Execute the exact frozen Player workload, not a second compilation whose
+// source-link/repository metadata may differ from the original artifact.
+for(const name of ['HybridCLR.ManagedCases.dll','HybridCLR.BoundaryContracts.dll'])
+  fs.copyFileSync(path.join(workload,name),path.join(referenceBin,name));
+const referenceRun=spawnSync('C:/Program Files/dotnet/dotnet.exe',[path.join(referenceBin,'HybridCLR.ReferenceRunner.dll'),'--manifest',manifestPath,'--golden',goldenPath,'--output',referencePath],{encoding:'utf8',windowsHide:true,timeout:180000});
+fs.writeFileSync(path.join(output,'reference.log'),(referenceRun.stdout||'')+(referenceRun.stderr||''));
 assert(referenceRun.status === 0, 'CLR reference failed');
 const reference = read(referencePath);
 assert(reference.summary.total === golden.cases.length && reference.summary.failed === 0, 'Incomplete CLR reference');
