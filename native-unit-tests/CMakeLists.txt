@@ -74,6 +74,10 @@ if (EXISTS "${HYBRIDCLR_TEST_SOURCE_ROOT}/AotModeHooks.cpp")
     )
 endif()
 
+if (EXISTS "${HYBRIDCLR_TEST_SOURCE_ROOT}/metadata/TraditionalAOTHomologousImage.cpp")
+    target_sources(hybridclr_metadata_compile_gate PRIVATE "${HYBRIDCLR_TEST_SOURCE_ROOT}/metadata/TraditionalAOTHomologousImage.cpp")
+endif()
+
 function(configure_hybridclr_target target)
     target_compile_features(${target} PRIVATE cxx_std_17)
     target_compile_definitions(${target} PRIVATE

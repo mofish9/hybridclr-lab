@@ -7,6 +7,8 @@ param(
     [string]$DheIl2CppRef = 'e426adc57c283865126423b169051558b339388c',
     [string]$DhePackageRef = 'f2946d5ba35a879724b76afd857176feb1a4adca',
     [string]$FixtureRootOverride,
+    [string[]]$Profiles=@('DHE','LegacyInterpreter'),
+    [string[]]$DheScriptingDefines=@(),
     [switch]$SkipInstall
 )
 $ErrorActionPreference = 'Stop'
@@ -56,7 +58,7 @@ function Invoke-Editor([string]$Project, [string]$Method, [string]$Profile) {
 if ($Stage -eq 'Prepare') {
     if (Test-Path -LiteralPath $OutputRoot) { throw "OutputRoot must be new: $OutputRoot" }
     New-Item -ItemType Directory -Path $OutputRoot | Out-Null
-    foreach ($profile in @('DHE','LegacyInterpreter')) {
+    foreach ($profile in $Profiles) {
         $sourceRoot = Join-Path $OutputRoot "sources/$profile"
         foreach ($repo in @('hybridclr','il2cpp_plus','hybridclr_unity')) {
             Export-Repo $repo $sources[$profile][$repo] (Join-Path $sourceRoot $repo)
@@ -76,7 +78,7 @@ if ($Stage -eq 'Prepare') {
         Write-Text (Join-Path $project 'Packages/manifest.json') (@{dependencies=@{'com.code-philosophy.hybridclr'="file:$package";'com.unity.modules.jsonserialize'='1.0.0'}} | ConvertTo-Json -Depth 3)
         Write-Text (Join-Path $project 'ProjectSettings/ProjectVersion.txt') "m_EditorVersion: 2022.3.62f3`nm_EditorVersionWithRevision: 2022.3.62f3 (96770f904ca7)`n"
         if ($profile -eq 'DHE') {
-            Write-Text (Join-Path $project 'Assets/csc.rsp') "-define:STARTUP_DHE_PROFILE`n"
+            Write-Text (Join-Path $project 'Assets/csc.rsp') ("-define:"+((@('STARTUP_DHE_PROFILE')+$DheScriptingDefines) -join ',')+"`n")
             $template = Get-Content (Join-Path $sourceRoot 'hybridclr_unity/ToolsSource~/DHE/templates/DheBuildIdentity.cs') -Raw
             Write-Text (Join-Path $project 'Assets/Runtime/DheBuildIdentity.cs') $template.Replace('__DHE_IDENTITY_NAMESPACE__','StartupWindowsFixture')
         }
@@ -84,14 +86,35 @@ if ($Stage -eq 'Prepare') {
     foreach ($dir in @('base','shared')) { New-Item -ItemType Directory -Path (Join-Path $OutputRoot $dir) | Out-Null }
     $csc = 'C:/Program Files/dotnet/sdk/6.0.428/Roslyn/bincore/csc.dll'
     $mscorlib = Join-Path $EditorRoot 'Editor/Data/MonoBleedingEdge/lib/mono/4.5/mscorlib.dll'
+    $supportSource = Join-Path $fixtureRoot 'AotSupport.cs'
+    $supportDll = Join-Path $OutputRoot 'shared/StartupAotSupport.dll'
+    if (Test-Path -LiteralPath $supportSource) {
+        & $dotnet $csc /nologo /target:library /optimize+ /deterministic /nostdlib "/reference:$mscorlib" "/out:$supportDll" $supportSource
+        if($LASTEXITCODE -ne 0){throw 'AOT support compilation failed'}
+    }
     foreach ($kind in @('base','shared')) {
-        $arguments = @($csc,'/nologo','/target:library','/optimize+','/nostdlib',"/reference:$mscorlib","/out:$(Join-Path $OutputRoot "$kind/StartupHotfix.dll")",(Join-Path $fixtureRoot 'Hotfix.cs'))
+        $arguments = @($csc,'/nologo','/target:library','/optimize+','/deterministic','/nostdlib',"/reference:$mscorlib","/out:$(Join-Path $OutputRoot "$kind/StartupHotfix.dll")",(Join-Path $fixtureRoot 'Hotfix.cs'))
         if ($kind -eq 'shared') { $arguments += '/define:CURRENT_PAYLOAD' }
+        if (Test-Path -LiteralPath $supportSource) { $arguments += "/reference:$supportDll" }
         & $dotnet @arguments
         if ($LASTEXITCODE -ne 0) { throw "Hotfix compilation failed: $kind" }
     }
-    foreach ($profile in @('DHE','LegacyInterpreter')) {
+    if (Test-Path -LiteralPath (Join-Path $fixtureRoot 'UnityHotfix.cs')) {
+        foreach ($kind in @('base','shared')) {
+            $arguments=@($csc,'/nologo','/target:library','/optimize+','/deterministic','/nostdlib',"/reference:$EditorRoot/Editor/Data/NetStandard/ref/2.1.0/netstandard.dll", "/reference:$EditorRoot/Editor/Data/Managed/UnityEngine/UnityEngine.CoreModule.dll", "/out:$(Join-Path $OutputRoot "$kind/StartupUnityHotfix.dll")", (Join-Path $fixtureRoot 'UnityHotfix.cs'))
+            if($kind -eq 'shared'){$arguments+='/define:CURRENT_PAYLOAD'}
+            & $dotnet @arguments
+            if($LASTEXITCODE -ne 0){throw 'Unity hotfix compilation failed'}
+        }
+    }
+    foreach ($profile in $Profiles) {
         Copy-Item (Join-Path $OutputRoot 'base/StartupHotfix.dll') (Join-Path $OutputRoot "projects/$profile/Assets/Plugins/StartupHotfix.dll")
+        if(Test-Path -LiteralPath $supportSource) {
+            Copy-Item $supportDll (Join-Path $OutputRoot "projects/$profile/Assets/Plugins/StartupAotSupport.dll")
+        }
+        if(Test-Path -LiteralPath (Join-Path $OutputRoot 'base/StartupUnityHotfix.dll')) {
+            Copy-Item (Join-Path $OutputRoot 'base/StartupUnityHotfix.dll') (Join-Path $OutputRoot "projects/$profile/Assets/Plugins/StartupUnityHotfix.dll")
+        }
     }
     Write-Text (Join-Path $OutputRoot 'source-identities.json') ($sources | ConvertTo-Json -Depth 4)
     Write-Output "Prepared source-locked projects: $OutputRoot"

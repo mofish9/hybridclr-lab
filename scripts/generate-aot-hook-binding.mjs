@@ -55,7 +55,7 @@ for(const group of groups){
     for(const [file,source] of sources) sources.set(file,source.replace(re,(body,prefix,actual,suffix)=>{
       if(normalized(actual)!==normalized(params.join(', ')))return body;
       replaced++;
-      return prefix.replace(name+'(',`HCLR_AOT_IMPL(${name})(`) + actual + suffix + `\n    HCLR_AOT_OBSERVE("${key}");`;
+      return prefix.replace(name+'(',`HCLR_AOT_IMPL(${name})(`) + actual + suffix;
     }));
     if(replaced!==1)throw new Error(`Expected one definition: ${key}, got ${replaced}; params=${params}`);
     return full+`\n#if HYBRIDCLR_ENABLE_AOT_SELECTION\n${indent}${group.name==='Metadata'?'static ':''}${ret} DheImpl_${name}(${params.join(', ')});\n#endif`;
