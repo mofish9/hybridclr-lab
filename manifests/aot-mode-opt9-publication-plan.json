@@ -25,6 +25,6 @@
   },
   "published": false,
   "publicationRequested": false,
-  "status": "Proposal only; version preparation completed. Await a separate user decision before creating tags, pushing, or applying the package manifest.",
+  "status": "Proposal only. Follow-up native enumeration P2 remains unresolved; readiness is not final. No tags, pushes or installer manifest switch authorized.",
   "runtimeTagNamesAreProposals": true
 }

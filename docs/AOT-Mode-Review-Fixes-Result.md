@@ -1,5 +1,8 @@
 # Unity 2022 启动模式选择：review 修复结果
 
+> 后续 review 新确认一项 opt8 已存在的原生类型枚举 P2；本报告中的旧两项修复仍有效，
+> 定版结论以 [后续 review](AOT-Mode-Followup-Review-20261006.md) 和最新 candidate lock 为准。
+
 本轮准备范围为 Unity 2022、Windows IL2CPP。用户明确要求先不发布；无打标、推送或安装清单切换。
 此前全面 review 的 P1/P2 均已修复并在新身份产物上验证。当前在 Unity 2022 / Windows IL2CPP
 范围内有条件通过，已达到本地新版本源码提交与准备完成状态；不代表其他平台生产资格或已经发布。

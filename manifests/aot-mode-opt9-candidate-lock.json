@@ -60,6 +60,10 @@
     "generator-verification.json": {
       "source": "E:/hclr/ar6/generator-verification.json",
       "sha256": "ef8e95476288b5494b7a6350fdb255bef3357c4ab221ca29f246b04d030d3e32"
+    },
+    "followup-native-api-review.json": {
+      "source": "E:/hclr/ar6/review-followup-20261006/expanded-summary.json",
+      "sha256": "37a57bbc7030c8ef4b606392d6d2cc3df3dbaf51c1a015e914f81026cc3a0c30"
     }
   },
   "windowsCorrectnessPassed": true,
@@ -103,12 +107,14 @@
     }
   },
   "formalMaintenanceGatePassed": true,
-  "versionPreparationComplete": true,
-  "readyForVersionSubmission": true,
-  "preparationBlockers": [],
+  "versionPreparationComplete": false,
+  "readyForVersionSubmission": false,
+  "preparationBlockers": [
+    "P2 inherited DHE native image enumeration omits Current-only types; reproduced in opt8, candidate DHE and fixed DHE. Resolve or explicitly disposition before final readiness."
+  ],
   "published": false,
   "publicationRequested": false,
-  "releaseReadinessMeaning": "Source preparation and Windows qualification complete. Installer manifest remains opt8; no opt9 publication has occurred. This is not cross-platform production qualification.",
+  "releaseReadinessMeaning": "Existing Windows gates and source identity remain valid. Follow-up review found an inherited DHE native enumeration gap outside those gates; unrestricted version readiness is withdrawn pending disposition. Not published.",
   "preparationScope": "Unity2022 source candidate and Windows IL2CPP verification only. Android/WebGL/iOS Player qualification remains unverified.",
   "performanceAcceptance": "Normal DHE and feature-disabled strict; interpreter fallback cost explicitly accepted and disclosed.",
   "reusedEvidence": [
@@ -121,10 +127,11 @@
     }
   ],
   "latestReview": {
-    "report": "docs/AOT-Mode-Review-Fixes-Result.md",
-    "previousFindings": "docs/AOT-Mode-Comprehensive-Review-20261006.md",
+    "report": "docs/AOT-Mode-Followup-Review-20261006.md",
+    "previousFindings": "docs/AOT-Mode-Review-Fixes-Result.md",
     "unresolvedP0": 0,
-    "unresolvedP1": 0
+    "unresolvedP1": 0,
+    "unresolvedP2": 1
   },
   "packageManifest": {
     "applied": false,
