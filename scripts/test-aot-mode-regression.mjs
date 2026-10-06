@@ -32,7 +32,9 @@ assert(reference.managedAssemblySha256.toLowerCase() === build.regressionPayload
 const expected = new Map(golden.cases.map(c => [c.id, c]));
 const decode = value => value === '-' ? null : Buffer.from(value,'base64').toString('utf8');
 const runs = [], failures = [];
-for (const [side, profile, mode] of [['candidate','DHE','dhe'],['candidate','DHE','legacy'],['baseline','DHE','dhe'],['candidate','LegacyInterpreter','legacy']]) {
+const profiles=[['candidate','DHE','dhe'],['candidate','DHE','legacy'],['baseline','DHE','dhe'],['candidate','LegacyInterpreter','legacy']];
+if (build.profiles['fixed/DHE']) profiles.push(['fixed','DHE','dhe']);
+for (const [side, profile, mode] of profiles) {
   for (const metadata of ['none','superset']) {
     const name = `${side}-${profile}-${mode}-${metadata}`;
     try {
@@ -41,7 +43,9 @@ for (const [side, profile, mode] of [['candidate','DHE','dhe'],['candidate','DHE
       assert(hash(path.join(player,'GameAssembly.dll'))===identity.gameAssemblySha256, 'Runtime identity drift');
       assert(hash(path.join(player,'StartupPlayer_Data/il2cpp_data/Metadata/global-metadata.dat'))===identity.metadataSha256, 'Metadata identity drift');
       const report=path.join(output,name+'.json');
-      const child=spawnSync(path.join(player,'StartupPlayer.exe'), ['-batchmode','-nographics','-scenario','correctness','-mode',mode,'-selectMode',String(side==='candidate'&&profile==='DHE'),'-startupPairRoot',path.join(root,side),'-bundleRoot',path.join(root,'candidate/shared/bundles'),'-regressionRoot',workload,'-regressionMetadata',metadata,'-startupReport',report,'-logFile',path.join(output,name+'.log')], {encoding:'utf8',windowsHide:true,timeout:180000});
+      const args=['-batchmode','-nographics','-scenario','correctness','-mode',mode,'-selectMode',String(side==='candidate'&&profile==='DHE'),'-startupPairRoot',path.join(root,side),'-bundleRoot',path.join(root,'candidate/shared/bundles'),'-regressionRoot',workload,'-regressionMetadata',metadata,'-startupReport',report,'-logFile',path.join(output,name+'.log')];
+      if(side==='fixed')args.push('-verifyFixedMode');
+      const child=spawnSync(path.join(player,'StartupPlayer.exe'), args, {encoding:'utf8',windowsHide:true,timeout:180000});
       assert(child.status===0 && fs.existsSync(report), `Player failure (${child.status}): ${child.error||''}`);
       const result=read(report);
       assert(result.passed && result.differential===0 && result.bundleResult===443, 'Startup/Bundle regression: '+result.error);

@@ -21,7 +21,7 @@ namespace AotModeRelease
             public int caseCount, differential, unityResult, visibleBefore, visibleAfter, rejectedLoadAttempts, bundleResult;
             public bool passed, diagnostics, prematureRejected, wrongLoaderRejected, identityMatches, changed, unchanged;
             public int[] actual, concurrentResults;
-            public double loadMilliseconds, firstEntryMilliseconds, selectionMilliseconds, selectionToEntryMilliseconds;
+            public double loadMilliseconds, firstEntryMilliseconds, selectionMilliseconds, selectionToEntryMilliseconds, processToEntryMilliseconds;
             public long privateBytesBefore, privateBytesAfter;
             public Sample[] samples;
             public string[] regressionRecords;
@@ -106,6 +106,8 @@ namespace AotModeRelease
                 result.unityResult=(int)unityLoaded.GetType("StartupUnityHotfix.Entry",true).GetMethod("Run").Invoke(null,null);
                 result.firstEntryMilliseconds=timer.Elapsed.TotalMilliseconds;
                 result.selectionToEntryMilliseconds=startupTimer.Elapsed.TotalMilliseconds;
+                // Windows fixture: include native initialization before the AOT callback.
+                result.processToEntryMilliseconds=(DateTime.UtcNow-Process.GetCurrentProcess().StartTime.ToUniversalTime()).TotalMilliseconds;
                 result.privateBytesAfter=PrivateBytes();
                 result.visibleAfter=Visible();
                 result.identityMatches=Assembly.Load("StartupHotfix")==loaded &&

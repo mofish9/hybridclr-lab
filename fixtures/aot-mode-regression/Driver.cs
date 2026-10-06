@@ -11,6 +11,15 @@ public static class AotModeRegression
     public static string[] Run(string root, string progress)
     {
         CaseRegistry.RuntimeTarget = "StandaloneWindows64";
+        if (Array.IndexOf(Environment.GetCommandLineArgs(), "-verifyFixedMode") >= 0)
+        {
+            var api = Type.GetType("HybridCLR.RuntimeApi, HybridCLR.Runtime", true);
+            var select = api.GetMethod("SelectExecutionMode");
+            var mode = Enum.ToObject(select.GetParameters()[0].ParameterType, 2);
+            if (Convert.ToInt32(select.Invoke(null, new[] { mode })) != 3 ||
+                Convert.ToInt32(api.GetMethod("GetExecutionMode").Invoke(null, null)) != 1)
+                throw new Exception("Disabled selection must report NotSupported and remain DHE");
+        }
         var records = new List<string>();
         File.WriteAllText(progress, "");
         var assembly = Assembly.Load(File.ReadAllBytes(Path.Combine(root, "HybridCLR.CrossAssemblyDerived.dll")));

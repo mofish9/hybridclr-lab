@@ -8,8 +8,11 @@ const pairs = Number(process.argv[3] || 0);
 if (!Number.isInteger(pairs) || pairs < 0) throw Error('Invalid pair count');
 const build = JSON.parse(fs.readFileSync(path.join(root, 'build.json')));
 const label = process.argv[4] || '';
+const comparison = process.argv[5] || 'dhe';
+assertComparison();
+function assertComparison() { if (!['dhe','legacy','fixed'].includes(comparison)) throw Error('Unknown performance comparison'); }
 if (label && !/^[a-z0-9-]+$/.test(label)) throw Error('Invalid run label');
-const output = path.join(root, (pairs ? `performance-${pairs}` : 'correctness') + (label ? '-' + label : ''));
+const output = path.join(root, (pairs ? `performance-${comparison}-${pairs}` : 'correctness') + (label ? '-' + label : ''));
 fs.mkdirSync(output); // Preserve existing evidence rather than overwrite it.
 const hash = file => crypto.createHash('sha256').update(fs.readFileSync(file)).digest('hex');
 const read = file => JSON.parse(fs.readFileSync(file, 'utf8').replace(/^\uFEFF/, ''));
@@ -52,13 +55,15 @@ function run(side, profile, mode, scenario, index) {
 }
 if (!pairs) {
   const failures=[];
-  for (const args of [
+  const profiles=[
     ['candidate','DHE','dhe','correctness',0],
     ['candidate','DHE','legacy','correctness',1],
     ['candidate','DHE','dhe','concurrent',2],
     ['baseline','DHE','dhe','correctness',3],
     ['candidate','LegacyInterpreter','legacy','correctness',4]
-  ]) { try { run(...args); } catch(error) { failures.push(error.message); console.error(error.message); } }
+  ];
+  if(build.profiles['fixed/DHE'])profiles.push(['fixed','DHE','dhe','correctness',5]);
+  for (const args of profiles) { try { run(...args); } catch(error) { failures.push(error.message); console.error(error.message); } }
   if (failures.length) {
     fs.writeFileSync(path.join(output,'failures.json'),JSON.stringify({build,failures},null,2));
     throw Error(`${failures.length} correctness profiles failed`);
@@ -66,18 +71,22 @@ if (!pairs) {
   const assetGate = read(path.join(root,'candidate/DHE/asset-gate.json'));
   assert(['sceneRejected','preloadedRejected','resourcesRejected','ordinaryAssetsAccepted'].every(k=>assetGate[k]===true), 'Base asset boundary failed');
 } else {
+  const control = comparison==='legacy' ? ['candidate','LegacyInterpreter','legacy'] : ['baseline','DHE','dhe'];
+  const candidate = comparison==='legacy' ? ['candidate','DHE','legacy'] : [comparison==='fixed'?'fixed':'candidate','DHE','dhe'];
   for (let i=0; i<pairs; ++i)
-    for (const side of i % 2 ? ['candidate','baseline'] : ['baseline','candidate'])
-      run(side,'DHE','dhe','benchmark',i);
+    for (const group of i % 2 ? ['candidate','baseline'] : ['baseline','candidate']) {
+      run(...(group==='candidate'?candidate:control),'benchmark',i);
+      runs[runs.length-1].comparisonGroup=group;
+    }
 }
 assert(new Set(runs.map(r=>r.pid)).size === runs.length, 'PID reuse: cannot count these as unique processes');
 const quantile = (xs,q) => { const a=[...xs].sort((a,b)=>a-b); const i=(a.length-1)*q; return a[Math.floor(i)]+(a[Math.ceil(i)]-a[Math.floor(i)])*(i%1); };
-const stats = xs => { const p50=quantile(xs,.5); return {count:xs.length,p50,p95:quantile(xs,.95),mad:quantile(xs.map(x=>Math.abs(x-p50)),.5)}; };
+const stats = xs => { const p50=quantile(xs,.5); return {count:xs.length,p50,p95:quantile(xs,.95),p99:quantile(xs,.99),mad:quantile(xs.map(x=>Math.abs(x-p50)),.5)}; };
 const metrics = {};
 if (pairs) {
-  const values = run => ({selection:run.selectionMilliseconds,selectionToEntry:run.selectionToEntryMilliseconds,load:run.loadMilliseconds,loadAndEntry:run.loadMilliseconds+run.firstEntryMilliseconds,privateBytes:run.privateBytesAfter,privateBytesDelta:run.privateBytesAfter-run.privateBytesBefore,...Object.fromEntries(run.samples.map(s=>[s.name,quantile(s.milliseconds,.5)]))});
+  const values = run => ({selection:run.selectionMilliseconds,selectionToEntry:run.selectionToEntryMilliseconds,processToEntry:run.processToEntryMilliseconds,load:run.loadMilliseconds,loadAndEntry:run.loadMilliseconds+run.firstEntryMilliseconds,privateBytes:run.privateBytesAfter,privateBytesDelta:run.privateBytesAfter-run.privateBytesBefore,...Object.fromEntries(run.samples.map(s=>[s.name,quantile(s.milliseconds,.5)]))});
   for (const run of runs) for (const sample of run.samples) {
-    const counterpart=runs.find(r=>r.index===run.index && r.side!==run.side).samples.find(s=>s.name===sample.name);
+    const counterpart=runs.find(r=>r.index===run.index && r.comparisonGroup!==run.comparisonGroup).samples.find(s=>s.name===sample.name);
     assert(sample.checksum===counterpart.checksum && sample.iterations===counterpart.iterations, 'Benchmark checksum/workload mismatch');
     let expected=0;
     for(let i=0;i<sample.iterations;i++) expected=(expected+(sample.name==='BenchNative'?(i&255)*3+1:sample.name==='BenchChanged'?(i&255)+200:(i&255)*(i%2?5:4)))|0;
@@ -85,12 +94,12 @@ if (pairs) {
     assert(sample.checksum===expected, `Wrong benchmark result: ${sample.name}`);
   }
   for (const name of Object.keys(values(runs[0]))) {
-    const baseline=runs.filter(r=>r.side==='baseline').map(r=>values(r)[name]);
-    const candidate=runs.filter(r=>r.side==='candidate').map(r=>values(r)[name]);
+    const baseline=runs.filter(r=>r.comparisonGroup==='baseline').map(r=>values(r)[name]);
+    const candidate=runs.filter(r=>r.comparisonGroup==='candidate').map(r=>values(r)[name]);
     const denominator=quantile(baseline,.5);
     metrics[name]={baseline:stats(baseline),candidate:stats(candidate),pairedDelta:stats(candidate.map((n,i)=>n-baseline[i])),pairedPercent:baseline.every(n=>n!==0)?stats(candidate.map((n,i)=>(n/baseline[i]-1)*100)):null,medianPercent:denominator!==0?(quantile(candidate,.5)/denominator-1)*100:null};
   }
 }
-const summary={format:'hybridclr.aot-mode.release-gate.v1',passed:true,correctnessPassed:true,performanceAcceptance:pairs?'requires-review':'not-measured',runnerSha256:hash(new URL(import.meta.url)),build,caseCount:reference.caseCount,unityExpected:236,independentProcesses:runs.length,pairs,diagnostics:false,p99HardGate:false,metrics,runs};
+const summary={format:'hybridclr.aot-mode.release-gate.v2',passed:true,correctnessPassed:true,performanceAcceptance:pairs?'requires-review':'not-measured',comparison,runnerSha256:hash(new URL(import.meta.url)),build,caseCount:reference.caseCount,unityExpected:236,independentProcesses:runs.length,pairs,diagnostics:false,p99SampleQualified:pairs>=100,p99HardGate:false,metrics,runs};
 fs.writeFileSync(path.join(output,'summary.json'),JSON.stringify(summary,null,2));
 console.log(JSON.stringify({passed:true,processes:runs.length,metrics},null,2));

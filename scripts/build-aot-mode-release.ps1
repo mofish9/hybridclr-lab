@@ -62,9 +62,11 @@ if($Stage -eq 'Prepare' -or $Stage -eq 'RefreshCandidate') {
 } elseif($Stage -eq 'Regression') {
     Prepare-Regression
 } elseif($Stage -eq 'Package') {
+    $sides=@('candidate','baseline')
+    if(Test-Path -LiteralPath "$OutputRoot/fixed/source-identities.json"){$sides+='fixed'}
     $manifest=[ordered]@{format='hybridclr.aot-mode.release-build.v1';engine='Unity2022.3.62f3';fixtureCommit=(& git -C $labRoot rev-parse HEAD).Trim();diagnostics=$false;ordinaryAotGuards=$true;supplementalAotMetadata=$true;payloads=@{};profiles=@{};fixtureHashes=@{}}
     foreach($file in Get-ChildItem -LiteralPath $fixture -File){$manifest.fixtureHashes[$file.Name]=(Get-FileHash $file.FullName).Hash.ToLowerInvariant()}
-    foreach($side in @('candidate','baseline')) {
+    foreach($side in $sides) {
         $tool=Join-Path $OutputRoot "$side/sources/DHE/hybridclr_unity/Tools~/DHE/HybridCLR.DheTool.dll"
         foreach($name in @('StartupHotfix','StartupUnityHotfix')) {
             foreach($kind in @('base','current')) {
@@ -85,6 +87,7 @@ if($Stage -eq 'Prepare' -or $Stage -eq 'RefreshCandidate') {
     foreach($name in @('StartupHotfix','StartupConsumer','StartupUnityHotfix','StartupAotSupport')) {
         $candidate=(Get-FileHash "$OutputRoot/candidate/shared/$name.dll").Hash.ToLowerInvariant()
         if($candidate -ne (Get-FileHash "$OutputRoot/baseline/shared/$name.dll").Hash.ToLowerInvariant()){throw "Payload drift: $name"}
+        if($sides -contains 'fixed' -and $candidate -ne (Get-FileHash "$OutputRoot/fixed/shared/$name.dll").Hash.ToLowerInvariant()){throw "Fixed payload drift: $name"}
         $manifest.payloads[$name]=$candidate
     }
     $manifest.bundlePayloads=@{}
@@ -95,6 +98,7 @@ if($Stage -eq 'Prepare' -or $Stage -eq 'RefreshCandidate') {
     foreach($name in @('HybridCLR.ManagedCases','HybridCLR.CrossAssemblyDerived','HybridCLR.BoundaryContracts','AotModeRegression')) {
         $hash=(Get-FileHash "$OutputRoot/candidate/shared/regression/$name.dll").Hash.ToLowerInvariant()
         if($hash -ne (Get-FileHash "$OutputRoot/baseline/shared/regression/$name.dll").Hash.ToLowerInvariant()){throw "Regression payload drift: $name"}
+        if($sides -contains 'fixed' -and $hash -ne (Get-FileHash "$OutputRoot/fixed/shared/regression/$name.dll").Hash.ToLowerInvariant()){throw "Fixed regression payload drift: $name"}
         $manifest.regressionPayloads["$name.dll"]=$hash
     }
     New-Item -ItemType Directory -Force -Path "$OutputRoot/candidate/shared/regression/aot"|Out-Null
