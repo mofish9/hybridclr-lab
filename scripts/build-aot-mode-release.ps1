@@ -23,7 +23,7 @@ if($Stage -eq 'Prepare' -or $Stage -eq 'RefreshCandidate') {
         $identities=Get-Content $identityPath -Raw | ConvertFrom-Json
         foreach($name in @('hybridclr','il2cpp_plus','hybridclr_unity')) {
             $source=Join-Path $sourceRoot $name
-            $archiveRoot=Join-Path $sourceRoot ($name+'.previous.'+$identities.DHE.$name.Substring(0,7))
+            $archiveRoot=Join-Path $sourceRoot ($name+'.before.'+$refs.hybridclr.Substring(0,7))
             if(Test-Path -LiteralPath $archiveRoot){throw 'Previous source snapshot already exists'}
             Move-Item -LiteralPath $source -Destination $archiveRoot
             New-Item -ItemType Directory -Path $source | Out-Null
