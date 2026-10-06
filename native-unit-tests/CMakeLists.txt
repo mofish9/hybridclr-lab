@@ -71,6 +71,7 @@ if (EXISTS "${HYBRIDCLR_TEST_SOURCE_ROOT}/AotModeHooks.cpp")
         "${HYBRIDCLR_TEST_SOURCE_ROOT}/metadata/Assembly.cpp"
         "${HYBRIDCLR_TEST_SOURCE_ROOT}/transform/TransformContext.cpp"
         "${HYBRIDCLR_RUNTIME_ROOT}/vm/GlobalMetadata.cpp"
+        "${HYBRIDCLR_RUNTIME_ROOT}/vm/Image.cpp"
         "${HYBRIDCLR_RUNTIME_ROOT}/il2cpp-api.cpp"
         "${HYBRIDCLR_RUNTIME_ROOT}/icalls/mscorlib/System/Array.cpp"
     )
