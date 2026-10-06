@@ -72,6 +72,10 @@ if($Stage -eq 'Prepare' -or $Stage -eq 'RefreshCandidate') {
         if($candidate -ne (Get-FileHash "$OutputRoot/baseline/shared/$name.dll").Hash.ToLowerInvariant()){throw "Payload drift: $name"}
         $manifest.payloads[$name]=$candidate
     }
+    $manifest.bundlePayloads=@{}
+    foreach($name in @('hotfix-assets','hotfix-scene')) {
+        $manifest.bundlePayloads[$name]=(Get-FileHash "$OutputRoot/candidate/shared/bundles/$name").Hash.ToLowerInvariant()
+    }
     [IO.File]::WriteAllText((Join-Path $OutputRoot 'build.json'),($manifest | ConvertTo-Json -Depth 7).Replace("`r`n","`n"),[Text.UTF8Encoding]::new($false))
     & $dotnet build (Join-Path $fixture 'Reference.csproj') -c Release -o (Join-Path $OutputRoot 'reference') --nologo
     if($LASTEXITCODE -ne 0){throw 'CLR reference build failed'}

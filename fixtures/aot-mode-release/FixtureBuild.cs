@@ -52,6 +52,7 @@ namespace StartupWindowsFixture
             Configure();
 #if STARTUP_MODE_SELECTION
             ValidateBaseAssetBoundary();
+            BuildHotfixBundles();
 #endif
 #if STARTUP_DHE_PROFILE
             string output = Argument("-startupOutput");
@@ -94,11 +95,31 @@ namespace StartupWindowsFixture
         { var args = Environment.GetCommandLineArgs(); int index = Array.IndexOf(args, name); if (index < 0 || index + 1 >= args.Length) throw new Exception("Missing " + name); return args[index + 1]; }
 
 #if STARTUP_MODE_SELECTION
+        static void BuildHotfixBundles()
+        {
+            var unityAssembly=System.Reflection.Assembly.Load("StartupUnityHotfix");
+            var scene=EditorSceneManager.NewScene(NewSceneSetup.EmptyScene,NewSceneMode.Single);
+            var go=new GameObject("Bundled hotfix component");
+            go.AddComponent(unityAssembly.GetType("StartupUnityHotfix.Worker",true));
+            PrefabUtility.SaveAsPrefabAsset(go,"Assets/HotfixPrefab.prefab");
+            var data=ScriptableObject.CreateInstance(unityAssembly.GetType("StartupUnityHotfix.Data",true));
+            AssetDatabase.CreateAsset(data,"Assets/HotfixData.asset");
+            EditorSceneManager.SaveScene(scene,"Assets/HotfixBundle.unity");
+            string output=Path.Combine(Directory.GetParent(Argument("-startupBaseRoot")).FullName,"shared/bundles");
+            Directory.CreateDirectory(output);
+            var bundles=new[] {
+                new AssetBundleBuild{assetBundleName="hotfix-assets",assetNames=new[]{"Assets/HotfixPrefab.prefab","Assets/HotfixData.asset"}},
+                new AssetBundleBuild{assetBundleName="hotfix-scene",assetNames=new[]{"Assets/HotfixBundle.unity"}}
+            };
+            if(BuildPipeline.BuildAssetBundles(output,bundles,BuildAssetBundleOptions.ForceRebuildAssetBundle,BuildTarget.StandaloneWindows64)==null)
+                throw new BuildFailedException("Hotfix bundle generation failed");
+            EditorSceneManager.OpenScene(Scene);
+        }
         static void ValidateBaseAssetBoundary()
         {
             var validatorType=typeof(HybridCLRSettings).Assembly.GetType("HybridCLR.Editor.BuildProcessors.AotModeAssetValidator",true);
             var validator=Activator.CreateInstance(validatorType,true);
-            var sceneGate=(IProcessSceneWithReport)validator;
+            var validateScene=validatorType.GetMethod("ValidateScene",System.Reflection.BindingFlags.Static|System.Reflection.BindingFlags.NonPublic);
             var buildGate=(IPreprocessBuildWithReport)validator;
             var scene=EditorSceneManager.GetActiveScene();
             var unityAssembly=System.Reflection.Assembly.Load("StartupUnityHotfix");
@@ -108,7 +129,7 @@ namespace StartupWindowsFixture
             var previous=PlayerSettings.GetPreloadedAssets();
             string dataPath="Assets/DeferredGateData.asset",resourcePath="Assets/Resources/DeferredGate.prefab";
             try {
-                try {sceneGate.OnProcessScene(scene,null);}catch(BuildFailedException){sceneRejected=true;}
+                try {validateScene.Invoke(null,new object[]{scene});}catch(System.Reflection.TargetInvocationException error) when(error.InnerException is BuildFailedException){sceneRejected=true;}
                 var data=ScriptableObject.CreateInstance(unityAssembly.GetType("StartupUnityHotfix.Data",true));
                 AssetDatabase.CreateAsset(data,dataPath);PlayerSettings.SetPreloadedAssets(new UnityEngine.Object[]{data});
                 try {buildGate.OnPreprocessBuild(null);}catch(BuildFailedException){preloadedRejected=true;}
@@ -121,7 +142,7 @@ namespace StartupWindowsFixture
                 AssetDatabase.DeleteAsset(dataPath);AssetDatabase.DeleteAsset(resourcePath);
                 EditorSceneManager.SaveScene(scene, Scene);
             }
-            sceneGate.OnProcessScene(scene,null);buildGate.OnPreprocessBuild(null);
+            validateScene.Invoke(null,new object[]{scene});buildGate.OnPreprocessBuild(null);
             if(!sceneRejected || !preloadedRejected || !resourcesRejected)throw new Exception("Base asset boundary gate failed");
             Directory.CreateDirectory(Argument("-startupOutput"));
             File.WriteAllText(Path.Combine(Argument("-startupOutput"),"asset-gate.json"),"{\"sceneRejected\":true,\"preloadedRejected\":true,\"resourcesRejected\":true,\"ordinaryAssetsAccepted\":true}");

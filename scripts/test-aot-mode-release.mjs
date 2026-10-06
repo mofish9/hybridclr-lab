@@ -23,6 +23,8 @@ for (const side of ['candidate', 'baseline'])
     assert(hash(path.join(root, side, 'shared', name + '.dll')) === expected, `Payload identity drift: ${side}/${name}`);
 
 const referencePath = path.join(output, 'clr.json');
+for (const [name, expected] of Object.entries(build.bundlePayloads))
+  assert(hash(path.join(root,'candidate/shared/bundles',name)) === expected, `Bundle identity drift: ${name}`);
 const referenceRun = spawnSync('C:/Program Files/dotnet/dotnet.exe', [path.join(root, 'reference/Reference.dll'), path.join(root, 'candidate'), referencePath], {encoding:'utf8', windowsHide:true, timeout:120000});
 assert(referenceRun.status === 0, `CLR reference failed: ${referenceRun.stderr} ${referenceRun.stdout}`);
 const reference = read(referencePath);
@@ -31,7 +33,7 @@ function run(side, profile, mode, scenario, index) {
   const name = `${index}-${side}-${profile}-${mode}-${scenario}`;
   const report = path.join(output, name + '.json');
   const exe = path.join(root, side, profile, 'player/StartupPlayer.exe');
-  const child = spawnSync(exe, ['-batchmode','-nographics','-scenario',scenario,'-mode',mode,'-startupPairRoot',path.join(root,side),'-startupReport',report,'-logFile',path.join(output,name+'.log')], {encoding:'utf8', windowsHide:true, timeout:120000});
+  const child = spawnSync(exe, ['-batchmode','-nographics','-scenario',scenario,'-mode',mode,'-selectMode',String(side==='candidate' && profile==='DHE'),'-bundleRoot',path.join(root,'candidate/shared/bundles'),'-startupPairRoot',path.join(root,side),'-startupReport',report,'-logFile',path.join(output,name+'.log')], {encoding:'utf8', windowsHide:true, timeout:120000});
   assert(child.status === 0 && fs.existsSync(report), `Player failed: ${name}; exit=${child.status}; ${child.error || ''}`);
   const result = read(report);
   assert(result.passed && result.differential === 0 && result.caseCount === reference.caseCount, `Correctness failed: ${name}: ${result.error}`);
@@ -40,6 +42,9 @@ function run(side, profile, mode, scenario, index) {
     assert(result[field] === build.payloads[assembly], `Loaded payload mismatch: ${name}/${field}`);
   assert(!result.diagnostics && result.unityResult === 236 && result.identityMatches, `Production/Unity boundary failed: ${name}`);
   if (scenario !== 'benchmark') assert(result.duplicateSupplemental === 5, `Wrong duplicate-metadata result: ${name}`);
+  if (scenario !== 'benchmark') assert(result.bundleResult === 443, `Bundle serialization/Current dispatch failed: ${name}`);
+  if (side === 'candidate' && profile === 'DHE' && scenario !== 'benchmark' && result.mode === 1)
+    assert(result.rejectedLoadAttempts === 512, `Rejected loads exhausted metadata indices: ${name}`);
   if (scenario === 'concurrent') assert(result.concurrentSuccesses === 1 && result.concurrentResults.filter(n=>n===1).length === 11, 'Concurrent selection failed');
   else assert(result.mode === (mode === 'dhe' ? 1 : 2), `Wrong mode: ${name}`);
   runs.push({side, profile, requestedMode:mode, index, ...result});
@@ -70,7 +75,7 @@ const quantile = (xs,q) => { const a=[...xs].sort((a,b)=>a-b); const i=(a.length
 const stats = xs => { const p50=quantile(xs,.5); return {count:xs.length,p50,p95:quantile(xs,.95),mad:quantile(xs.map(x=>Math.abs(x-p50)),.5)}; };
 const metrics = {};
 if (pairs) {
-  const values = run => ({load:run.loadMilliseconds,loadAndEntry:run.loadMilliseconds+run.firstEntryMilliseconds,privateBytes:run.privateBytesAfter,privateBytesDelta:run.privateBytesAfter-run.privateBytesBefore,...Object.fromEntries(run.samples.map(s=>[s.name,quantile(s.milliseconds,.5)]))});
+  const values = run => ({selection:run.selectionMilliseconds,selectionToEntry:run.selectionToEntryMilliseconds,load:run.loadMilliseconds,loadAndEntry:run.loadMilliseconds+run.firstEntryMilliseconds,privateBytes:run.privateBytesAfter,privateBytesDelta:run.privateBytesAfter-run.privateBytesBefore,...Object.fromEntries(run.samples.map(s=>[s.name,quantile(s.milliseconds,.5)]))});
   for (const run of runs) for (const sample of run.samples) {
     const counterpart=runs.find(r=>r.index===run.index && r.side!==run.side).samples.find(s=>s.name===sample.name);
     assert(sample.checksum===counterpart.checksum && sample.iterations===counterpart.iterations, 'Benchmark checksum/workload mismatch');

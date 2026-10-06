@@ -75,7 +75,7 @@ if ($Stage -eq 'Prepare') {
             Copy-Item (Join-Path $fixtureRoot 'Workload.cs') (Join-Path $project 'Assets/Runtime/Workload.cs')
         }
         $package = (Join-Path $sourceRoot 'hybridclr_unity').Replace('\','/')
-        Write-Text (Join-Path $project 'Packages/manifest.json') (@{dependencies=@{'com.code-philosophy.hybridclr'="file:$package";'com.unity.modules.jsonserialize'='1.0.0'}} | ConvertTo-Json -Depth 3)
+        Write-Text (Join-Path $project 'Packages/manifest.json') (@{dependencies=@{'com.code-philosophy.hybridclr'="file:$package";'com.unity.modules.jsonserialize'='1.0.0';'com.unity.modules.assetbundle'='1.0.0'}} | ConvertTo-Json -Depth 3)
         Write-Text (Join-Path $project 'ProjectSettings/ProjectVersion.txt') "m_EditorVersion: 2022.3.62f3`nm_EditorVersionWithRevision: 2022.3.62f3 (96770f904ca7)`n"
         if ($profile -eq 'DHE') {
             Write-Text (Join-Path $project 'Assets/csc.rsp') ("-define:"+((@('STARTUP_DHE_PROFILE')+$DheScriptingDefines) -join ',')+"`n")

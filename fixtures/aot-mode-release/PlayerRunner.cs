@@ -7,6 +7,7 @@ using System.Runtime.InteropServices;
 using System.Security.Cryptography;
 using System.Threading.Tasks;
 using UnityEngine;
+using UnityEngine.SceneManagement;
 
 namespace AotModeRelease
 {
@@ -17,14 +18,15 @@ namespace AotModeRelease
         {
             public string format="hybridclr.aot-mode.release.v1", scenario, error, currentSha256, consumerSha256, unitySha256, supportSha256;
             public int pid, mode, before, after, selected, repeated, invalid, concurrentSuccesses, supplemental, duplicateSupplemental;
-            public int caseCount, differential, unityResult, visibleBefore, visibleAfter;
+            public int caseCount, differential, unityResult, visibleBefore, visibleAfter, rejectedLoadAttempts, bundleResult;
             public bool passed, diagnostics, prematureRejected, wrongLoaderRejected, identityMatches, changed, unchanged;
             public int[] actual, concurrentResults;
-            public double loadMilliseconds, firstEntryMilliseconds;
+            public double loadMilliseconds, firstEntryMilliseconds, selectionMilliseconds, selectionToEntryMilliseconds;
             public long privateBytesBefore, privateBytesAfter;
             public Sample[] samples;
         }
         static Result result;
+        static AssetBundle sceneBundle;
         // Windows Player fixture only; the library has no platform persistence or launcher code.
         [StructLayout(LayoutKind.Sequential)]
         struct MemoryCounters
@@ -41,16 +43,9 @@ namespace AotModeRelease
             if(!GetProcessMemoryInfo(new IntPtr(-1),ref counters,counters.size))throw new Exception("Windows process memory query failed");
             return checked((long)counters.privateBytes.ToUInt64());
         }
-        static bool IsCandidate
-        {
-            get {
-#if STARTUP_MODE_SELECTION
-                return true;
-#else
-                return false;
-#endif
-            }
-        }
+        // Keep the same AOT harness roots on both DHE Players. Only the launch
+        // argument decides whether the candidate-only native API is called.
+        static bool IsCandidate => Argument("-selectMode","false")=="true";
 
         [RuntimeInitializeOnLoadMethod(RuntimeInitializeLoadType.BeforeSceneLoad)]
         static void Bootstrap()
@@ -66,8 +61,9 @@ namespace AotModeRelease
                 result.currentSha256=Hash(dll);result.consumerSha256=Hash(other);result.unitySha256=Hash(unity);result.supportSha256=Hash(support);
                 bool correctness=result.scenario!="benchmark";
                 result.visibleBefore=Visible();
-#if STARTUP_MODE_SELECTION
-                result.before=(int)HybridCLR.RuntimeApi.GetExecutionMode();
+                var startupTimer=Stopwatch.StartNew();
+                if(IsCandidate) {
+                result.before=QueryMode();
                 if(correctness) {
                     result.invalid=Select(99);
                     try { Assembly.Load(dll); } catch(InvalidOperationException) { result.prematureRejected=true; }
@@ -78,12 +74,23 @@ namespace AotModeRelease
                     result.concurrentResults=tasks.Select(t=>t.Result).ToArray();result.concurrentSuccesses=result.concurrentResults.Count(n=>n==0);
                     result.selected=result.concurrentSuccesses==1 ? 0 : -1;
                 } else result.selected=Select(desired);
-                result.mode=(int)HybridCLR.RuntimeApi.GetExecutionMode();
-#elif STARTUP_DHE_PROFILE
+                result.mode=QueryMode();
+                } else {
+#if STARTUP_DHE_PROFILE
                 result.mode=1;
 #else
                 result.mode=2;
 #endif
+                }
+                result.selectionMilliseconds=startupTimer.Elapsed.TotalMilliseconds;
+                // Exceeds the finite metadata-image index pool. Rejected loads
+                // must leave it available for the legitimate loads below.
+                if (IsCandidate && correctness && result.mode == 1)
+                    for (int i = 0; i < 512; ++i)
+                    {
+                        try { Assembly.Load(dll); }
+                        catch (InvalidOperationException) { ++result.rejectedLoadAttempts; }
+                    }
                 result.privateBytesBefore=PrivateBytes();
                 var timer=Stopwatch.StartNew();
                 result.supplemental=(int)HybridCLR.RuntimeApi.LoadMetadataForAOTAssembly(support,HybridCLR.HomologousImageMode.SuperSet);
@@ -97,6 +104,7 @@ namespace AotModeRelease
                 result.differential=result.actual.Where((value,i)=>value!=Workload.Expected[i]).Count();
                 result.unityResult=(int)unityLoaded.GetType("StartupUnityHotfix.Entry",true).GetMethod("Run").Invoke(null,null);
                 result.firstEntryMilliseconds=timer.Elapsed.TotalMilliseconds;
+                result.selectionToEntryMilliseconds=startupTimer.Elapsed.TotalMilliseconds;
                 result.privateBytesAfter=PrivateBytes();
                 result.visibleAfter=Visible();
                 result.identityMatches=Assembly.Load("StartupHotfix")==loaded &&
@@ -111,25 +119,24 @@ namespace AotModeRelease
 #endif
                 if(correctness) {
                     result.duplicateSupplemental=(int)HybridCLR.RuntimeApi.LoadMetadataForAOTAssembly(support,HybridCLR.HomologousImageMode.SuperSet);
-#if STARTUP_MODE_SELECTION
+#if STARTUP_DHE_PROFILE
+                    if(IsCandidate) {
                     result.repeated=Select(result.mode==1?2:1);
                     try {
                         if(result.mode==1)Assembly.Load(dll);
                         else LoadDhe(root,"StartupHotfix",dll);
                     } catch(InvalidOperationException) { result.wrongLoaderRejected=true; }
+                    }
 #endif
                 }
-#if STARTUP_MODE_SELECTION
-                result.after=(int)HybridCLR.RuntimeApi.GetExecutionMode();
-#else
-                result.after=result.mode;
-#endif
+                result.after=IsCandidate?QueryMode():result.mode;
                 if(result.scenario=="benchmark")result.samples=Measure(loaded,int.Parse(Argument("-iterations","200000")));
                 result.passed=result.differential==0 && result.caseCount==Workload.Expected.Length && result.unityResult==236 &&
                     result.identityMatches && result.visibleAfter==2 && result.mode==result.after && !result.diagnostics;
                 if(result.mode==1)result.passed &= result.changed && !result.unchanged;
                 if(IsCandidate)result.passed &= result.before==0 && result.selected==0 && result.visibleBefore==0 &&
                     (!correctness || (result.invalid==2 && result.repeated==1 && result.prematureRejected && result.wrongLoaderRejected));
+                if(IsCandidate && correctness && result.mode==1)result.passed &= result.rejectedLoadAttempts==512;
                 if(correctness)result.passed &= result.duplicateSupplemental!=0;
             }
             catch(Exception error) { result.error=error.ToString();result.passed=false; }
@@ -151,9 +158,20 @@ namespace AotModeRelease
                 File.ReadAllBytes(Path.Combine(root,"shared/"+name+".base.mv")),File.ReadAllBytes(Path.Combine(root,"shared/"+name+".current.mv")));
         }
 #endif
-#if STARTUP_MODE_SELECTION
-        static int Select(int mode) { return (int)HybridCLR.RuntimeApi.SelectExecutionMode((HybridCLR.ExecutionMode)mode); }
+        static int Select(int mode) {
+#if STARTUP_DHE_PROFILE
+            return (int)HybridCLR.RuntimeApi.SelectExecutionMode((HybridCLR.ExecutionMode)mode);
+#else
+            throw new NotSupportedException();
 #endif
+        }
+        static int QueryMode() {
+#if STARTUP_DHE_PROFILE
+            return (int)HybridCLR.RuntimeApi.GetExecutionMode();
+#else
+            return 2;
+#endif
+        }
         static Sample[] Measure(Assembly loaded,int iterations)
         {
             return new[]{"BenchNative","BenchChanged","BenchVirtual"}.Select(name=> {
@@ -171,8 +189,47 @@ namespace AotModeRelease
         }
         [RuntimeInitializeOnLoadMethod(RuntimeInitializeLoadType.AfterSceneLoad)]
         static void Finish() {
+            if(result.passed && result.scenario!="benchmark") {
+                try { BeginBundleCheck(); return; }
+                catch(Exception error) { result.error=error.ToString(); result.passed=false; }
+            }
+            WriteResult();
+        }
+        static void WriteResult() {
             var path=Argument("-startupReport");Directory.CreateDirectory(Path.GetDirectoryName(path));
             File.WriteAllText(path,JsonUtility.ToJson(result,true));UnityEngine.Debug.Log("AOT_MODE_RESULT "+JsonUtility.ToJson(result));Application.Quit(result.passed?0:2);
+        }
+        static void BeginBundleCheck() {
+            string root=Argument("-bundleRoot");
+            var assembly=Assembly.Load("StartupUnityHotfix");
+            var workerType=assembly.GetType("StartupUnityHotfix.Worker",true);
+            var assets=AssetBundle.LoadFromFile(Path.Combine(root,"hotfix-assets"));
+            if(assets==null)throw new Exception("Unable to load hotfix assets bundle");
+            var prefab=assets.LoadAsset<GameObject>("Assets/HotfixPrefab.prefab");
+            var instance=UnityEngine.Object.Instantiate(prefab);
+            var worker=instance.GetComponent(workerType);
+            var data=assets.LoadAsset("Assets/HotfixData.asset");
+            if(worker==null || worker.GetType()!=workerType || data.GetType()!=assembly.GetType("StartupUnityHotfix.Data",true))
+                throw new Exception("Bundle script identity mismatch");
+            result.bundleResult=(int)workerType.GetField("Value").GetValue(worker)+(int)data.GetType().GetField("Value").GetValue(data);
+            sceneBundle=AssetBundle.LoadFromFile(Path.Combine(root,"hotfix-scene"));
+            if(sceneBundle==null)throw new Exception("Unable to load hotfix scene bundle");
+            UnityEngine.Object.Destroy(instance); assets.Unload(false);
+            SceneManager.sceneLoaded+=OnBundleSceneLoaded;
+            SceneManager.LoadScene("Assets/HotfixBundle.unity",LoadSceneMode.Additive);
+        }
+        static void OnBundleSceneLoaded(Scene scene,LoadSceneMode mode) {
+            if(scene.path!="Assets/HotfixBundle.unity")return;
+            SceneManager.sceneLoaded-=OnBundleSceneLoaded;
+            try {
+            var workerType=Assembly.Load("StartupUnityHotfix").GetType("StartupUnityHotfix.Worker",true);
+            var sceneWorker=scene.GetRootGameObjects().Single().GetComponent(workerType);
+            if(sceneWorker==null || sceneWorker.GetType()!=workerType)throw new Exception("Bundle scene script identity mismatch");
+            result.bundleResult+=(int)workerType.GetField("Value").GetValue(sceneWorker);
+            result.passed &= result.bundleResult==443;
+            sceneBundle.Unload(false);
+            } catch(Exception error) { result.error=error.ToString(); result.passed=false; }
+            WriteResult();
         }
         static int Visible() { return AppDomain.CurrentDomain.GetAssemblies().Count(a=>a.GetName().Name=="StartupHotfix" || a.GetName().Name=="StartupUnityHotfix"); }
         static string Hash(byte[] bytes) { using(var sha=SHA256.Create())return BitConverter.ToString(sha.ComputeHash(bytes)).Replace("-","").ToLowerInvariant(); }
