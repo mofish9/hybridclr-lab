@@ -5,6 +5,7 @@ param(
     [ValidateSet('Prepare', 'DHE', 'LegacyInterpreter', 'Package')][string]$Stage = 'Prepare',
     [string]$DheHybridClrRef = '9c607a3c3d45f88ee83ff9dc5bb0f5ad12c57071',
     [string]$DheIl2CppRef = 'e426adc57c283865126423b169051558b339388c',
+    [string]$DhePackageRef = 'f2946d5ba35a879724b76afd857176feb1a4adca',
     [string]$FixtureRootOverride,
     [switch]$SkipInstall
 )
@@ -17,7 +18,7 @@ if ($FixtureRootOverride) { $fixtureRoot = [IO.Path]::GetFullPath($FixtureRootOv
 $editor = Join-Path $EditorRoot 'Editor/Unity.exe'
 $dotnet = 'C:/Program Files/dotnet/dotnet.exe'
 $sources = @{
-    DHE = @{ hybridclr=$DheHybridClrRef; il2cpp_plus=$DheIl2CppRef; hybridclr_unity='f2946d5ba35a879724b76afd857176feb1a4adca' }
+    DHE = @{ hybridclr=$DheHybridClrRef; il2cpp_plus=$DheIl2CppRef; hybridclr_unity=$DhePackageRef }
     LegacyInterpreter = @{ hybridclr='f40c6f08ccd0391ad9285276b4cc21ada3a180ab'; il2cpp_plus='bf15337e189ae7da5876aa51c9b896a36c52a155'; hybridclr_unity='ac0fdc5c6363a1b6323d017e068c536dd22127dc' }
 }
 function Export-Repo([string]$Repo, [string]$Commit, [string]$Destination) {
@@ -68,6 +69,9 @@ if ($Stage -eq 'Prepare') {
         Copy-Item (Join-Path $fixtureRoot 'StartupControl.cs') (Join-Path $project 'Assets/Runtime/StartupControl.cs')
         Copy-Item (Join-Path $fixtureRoot 'PlayerRunner.cs') (Join-Path $project 'Assets/Runtime/PlayerRunner.cs')
         Copy-Item (Join-Path $fixtureRoot 'FixtureBuild.cs') (Join-Path $project 'Assets/Editor/FixtureBuild.cs')
+        if (Test-Path -LiteralPath (Join-Path $fixtureRoot 'Workload.cs')) {
+            Copy-Item (Join-Path $fixtureRoot 'Workload.cs') (Join-Path $project 'Assets/Runtime/Workload.cs')
+        }
         $package = (Join-Path $sourceRoot 'hybridclr_unity').Replace('\','/')
         Write-Text (Join-Path $project 'Packages/manifest.json') (@{dependencies=@{'com.code-philosophy.hybridclr'="file:$package";'com.unity.modules.jsonserialize'='1.0.0'}} | ConvertTo-Json -Depth 3)
         Write-Text (Join-Path $project 'ProjectSettings/ProjectVersion.txt') "m_EditorVersion: 2022.3.62f3`nm_EditorVersionWithRevision: 2022.3.62f3 (96770f904ca7)`n"
