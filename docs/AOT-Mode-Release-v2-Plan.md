@@ -17,6 +17,11 @@ Unity 2021 和团结不属于本轮范围；用户对本轮范围的明确限定
 Editor 专用资产不误拦截，真实 Player Resources 仍拦截；重复错误加载不消耗 image index，随后正常加载成功。
 所有这些用例位于 lab，不能把测试开关/故障注入放回生产库。
 
+新增的真实 Bundle Player 测试在候选两路失败，独立 opt3 传统 Player 同资源通过。
+修复范围补充 Unity 资源系统的稳定空 image 句柄：Unity 原生查询能在 AOT 入口之前取得占位，
+managed Base 可见性规则不变；选择后保留 image 地址，分别绑定 Base 视图/普通 Current。
+必须通过两种模式的 prefab、ScriptableObject 和 scene 反序列化及 Current Awake 行为，不能以动态创建代替。
+
 性能主指标：正常 DHE steady-state、启动选择+加载+首次入口；次指标：解释模式对照、
 首次反射、内存和二进制体积。记录 P50/P95/P99、MAD、唯一 PID、源码和程序集身份，
 尚无批准的数值退化阈值，不能自动把 measurements 记为性能通过。P99 门禁各组至少 100 进程。

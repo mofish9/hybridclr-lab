@@ -24,6 +24,12 @@ Unity 2021 和团结不属于本轮实施或发布前置范围。
 | 一次绑定 | 在 metadata 锁下选择不可变函数表，把模式与目标一起 release 发布；读者 acquire 读取 | 一次选择，查询/扩展调用读取 |
 | 两路执行 | DHE 表指向现有 DHE 扩展；解释表返回原身份/普通查找，不使用 DHE overlay；传统 SUPERSET 使用原实现 | 加载及既有扩展入口 |
 
+Unity 原生资源系统会在 AOT 启动入口之前缓存程序集 image，所以还要保留既有 HybridCLR 的空占位
+image 作为 Unity API 的稳定句柄。此时它不包含 Base 类型，managed 查询仍隐藏 deferred Base。
+DHE 选择把 Base 的 image 视图绑定到该占位对象；解释模式由原 Assembly.Load 填入 Current。
+Unity 的 assembly/class image 查询统一返回这一稳定句柄，内部 DHE 元数据仍使用原 canonical Base。
+该边界由 Unity 2022 的 IL2CPP API 接入处理，不引入平台启动逻辑。
+
 执行指令循环没有新增模式分支。已有 DHE 扩展入口使用同一张选定表，热点仍有原子读取和间接调用，
 不能宣称零开销。功能关闭时保留原直接调用路径。进入 DHE 实现后的内部调用直接绑定，避免重复查表。
 
