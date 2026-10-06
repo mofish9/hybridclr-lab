@@ -37,6 +37,8 @@ AOT 回调，但同一阶段多个回调的顺序不应作为保证；最好由�
 同一份 Current DLL 同时供两条路使用。正常 DHE 继续使用原来的 MV 和兼容校验；
 传统模式使用标准 Assembly.Load，不读取 DHE MV。无需为两个模式维护两套业务 DLL，
 但每次发布的兼容 Current 应分别跑两条路的 correctness 门禁。
+资源集合仍需满足普通 HybridCLR 的桥接与补充 AOT metadata 要求；需要这些 metadata 时，
+将匹配该 Base 的数据放进同一套资源，并在选择模式之后加载。无需为两条路编译两套业务 DLL。
 
 当前候选的强制边界：
 
