@@ -1,0 +1,27 @@
+{
+  "format": "hybridclr.aot-mode.performance-policy.v2",
+  "scope": "Unity2022 Windows IL2CPP startup selection",
+  "minimumIndependentProcessesPerSide": 100,
+  "steadyState": {
+    "maximumP50RegressionPercent": 5,
+    "maximumP95RegressionPercent": 5,
+    "maximumP99RegressionPercent": 10
+  },
+  "startup": {
+    "maximumP50P95RegressionPercent": 10,
+    "maximumP99RegressionPercent": 15,
+    "absoluteRegressionFloorMilliseconds": 1
+  },
+  "memory": {
+    "maximumP50RegressionPercent": 5,
+    "absoluteRegressionFloorBytes": 8388608
+  },
+  "notes": [
+    "Set before the v2 final sampling; no adjustment to make observed results pass.",
+    "DHE and fixed-mode compare against uninstrumented opt8; traditional mode compares against independent opt3.",
+    "Steady-state thresholds apply independently to each benchmark. Report MAD and paired differences; no summing opt improvements.",
+    "Startup and memory fail only when both relative and absolute limits are exceeded, matching the existing metadata policy's materiality rule.",
+    "Startup includes both selection-to-entry and process-to-entry; individual selection latency is reported, not compared to a zero-work baseline.",
+    "Passing this Windows policy does not qualify ARM64 or WebGL performance. Binary size is reported separately without claiming a pure-library delta."
+  ]
+}
