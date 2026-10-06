@@ -1,0 +1,35 @@
+using System;
+using System.Reflection;
+using UnityEditor.Build;
+using UnityEditor.Build.Reporting;
+using UnityEngine;
+using UnityEngine.SceneManagement;
+
+// Editor-only negative test, staged into the source-locked Player fixture by lab.
+public sealed class AotModePlayerSceneProbe : IProcessSceneWithReport
+{
+    public int callbackOrder => 9;
+    public void OnProcessScene(Scene scene, BuildReport report)
+    {
+        if (report == null || Environment.GetEnvironmentVariable("HYBRIDCLR_LAB_INJECT_SCENE") != "1") return;
+        var go = new GameObject("AOT gate injected component");
+        SceneManager.MoveGameObjectToScene(go, scene);
+        go.AddComponent(Assembly.Load("StartupUnityHotfix").GetType("StartupUnityHotfix.Worker", true));
+        Debug.Log("AOT_GATE_INJECTED_SCENE " + scene.path);
+    }
+    public static void Run()
+    {
+        Environment.SetEnvironmentVariable("HYBRIDCLR_LAB_INJECT_SCENE", "1");
+        try
+        {
+            StartupWindowsFixture.FixtureBuild.Build();
+        }
+        catch (BuildFailedException)
+        {
+            Debug.Log("AOT_GATE_PLAYER_BUILD_REJECTED");
+            return;
+        }
+        finally { Environment.SetEnvironmentVariable("HYBRIDCLR_LAB_INJECT_SCENE", null); }
+        throw new Exception("Player build accepted an injected deferred component");
+    }
+}
