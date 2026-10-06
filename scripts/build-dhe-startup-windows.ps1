@@ -3,6 +3,9 @@ param(
     [string]$OutputRoot = (Join-Path (Split-Path -Parent $PSScriptRoot) 'artifacts/startup-windows-v1'),
     [string]$EditorRoot = 'C:/Program Files/Unity/Hub/Editor/2022.3.62f3',
     [ValidateSet('Prepare', 'DHE', 'LegacyInterpreter', 'Package')][string]$Stage = 'Prepare',
+    [string]$DheHybridClrRef = '9c607a3c3d45f88ee83ff9dc5bb0f5ad12c57071',
+    [string]$DheIl2CppRef = 'e426adc57c283865126423b169051558b339388c',
+    [string]$FixtureRootOverride,
     [switch]$SkipInstall
 )
 $ErrorActionPreference = 'Stop'
@@ -10,10 +13,11 @@ $OutputRoot = [IO.Path]::GetFullPath($OutputRoot)
 $WorkspaceRoot = [IO.Path]::GetFullPath($WorkspaceRoot)
 $labRoot = Split-Path -Parent $PSScriptRoot
 $fixtureRoot = Join-Path $labRoot 'fixtures/startup-windows'
+if ($FixtureRootOverride) { $fixtureRoot = [IO.Path]::GetFullPath($FixtureRootOverride) }
 $editor = Join-Path $EditorRoot 'Editor/Unity.exe'
 $dotnet = 'C:/Program Files/dotnet/dotnet.exe'
 $sources = @{
-    DHE = @{ hybridclr='9c607a3c3d45f88ee83ff9dc5bb0f5ad12c57071'; il2cpp_plus='e426adc57c283865126423b169051558b339388c'; hybridclr_unity='f2946d5ba35a879724b76afd857176feb1a4adca' }
+    DHE = @{ hybridclr=$DheHybridClrRef; il2cpp_plus=$DheIl2CppRef; hybridclr_unity='f2946d5ba35a879724b76afd857176feb1a4adca' }
     LegacyInterpreter = @{ hybridclr='f40c6f08ccd0391ad9285276b4cc21ada3a180ab'; il2cpp_plus='bf15337e189ae7da5876aa51c9b896a36c52a155'; hybridclr_unity='ac0fdc5c6363a1b6323d017e068c536dd22127dc' }
 }
 function Export-Repo([string]$Repo, [string]$Commit, [string]$Destination) {
