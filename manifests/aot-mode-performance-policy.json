@@ -2,6 +2,12 @@
   "format": "hybridclr.aot-mode.performance-policy.v2",
   "scope": "Unity2022 Windows IL2CPP startup selection",
   "minimumIndependentProcessesPerSide": 100,
+  "comparisonAcceptance": {
+    "dhe": "strict",
+    "fixed": "strict",
+    "legacy": "measure-and-disclose"
+  },
+  "legacyCostDecision": "User explicitly accepts additional fallback cost; full correctness and measurement integrity remain mandatory. Normal DHE thresholds are unchanged.",
   "steadyState": {
     "maximumP50RegressionPercent": 5,
     "maximumP95RegressionPercent": 5,
@@ -17,7 +23,8 @@
     "absoluteRegressionFloorBytes": 8388608
   },
   "notes": [
-    "Set before the v2 final sampling; no adjustment to make observed results pass.",
+    "Numeric thresholds were set before v2 sampling and remain unchanged. Legacy parity was subsequently waived explicitly by the user; previous failed reports remain unchanged.",
+    "Count distinct numeric PIDs per side conservatively toward the 100-process minimum. Windows may recycle exited process IDs; retain every launch and sample, including repeated numeric PIDs and outliers.",
     "DHE and fixed-mode compare against uninstrumented opt8; traditional mode compares against independent opt3.",
     "Steady-state thresholds apply independently to each benchmark. Report MAD and paired differences; no summing opt improvements.",
     "Startup and memory fail only when both relative and absolute limits are exceeded, matching the existing metadata policy's materiality rule.",

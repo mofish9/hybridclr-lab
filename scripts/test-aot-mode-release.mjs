@@ -2,6 +2,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import crypto from 'node:crypto';
 import {spawnSync} from 'node:child_process';
+import {processCounts,summarizePerformance} from './aot-mode-performance-statistics.mjs';
 
 const root = path.resolve(process.argv[2] || 'artifacts/ar1');
 const pairs = Number(process.argv[3] || 0);
@@ -36,9 +37,13 @@ function run(side, profile, mode, scenario, index) {
   const name = `${index}-${side}-${profile}-${mode}-${scenario}`;
   const report = path.join(output, name + '.json');
   const exe = path.join(root, side, profile, 'player/StartupPlayer.exe');
+  const launchedAtUtc = new Date().toISOString();
   const child = spawnSync(exe, ['-batchmode','-nographics','-scenario',scenario,'-mode',mode,'-selectMode',String(side==='candidate' && profile==='DHE'),'-bundleRoot',path.join(root,'candidate/shared/bundles'),'-startupPairRoot',path.join(root,side),'-startupReport',report,'-logFile',path.join(output,name+'.log')], {encoding:'utf8', windowsHide:true, timeout:120000});
   assert(child.status === 0 && fs.existsSync(report), `Player failed: ${name}; exit=${child.status}; ${child.error || ''}`);
   const result = read(report);
+  assert(result.pid === child.pid, `Parent/Player PID mismatch: ${name}`);
+  const launch = {pid:child.pid,launchedAtUtc,exitedAtUtc:new Date().toISOString(),exitCode:child.status};
+  fs.writeFileSync(path.join(output,name+'.launch.json'),JSON.stringify(launch));
   assert(result.passed && result.differential === 0 && result.caseCount === reference.caseCount, `Correctness failed: ${name}: ${result.error}`);
   assert(JSON.stringify(result.actual) === JSON.stringify(reference.actual), `CLR differential: ${name}`);
   for (const [field, assembly] of [['currentSha256','StartupHotfix'],['consumerSha256','StartupConsumer'],['unitySha256','StartupUnityHotfix'],['supportSha256','StartupAotSupport']])
@@ -50,7 +55,7 @@ function run(side, profile, mode, scenario, index) {
     assert(result.rejectedLoadAttempts === 512, `Rejected loads exhausted metadata indices: ${name}`);
   if (scenario === 'concurrent') assert(result.concurrentSuccesses === 1 && result.concurrentResults.filter(n=>n===1).length === 11, 'Concurrent selection failed');
   else assert(result.mode === (mode === 'dhe' ? 1 : 2), `Wrong mode: ${name}`);
-  runs.push({side, profile, requestedMode:mode, index, ...result});
+  runs.push({side, profile, requestedMode:mode, index, launch, ...result});
   console.log(`PASS ${name}, pid=${result.pid}`);
 }
 if (!pairs) {
@@ -79,27 +84,8 @@ if (!pairs) {
       runs[runs.length-1].comparisonGroup=group;
     }
 }
-assert(new Set(runs.map(r=>r.pid)).size === runs.length, 'PID reuse: cannot count these as unique processes');
-const quantile = (xs,q) => { const a=[...xs].sort((a,b)=>a-b); const i=(a.length-1)*q; return a[Math.floor(i)]+(a[Math.ceil(i)]-a[Math.floor(i)])*(i%1); };
-const stats = xs => { const p50=quantile(xs,.5); return {count:xs.length,p50,p95:quantile(xs,.95),p99:quantile(xs,.99),mad:quantile(xs.map(x=>Math.abs(x-p50)),.5)}; };
-const metrics = {};
-if (pairs) {
-  const values = run => ({selection:run.selectionMilliseconds,selectionToEntry:run.selectionToEntryMilliseconds,processToEntry:run.processToEntryMilliseconds,load:run.loadMilliseconds,loadAndEntry:run.loadMilliseconds+run.firstEntryMilliseconds,privateBytes:run.privateBytesAfter,privateBytesDelta:run.privateBytesAfter-run.privateBytesBefore,...Object.fromEntries(run.samples.map(s=>[s.name,quantile(s.milliseconds,.5)]))});
-  for (const run of runs) for (const sample of run.samples) {
-    const counterpart=runs.find(r=>r.index===run.index && r.comparisonGroup!==run.comparisonGroup).samples.find(s=>s.name===sample.name);
-    assert(sample.checksum===counterpart.checksum && sample.iterations===counterpart.iterations, 'Benchmark checksum/workload mismatch');
-    let expected=0;
-    for(let i=0;i<sample.iterations;i++) expected=(expected+(sample.name==='BenchNative'?(i&255)*3+1:sample.name==='BenchChanged'?(i&255)+200:(i&255)*(i%2?5:4)))|0;
-    if(sample.name==='BenchChanged')expected=(expected+1)|0;
-    assert(sample.checksum===expected, `Wrong benchmark result: ${sample.name}`);
-  }
-  for (const name of Object.keys(values(runs[0]))) {
-    const baseline=runs.filter(r=>r.comparisonGroup==='baseline').map(r=>values(r)[name]);
-    const candidate=runs.filter(r=>r.comparisonGroup==='candidate').map(r=>values(r)[name]);
-    const denominator=quantile(baseline,.5);
-    metrics[name]={baseline:stats(baseline),candidate:stats(candidate),pairedDelta:stats(candidate.map((n,i)=>n-baseline[i])),pairedPercent:baseline.every(n=>n!==0)?stats(candidate.map((n,i)=>(n/baseline[i]-1)*100)):null,medianPercent:denominator!==0?(quantile(candidate,.5)/denominator-1)*100:null};
-  }
-}
-const summary={format:'hybridclr.aot-mode.release-gate.v2',passed:true,correctnessPassed:true,performanceAcceptance:pairs?'requires-review':'not-measured',comparison,runnerSha256:hash(new URL(import.meta.url)),build,caseCount:reference.caseCount,unityExpected:236,independentProcesses:runs.length,pairs,diagnostics:false,p99SampleQualified:pairs>=100,p99HardGate:false,metrics,runs};
+const processes=processCounts(runs);
+const metrics=pairs?summarizePerformance(runs):{};
+const summary={format:'hybridclr.aot-mode.release-gate.v2',passed:true,correctnessPassed:true,performanceAcceptance:pairs?'requires-review':'not-measured',comparison,runnerSha256:hash(new URL(import.meta.url)),statisticsSha256:hash(new URL('./aot-mode-performance-statistics.mjs',import.meta.url)),build,caseCount:reference.caseCount,unityExpected:236,independentProcesses:runs.length,pairs,diagnostics:false,processCounts:processes,p99SampleQualified:pairs>=100&&Object.values(processes).every(g=>g.uniquePids>=100),p99HardGate:false,metrics,runs};
 fs.writeFileSync(path.join(output,'summary.json'),JSON.stringify(summary,null,2));
 console.log(JSON.stringify({passed:true,processes:runs.length,metrics},null,2));

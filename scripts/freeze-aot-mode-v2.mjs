@@ -37,7 +37,15 @@ const inputs={'build.json':path.join(root,'build.json'),'correctness.json':corre
 for(const entry of acceptance.checked) {
   assert(hash(entry.reportPath)===entry.sha256,'Performance report changed');
   const report=read(entry.reportPath);
-  assert(JSON.stringify(report.build)===JSON.stringify(build),'Performance build differs');
+  // A later fixed-mode rebuild must not relabel previous samples or invalidate
+  // unrelated DHE/legacy binaries. Bind every profile actually measured, plus
+  // all shared workload/config identities, instead of the unused profile map.
+  for(const key of ['engine','diagnostics','ordinaryAotGuards','supplementalAotMetadata','payloads','fixtureHashes','bundlePayloads','regressionPayloads'])
+    assert(JSON.stringify(report.build[key])===JSON.stringify(build[key]),`Performance workload/config differs: ${key}`);
+  for(const run of report.runs) {
+    const key=`${run.side}/${run.profile}`;
+    assert(JSON.stringify(report.build.profiles[key])===JSON.stringify(build.profiles[key]),`Performance binary/source differs: ${key}`);
+  }
   inputs[`performance-${entry.comparison}.json`]=entry.reportPath;
 }
 assert(!git(lab,'status','--porcelain'),'Commit lab sources before freeze');

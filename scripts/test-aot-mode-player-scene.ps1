@@ -1,12 +1,14 @@
 param(
     [Parameter(Mandatory=$true)][string]$BuildRoot,
+    [string]$OutputName='rejected-scene',
     [string]$EditorRoot='C:/Program Files/Unity/Hub/Editor/2022.3.62f3'
 )
 $ErrorActionPreference='Stop'
 $labRoot=Split-Path -Parent $PSScriptRoot
 $BuildRoot=[IO.Path]::GetFullPath($BuildRoot)
 $project=Join-Path $BuildRoot 'candidate/projects/DHE'
-$output=Join-Path $BuildRoot 'rejected-scene'
+if($OutputName -notmatch '^[a-z0-9-]+$'){throw 'Invalid output name'}
+$output=Join-Path $BuildRoot $OutputName
 if(Test-Path -LiteralPath $output){throw 'Preserve prior evidence; use a new probe output'}
 New-Item -ItemType Directory -Path $output|Out-Null
 # FixtureBuild creates bundles beside its input base directory. Isolate these
