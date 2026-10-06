@@ -1,5 +1,5 @@
 param(
-    [string]$PairRoot=(Join-Path (Split-Path -Parent $PSScriptRoot) 'artifacts/as2'),
+    [string]$PairRoot=(Join-Path (Split-Path -Parent $PSScriptRoot) 'artifacts/as4'),
     [string]$ReportRoot=(Join-Path (Split-Path -Parent $PSScriptRoot) 'reports/aot-isolation-v2')
 )
 $ErrorActionPreference='Stop'

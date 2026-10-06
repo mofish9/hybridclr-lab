@@ -1,5 +1,5 @@
 param(
-    [string]$BuildRoot=(Join-Path (Split-Path -Parent $PSScriptRoot) 'artifacts/as3'),
+    [string]$BuildRoot=(Join-Path (Split-Path -Parent $PSScriptRoot) 'artifacts/as4'),
     [string]$EditorRoot='C:/Program Files/Unity/Hub/Editor/2022.3.62f3'
 )
 $ErrorActionPreference='Stop'

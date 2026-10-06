@@ -1,6 +1,6 @@
 param(
     [string]$WorkspaceRoot='C:/hybridclr_optimize',
-    [string]$OutputRoot=(Join-Path (Split-Path -Parent $PSScriptRoot) 'artifacts/as2'),
+    [string]$OutputRoot=(Join-Path (Split-Path -Parent $PSScriptRoot) 'artifacts/as4'),
     [ValidateSet('Prepare','DHE','LegacyInterpreter','Package')][string]$Stage='Prepare',
     [string]$EditorRoot='C:/Program Files/Unity/Hub/Editor/2022.3.62f3'
 )
@@ -14,7 +14,14 @@ $hclr=(& git -C $hclrRepo rev-parse HEAD).Trim(); if($LASTEXITCODE -ne 0){throw 
 $packageRepo=Join-Path $WorkspaceRoot 'worktrees/hybridclr-unity-aot-select-v1'
 $package=(& git -C $packageRepo rev-parse HEAD).Trim()
 $il2cpp=(& git -C $il2cppRepo rev-parse HEAD).Trim(); if($LASTEXITCODE -ne 0){throw 'IL2CPP ref missing'}
-if(@(& git -C $packageRepo status --porcelain).Count -or @(& git -C $hclrRepo status --porcelain).Count -or @(& git -C $il2cppRepo status --porcelain).Count){throw 'Commit source candidates before building'}
+if($Stage -eq 'Prepare') {
+    if(@(& git -C $packageRepo status --porcelain).Count -or @(& git -C $hclrRepo status --porcelain).Count -or @(& git -C $il2cppRepo status --porcelain).Count){throw 'Commit source candidates before exporting'}
+} else {
+    # Later stages build the immutable exported combination, even if work on a
+    # subsequent candidate has begun in the source worktrees.
+    $exported=Get-Content (Join-Path $OutputRoot 'source-identities.json') -Raw | ConvertFrom-Json
+    $hclr=$exported.DHE.hybridclr; $il2cpp=$exported.DHE.il2cpp_plus; $package=$exported.DHE.hybridclr_unity
+}
 $dotnet='C:/Program Files/dotnet/dotnet.exe'
 if($Stage -eq 'Prepare'){
     & (Join-Path $PSScriptRoot 'build-dhe-startup-windows.ps1') -WorkspaceRoot $WorkspaceRoot -OutputRoot $OutputRoot -EditorRoot $EditorRoot -Stage Prepare -DheHybridClrRef $hclr -DheIl2CppRef $il2cpp -DhePackageRef $package -FixtureRootOverride $fixture

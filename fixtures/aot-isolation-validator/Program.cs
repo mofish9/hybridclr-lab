@@ -25,6 +25,13 @@ class Program
         try { AotModeDependencyValidator.Validate(new[]{positive,previous},deferred); }
         catch(InvalidOperationException error) { oldRejected=error.Message.Contains("Assembly-CSharp"); }
         if(!oldRejected)throw new Exception("The observed static-reference counterexample was accepted.");
-        Console.WriteLine(JsonSerializer.Serialize(new {passes=4,staticReferenceRejected=rejected,observedCounterexampleRejected=oldRejected,hotfixToHotfixAllowed=true}));
+        foreach(string unsafeAssembly in args.Skip(1))
+        {
+            bool unsafeRejected=false;
+            try { AotModeDependencyValidator.Validate(new[]{unsafeAssembly},deferred); }
+            catch(InvalidOperationException error) { unsafeRejected=error.Message.Contains("deferred"); }
+            if(!unsafeRejected)throw new Exception("Unsafe Unity registration was accepted: "+unsafeAssembly);
+        }
+        Console.WriteLine(JsonSerializer.Serialize(new {passes=4+args.Length-1,staticReferenceRejected=rejected,observedCounterexampleRejected=oldRejected,hotfixToHotfixAllowed=true,unsafeUnityRegistrationsRejected=args.Length-1}));
     }
 }
