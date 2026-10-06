@@ -18,6 +18,9 @@ const identity=build.profiles['candidate/DHE'].sources;
 const correct=read(correctArg), full=read(fullArg), acceptance=read(acceptanceArg);
 const native=read(path.join(root,'candidate/native-gate.json'));
 const assets=read(assetsArg), scene=read(sceneArg), validator=read(validatorArg);
+const policyRegression=read(path.join(root,'performance-policy-regression.json'));
+assert(policyRegression.passed&&policyRegression.cases.length===12&&policyRegression.cases.every(c=>c.actual===c.expected),'Performance checker regression failed');
+assert(policyRegression.checkerSha256===hash(path.join(lab,'scripts/check-aot-mode-performance.mjs')),'Stale performance checker regression');
 assert(correct.passed&&full.passed&&acceptance.passed&&assets.passed&&scene.passed&&validator.result.passes===7,'Release prerequisite failed');
 assert(acceptance.checkerSha256===hash(path.join(lab,'scripts/check-aot-mode-performance.mjs')),'Stale performance checker');
 assert(acceptance.policySha256===hash(path.join(lab,'manifests/aot-mode-performance-policy.json')),'Stale performance policy');
@@ -38,6 +41,7 @@ for(const [name,sha] of Object.entries(build.bundlePayloads))assert(hash(path.jo
 for(const [name,sha] of Object.entries(build.regressionPayloads))assert(hash(path.join(root,'candidate/shared/regression',name))===sha,'Regression payload changed');
 assert(new Set(acceptance.checked.map(r=>r.comparison)).size===3,'Incomplete performance comparisons');
 const inputs={'build.json':path.join(root,'build.json'),'correctness.json':correctArg,'full-regression.json':fullArg,'performance-acceptance.json':acceptanceArg,'native-unity2022.json':path.join(root,'candidate/native-gate.json'),'asset-regression.json':assetsArg,'player-scene.json':sceneArg,'dependency-validator.json':validatorArg};
+inputs['performance-policy-regression.json']=path.join(root,'performance-policy-regression.json');
 for(const entry of acceptance.checked) {
   assert(hash(entry.reportPath)===entry.sha256,'Performance report changed');
   const report=read(entry.reportPath);

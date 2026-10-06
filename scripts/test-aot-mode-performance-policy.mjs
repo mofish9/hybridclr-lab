@@ -4,6 +4,7 @@ import path from 'node:path';
 import assert from 'node:assert/strict';
 import {spawnSync} from 'node:child_process';
 import {fileURLToPath} from 'node:url';
+import crypto from 'node:crypto';
 const directory=fs.mkdtempSync(path.join(os.tmpdir(),'aot-performance-policy-'));
 const metrics=['BenchNative','BenchChanged','BenchVirtual','selection','selectionToEntry','processToEntry','load','loadAndEntry','privateBytes','privateBytesDelta'];
 const sample={count:100,p50:10,p95:10,p99:10,mad:0};
@@ -37,4 +38,4 @@ for(const [name,mutate,expected] of cases){
   assert.equal(actual.passed,expected,`${name}: ${child.stdout}`);
   assert.equal(child.status,expected?0:1,name);
 }
-console.log(JSON.stringify({passed:true,cases:results,evidenceDirectory:directory},null,2));
+console.log(JSON.stringify({passed:true,cases:results,evidenceDirectory:directory,checkerSha256:crypto.createHash('sha256').update(fs.readFileSync(checker)).digest('hex')},null,2));
