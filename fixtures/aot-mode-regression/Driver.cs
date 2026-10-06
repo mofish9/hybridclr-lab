@@ -29,10 +29,10 @@ public static class AotModeRegression
         }
         return records.ToArray();
     }
-    static string Encode(string value) => value == null ? "-" : Convert.ToBase64String(Encoding.UTF8.GetBytes(value));
+    static string Encode(string? value) => value == null ? "-" : Convert.ToBase64String(Encoding.UTF8.GetBytes(value));
     static string Execute(CaseDefinition definition)
     {
-        string value = null, side = null, error = null;
+        string? value = null, side = null, error = null;
         try { var observation = definition.Execute(); value = observation.ReturnValue; side = observation.SideEffect; }
         catch (Exception exception) { error = exception.GetType().FullName; }
         return definition.Id + "\t" + Encode(value) + "\t" + Encode(side) + "\t" + Encode(error);

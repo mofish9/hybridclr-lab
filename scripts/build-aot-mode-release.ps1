@@ -1,7 +1,7 @@
 param(
     [string]$WorkspaceRoot='C:/hybridclr_optimize',
     [string]$OutputRoot=(Join-Path (Split-Path -Parent $PSScriptRoot) 'artifacts/ar1'),
-    [ValidateSet('Prepare','RefreshCandidate','Candidate','Baseline','Reference','Package')][string]$Stage='Prepare',
+    [ValidateSet('Prepare','Regression','RefreshCandidate','Candidate','Baseline','Reference','Package')][string]$Stage='Prepare',
     [string]$EditorRoot='C:/Program Files/Unity/Hub/Editor/2022.3.62f3'
 )
 $ErrorActionPreference='Stop'
@@ -10,6 +10,18 @@ $labRoot=Split-Path -Parent $PSScriptRoot
 $fixture=Join-Path $labRoot 'fixtures/aot-mode-release'
 $helper=Join-Path $PSScriptRoot 'build-dhe-startup-windows.ps1'
 $dotnet='C:/Program Files/dotnet/dotnet.exe'
+function Prepare-Regression {
+    foreach($side in @('candidate','baseline')) {
+        $regression="$OutputRoot/$side/shared/regression"
+        & $dotnet build (Join-Path $labRoot 'fixtures/aot-mode-regression/Driver.csproj') -c Release -o $regression --nologo -v:q
+        if($LASTEXITCODE -ne 0){throw 'Full regression workload compilation failed'}
+        foreach($profile in $(if($side -eq 'candidate'){@('DHE','LegacyInterpreter')}else{@('DHE')})) {
+            foreach($name in @('HybridCLR.ManagedCases','HybridCLR.CrossAssemblyDerived','HybridCLR.BoundaryContracts','AotModeRegression')) {
+                Copy-Item -LiteralPath "$regression/$name.dll" -Destination "$OutputRoot/$side/projects/$profile/Assets/Plugins/$name.dll"
+            }
+        }
+    }
+}
 if($Stage -eq 'Prepare' -or $Stage -eq 'RefreshCandidate') {
     $refs=@{}
     foreach($entry in @(@('hybridclr','hybridclr-aot-select-v1'),@('il2cpp_plus','il2cpp-aot-select-v1'),@('hybridclr_unity','hybridclr-unity-aot-select-v1'))) {
@@ -46,16 +58,9 @@ if($Stage -eq 'Prepare' -or $Stage -eq 'RefreshCandidate') {
     foreach($name in @('StartupHotfix','StartupConsumer','StartupUnityHotfix','StartupAotSupport')) {
         if((Get-FileHash "$OutputRoot/candidate/shared/$name.dll").Hash -ne (Get-FileHash "$OutputRoot/baseline/shared/$name.dll").Hash){throw "Payload drift: $name"}
     }
-    foreach($side in @('candidate','baseline')) {
-        $regression="$OutputRoot/$side/shared/regression"
-        & $dotnet build (Join-Path $labRoot 'fixtures/aot-mode-regression/Driver.csproj') -c Release -o $regression --nologo -v:q
-        if($LASTEXITCODE -ne 0){throw 'Full regression workload compilation failed'}
-        foreach($profile in $(if($side -eq 'candidate'){@('DHE','LegacyInterpreter')}else{@('DHE')})) {
-            foreach($name in @('HybridCLR.ManagedCases','HybridCLR.CrossAssemblyDerived','HybridCLR.BoundaryContracts','AotModeRegression')) {
-                Copy-Item -LiteralPath "$regression/$name.dll" -Destination "$OutputRoot/$side/projects/$profile/Assets/Plugins/$name.dll"
-            }
-        }
-    }
+    Prepare-Regression
+} elseif($Stage -eq 'Regression') {
+    Prepare-Regression
 } elseif($Stage -eq 'Package') {
     $manifest=[ordered]@{format='hybridclr.aot-mode.release-build.v1';engine='Unity2022.3.62f3';fixtureCommit=(& git -C $labRoot rev-parse HEAD).Trim();diagnostics=$false;ordinaryAotGuards=$true;supplementalAotMetadata=$true;payloads=@{};profiles=@{};fixtureHashes=@{}}
     foreach($file in Get-ChildItem -LiteralPath $fixture -File){$manifest.fixtureHashes[$file.Name]=(Get-FileHash $file.FullName).Hash.ToLowerInvariant()}
