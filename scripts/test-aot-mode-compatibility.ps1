@@ -13,7 +13,7 @@ New-Item -ItemType Directory -Path $OutputRoot | Out-Null
 $cmake='C:/Program Files (x86)/Microsoft Visual Studio/2022/BuildTools/Common7/IDE/CommonExtensions/Microsoft/CMake/CMake/bin/cmake.exe'
 $ctest=Join-Path (Split-Path -Parent $cmake) 'ctest.exe'
 $profiles=@(
-    @{name='Unity2021';commit='10cbacd02b3ed291af6a6a34d444ae50c85462e0';editor='C:/Program Files/Unity/Hub/Editor/2021.3.45f2';unity=20210345;tuanjie=0;fgs=0},
+    @{name='Unity2021';commit='be0493c9c98a19007d130ec4a6ef07c1496caab6';editor='C:/Program Files/Unity/Hub/Editor/2021.3.45f2';unity=20210345;tuanjie=0;fgs=0},
     @{name='Tuanjie2022';commit='52968ad6c88416f212d09d919b9a1b6afdc8a53b';editor='C:/Program Files/Tuanjie/Hub/Editor/2022.3.62t12';unity=20220362;tuanjie=11000;fgs=1}
 )
 $results=@()
