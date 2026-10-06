@@ -1,5 +1,8 @@
 # opt9 发布记录
 
+> 后续确认 Android/C++11 编译阻断：PendingDheImage 聚合初始化不兼容 C++11。
+> 本地维护线已修复，原 opt9 标签未改变。见 [修复与单元编译验证](Opt9-Android-Cxx11-Fix.md)。
+
 已发布 Unity 2022 opt9。验收范围为 Windows IL2CPP；Android/WebGL/iOS 尚未取得 Player 资格。
 发布时间（UTC）：2026-10-06T12:35:17.229Z。
 

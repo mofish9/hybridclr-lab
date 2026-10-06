@@ -163,5 +163,18 @@
     "operationalFallback": "Project persists Interpreter for next launch and restarts."
   },
   "transport": "Authenticated Git SSH over port 443 with host keys verified against GitHub HTTPS API; original commit objects preserved",
-  "stashDisposition": "No new stashes. Historical FGS and opt3 research stashes preserved."
+  "stashDisposition": "No new stashes. Historical FGS and opt3 research stashes preserved.",
+  "knownIssues": [
+    {
+      "id": "PendingDheImage-Cxx11",
+      "status": "fixed-on-local-maintenance-unreleased",
+      "affectedTag": "v8.13.0-opt9",
+      "platform": "Unity2022.3.62f3 Android ARM64 C++11",
+      "fixedCommit": "252100f9decff54f0f0f1a58ca3127f3d6aa291b",
+      "validation": "RuntimeApi.cpp compiles with startup selection off/on; original opt9 fails in both. Full APK and runtime validation pending.",
+      "report": "docs/Opt9-Android-Cxx11-Fix.md",
+      "evidence": "C:/hybridclr_optimize/tmp/opt9-cxx11-validation/verified/summary.json",
+      "evidenceSha256": "048671d9daf2d6ce2117d2a182018b87379adf5e7be9a85391dbbfcac8321550"
+    }
+  ]
 }
