@@ -3,6 +3,9 @@
 范围仅为 Unity 2022；固定上游为 HybridCLR/package 8.13.0、il2cpp_plus v2022-8.11.0。
 Unity 2021 和团结既不实施，也不作为本轮发布前置条件。Windows IL2CPP 是已具备的 Player 验证环境。
 
+本次任务是准备版本，不是执行发布。该范围内的源码、验收、实施说明与回滚准备已经完成。
+下文的 opt9 tag 和安装清单仅是发布预案；创建标签、推送或切换安装清单须等待用户另行决定。
+
 ## 正确性与边界
 
 本轮发现并修复的发布阻断项：
@@ -91,8 +94,9 @@ Unity 2022 一项；其他引擎条目保持既有版本。package 不打 tag。
 构建也通过 100 对严格性能验收；所有相关源码工作树 clean。未重建或重新标记正常 DHE 的既有二进制。
 最初复用 candidate 的 CMake cache 因 lab 源目录变更被拒绝，随后使用全新构建目录通过，失败日志保留。
 
-发布前最后一次只读远端检查遇到 GitHub 连接重置/443 超时，因此尚不能再次确认 opt9 名称可用。
-`manifests/aot-mode-opt9-publication-plan.json` 锁定待发布提交和 tag 名称；
+此前只读远端检查遇到 GitHub 连接重置/443 超时。远端可用性不构成本次版本准备的阻塞，
+不再为此自动重试或推进发布。
+`manifests/aot-mode-opt9-publication-plan.json` 记录候选提交和建议 tag 名称；
 `aot-mode-opt9-proposed-package-versions.json` 是预备清单，只改 Unity 2022 一项，未应用到 package。
 正式发布仍需按顺序重新确认远端、发布 runtime tags、应用清单并记录新 package commit/tree。
 

@@ -23,5 +23,8 @@
     "createPackageTag": false,
     "applyOnlyAfterRemoteRuntimeTagsVerified": true
   },
-  "published": false
+  "published": false,
+  "publicationRequested": false,
+  "status": "Proposal only; version preparation completed. Await a separate user decision before creating tags, pushing, or applying the package manifest.",
+  "runtimeTagNamesAreProposals": true
 }

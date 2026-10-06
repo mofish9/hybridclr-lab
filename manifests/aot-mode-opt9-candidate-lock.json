@@ -96,15 +96,20 @@
   },
   "published": false,
   "performanceAcceptance": "Normal DHE and feature-disabled strict; interpreter fallback cost explicitly accepted and disclosed.",
-  "pending": [
-    "Create and publish immutable Unity2022-only opt9 runtime tags after rechecking remote refs",
-    "After remote tag verification update only the Unity2022 package manifest and record its final commit/tree",
-    "Publish package maintenance branch and lab release lock"
-  ],
-  "remoteAvailabilityCheck": "Latest read-only checks failed: GitHub connection reset/port 443 timeout; opt9 availability must be rechecked before creation.",
+  "pending": [],
+  "remoteAvailabilityCheck": "Historical read-only GitHub checks failed. Network availability is not a blocker for version preparation; do not retry or publish without a subsequent user request.",
   "initialMaintenanceConfigureAttempt": {
     "passed": false,
     "reason": "Existing CMake cache recorded the candidate lab path. Reconfigured into a new build directory; both actual compile/CTest gates then passed.",
     "log": "E:/hclr/ar5/candidate/native-1-configure.log"
-  }
+  },
+  "versionPreparationComplete": true,
+  "preparationScope": "Unity2022 source candidate, Windows IL2CPP validation, implementation/review/rollback documentation. Android/WebGL/iOS qualification remains explicitly unverified.",
+  "publicationRequested": false,
+  "preparationBlockers": [],
+  "futurePublicationSteps": [
+    "Create and publish immutable Unity2022-only opt9 runtime tags after rechecking remote refs",
+    "After remote tag verification update only the Unity2022 package manifest and record its final commit/tree",
+    "Publish package maintenance branch and lab release lock"
+  ]
 }
