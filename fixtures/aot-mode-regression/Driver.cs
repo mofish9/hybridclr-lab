@@ -23,18 +23,21 @@ public static class AotModeRegression
             File.AppendAllText(progress, definition.Id + "\n");
             // Match the established Player suite's worker execution, avoiding
             // Unity's main-thread synchronization context for async cases.
-            var task = Task.Run(() => Execute(definition));
+            var task = Task.Run(() => Execute(definition, progress));
             if (!task.Wait(10000)) throw new TimeoutException("Case timeout: " + definition.Id);
             records.Add(task.GetAwaiter().GetResult());
         }
         return records.ToArray();
     }
     static string Encode(string? value) => value == null ? "-" : Convert.ToBase64String(Encoding.UTF8.GetBytes(value));
-    static string Execute(CaseDefinition definition)
+    static string Execute(CaseDefinition definition, string progress)
     {
         string? value = null, side = null, error = null;
         try { var observation = definition.Execute(); value = observation.ReturnValue; side = observation.SideEffect; }
-        catch (Exception exception) { error = exception.GetType().FullName; }
+        catch (Exception exception) {
+            error = exception.GetType().FullName;
+            File.AppendAllText(progress, "EXCEPTION " + definition.Id + " " + exception.Message + "\n");
+        }
         return definition.Id + "\t" + Encode(value) + "\t" + Encode(side) + "\t" + Encode(error);
     }
 }

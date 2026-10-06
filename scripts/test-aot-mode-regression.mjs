@@ -23,7 +23,7 @@ const goldenPath = path.join(lab, 'manifests/test-golden.json');
 const manifestPath = path.join(lab, 'manifests/test-manifest.json');
 const golden = read(goldenPath);
 const referencePath = path.join(output, 'reference.json');
-const referenceRun = spawnSync('C:/Program Files/dotnet/dotnet.exe', ['run', '--project', path.join(lab, 'runners/dotnet-reference/HybridCLR.ReferenceRunner.csproj'), '-c', 'Release', '--', '--manifest', manifestPath, '--golden', goldenPath, '--output', referencePath], {encoding:'utf8', windowsHide:true, timeout:180000});
+const referenceRun = spawnSync('C:/Program Files/dotnet/dotnet.exe', ['run', '--project', path.join(lab, 'runners/dotnet-reference/HybridCLR.ReferenceRunner.csproj'), '-c', 'Release', '-p:IncludeSourceRevisionInInformationalVersion=false', '--', '--manifest', manifestPath, '--golden', goldenPath, '--output', referencePath], {encoding:'utf8', windowsHide:true, timeout:180000});
 fs.writeFileSync(path.join(output,'reference.log'), (referenceRun.stdout||'')+(referenceRun.stderr||''));
 assert(referenceRun.status === 0, 'CLR reference failed');
 const reference = read(referencePath);
@@ -60,9 +60,18 @@ for (const [side, profile, mode] of [['candidate','DHE','dhe'],['candidate','DHE
             (actual.exceptionType===null && (actual.returnValue!==(contract.returnValue??null) || actual.sideEffect!==(contract.sideEffect??null))))
           differences.push({id,expected:contract,actual});
       }
-      runs.push({name,pid:result.pid,mode:result.mode,metadata,cases:observations.size,differences});
-      assert(differences.length===0, `${differences.length} differential failures`);
-      console.log(`PASS ${name}: ${observations.size} cases, pid=${result.pid}`);
+      const negativeControl=side==='baseline';
+      runs.push({name,pid:result.pid,mode:result.mode,metadata,cases:observations.size,differences,negativeControl});
+      if (negativeControl) {
+        // opt8 predates the ordinary-interpreter/PInvoke lowering fix. Require
+        // exactly the reproduced failures, never count them as passing cases.
+        assert(identity.sources.hybridclr==='9c607a3c3d45f88ee83ff9dc5bb0f5ad12c57071', 'Unexpected negative-control runtime');
+        assert(JSON.stringify(differences.map(d=>d.id).sort())===JSON.stringify(['pinvoke_process_id','reverse_pinvoke_qsort']) && differences.every(d=>d.actual.exceptionType==='System.ExecutionEngineException'), 'Baseline failure set changed');
+        console.log(`NEGATIVE CONTROL ${name}: ${differences.length} known failures reproduced`);
+      } else {
+        assert(differences.length===0, `${differences.length} differential failures`);
+        console.log(`PASS ${name}: ${observations.size} cases, pid=${result.pid}`);
+      }
     } catch(error) {failures.push({name,error:String(error)}); console.error(`FAIL ${name}: ${error}`);}
   }
 }

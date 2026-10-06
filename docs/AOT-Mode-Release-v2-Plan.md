@@ -22,6 +22,12 @@ Editor 专用资产不误拦截，真实 Player Resources 仍拦截；重复错�
 managed Base 可见性规则不变；选择后保留 image 地址，分别绑定 Base 视图/普通 Current。
 必须通过两种模式的 prefab、ScriptableObject 和 scene 反序列化及 Current Awake 行为，不能以动态创建代替。
 
+完整 220 项回归另复现普通解释 DLL 的 P/Invoke 调用走错分支：opt8 的 CALL lowering 只询问
+AOT homologous image/DHE 判定，遗漏 MethodInfo 已有的 isInterpterImpl 标志，进而跳过专门的
+P/Invoke lowering。修复在 IL 转换期优先保留已解释的方法，不在执行期增加模式判断。
+候选两路与独立 opt3 传统 Player 必须 220/220 对齐 CLR/golden；原 opt8 的两个互操作失败
+作为明确负对照保留，不宣称其完整 correctness 通过，也不把错误执行的用例用于性能对比。
+
 性能主指标：正常 DHE steady-state、启动选择+加载+首次入口；次指标：解释模式对照、
 首次反射、内存和二进制体积。记录 P50/P95/P99、MAD、唯一 PID、源码和程序集身份，
 尚无批准的数值退化阈值，不能自动把 measurements 记为性能通过。P99 门禁各组至少 100 进程。

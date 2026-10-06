@@ -13,7 +13,7 @@ $dotnet='C:/Program Files/dotnet/dotnet.exe'
 function Prepare-Regression {
     foreach($side in @('candidate','baseline')) {
         $regression="$OutputRoot/$side/shared/regression"
-        & $dotnet build (Join-Path $labRoot 'fixtures/aot-mode-regression/Driver.csproj') -c Release -o $regression --nologo -v:q
+        & $dotnet build (Join-Path $labRoot 'fixtures/aot-mode-regression/Driver.csproj') -c Release -o $regression -p:IncludeSourceRevisionInInformationalVersion=false --nologo -v:q
         if($LASTEXITCODE -ne 0){throw 'Full regression workload compilation failed'}
         foreach($profile in $(if($side -eq 'candidate'){@('DHE','LegacyInterpreter')}else{@('DHE')})) {
             foreach($name in @('HybridCLR.ManagedCases','HybridCLR.CrossAssemblyDerived','HybridCLR.BoundaryContracts','AotModeRegression')) {
