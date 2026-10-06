@@ -3,6 +3,7 @@ import path from 'node:path';
 import crypto from 'node:crypto';
 import {fileURLToPath} from 'node:url';
 import {execFileSync} from 'node:child_process';
+import {isDeepStrictEqual} from 'node:util';
 
 const [buildArg, correctArg, fullArg, acceptanceArg, assetsArg, sceneArg, validatorArg, outputArg]=process.argv.slice(2);
 if(!outputArg)throw Error('Expected build, correctness, full regression, performance acceptance, assets, Player scene, dependency validator and output paths');
@@ -41,10 +42,10 @@ for(const entry of acceptance.checked) {
   // unrelated DHE/legacy binaries. Bind every profile actually measured, plus
   // all shared workload/config identities, instead of the unused profile map.
   for(const key of ['engine','diagnostics','ordinaryAotGuards','supplementalAotMetadata','payloads','fixtureHashes','bundlePayloads','regressionPayloads'])
-    assert(JSON.stringify(report.build[key])===JSON.stringify(build[key]),`Performance workload/config differs: ${key}`);
+    assert(isDeepStrictEqual(report.build[key],build[key]),`Performance workload/config differs: ${key}`);
   for(const run of report.runs) {
     const key=`${run.side}/${run.profile}`;
-    assert(JSON.stringify(report.build.profiles[key])===JSON.stringify(build.profiles[key]),`Performance binary/source differs: ${key}`);
+    assert(isDeepStrictEqual(report.build.profiles[key],build.profiles[key]),`Performance binary/source differs: ${key}`);
   }
   inputs[`performance-${entry.comparison}.json`]=entry.reportPath;
 }
