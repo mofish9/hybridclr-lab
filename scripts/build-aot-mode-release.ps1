@@ -103,7 +103,7 @@ if($Stage -eq 'Prepare' -or $Stage -eq 'RefreshCandidate') {
     }
     New-Item -ItemType Directory -Force -Path "$OutputRoot/candidate/shared/regression/aot"|Out-Null
     foreach($name in @('mscorlib','System','System.Core','HybridCLR.BoundaryContracts')) {
-        Copy-Item -LiteralPath "$OutputRoot/candidate/projects/DHE/HybridCLRData/AssembliesPostIl2CppStrip/StandaloneWindows64/$name.dll" -Destination "$OutputRoot/candidate/shared/regression/aot/$name.dll"
+        Copy-Item -LiteralPath "$OutputRoot/candidate/DHE/player/StartupPlayer_BackUpThisFolder_ButDontShipItWithYourGame/Managed/$name.dll" -Destination "$OutputRoot/candidate/shared/regression/aot/$name.dll"
         $manifest.regressionPayloads["aot/$name.dll"]=(Get-FileHash "$OutputRoot/candidate/shared/regression/aot/$name.dll").Hash.ToLowerInvariant()
     }
     [IO.File]::WriteAllText((Join-Path $OutputRoot 'build.json'),($manifest | ConvertTo-Json -Depth 7).Replace("`r`n","`n"),[Text.UTF8Encoding]::new($false))
