@@ -7,7 +7,9 @@ const root = path.resolve(process.argv[2] || 'artifacts/ar1');
 const pairs = Number(process.argv[3] || 0);
 if (!Number.isInteger(pairs) || pairs < 0) throw Error('Invalid pair count');
 const build = JSON.parse(fs.readFileSync(path.join(root, 'build.json')));
-const output = path.join(root, pairs ? `performance-${pairs}` : 'correctness');
+const label = process.argv[4] || '';
+if (label && !/^[a-z0-9-]+$/.test(label)) throw Error('Invalid run label');
+const output = path.join(root, (pairs ? `performance-${pairs}` : 'correctness') + (label ? '-' + label : ''));
 fs.mkdirSync(output); // Preserve existing evidence rather than overwrite it.
 const hash = file => crypto.createHash('sha256').update(fs.readFileSync(file)).digest('hex');
 const read = file => JSON.parse(fs.readFileSync(file, 'utf8').replace(/^\uFEFF/, ''));
@@ -43,11 +45,18 @@ function run(side, profile, mode, scenario, index) {
   console.log(`PASS ${name}, pid=${result.pid}`);
 }
 if (!pairs) {
-  run('candidate','DHE','dhe','correctness',0);
-  run('candidate','DHE','legacy','correctness',1);
-  run('candidate','DHE','dhe','concurrent',2);
-  run('baseline','DHE','dhe','correctness',3);
-  run('candidate','LegacyInterpreter','legacy','correctness',4);
+  const failures=[];
+  for (const args of [
+    ['candidate','DHE','dhe','correctness',0],
+    ['candidate','DHE','legacy','correctness',1],
+    ['candidate','DHE','dhe','concurrent',2],
+    ['baseline','DHE','dhe','correctness',3],
+    ['candidate','LegacyInterpreter','legacy','correctness',4]
+  ]) { try { run(...args); } catch(error) { failures.push(error.message); console.error(error.message); } }
+  if (failures.length) {
+    fs.writeFileSync(path.join(output,'failures.json'),JSON.stringify({build,failures},null,2));
+    throw Error(`${failures.length} correctness profiles failed`);
+  }
   const assetGate = read(path.join(root,'candidate/DHE/asset-gate.json'));
   assert(['sceneRejected','preloadedRejected','resourcesRejected','ordinaryAssetsAccepted'].every(k=>assetGate[k]===true), 'Base asset boundary failed');
 } else {
