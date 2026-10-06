@@ -77,9 +77,10 @@ if (pairs) {
   for (const name of Object.keys(values(runs[0]))) {
     const baseline=runs.filter(r=>r.side==='baseline').map(r=>values(r)[name]);
     const candidate=runs.filter(r=>r.side==='candidate').map(r=>values(r)[name]);
-    metrics[name]={baseline:stats(baseline),candidate:stats(candidate),pairedPercent:stats(candidate.map((n,i)=>(n/baseline[i]-1)*100)),medianPercent:(quantile(candidate,.5)/quantile(baseline,.5)-1)*100};
+    const denominator=quantile(baseline,.5);
+    metrics[name]={baseline:stats(baseline),candidate:stats(candidate),pairedDelta:stats(candidate.map((n,i)=>n-baseline[i])),pairedPercent:baseline.every(n=>n!==0)?stats(candidate.map((n,i)=>(n/baseline[i]-1)*100)):null,medianPercent:denominator!==0?(quantile(candidate,.5)/denominator-1)*100:null};
   }
 }
-const summary={format:'hybridclr.aot-mode.release-gate.v1',passed:true,build,caseCount:reference.caseCount,unityExpected:236,independentProcesses:runs.length,pairs,diagnostics:false,p99HardGate:false,metrics,runs};
+const summary={format:'hybridclr.aot-mode.release-gate.v1',passed:true,correctnessPassed:true,performanceAcceptance:pairs?'requires-review':'not-measured',runnerSha256:hash(new URL(import.meta.url)),build,caseCount:reference.caseCount,unityExpected:236,independentProcesses:runs.length,pairs,diagnostics:false,p99HardGate:false,metrics,runs};
 fs.writeFileSync(path.join(output,'summary.json'),JSON.stringify(summary,null,2));
 console.log(JSON.stringify({passed:true,processes:runs.length,metrics},null,2));
