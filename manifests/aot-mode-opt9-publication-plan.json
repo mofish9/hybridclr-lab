@@ -1,0 +1,27 @@
+{
+  "scope": "Unity2022 only; Windows IL2CPP gates passed, Android/WebGL/iOS Player qualification pending",
+  "runtimeTags": [
+    {
+      "repo": "hybridclr",
+      "name": "v8.13.0-opt9",
+      "commit": "643c4d537eb9ceb5fc40a45a2f3342312d17907e"
+    },
+    {
+      "repo": "il2cpp_plus",
+      "name": "v2022-8.11.0-opt9",
+      "commit": "124f90294beb45a3c4cba8a525ac2488f82170f8"
+    }
+  ],
+  "package": {
+    "branch": "optimize/v8.13.0",
+    "functionalCommit": "da9eac383cd953aab58ad0a8c7d851db5e0a36dc",
+    "functionalTree": "25cc23c132a0cd9a7c2c5dbeb3039f16e84560e2",
+    "manifestFile": "Data~/hybridclr_version.json",
+    "currentManifestSha256": "9296d94b8e4c18ed95753693382535d2096a8681e8eef3298b2cf513b8bbc427",
+    "proposedManifest": "manifests/aot-mode-opt9-proposed-package-versions.json",
+    "proposedManifestSha256": "c896f97ca66a338567bdf6d5df1a9f6e87550a829ccabebddbdabe215a2f0258",
+    "createPackageTag": false,
+    "applyOnlyAfterRemoteRuntimeTagsVerified": true
+  },
+  "published": false
+}

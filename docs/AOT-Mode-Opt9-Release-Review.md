@@ -86,6 +86,16 @@ virtual 微基准 P50 5.0802→5.7197 ms（+12.59%），private bytes P50 增加
 Unity 2022 一项；其他引擎条目保持既有版本。package 不打 tag。最后同步 lab lock/报告。
 当前无新 runtime tag、无远端推送；发布状态见随附 candidate lock 和维护线验收记录。
 
+本地三条上述维护线已 fast-forward 到表中提交，合入后重新执行 Unity 2022 实际 headers
+开/关编译与 CTest、6-profile smoke 和完整 220 例矩阵，全部通过。功能关闭的最终 package
+构建也通过 100 对严格性能验收；所有相关源码工作树 clean。未重建或重新标记正常 DHE 的既有二进制。
+最初复用 candidate 的 CMake cache 因 lab 源目录变更被拒绝，随后使用全新构建目录通过，失败日志保留。
+
+发布前最后一次只读远端检查遇到 GitHub 连接重置/443 超时，因此尚不能再次确认 opt9 名称可用。
+`manifests/aot-mode-opt9-publication-plan.json` 锁定待发布提交和 tag 名称；
+`aot-mode-opt9-proposed-package-versions.json` 是预备清单，只改 Unity 2022 一项，未应用到 package。
+正式发布仍需按顺序重新确认远端、发布 runtime tags、应用清单并记录新 package commit/tree。
+
 每次热更只需一份兼容 Current DLL 与资源，但发包回归应覆盖两种模式。
 项目在普通 AOT 入口读取配置并调用 Select/Get；下一次启动配置、HTTP、存储、重启 UX 由项目实现。
 运营回滚：保存下次 Interpreter 并重启。没有该能力的旧 Base 仍需先更新 Base。

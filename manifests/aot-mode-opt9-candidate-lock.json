@@ -1,0 +1,110 @@
+{
+  "format": "hybridclr.aot-mode.maintenance-lock.v2",
+  "createdAtUtc": "2026-10-06T08:09:30.487Z",
+  "scope": "Unity2022 Windows IL2CPP; other engines excluded from this release by user instruction",
+  "labSourceCommit": "0022b53bdc1e42abcb767162d7b76da1efee30cf",
+  "sources": {
+    "il2cpp_plus": "124f90294beb45a3c4cba8a525ac2488f82170f8",
+    "hybridclr": "643c4d537eb9ceb5fc40a45a2f3342312d17907e",
+    "hybridclr_unity": "da9eac383cd953aab58ad0a8c7d851db5e0a36dc"
+  },
+  "evidence": {
+    "build.json": {
+      "source": "E:\\hclr\\ar5\\build.json",
+      "sha256": "1d20410559ba15558e658343c6c40dc10fdfa86e03b4a07a2bb93e197d53a658"
+    },
+    "correctness.json": {
+      "source": "E:\\hclr\\ar5\\correctness-final-identity\\summary.json",
+      "sha256": "64a77ad2e06aea5aa65efa4f4bda8e8ec0ad68ea6fd43c7623af627a7c0e5a8e"
+    },
+    "full-regression.json": {
+      "source": "E:\\hclr\\ar5\\full-final-identity\\summary.json",
+      "sha256": "dc36cf3ce9951fd0c54015f134cc3ec84c44cccc41aaaa3f141d6fc70416e9a2"
+    },
+    "performance-acceptance.json": {
+      "source": "E:\\hclr\\ar5\\performance-acceptance-final.json",
+      "sha256": "089cbdcd9fbab29436ea731247cf3f4465c7652f6e976e41178701c6faf5a491"
+    },
+    "native-unity2022.json": {
+      "source": "E:\\hclr\\ar5\\candidate\\native-gate.json",
+      "sha256": "4c379c5e1488dcefa577316296d80619f0f5bc994b95916149b8552a9012983a"
+    },
+    "asset-regression.json": {
+      "source": "E:\\hclr\\ar5\\assets-final\\gate.json",
+      "sha256": "97a1d84835386d73db239b7999c063a7a45f7ff5be1004e958bb4c3e1152d959"
+    },
+    "player-scene.json": {
+      "source": "E:\\hclr\\ar5\\rejected-scene-final\\gate.json",
+      "sha256": "1c125f115a2709ff1aaac25328bacac7e4d133dfa2879f4973f4c98a71aa7530"
+    },
+    "dependency-validator.json": {
+      "source": "E:\\hclr\\ar5\\dependency-final\\validator-gate.json",
+      "sha256": "8505044271a71bc2d9bae0f39f2c241486c49186d24f958fc278fe5ef50310c1"
+    },
+    "performance-dhe.json": {
+      "source": "E:\\hclr\\ar5\\performance-dhe-400-qualified\\summary.json",
+      "sha256": "6e67cfee24a897a1a02f40d6eed8d8df198623e4c804af9ea0b46086f6cb3a48"
+    },
+    "performance-legacy.json": {
+      "source": "E:\\hclr\\ar5\\performance-legacy-100-direct-accepted\\summary.json",
+      "sha256": "eb5b5e542604d4372f6d6fba1dc743df0cbee89e9708bccaf92a029faa349f3e"
+    },
+    "performance-fixed.json": {
+      "source": "E:\\hclr\\ar5\\performance-fixed-100-final-package\\summary.json",
+      "sha256": "ef4055179f3b4881a94af5d65e2bf1b05edd989cf667dc2d12be99de0c9d1682"
+    }
+  },
+  "windowsCorrectnessPassed": true,
+  "windowsPerformancePassed": true,
+  "sourceCandidateReady": true,
+  "formalMaintenanceGatePending": false,
+  "releaseReady": false,
+  "androidPlayerVerified": false,
+  "webglPlayerVerified": false,
+  "iosPlayerVerified": false,
+  "maintenance": {
+    "hybridclr": {
+      "branch": "optimize/v8.13.0",
+      "commit": "643c4d537eb9ceb5fc40a45a2f3342312d17907e",
+      "tree": "17eef0695ff4548f31f0ce01ecf891fe01cdbeb9"
+    },
+    "il2cpp_plus": {
+      "branch": "optimize/unity2022-v8.11.0",
+      "commit": "124f90294beb45a3c4cba8a525ac2488f82170f8",
+      "tree": "677a76445e0ab6249e3c8790589b3c4a57b2bb3d"
+    },
+    "hybridclr_unity": {
+      "branch": "optimize/v8.13.0",
+      "commit": "da9eac383cd953aab58ad0a8c7d851db5e0a36dc",
+      "tree": "25cc23c132a0cd9a7c2c5dbeb3039f16e84560e2"
+    }
+  },
+  "formalMaintenanceGatePassed": true,
+  "maintenanceEvidence": {
+    "native": {
+      "path": "E:/hclr/ar5/maintenance-native/native-gate.json",
+      "sha256": "2b64a4fde16149a5b27ff39053071af7449881ca8dc2a375299be065a15a360b"
+    },
+    "smoke": {
+      "path": "E:/hclr/ar5/correctness-maintenance/summary.json",
+      "sha256": "d29ab4237e95417f5d2083ae03530a5d25e6f9848ea159f33dfd6636f5dfbf13"
+    },
+    "full": {
+      "path": "E:/hclr/ar5/full-maintenance/summary.json",
+      "sha256": "8fe3b21cb6ef02bd2cb3db8ffd46fdd30755bbd62208008dae517d4219edf784"
+    }
+  },
+  "published": false,
+  "performanceAcceptance": "Normal DHE and feature-disabled strict; interpreter fallback cost explicitly accepted and disclosed.",
+  "pending": [
+    "Create and publish immutable Unity2022-only opt9 runtime tags after rechecking remote refs",
+    "After remote tag verification update only the Unity2022 package manifest and record its final commit/tree",
+    "Publish package maintenance branch and lab release lock"
+  ],
+  "remoteAvailabilityCheck": "Latest read-only checks failed: GitHub connection reset/port 443 timeout; opt9 availability must be rechecked before creation.",
+  "initialMaintenanceConfigureAttempt": {
+    "passed": false,
+    "reason": "Existing CMake cache recorded the candidate lab path. Reconfigured into a new build directory; both actual compile/CTest gates then passed.",
+    "log": "E:/hclr/ar5/candidate/native-1-configure.log"
+  }
+}
