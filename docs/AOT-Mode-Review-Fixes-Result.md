@@ -1,7 +1,9 @@
 # Unity 2022 启动模式选择：review 修复结果
 
 本轮准备范围为 Unity 2022、Windows IL2CPP。用户明确要求先不发布；无打标、推送或安装清单切换。
-此前全面 review 的 P1/P2 均已修复并在新身份产物上验证。后续提交/冻结状态以 candidate lock 为准。
+此前全面 review 的 P1/P2 均已修复并在新身份产物上验证。当前在 Unity 2022 / Windows IL2CPP
+范围内有条件通过，已达到本地新版本源码提交与准备完成状态；不代表其他平台生产资格或已经发布。
+精确提交/冻结状态以 `manifests/aot-mode-opt9-candidate-lock.json` 为准。
 
 ## 实现边界
 
@@ -82,3 +84,13 @@ Current-only 资源在独立 Editor 项目中使用被冻结的 Current DLL 构�
 运行期降级则由项目保存下一次 Interpreter 并重启。详见 AOT-Mode-Implementation.md。
 
 本轮只完成版本准备。拟用 opt9 的名称与清单保持为提案，不创建 runtime tag，不创建 package tag，不访问远端推进发布。
+
+上述功能源码已合入本地正式维护线；合入后使用实际 Unity 2022 headers 重新通过 selection 开/关
+native compile + CTest、6-profile 启动及 8 个正对照各 220/220 的完整回归（另有 2 个 opt8 负对照）。
+合入采用 fast-forward，runtime/package/Player 身份没有变化，性能沿用本轮 ar6 的精确身份测量。
+测试脚本基于 lab `5045c4420aae8ccc65bd2c84fd512f315e8ddb75`；之后只有准备锁与本文的记录更新。
+相关源码工作树 clean；没有新 stash，历史 FGS/opt3 stash 保留。
+
+精确源码回滚组合：HybridCLR `9c607a3c3d45f88ee83ff9dc5bb0f5ad12c57071`，
+il2cpp_plus `e426adc57c283865126423b169051558b339388c`，package `f2946d5ba35a879724b76afd857176feb1a4adca`，
+需要重新构建 Base。当前 Base 的运行降级不需要换业务热更包，但仍需按项目流程重启。
