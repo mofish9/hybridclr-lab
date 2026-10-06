@@ -9,6 +9,13 @@ $project=Join-Path $BuildRoot 'candidate/projects/DHE'
 $output=Join-Path $BuildRoot 'rejected-scene'
 if(Test-Path -LiteralPath $output){throw 'Preserve prior evidence; use a new probe output'}
 New-Item -ItemType Directory -Path $output|Out-Null
+# FixtureBuild creates bundles beside its input base directory. Isolate these
+# inputs/outputs so the negative build cannot overwrite the release resources.
+Copy-Item -LiteralPath "$BuildRoot/candidate/base" -Destination "$output/base" -Recurse
+if(Test-Path -LiteralPath "$BuildRoot/candidate/shared/regression") {
+    New-Item -ItemType Directory -Path "$output/shared"|Out-Null
+    Copy-Item -LiteralPath "$BuildRoot/candidate/shared/regression" -Destination "$output/shared/regression" -Recurse
+}
 $fixture=Join-Path $labRoot 'fixtures/aot-mode-assets/PlayerSceneProbe.cs.txt'
 $staged=Join-Path $project 'Assets/Editor/AotModePlayerSceneProbe.cs'
 if(Test-Path -LiteralPath $staged){throw 'Probe source already exists'}
@@ -16,7 +23,7 @@ Copy-Item -LiteralPath $fixture -Destination $staged
 $log=Join-Path $output 'editor.log'
 $start=[Diagnostics.ProcessStartInfo]::new("$EditorRoot/Editor/Unity.exe")
 $start.UseShellExecute=$false;$start.CreateNoWindow=$true
-foreach($arg in @('-batchmode','-nographics','-quit','-projectPath',$project,'-executeMethod','AotModePlayerSceneProbe.Run','-startupRuntime',"$BuildRoot/candidate/sources/DHE/il2cpp_plus/libil2cpp",'-startupBaseRoot',"$BuildRoot/candidate/base",'-startupOutput',$output,'-logFile',$log)){$start.ArgumentList.Add($arg)}
+foreach($arg in @('-batchmode','-nographics','-quit','-projectPath',$project,'-executeMethod','AotModePlayerSceneProbe.Run','-startupRuntime',"$BuildRoot/candidate/sources/DHE/il2cpp_plus/libil2cpp",'-startupBaseRoot',"$output/base",'-startupOutput',$output,'-logFile',$log)){$start.ArgumentList.Add($arg)}
 $process=[Diagnostics.Process]::Start($start)
 $process.Id|Set-Content -LiteralPath "$output/pid.txt"
 try {

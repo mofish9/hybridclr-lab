@@ -46,6 +46,16 @@ if($Stage -eq 'Prepare' -or $Stage -eq 'RefreshCandidate') {
     foreach($name in @('StartupHotfix','StartupConsumer','StartupUnityHotfix','StartupAotSupport')) {
         if((Get-FileHash "$OutputRoot/candidate/shared/$name.dll").Hash -ne (Get-FileHash "$OutputRoot/baseline/shared/$name.dll").Hash){throw "Payload drift: $name"}
     }
+    foreach($side in @('candidate','baseline')) {
+        $regression="$OutputRoot/$side/shared/regression"
+        & $dotnet build (Join-Path $labRoot 'fixtures/aot-mode-regression/Driver.csproj') -c Release -o $regression --nologo -v:q
+        if($LASTEXITCODE -ne 0){throw 'Full regression workload compilation failed'}
+        foreach($profile in $(if($side -eq 'candidate'){@('DHE','LegacyInterpreter')}else{@('DHE')})) {
+            foreach($name in @('HybridCLR.ManagedCases','HybridCLR.CrossAssemblyDerived','HybridCLR.BoundaryContracts','AotModeRegression')) {
+                Copy-Item -LiteralPath "$regression/$name.dll" -Destination "$OutputRoot/$side/projects/$profile/Assets/Plugins/$name.dll"
+            }
+        }
+    }
 } elseif($Stage -eq 'Package') {
     $manifest=[ordered]@{format='hybridclr.aot-mode.release-build.v1';engine='Unity2022.3.62f3';fixtureCommit=(& git -C $labRoot rev-parse HEAD).Trim();diagnostics=$false;ordinaryAotGuards=$true;supplementalAotMetadata=$true;payloads=@{};profiles=@{};fixtureHashes=@{}}
     foreach($file in Get-ChildItem -LiteralPath $fixture -File){$manifest.fixtureHashes[$file.Name]=(Get-FileHash $file.FullName).Hash.ToLowerInvariant()}
@@ -75,6 +85,17 @@ if($Stage -eq 'Prepare' -or $Stage -eq 'RefreshCandidate') {
     $manifest.bundlePayloads=@{}
     foreach($name in @('hotfix-assets','hotfix-scene')) {
         $manifest.bundlePayloads[$name]=(Get-FileHash "$OutputRoot/candidate/shared/bundles/$name").Hash.ToLowerInvariant()
+    }
+    $manifest.regressionPayloads=@{}
+    foreach($name in @('HybridCLR.ManagedCases','HybridCLR.CrossAssemblyDerived','HybridCLR.BoundaryContracts','AotModeRegression')) {
+        $hash=(Get-FileHash "$OutputRoot/candidate/shared/regression/$name.dll").Hash.ToLowerInvariant()
+        if($hash -ne (Get-FileHash "$OutputRoot/baseline/shared/regression/$name.dll").Hash.ToLowerInvariant()){throw "Regression payload drift: $name"}
+        $manifest.regressionPayloads["$name.dll"]=$hash
+    }
+    New-Item -ItemType Directory -Force -Path "$OutputRoot/candidate/shared/regression/aot"|Out-Null
+    foreach($name in @('mscorlib','System','System.Core','HybridCLR.BoundaryContracts')) {
+        Copy-Item -LiteralPath "$OutputRoot/candidate/projects/DHE/HybridCLRData/AssembliesPostIl2CppStrip/StandaloneWindows64/$name.dll" -Destination "$OutputRoot/candidate/shared/regression/aot/$name.dll"
+        $manifest.regressionPayloads["aot/$name.dll"]=(Get-FileHash "$OutputRoot/candidate/shared/regression/aot/$name.dll").Hash.ToLowerInvariant()
     }
     [IO.File]::WriteAllText((Join-Path $OutputRoot 'build.json'),($manifest | ConvertTo-Json -Depth 7).Replace("`r`n","`n"),[Text.UTF8Encoding]::new($false))
     & $dotnet build (Join-Path $fixture 'Reference.csproj') -c Release -o (Join-Path $OutputRoot 'reference') --nologo

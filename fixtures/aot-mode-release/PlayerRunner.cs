@@ -24,6 +24,7 @@ namespace AotModeRelease
             public double loadMilliseconds, firstEntryMilliseconds, selectionMilliseconds, selectionToEntryMilliseconds;
             public long privateBytesBefore, privateBytesAfter;
             public Sample[] samples;
+            public string[] regressionRecords;
         }
         static Result result;
         static AssetBundle sceneBundle;
@@ -190,10 +191,23 @@ namespace AotModeRelease
         [RuntimeInitializeOnLoadMethod(RuntimeInitializeLoadType.AfterSceneLoad)]
         static void Finish() {
             if(result.passed && result.scenario!="benchmark") {
-                try { BeginBundleCheck(); return; }
+                try { RunRegressionIfRequested(); BeginBundleCheck(); return; }
                 catch(Exception error) { result.error=error.ToString(); result.passed=false; }
             }
             WriteResult();
+        }
+        static void RunRegressionIfRequested() {
+            string root=Argument("-regressionRoot","");
+            if(root.Length==0)return;
+            if(Argument("-regressionMetadata","none")=="superset")
+                foreach(string name in new[]{"mscorlib","System","System.Core","HybridCLR.BoundaryContracts"}) {
+                    var bytes=File.ReadAllBytes(Path.Combine(root,"aot",name+".dll"));
+                    int code=(int)HybridCLR.RuntimeApi.LoadMetadataForAOTAssembly(bytes,HybridCLR.HomologousImageMode.SuperSet);
+                    if(code!=0)throw new Exception("Regression metadata failed: "+name+" "+code);
+                }
+            Assembly.Load(File.ReadAllBytes(Path.Combine(root,"HybridCLR.ManagedCases.dll")));
+            var driver=Assembly.Load(File.ReadAllBytes(Path.Combine(root,"AotModeRegression.dll")));
+            result.regressionRecords=(string[])driver.GetType("AotModeRegression",true).GetMethod("Run").Invoke(null,new object[]{root,Argument("-startupReport")+".progress"});
         }
         static void WriteResult() {
             var path=Argument("-startupReport");Directory.CreateDirectory(Path.GetDirectoryName(path));

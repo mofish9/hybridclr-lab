@@ -1,0 +1,10 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <TargetFramework>netstandard2.1</TargetFramework>
+    <AssemblyName>AotModeRegression</AssemblyName>
+  </PropertyGroup>
+  <ItemGroup>
+    <ProjectReference Include="../../managed-cases/HybridCLR.ManagedCases/HybridCLR.ManagedCases.csproj" />
+    <ProjectReference Include="../../managed-cases/HybridCLR.CrossAssemblyDerived/HybridCLR.CrossAssemblyDerived.csproj" />
+  </ItemGroup>
+</Project>

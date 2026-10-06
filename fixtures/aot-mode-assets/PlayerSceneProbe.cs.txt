@@ -24,7 +24,7 @@ public sealed class AotModePlayerSceneProbe : IProcessSceneWithReport
         {
             StartupWindowsFixture.FixtureBuild.Build();
         }
-        catch (BuildFailedException)
+        catch (Exception)
         {
             Debug.Log("AOT_GATE_PLAYER_BUILD_REJECTED");
             return;

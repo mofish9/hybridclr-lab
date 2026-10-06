@@ -23,6 +23,9 @@ namespace StartupWindowsFixture
             settings.enable = true; settings.useGlobalIl2cpp = false;
             settings.hotUpdateAssemblyDefinitions = new UnityEditorInternal.AssemblyDefinitionAsset[0];
             settings.hotUpdateAssemblies = new[] { "StartupHotfix", "StartupUnityHotfix" };
+            string regression=Path.Combine(Directory.GetParent(Argument("-startupBaseRoot")).FullName,"shared/regression");
+            if(Directory.Exists(regression))
+                settings.hotUpdateAssemblies=new[]{"StartupHotfix","StartupUnityHotfix","HybridCLR.ManagedCases","HybridCLR.CrossAssemblyDerived","AotModeRegression"};
             settings.preserveHotUpdateAssemblies = new string[0];
             settings.externalHotUpdateAssembliyDirs = new[] { Argument("-startupBaseRoot") };
             settings.patchAOTAssemblies = new string[0];
@@ -33,7 +36,7 @@ namespace StartupWindowsFixture
 #else
             settings.enableAotModeSelection = false;
 #endif
-            settings.dhePreserveAotAssemblies = new[] { "mscorlib", "System", "System.Core", "StartupAotSupport" };
+            settings.dhePreserveAotAssemblies = new[] { "mscorlib", "System", "System.Core", "StartupAotSupport", "HybridCLR.BoundaryContracts" };
 #endif
             HybridCLRSettings.Save();
             PlayerSettings.productName = "StartupPlayer";
