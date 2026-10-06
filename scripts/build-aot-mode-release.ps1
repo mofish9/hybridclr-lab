@@ -59,12 +59,23 @@ if($Stage -eq 'Prepare' -or $Stage -eq 'RefreshCandidate') {
         if((Get-FileHash "$OutputRoot/candidate/shared/$name.dll").Hash -ne (Get-FileHash "$OutputRoot/baseline/shared/$name.dll").Hash){throw "Payload drift: $name"}
     }
     Prepare-Regression
+    $cmake='C:/Program Files (x86)/Microsoft Visual Studio/2022/BuildTools/Common7/IDE/CommonExtensions/Microsoft/CMake/CMake/bin/cmake.exe'
+    $nativeProbe=Join-Path $OutputRoot 'native-image-probe'
+    & $cmake -S (Join-Path $labRoot 'fixtures/aot-mode-native-image') -B $nativeProbe -G 'Visual Studio 17 2022' -A x64
+    if($LASTEXITCODE -ne 0){throw 'Native image probe configure failed'}
+    & $cmake --build $nativeProbe --config Release
+    if($LASTEXITCODE -ne 0){throw 'Native image probe build failed'}
+    foreach($key in @('candidate/projects/DHE','candidate/projects/LegacyInterpreter','baseline/projects/DHE')) {
+        $plugins=Join-Path $OutputRoot "$key/Assets/Plugins/x86_64"
+        New-Item -ItemType Directory -Path $plugins -Force | Out-Null
+        Copy-Item -LiteralPath "$nativeProbe/Release/AotImageProbe.dll" -Destination "$plugins/AotImageProbe.dll"
+    }
 } elseif($Stage -eq 'Regression') {
     Prepare-Regression
 } elseif($Stage -eq 'Package') {
     $sides=@('candidate','baseline')
     if(Test-Path -LiteralPath "$OutputRoot/fixed/source-identities.json"){$sides+='fixed'}
-    $manifest=[ordered]@{format='hybridclr.aot-mode.release-build.v1';engine='Unity2022.3.62f3';fixtureCommit=(& git -C $labRoot rev-parse HEAD).Trim();diagnostics=$false;ordinaryAotGuards=$true;supplementalAotMetadata=$true;payloads=@{};profiles=@{};fixtureHashes=@{}}
+    $manifest=[ordered]@{format='hybridclr.aot-mode.release-build.v1';engine='Unity2022.3.62f3';fixtureCommit=(& git -C $labRoot rev-parse HEAD).Trim();diagnostics=$false;ordinaryAotGuards=$true;supplementalAotMetadata=$true;payloads=@{};profiles=@{};fixtureHashes=@{};nativeImageProbeSha256=(Get-FileHash "$OutputRoot/native-image-probe/Release/AotImageProbe.dll").Hash.ToLowerInvariant()}
     foreach($file in Get-ChildItem -LiteralPath $fixture -File){$manifest.fixtureHashes[$file.Name]=(Get-FileHash $file.FullName).Hash.ToLowerInvariant()}
     foreach($side in $sides) {
         $tool=Join-Path $OutputRoot "$side/sources/DHE/hybridclr_unity/Tools~/DHE/HybridCLR.DheTool.dll"
@@ -77,6 +88,7 @@ if($Stage -eq 'Prepare' -or $Stage -eq 'RefreshCandidate') {
         }
         foreach($profile in $(if($side -eq 'candidate'){@('DHE','LegacyInterpreter')}else{@('DHE')})) {
             $key="$side/$profile";$player="$OutputRoot/$key/player"
+            if((Get-FileHash "$player/StartupPlayer_Data/Plugins/x86_64/AotImageProbe.dll").Hash.ToLowerInvariant() -ne $manifest.nativeImageProbeSha256){throw 'Player native image probe differs'}
             foreach($name in @('PlayerRunner.cs','FixtureBuild.cs','StartupControl.cs','Workload.cs')) {
                 $area=if($name -eq 'FixtureBuild.cs'){'Editor'}else{'Runtime'}
                 if((Get-FileHash "$OutputRoot/$side/projects/$profile/Assets/$area/$name").Hash.ToLowerInvariant() -ne $manifest.fixtureHashes[$name]){throw 'Stale staged fixture'}

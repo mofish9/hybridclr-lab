@@ -14,6 +14,14 @@ namespace StartupUnityHotfix
         }
     }
     public sealed class Data : ScriptableObject { public int Value=29; }
+#if CURRENT_PAYLOAD
+    public sealed class AddedWorker : MonoBehaviour
+    {
+        public int Value;
+        void Awake() { Value=401; }
+    }
+    public sealed class AddedData : ScriptableObject { public int Value=53; }
+#endif
     public static class Entry
     {
         public static int Run()

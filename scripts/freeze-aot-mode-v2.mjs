@@ -19,6 +19,8 @@ const correct=read(correctArg), full=read(fullArg), acceptance=read(acceptanceAr
 const native=read(path.join(root,'candidate/native-gate.json'));
 const assets=read(assetsArg), scene=read(sceneArg), validator=read(validatorArg);
 assert(correct.passed&&full.passed&&acceptance.passed&&assets.passed&&scene.passed&&validator.result.passes===7,'Release prerequisite failed');
+assert(acceptance.checkerSha256===hash(path.join(lab,'scripts/check-aot-mode-performance.mjs')),'Stale performance checker');
+assert(acceptance.policySha256===hash(path.join(lab,'manifests/aot-mode-performance-policy.json')),'Stale performance policy');
 assert(JSON.stringify(correct.build)===JSON.stringify(build)&&JSON.stringify(full.build)===JSON.stringify(build),'Player evidence identity differs');
 assert(correct.runs.length===6&&full.runs.length===10,'Incomplete Player matrix');
 assert(full.runs.filter(r=>!r.negativeControl).every(r=>r.cases===full.reference.summary.total&&r.differences.length===0),'Incomplete positive full regression');
@@ -30,6 +32,7 @@ for(const [repo,commit] of Object.entries(identity))assert(scene.sources[repo]==
 for(const [key,profile] of Object.entries(build.profiles)) {
   assert(hash(path.join(root,key,'player/GameAssembly.dll'))===profile.gameAssemblySha256,'Player binary changed');
   assert(hash(path.join(root,key,'player/StartupPlayer_Data/il2cpp_data/Metadata/global-metadata.dat'))===profile.metadataSha256,'Player metadata changed');
+  assert(hash(path.join(root,key,'player/StartupPlayer_Data/Plugins/x86_64/AotImageProbe.dll'))===build.nativeImageProbeSha256,'Native image probe changed');
 }
 for(const [name,sha] of Object.entries(build.bundlePayloads))assert(hash(path.join(root,'candidate/shared/bundles',name))===sha,'Bundle changed');
 for(const [name,sha] of Object.entries(build.regressionPayloads))assert(hash(path.join(root,'candidate/shared/regression',name))===sha,'Regression payload changed');
@@ -41,7 +44,7 @@ for(const entry of acceptance.checked) {
   // A later fixed-mode rebuild must not relabel previous samples or invalidate
   // unrelated DHE/legacy binaries. Bind every profile actually measured, plus
   // all shared workload/config identities, instead of the unused profile map.
-  for(const key of ['engine','diagnostics','ordinaryAotGuards','supplementalAotMetadata','payloads','fixtureHashes','bundlePayloads','regressionPayloads'])
+  for(const key of ['engine','diagnostics','ordinaryAotGuards','supplementalAotMetadata','payloads','fixtureHashes','bundlePayloads','regressionPayloads','nativeImageProbeSha256'])
     assert(isDeepStrictEqual(report.build[key],build[key]),`Performance workload/config differs: ${key}`);
   for(const run of report.runs) {
     const key=`${run.side}/${run.profile}`;

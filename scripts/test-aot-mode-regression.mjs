@@ -56,7 +56,7 @@ for (const [side, profile, mode] of profiles) {
       const child=spawnSync(path.join(player,'StartupPlayer.exe'), args, {encoding:'utf8',windowsHide:true,timeout:180000});
       assert(child.status===0 && fs.existsSync(report), `Player failure (${child.status}): ${child.error||''}`);
       const result=read(report);
-      assert(result.passed && result.differential===0 && result.bundleResult===443, 'Startup/Bundle regression: '+result.error);
+      assert(result.passed && result.differential===0 && result.bundleResult===1298 && result.nativeTypeLookup===63, 'Startup/Bundle/native type regression: '+result.error);
       assert(result.mode===(mode==='dhe'?1:2), 'Wrong mode');
       const observations=new Map();
       for (const line of result.regressionRecords) {

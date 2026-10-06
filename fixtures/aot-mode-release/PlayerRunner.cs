@@ -19,6 +19,7 @@ namespace AotModeRelease
             public string format="hybridclr.aot-mode.release.v1", scenario, error, currentSha256, consumerSha256, unitySha256, supportSha256;
             public int pid, mode, before, after, selected, repeated, invalid, concurrentSuccesses, supplemental, duplicateSupplemental;
             public int caseCount, differential, unityResult, visibleBefore, visibleAfter, rejectedLoadAttempts, bundleResult;
+            public uint nativeTypeLookup;
             public bool passed, diagnostics, prematureRejected, wrongLoaderRejected, identityMatches, changed, unchanged;
             public int[] actual, concurrentResults;
             public double loadMilliseconds, firstEntryMilliseconds, selectionMilliseconds, selectionToEntryMilliseconds, processToEntryMilliseconds;
@@ -28,6 +29,8 @@ namespace AotModeRelease
         }
         static Result result;
         static AssetBundle sceneBundle;
+        [DllImport("AotImageProbe")]
+        static extern uint CheckCurrentTypes(uint phase);
         // Windows Player fixture only; the library has no platform persistence or launcher code.
         [StructLayout(LayoutKind.Sequential)]
         struct MemoryCounters
@@ -70,6 +73,7 @@ namespace AotModeRelease
                 byte[] support=File.ReadAllBytes(Path.Combine(root,"shared/StartupAotSupport.dll"));
                 result.currentSha256=Hash(dll);result.consumerSha256=Hash(other);result.unitySha256=Hash(unity);result.supportSha256=Hash(support);
                 bool correctness=result.scenario!="benchmark";
+                if(correctness)CheckCurrentTypes(0); // Cache Unity's public handles before selection.
                 result.visibleBefore=Visible();
                 var startupTimer=Stopwatch.StartNew();
                 if(IsCandidate) {
@@ -130,6 +134,8 @@ namespace AotModeRelease
                 }
 #endif
                 if(correctness) {
+                    result.nativeTypeLookup=CheckCurrentTypes(1);
+                    if(result.nativeTypeLookup!=63)throw new Exception("Native Current type lookup/image identity failed: "+result.nativeTypeLookup);
                     result.duplicateSupplemental=(int)HybridCLR.RuntimeApi.LoadMetadataForAOTAssembly(support,HybridCLR.HomologousImageMode.SuperSet);
 #if STARTUP_DHE_PROFILE
                     if(IsCandidate) {
@@ -237,6 +243,12 @@ namespace AotModeRelease
             if(worker==null || worker.GetType()!=workerType || data.GetType()!=assembly.GetType("StartupUnityHotfix.Data",true))
                 throw new Exception("Bundle script identity mismatch");
             result.bundleResult=(int)workerType.GetField("Value").GetValue(worker)+(int)data.GetType().GetField("Value").GetValue(data);
+            var addedType=assembly.GetType("StartupUnityHotfix.AddedWorker",true);
+            var added=instance.GetComponent(addedType);
+            var addedData=assets.LoadAsset("Assets/AddedData.asset");
+            if(added==null || added.GetType()!=addedType || addedData==null || addedData.GetType()!=assembly.GetType("StartupUnityHotfix.AddedData",true))
+                throw new Exception("Current-only bundle script identity mismatch");
+            result.bundleResult+=(int)addedType.GetField("Value").GetValue(added)+(int)addedData.GetType().GetField("Value").GetValue(addedData);
             sceneBundle=AssetBundle.LoadFromFile(Path.Combine(root,"hotfix-scene"));
             if(sceneBundle==null)throw new Exception("Unable to load hotfix scene bundle");
             UnityEngine.Object.Destroy(instance); assets.Unload(false);
@@ -251,7 +263,11 @@ namespace AotModeRelease
             var sceneWorker=scene.GetRootGameObjects().Single().GetComponent(workerType);
             if(sceneWorker==null || sceneWorker.GetType()!=workerType)throw new Exception("Bundle scene script identity mismatch");
             result.bundleResult+=(int)workerType.GetField("Value").GetValue(sceneWorker);
-            result.passed &= result.bundleResult==443;
+            var addedType=Assembly.Load("StartupUnityHotfix").GetType("StartupUnityHotfix.AddedWorker",true);
+            var added=scene.GetRootGameObjects().Single().GetComponent(addedType);
+            if(added==null || added.GetType()!=addedType)throw new Exception("Current-only scene script identity mismatch");
+            result.bundleResult+=(int)addedType.GetField("Value").GetValue(added);
+            result.passed &= result.bundleResult==1298;
             sceneBundle.Unload(false);
             } catch(Exception error) { result.error=error.ToString(); result.passed=false; }
             WriteResult();
