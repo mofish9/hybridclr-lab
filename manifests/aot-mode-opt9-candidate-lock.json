@@ -1,69 +1,93 @@
 {
   "format": "hybridclr.aot-mode.maintenance-lock.v2",
-  "createdAtUtc": "2026-10-06T09:26:49.421Z",
+  "createdAtUtc": "2026-10-06T11:49:09.140Z",
   "scope": "Unity2022 Windows IL2CPP; other engines excluded from this release by user instruction",
-  "labSourceCommit": "5045c4420aae8ccc65bd2c84fd512f315e8ddb75",
+  "labSourceCommit": "d8e78de2f95242ac9d0ce67113027660bd9a947c",
   "sources": {
-    "hybridclr": "da9403a8c0f6421cd9afa45fdb234c867e0dac9f",
-    "il2cpp_plus": "124f90294beb45a3c4cba8a525ac2488f82170f8",
-    "hybridclr_unity": "da9eac383cd953aab58ad0a8c7d851db5e0a36dc"
+    "hybridclr_unity": "da9eac383cd953aab58ad0a8c7d851db5e0a36dc",
+    "il2cpp_plus": "135f18fd5a26906e7800e0c4313826eaf2a7756c",
+    "hybridclr": "552bc0b549bbcbad223f22fbfb029b83c46e152f"
   },
   "evidence": {
     "build.json": {
-      "source": "E:\\hclr\\ar6\\build.json",
-      "sha256": "7663fa8896cfcc0e21c705891d2040be3f7c8d1b725036a3a68a51e819a2543d"
+      "source": "E:\\hclr\\ar11\\build.json",
+      "sha256": "5f71692acf6b081e9da2cab676b73d2a2dd4616815af4da31763f386aea88bc9"
     },
     "correctness.json": {
-      "source": "E:\\hclr\\ar6\\correctness-verified\\summary.json",
-      "sha256": "3d0de8b963fc42b6c59d498751b6c0fb038edb49c49d6062b14f1d88b2ccb426"
+      "source": "E:\\hclr\\ar11\\correctness-verified\\summary.json",
+      "sha256": "f17950ab275381f30fb08ef71e607442dd16a74343cb84d8034eccd0c2404fe1"
     },
     "full-regression.json": {
-      "source": "E:\\hclr\\ar6\\full-verified\\summary.json",
-      "sha256": "0ff24e903c8a9b7c6467951f1c23371d7e3357e8ca07aafbfb57cf6fce5650bf"
+      "source": "E:\\hclr\\ar11\\full-verified\\summary.json",
+      "sha256": "141871562bee76e12fc60f5d802ef7079f96ab1c5a7813f1f7bcf54e0990c7e5"
     },
     "performance-acceptance.json": {
-      "source": "E:\\hclr\\ar6\\performance-acceptance.json",
-      "sha256": "65bbc0119a0061e82499077b80b82f615c27fbc179fe90edf076b08ed214ec3d"
+      "source": "E:\\hclr\\ar11\\performance-acceptance.json",
+      "sha256": "fda664979011b8a7a0750e66f475821dbc0a68dcf7e41fdba33f758f6df70aaa"
     },
     "native-unity2022.json": {
-      "source": "E:\\hclr\\ar6\\candidate\\native-gate.json",
-      "sha256": "5c0d3666fde01373aa2b427198613b0d4e8812f6b8e2aa713acf91670a7a0707"
+      "source": "E:\\hclr\\ar11\\candidate\\native-gate.json",
+      "sha256": "381c7af7758aecfa1c1da1c0ac42980055f87e9ee3885f20da4228883a352b30"
     },
     "asset-regression.json": {
       "source": "E:\\hclr\\ar5\\assets-final\\gate.json",
       "sha256": "97a1d84835386d73db239b7999c063a7a45f7ff5be1004e958bb4c3e1152d959"
     },
     "player-scene.json": {
-      "source": "E:\\hclr\\ar6\\rejected-scene-final\\gate.json",
-      "sha256": "56bcfd9224a743be60b2ae42ef23ccc9544ab2da5636ea09d1aea5881f5b1075"
+      "source": "E:\\hclr\\ar11\\rejected-scene-final\\gate.json",
+      "sha256": "134cf50b27c6163ce4cea0cd1ead5d45243f7004ca9f74f196c1f625617d87ef"
     },
     "dependency-validator.json": {
       "source": "E:\\hclr\\ar5\\dependency-final\\validator-gate.json",
       "sha256": "8505044271a71bc2d9bae0f39f2c241486c49186d24f958fc278fe5ef50310c1"
     },
     "performance-policy-regression.json": {
-      "source": "E:\\hclr\\ar6\\performance-policy-regression.json",
-      "sha256": "67f78547c8b06b761661ba249df13823f761c084380b99b1fbc7bf76ca4fb30b"
+      "source": "E:\\hclr\\ar11\\performance-policy-regression.json",
+      "sha256": "ed71235ae1e85a68f50895322248fdac339e557a57a1ac71fdbff919b4daa7a6"
     },
     "performance-dhe.json": {
-      "source": "E:\\hclr\\ar6\\performance-dhe-200-verified\\summary.json",
-      "sha256": "f43a47be3e5949d290b1a59fcabde772ac6f4d1ac287b89bec5ca8534b9f891d"
-    },
-    "performance-legacy.json": {
-      "source": "E:\\hclr\\ar6\\performance-legacy-100-verified\\summary.json",
-      "sha256": "3550c2eb8d821ac3d39332c973b7c8c1321553849ecfa3b051bd4e5cfd631d1c"
+      "source": "E:\\hclr\\ar11\\performance-dhe-400-verified\\summary.json",
+      "sha256": "4c458a6e3050f5405423f1fb206550d4c8cdd4164cc9bc899cf17677417b7105"
     },
     "performance-fixed.json": {
-      "source": "E:\\hclr\\ar6\\performance-fixed-200-verified\\summary.json",
-      "sha256": "65f0d67f4536784e99b2af46039bb4775e351bc28a73cc2b1e79c895de1cb3bd"
+      "source": "E:\\hclr\\ar11\\performance-fixed-400-verified\\summary.json",
+      "sha256": "d84495bdde7d063137b2f799c1c5c8aeed99e445e72f09d5f689608a8f44f8dc"
+    },
+    "performance-legacy.json": {
+      "source": "E:\\hclr\\ar11\\performance-legacy-200-verified\\summary.json",
+      "sha256": "430b7ae6def1d466f071b4e4cb4bd7824d14a576c0304608989a6ae7670e6c77"
     },
     "generator-verification.json": {
-      "source": "E:/hclr/ar6/generator-verification.json",
-      "sha256": "ef8e95476288b5494b7a6350fdb255bef3357c4ab221ca29f246b04d030d3e32"
+      "source": "E:/hclr/ar11/generator-verification.json",
+      "sha256": "8dee70ee86b8047c9809d0545b10a2cd1c567b5ed3acbef0b59bc69baa6269d4"
     },
-    "followup-native-api-review.json": {
-      "source": "E:/hclr/ar6/review-followup-20261006/expanded-summary.json",
-      "sha256": "37a57bbc7030c8ef4b606392d6d2cc3df3dbaf51c1a015e914f81026cc3a0c30"
+    "reused-controls.json": {
+      "source": "E:/hclr/ar11/reused-controls.json",
+      "sha256": "cdd2b8ae391900713540372bdcbfa83d9e074a15ff76d4a54395663349c3690b"
+    },
+    "guard-symbols.txt": {
+      "source": "E:/hclr/ar11/guard-symbols.txt",
+      "sha256": "41fdfcee82db3adfc948db9726108f660ee6513eed2dd1126f6a8b380513dc37"
+    },
+    "guard-disassembly.txt": {
+      "source": "E:/hclr/ar11/guard-disassembly.txt",
+      "sha256": "9a12d6ce9b96ecf13211d91e79af52d86037238609bbd06f63d653b771cf0344"
+    },
+    "historical-ar7-failed-performance.json": {
+      "source": "E:/hclr/ar7/performance-acceptance.json",
+      "sha256": "bdfc1e6048bb4cb55e762f42f50df7b04576eb25a495e05375e591171643c7e4"
+    },
+    "historical-ar8-failed-performance.json": {
+      "source": "E:/hclr/ar8/performance-acceptance.json",
+      "sha256": "62459f69a1e085cdc81c4b1beab84da337c34e4815041f7a5ce2cb10f3d44fec"
+    },
+    "historical-ar9-failed-performance.json": {
+      "source": "E:/hclr/ar9/performance-acceptance.json",
+      "sha256": "521fefb13082dff47ca8ba9a8cff37f65b26bd36059a19e368a5def82421fad5"
+    },
+    "historical-ar10-failed-performance.json": {
+      "source": "E:/hclr/ar10/performance-acceptance.json",
+      "sha256": "b575fa7523fecc94b2e01400173ba1e91c3ae8d6613b0c851611bd56a20a932d"
     }
   },
   "windowsCorrectnessPassed": true,
@@ -74,47 +98,46 @@
   "androidPlayerVerified": false,
   "webglPlayerVerified": false,
   "iosPlayerVerified": false,
-  "fixtureCommit": "49f19d5e03f44233ce7ebe7b1e01ca8e5415e8c7",
+  "fixtureCommit": "a1987e9603b1af1df3d77a49253c9b1983d24126",
   "maintenance": {
-    "hybridclr": {
-      "branch": "optimize/v8.13.0",
-      "commit": "da9403a8c0f6421cd9afa45fdb234c867e0dac9f",
-      "tree": "8a85f9227426acd97e8d79918ed3234daaaea8cf"
-    },
-    "il2cpp_plus": {
-      "branch": "optimize/unity2022-v8.11.0",
-      "commit": "124f90294beb45a3c4cba8a525ac2488f82170f8",
-      "tree": "677a76445e0ab6249e3c8790589b3c4a57b2bb3d"
-    },
     "hybridclr_unity": {
       "branch": "optimize/v8.13.0",
       "commit": "da9eac383cd953aab58ad0a8c7d851db5e0a36dc",
       "tree": "25cc23c132a0cd9a7c2c5dbeb3039f16e84560e2"
-    }
-  },
-  "maintenanceEvidence": {
-    "native": {
-      "path": "E:/hclr/ar6/maintenance-native/native-gate.json",
-      "sha256": "d66f4d6e5524a32f4f7977401937db2944ff1b896cf8e9a8bf8887ede825df33"
     },
-    "smoke": {
-      "path": "E:/hclr/ar6/correctness-maintenance/summary.json",
-      "sha256": "29b0bfea1940d7dbc0eeaf1f251b3b752c52de285d685d096966f1a0a21833e7"
+    "il2cpp_plus": {
+      "branch": "optimize/unity2022-v8.11.0",
+      "commit": "135f18fd5a26906e7800e0c4313826eaf2a7756c",
+      "tree": "0b5887f1e258e129ad3d37b522aeb51d3121f9c0"
     },
-    "full": {
-      "path": "E:/hclr/ar6/full-maintenance/summary.json",
-      "sha256": "efd7b0eb9683a1d6187f24d78895975fb63232fbf159446843dfed52a81ba4a1"
+    "hybridclr": {
+      "branch": "optimize/v8.13.0",
+      "commit": "552bc0b549bbcbad223f22fbfb029b83c46e152f",
+      "tree": "9b77818f3fbc6533bf36d97d47629fdf396a6b01"
     }
   },
   "formalMaintenanceGatePassed": true,
-  "versionPreparationComplete": false,
-  "readyForVersionSubmission": false,
-  "preparationBlockers": [
-    "P2 inherited DHE native image enumeration omits Current-only types; reproduced in opt8, candidate DHE and fixed DHE. Resolve or explicitly disposition before final readiness."
-  ],
+  "maintenanceEvidence": {
+    "method": "Exact tested commits fast-forwarded locally; commit/tree identity verified. Gates are reused at identical source identity, not represented as post-merge reruns.",
+    "native": {
+      "source": "E:\\hclr\\ar11\\candidate\\native-gate.json",
+      "sha256": "381c7af7758aecfa1c1da1c0ac42980055f87e9ee3885f20da4228883a352b30"
+    },
+    "smoke": {
+      "source": "E:\\hclr\\ar11\\correctness-verified\\summary.json",
+      "sha256": "f17950ab275381f30fb08ef71e607442dd16a74343cb84d8034eccd0c2404fe1"
+    },
+    "full": {
+      "source": "E:\\hclr\\ar11\\full-verified\\summary.json",
+      "sha256": "141871562bee76e12fc60f5d802ef7079f96ab1c5a7813f1f7bcf54e0990c7e5"
+    }
+  },
+  "versionPreparationComplete": true,
+  "readyForVersionSubmission": true,
+  "preparationBlockers": [],
   "published": false,
   "publicationRequested": false,
-  "releaseReadinessMeaning": "Existing Windows gates and source identity remain valid. Follow-up review found an inherited DHE native enumeration gap outside those gates; unrestricted version readiness is withdrawn pending disposition. Not published.",
+  "releaseReadinessMeaning": "Unity2022 source preparation and Windows IL2CPP gates complete; not published. Android/WebGL/iOS Player qualification unverified. Installer manifest remains opt8.",
   "preparationScope": "Unity2022 source candidate and Windows IL2CPP verification only. Android/WebGL/iOS Player qualification remains unverified.",
   "performanceAcceptance": "Normal DHE and feature-disabled strict; interpreter fallback cost explicitly accepted and disclosed.",
   "reusedEvidence": [
@@ -124,14 +147,26 @@
         "dependency-validator.json"
       ],
       "reason": "Package da9eac3 and corresponding validator/test sources unchanged; ar5 results reused explicitly."
+    },
+    {
+      "reports": [
+        "performance-policy-regression.json"
+      ],
+      "reason": "Unchanged checker and policy; ar7 twelve-case regression reused explicitly."
+    },
+    {
+      "reports": [
+        "reused-controls.json"
+      ],
+      "reason": "ar7 opt8/opt3 GameAssembly and metadata reused with identical hashes; ar11 probe rebuilt from same source. All performance samples collected anew."
     }
   ],
   "latestReview": {
-    "report": "docs/AOT-Mode-Followup-Review-20261006.md",
-    "previousFindings": "docs/AOT-Mode-Review-Fixes-Result.md",
+    "report": "docs/AOT-Mode-Native-Enumeration-Fix.md",
+    "previousFindings": "docs/AOT-Mode-Followup-Review-20261006.md",
     "unresolvedP0": 0,
     "unresolvedP1": 0,
-    "unresolvedP2": 1
+    "unresolvedP2": 0
   },
   "packageManifest": {
     "applied": false,

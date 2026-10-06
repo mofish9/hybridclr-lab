@@ -4,12 +4,12 @@
     {
       "repo": "hybridclr",
       "name": "v8.13.0-opt9",
-      "commit": "da9403a8c0f6421cd9afa45fdb234c867e0dac9f"
+      "commit": "552bc0b549bbcbad223f22fbfb029b83c46e152f"
     },
     {
       "repo": "il2cpp_plus",
       "name": "v2022-8.11.0-opt9",
-      "commit": "124f90294beb45a3c4cba8a525ac2488f82170f8"
+      "commit": "135f18fd5a26906e7800e0c4313826eaf2a7756c"
     }
   ],
   "package": {
@@ -25,6 +25,6 @@
   },
   "published": false,
   "publicationRequested": false,
-  "status": "Proposal only. Follow-up native enumeration P2 remains unresolved; readiness is not final. No tags, pushes or installer manifest switch authorized.",
+  "status": "Proposal only. Unity2022/Windows source preparation and exact-identity gates complete. No tags, pushes, remote checks or installer manifest switch performed or requested.",
   "runtimeTagNamesAreProposals": true
 }
