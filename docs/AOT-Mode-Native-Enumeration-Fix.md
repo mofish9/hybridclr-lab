@@ -96,7 +96,15 @@ HybridCLR `906bed5` 在不可变 PublishedState 中新增 64 位 changedMethodTo
 ResolveAotGuardMethodByToken 中，bit 未置位可直接返回空目标；bit 已置位仍使用原程序集名及
 完整 token 的精确查询。碰撞只影响命中预筛后的查询成本，不会误分派，空集也自然返回空目标。
 mask 在原 release 发布前写完；读者沿用原 acquire，不增加锁、计数、模式判断或平台代码。
-每个已存在的发布快照增加 8 字节；密集变更可能不具备预筛收益，但不会改变完整查询语义。
+每个发布快照新增一个 64 位字段；密集变更可能不具备预筛收益，但不会改变完整查询语义。
 
 第三轮 ar9 保留同一个 IL2CPP 枚举修复、同一 Current DLL 和同一 opt8/opt3 对照。
 三组性能各采 200 对，保留全部启动；没有降低至少 100 个不同 PID 的要求，也没有改数值门限。
+
+ar9 的功能/并发/完整回归通过；正常 DHE 性能通过，native P50 -66.94%，virtual P50/P95
++3.68%/+3.81%。功能关闭的 virtual P50/P95 为 +5.73%/+5.56%，BenchChanged P99 为 +17.18%，
+因此整体仍失败。ar9/performance-acceptance.json 及全部样本保留。
+
+ar10 使用 HybridCLR `d6443bd`：移除此前 `4dc14f5` 的空目标快返实验，非空虚调用恢复原分支；
+保留 `906bed5` 的 token 预筛。相对原 da9403a，最终 runtime 净改动为 7 行新增、1 行删除。
+为复核尾部指标，正常 DHE/功能关闭各使用 400 对，解释兜底使用 200 对，不改门限且保留全部样本。
