@@ -37,6 +37,7 @@ ScriptableObject 是单独验证项。当前测试不等价于完整 AssetBundle
 实验观察器、故障注入入口和无条件 lab internal call 已从 runtime 删除。DHE 诊断计数
 在生产构建关闭，ResetForTests 仅在测试/诊断宏内存在。测试程序及 Windows 内存采样
 位于 lab，不进入用户 package。函数表仍有一次原子读取和间接调用成本，必须实测。
+已通过选择表进入的 DHE guard、虚调用和接口调用内部使用直接调用，避免重复查表。
 
 同一份兼容 Current DLL 供两种模式使用；传统加载不依赖 MV。运营不需要两套业务资源，
 但每次发布需要让同一组业务用例分别通过两种模式。Base 构建时开启此能力，已发布且未
