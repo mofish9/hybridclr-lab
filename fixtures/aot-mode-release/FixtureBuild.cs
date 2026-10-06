@@ -24,10 +24,13 @@ namespace StartupWindowsFixture
             settings.hotUpdateAssemblyDefinitions = new UnityEditorInternal.AssemblyDefinitionAsset[0];
             settings.hotUpdateAssemblies = new[] { "StartupHotfix", "StartupUnityHotfix" };
             string regression=Path.Combine(Directory.GetParent(Argument("-startupBaseRoot")).FullName,"shared/regression");
+#if !STARTUP_DHE_PROFILE
             if(Directory.Exists(regression))
                 settings.hotUpdateAssemblies=new[]{"StartupHotfix","StartupUnityHotfix","HybridCLR.ManagedCases","HybridCLR.CrossAssemblyDerived","AotModeRegression"};
+#endif
             settings.preserveHotUpdateAssemblies = new string[0];
-            settings.externalHotUpdateAssembliyDirs = new[] { Argument("-startupBaseRoot") };
+            settings.externalHotUpdateAssembliyDirs = Directory.Exists(regression)
+                ? new[] { Argument("-startupBaseRoot"), regression } : new[] { Argument("-startupBaseRoot") };
             settings.patchAOTAssemblies = new string[0];
 #if STARTUP_DHE_PROFILE
             settings.dheAotAssemblies = new[] { "StartupHotfix", "StartupUnityHotfix" };
@@ -67,8 +70,14 @@ namespace StartupWindowsFixture
                 RuntimeAssetRoot = "Assets/StreamingAssets/HybridCLR/DHE",
                 EnableDispatchDiagnostics = false,
                 GuardOrdinaryAotMethods = true,
+                BeforeCurrentGeneration = _ => SetRegressionInputs(true),
+                AfterCurrentGeneration = _ => SetRegressionInputs(false),
                 GetScenes = () => new[] { Scene },
-                BuildPlayer = options => BuildPipeline.BuildPlayer(options),
+                BuildPlayer = options => {
+                    SetRegressionInputs(true);
+                    try { return BuildPipeline.BuildPlayer(options); }
+                    finally { SetRegressionInputs(false); }
+                },
                 ResolvePlayerOutput = (target, root) => Path.Combine(root, "player", "StartupPlayer.exe")
             }, new DheProjectWorkflowOptions {
                 Target = BuildTarget.StandaloneWindows64, OutputRoot = output,
@@ -96,6 +105,18 @@ namespace StartupWindowsFixture
         }
         static string Argument(string name)
         { var args = Environment.GetCommandLineArgs(); int index = Array.IndexOf(args, name); if (index < 0 || index + 1 >= args.Length) throw new Exception("Missing " + name); return args[index + 1]; }
+
+        static void SetRegressionInputs(bool include)
+        {
+            string root=Path.Combine(Directory.GetParent(Argument("-startupBaseRoot")).FullName,"shared/regression");
+            if(!Directory.Exists(root))return;
+            // The release pair remains the two DHE business DLLs. Auxiliary
+            // ordinary interpreter tests participate in filtering/bridge generation.
+            HybridCLRSettings.Instance.hotUpdateAssemblies=include
+                ? new[]{"StartupHotfix","StartupUnityHotfix","HybridCLR.ManagedCases","HybridCLR.CrossAssemblyDerived","AotModeRegression"}
+                : new[]{"StartupHotfix","StartupUnityHotfix"};
+            HybridCLRSettings.Save();
+        }
 
 #if STARTUP_MODE_SELECTION
         static void BuildHotfixBundles()
