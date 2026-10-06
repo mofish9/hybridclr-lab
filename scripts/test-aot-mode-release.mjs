@@ -39,6 +39,7 @@ function run(side, profile, mode, scenario, index) {
   for (const [field, assembly] of [['currentSha256','StartupHotfix'],['consumerSha256','StartupConsumer'],['unitySha256','StartupUnityHotfix'],['supportSha256','StartupAotSupport']])
     assert(result[field] === build.payloads[assembly], `Loaded payload mismatch: ${name}/${field}`);
   assert(!result.diagnostics && result.unityResult === 236 && result.identityMatches, `Production/Unity boundary failed: ${name}`);
+  if (scenario !== 'benchmark') assert(result.duplicateSupplemental === 5, `Wrong duplicate-metadata result: ${name}`);
   if (scenario === 'concurrent') assert(result.concurrentSuccesses === 1 && result.concurrentResults.filter(n=>n===1).length === 11, 'Concurrent selection failed');
   else assert(result.mode === (mode === 'dhe' ? 1 : 2), `Wrong mode: ${name}`);
   runs.push({side, profile, requestedMode:mode, index, ...result});
@@ -73,6 +74,10 @@ if (pairs) {
   for (const run of runs) for (const sample of run.samples) {
     const counterpart=runs.find(r=>r.index===run.index && r.side!==run.side).samples.find(s=>s.name===sample.name);
     assert(sample.checksum===counterpart.checksum && sample.iterations===counterpart.iterations, 'Benchmark checksum/workload mismatch');
+    let expected=0;
+    for(let i=0;i<sample.iterations;i++) expected=(expected+(sample.name==='BenchNative'?(i&255)*3+1:sample.name==='BenchChanged'?(i&255)+200:(i&255)*(i%2?5:4)))|0;
+    if(sample.name==='BenchChanged')expected=(expected+1)|0;
+    assert(sample.checksum===expected, `Wrong benchmark result: ${sample.name}`);
   }
   for (const name of Object.keys(values(runs[0]))) {
     const baseline=runs.filter(r=>r.side==='baseline').map(r=>values(r)[name]);
