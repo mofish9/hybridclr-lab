@@ -8,12 +8,12 @@
     "06-concurrent-single-selection.json": "e166c1553c77e8fe50a30a84329fe6b3976d8509bdab67baf534051e3894b425",
     "07-interpreter-ignores-dhe-mv.json": "a2d6bf794fa29cec664b2caf880152ac89e389f53bc1bf4d58b583afafa2d04e",
     "clr-reference.json": "d02a5f2212692e0139b9b2fe2dabbfc5ba71b170e64409ddc4d0a73df3b11b57",
-    "native-0-ctest.log": "a68c19c15f4d80d48021914f5a2aa1563826e69562b5f78fa89679834f4cd829",
-    "native-1-ctest.log": "e1cb3e291ae62128f66ae727abd6bc88a397d6a488287abcf933d9ab8a617dcc",
-    "native-gate.json": "87b0f09efad54f767968e29194930ac73e57aab61d7b4140db396b62ccae582f",
+    "native-0-ctest.log": "b5863bec4e18b666b1b40031471d55d5e7b9b60c6f7d34060eaf4f06f1556003",
+    "native-1-ctest.log": "ab783b343f3e5691178fdcda2f5c327cda9c6bdd7b841b594ca6811c346c611a",
+    "native-gate.json": "49a9d7e2a2cc6a8752daf09a00c8c77b1be0679198cb01654c567cf987c42992",
     "probe-build.json": "cd7a65b856b112494f351c147064c5cc47fbc6557d7a786e237e73a9306c56a9",
     "summary.json": "97ff68a6579481055de1f4039a30268171fe9541acb65306917b360b04a6a0b9",
-    "validator-gate.json": "dc798f92a6c89264e3c6829e8e71016ff68add2bd581899ea2e544671def1152"
+    "validator-gate.json": "2b4fa1a2f8c31992c39d9be159e47d0662b566fc89a713261c2c687815fe4495"
   },
   "scope": "Windows Unity2022 AOT selection and 83 routed extension boundaries",
   "mergeReady": false,
@@ -37,5 +37,22 @@
       "branch": "research/aot-mode-selection-v1"
     }
   },
-  "fixtureCommit": "e2fb63b8e2309670513d90686678162dfe292107"
+  "fixtureCommit": "e2fb63b8e2309670513d90686678162dfe292107",
+  "originalFileSha256": {
+    "01-reference-traditional.json": "cdbef0808bc69f792af3a8ea9afba4e89b7d4d007ffd6f70c24779f43267f98f",
+    "02-aot-select-dhe.json": "17842622a40e75a99f0ac9ad6a0045a00c521814c4c34ab4bcc7fa5d7cb50ef1",
+    "03-aot-select-interpreter.json": "462ce8f1d63649844a89e44fe266402f851658b5b707f28b4187d90490228578",
+    "04-legacy-survives-dhe-poison.json": "34835642182e4a9a332e2fca088784a1b62e4b76d9bdd136c69be98758c8f673",
+    "05-dhe-poison-control.json": "ee56652a5f06b7dd893e552ddb7550f18aa80361cee1fab9675637365af76cfd",
+    "06-concurrent-single-selection.json": "e166c1553c77e8fe50a30a84329fe6b3976d8509bdab67baf534051e3894b425",
+    "07-interpreter-ignores-dhe-mv.json": "a2d6bf794fa29cec664b2caf880152ac89e389f53bc1bf4d58b583afafa2d04e",
+    "clr-reference.json": "d02a5f2212692e0139b9b2fe2dabbfc5ba71b170e64409ddc4d0a73df3b11b57",
+    "native-0-ctest.log": "a68c19c15f4d80d48021914f5a2aa1563826e69562b5f78fa89679834f4cd829",
+    "native-1-ctest.log": "e1cb3e291ae62128f66ae727abd6bc88a397d6a488287abcf933d9ab8a617dcc",
+    "native-gate.json": "87b0f09efad54f767968e29194930ac73e57aab61d7b4140db396b62ccae582f",
+    "probe-build.json": "cd7a65b856b112494f351c147064c5cc47fbc6557d7a786e237e73a9306c56a9",
+    "summary.json": "97ff68a6579481055de1f4039a30268171fe9541acb65306917b360b04a6a0b9",
+    "validator-gate.json": "dc798f92a6c89264e3c6829e8e71016ff68add2bd581899ea2e544671def1152"
+  },
+  "textNormalization": "CRLF to LF for committed text evidence; original artifact hashes retained."
 }
