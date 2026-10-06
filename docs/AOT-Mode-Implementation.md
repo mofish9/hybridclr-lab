@@ -61,7 +61,19 @@ AotModeHooks 表与 inventory 大部分由生成器产生；MetadataModule/DheRu
 首轮完整 v2 性能采样未通过预先设定门限：DHE native 微基准 P50 +12.72%，虚调用 +5.35%；
 解释模式相对独立 opt3 的进程启动到入口约 +14.52 ms，虚调用微基准 +12.87%。
 证据保留在 E:/hclr/ar5/performance-*-100-qualified；旧候选 Player 和资源另存 before-direct-guards。
-direct guard 优化后的结果必须重测，不能继承上述构建的测量或把失败改写成通过。
+direct guard 优化后的正常 DHE 使用完整 400 对独立启动样本验收（包含先前 100 对中的慢启动，
+未删除离群点）。相对 opt8：native/changed/virtual 微基准 P50 分别 -4.33%/+0.63%/+1.61%，
+进程到入口 P50 为 127.39→126.65 ms，P99 为 153.28→147.00 ms；选择到入口 P50 增加 0.103 ms。
+这些都是该 Windows fixture 的测量，不是整个游戏的收益声明。
+
+用户明确接受解释兜底的额外成本，正常 DHE 和功能关闭路径仍使用原数值门限。
+最终两路 Player 中的解释模式相对独立 opt3，100 对测量的进程到入口 P50 增加 13.98 ms，
+虚调用微基准 P50 增加 12.59%，private bytes P50 增加约 3.97 MiB。完整正确性仍须通过。
+
+采样器曾因 Windows 复用已退出进程的数值 PID，在完成 300 对后拒绝生成汇总。
+完整恢复报告保留所有原始记录、顺序启动完成日志、输入 hash，以及原 100 对汇总；两侧各有
+398/395 个不同 PID，均超过 100 的最低门槛。恢复报告明确披露旧采样器没有父进程启动时间戳。
+新采样器交叉核对父子 PID 并记录每次启动/退出时间；不因数值 PID 重用而丢弃任何性能样本。
 
 源码按 runtime、Unity 2022 hook、package、lab 独立提交。完成当前身份门禁后合入对应正式维护线，
 发布 runtime annotated tags，再更新 package 的 Unity 2022 清单与 lab lock；package 不打 opt tag。
@@ -69,3 +81,10 @@ direct guard 优化后的结果必须重测，不能继承上述构建的测量�
 
 业务回滚是保存下一启动 Interpreter 并重启，不能回滚共享解释器/IL2CPP 本身的缺陷。
 源码回滚恢复 opt8 Unity 2022 runtime/package 组合并重建 Base；没有此能力的旧 Base 不能只靠热更 DLL 增加开关。
+
+## 发包和维护成本
+
+每轮只发布一份兼容的 Current DLL 和资源。DHE 使用其计划/版本信息，解释模式使用同一 DLL 的普通加载；
+不需要两套热更业务包。Base 必须事先具备两路能力，解释模式需要的 AOT 桥接/泛型补充 metadata 也要准备齐全。
+新增维护成本主要是双模式回归，以及新增 DHE 扩展入口时审核其解释 fallback；生成器会拒绝未登记的入口。
+库不维护平台配置存储、远程开关或重启实现，也不要求每次切换重新构建 APK。
