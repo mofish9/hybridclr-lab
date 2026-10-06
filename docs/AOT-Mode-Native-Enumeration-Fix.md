@@ -1,5 +1,7 @@
 # Unity 2022 原生类型枚举修复边界
 
+> opt9 已正式发布；发布提交、标签及 package 引用见 [发布记录](AOT-Mode-Opt9-Release.md)。下文的“未发布”描述保留当时准备阶段的状态。
+
 当前候选：HybridCLR `552bc0b549bbcbad223f22fbfb029b83c46e152f`、Unity 2022 il2cpp_plus
 `135f18fd5a26906e7800e0c4313826eaf2a7756c`、package `da9eac383cd953aab58ad0a8c7d851db5e0a36dc`。
 ar11 已通过真实 headers 的选择开/关编译及 CTest、6 组启动回归、8 组各 220 项完整回归和

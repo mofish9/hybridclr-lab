@@ -63,5 +63,40 @@
         "path": "../worktrees/il2cpp-plus-metadata-unity2022-v8.11.0"
       }
     }
+  },
+  "aotModeOptimization": {
+    "version": "opt9",
+    "scope": "Unity2022 only",
+    "releaseLock": "manifests/aot-mode-opt9-release-lock.json",
+    "hybridclr": {
+      "branch": "optimize/v8.13.0",
+      "commit": "552bc0b549bbcbad223f22fbfb029b83c46e152f",
+      "tree": "9b77818f3fbc6533bf36d97d47629fdf396a6b01",
+      "tag": "v8.13.0-opt9",
+      "tagObject": "9ff7b047f120ff095cd568773fcd592d90e30cf8",
+      "annotated": true,
+      "remoteVerified": true,
+      "url": "https://github.com/mofish9/hybridclr/tree/v8.13.0-opt9"
+    },
+    "il2cppPlus": {
+      "branch": "optimize/unity2022-v8.11.0",
+      "commit": "135f18fd5a26906e7800e0c4313826eaf2a7756c",
+      "tree": "0b5887f1e258e129ad3d37b522aeb51d3121f9c0",
+      "tag": "v2022-8.11.0-opt9",
+      "tagObject": "49b0fe5ca1298f960ccbcdf52ce0f93839311c92",
+      "annotated": true,
+      "remoteVerified": true,
+      "url": "https://github.com/mofish9/il2cpp_plus/tree/v2022-8.11.0-opt9"
+    },
+    "package": {
+      "branch": "optimize/v8.13.0",
+      "commit": "4449974800e449b50c3e5cdab32d77e1f51dca78",
+      "tree": "26542e9340483dae793e3861f9f3b4e8d74df8a9",
+      "testedFunctionalCommit": "da9eac383cd953aab58ad0a8c7d851db5e0a36dc",
+      "onlyPostTestChange": "Data~/hybridclr_version.json: Unity2022 opt8 references changed to verified opt9 tags",
+      "manifestSha256": "c896f97ca66a338567bdf6d5df1a9f6e87550a829ccabebddbdabe215a2f0258",
+      "remoteVerified": true,
+      "packageTagCreated": false
+    }
   }
 }

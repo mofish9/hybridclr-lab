@@ -1,13 +1,48 @@
 {
-  "format": "hybridclr.aot-mode.maintenance-lock.v2",
-  "createdAtUtc": "2026-10-06T11:49:09.140Z",
-  "scope": "Unity2022 Windows IL2CPP; other engines excluded from this release by user instruction",
-  "labSourceCommit": "d8e78de2f95242ac9d0ce67113027660bd9a947c",
-  "sources": {
+  "format": "hybridclr.aot-mode.release-lock.v1",
+  "version": "opt9",
+  "publishedAtUtc": "2026-10-06T12:35:17.229Z",
+  "published": true,
+  "scope": "Unity2022; qualified Windows IL2CPP source release; Android/WebGL/iOS Player qualification pending",
+  "runtimes": {
+    "hybridclr": {
+      "branch": "optimize/v8.13.0",
+      "commit": "552bc0b549bbcbad223f22fbfb029b83c46e152f",
+      "tree": "9b77818f3fbc6533bf36d97d47629fdf396a6b01",
+      "tag": "v8.13.0-opt9",
+      "tagObject": "9ff7b047f120ff095cd568773fcd592d90e30cf8",
+      "annotated": true,
+      "remoteVerified": true,
+      "url": "https://github.com/mofish9/hybridclr/tree/v8.13.0-opt9"
+    },
+    "il2cpp_plus": {
+      "branch": "optimize/unity2022-v8.11.0",
+      "commit": "135f18fd5a26906e7800e0c4313826eaf2a7756c",
+      "tree": "0b5887f1e258e129ad3d37b522aeb51d3121f9c0",
+      "tag": "v2022-8.11.0-opt9",
+      "tagObject": "49b0fe5ca1298f960ccbcdf52ce0f93839311c92",
+      "annotated": true,
+      "remoteVerified": true,
+      "url": "https://github.com/mofish9/il2cpp_plus/tree/v2022-8.11.0-opt9"
+    }
+  },
+  "package": {
+    "branch": "optimize/v8.13.0",
+    "commit": "4449974800e449b50c3e5cdab32d77e1f51dca78",
+    "tree": "26542e9340483dae793e3861f9f3b4e8d74df8a9",
+    "testedFunctionalCommit": "da9eac383cd953aab58ad0a8c7d851db5e0a36dc",
+    "onlyPostTestChange": "Data~/hybridclr_version.json: Unity2022 opt8 references changed to verified opt9 tags",
+    "manifestSha256": "c896f97ca66a338567bdf6d5df1a9f6e87550a829ccabebddbdabe215a2f0258",
+    "remoteVerified": true,
+    "packageTagCreated": false
+  },
+  "testedSources": {
     "hybridclr_unity": "da9eac383cd953aab58ad0a8c7d851db5e0a36dc",
     "il2cpp_plus": "135f18fd5a26906e7800e0c4313826eaf2a7756c",
     "hybridclr": "552bc0b549bbcbad223f22fbfb029b83c46e152f"
   },
+  "labSourceCommit": "d8e78de2f95242ac9d0ce67113027660bd9a947c",
+  "fixtureCommit": "a1987e9603b1af1df3d77a49253c9b1983d24126",
   "evidence": {
     "build.json": {
       "source": "E:\\hclr\\ar11\\build.json",
@@ -90,56 +125,6 @@
       "sha256": "b575fa7523fecc94b2e01400173ba1e91c3ae8d6613b0c851611bd56a20a932d"
     }
   },
-  "windowsCorrectnessPassed": true,
-  "windowsPerformancePassed": true,
-  "sourceCandidateReady": true,
-  "formalMaintenanceGatePending": false,
-  "releaseReady": true,
-  "androidPlayerVerified": false,
-  "webglPlayerVerified": false,
-  "iosPlayerVerified": false,
-  "fixtureCommit": "a1987e9603b1af1df3d77a49253c9b1983d24126",
-  "maintenance": {
-    "hybridclr_unity": {
-      "branch": "optimize/v8.13.0",
-      "commit": "da9eac383cd953aab58ad0a8c7d851db5e0a36dc",
-      "tree": "25cc23c132a0cd9a7c2c5dbeb3039f16e84560e2"
-    },
-    "il2cpp_plus": {
-      "branch": "optimize/unity2022-v8.11.0",
-      "commit": "135f18fd5a26906e7800e0c4313826eaf2a7756c",
-      "tree": "0b5887f1e258e129ad3d37b522aeb51d3121f9c0"
-    },
-    "hybridclr": {
-      "branch": "optimize/v8.13.0",
-      "commit": "552bc0b549bbcbad223f22fbfb029b83c46e152f",
-      "tree": "9b77818f3fbc6533bf36d97d47629fdf396a6b01"
-    }
-  },
-  "formalMaintenanceGatePassed": true,
-  "maintenanceEvidence": {
-    "method": "Exact tested commits fast-forwarded locally; commit/tree identity verified. Gates are reused at identical source identity, not represented as post-merge reruns.",
-    "native": {
-      "source": "E:\\hclr\\ar11\\candidate\\native-gate.json",
-      "sha256": "381c7af7758aecfa1c1da1c0ac42980055f87e9ee3885f20da4228883a352b30"
-    },
-    "smoke": {
-      "source": "E:\\hclr\\ar11\\correctness-verified\\summary.json",
-      "sha256": "f17950ab275381f30fb08ef71e607442dd16a74343cb84d8034eccd0c2404fe1"
-    },
-    "full": {
-      "source": "E:\\hclr\\ar11\\full-verified\\summary.json",
-      "sha256": "141871562bee76e12fc60f5d802ef7079f96ab1c5a7813f1f7bcf54e0990c7e5"
-    }
-  },
-  "versionPreparationComplete": true,
-  "readyForVersionSubmission": true,
-  "preparationBlockers": [],
-  "published": true,
-  "publicationRequested": true,
-  "releaseReadinessMeaning": "Published opt9 for the qualified Unity2022/Windows IL2CPP scope. The source/evidence fields retain tested identities; the separate release lock records the manifest-only package release commit. Android/WebGL/iOS remain unverified.",
-  "preparationScope": "Unity2022 source candidate and Windows IL2CPP verification only. Android/WebGL/iOS Player qualification remains unverified.",
-  "performanceAcceptance": "Normal DHE and feature-disabled strict; interpreter fallback cost explicitly accepted and disclosed.",
   "reusedEvidence": [
     {
       "reports": [
@@ -161,19 +146,15 @@
       "reason": "ar7 opt8/opt3 GameAssembly and metadata reused with identical hashes; ar11 probe rebuilt from same source. All performance samples collected anew."
     }
   ],
-  "latestReview": {
-    "report": "docs/AOT-Mode-Native-Enumeration-Fix.md",
-    "previousFindings": "docs/AOT-Mode-Followup-Review-20261006.md",
-    "unresolvedP0": 0,
-    "unresolvedP1": 0,
-    "unresolvedP2": 0
+  "qualification": {
+    "windowsNative": true,
+    "windowsCorrectness": true,
+    "windowsPerformance": true,
+    "androidPlayer": false,
+    "webglPlayer": false,
+    "iosPlayer": false
   },
-  "packageManifest": {
-    "applied": true,
-    "testedSha256": "9296d94b8e4c18ed95753693382535d2096a8681e8eef3298b2cf513b8bbc427",
-    "currentSha256": "c896f97ca66a338567bdf6d5df1a9f6e87550a829ccabebddbdabe215a2f0258",
-    "releaseCommit": "4449974800e449b50c3e5cdab32d77e1f51dca78"
-  },
+  "performanceAcceptance": "Normal DHE and feature-disabled strict; interpreter fallback cost explicitly accepted and disclosed.",
   "rollback": {
     "hybridclr": "9c607a3c3d45f88ee83ff9dc5bb0f5ad12c57071",
     "il2cpp_plus": "e426adc57c283865126423b169051558b339388c",
@@ -181,7 +162,6 @@
     "requiresBaseRebuild": true,
     "operationalFallback": "Project persists Interpreter for next launch and restarts."
   },
-  "futurePublicationSteps": [],
-  "stashDisposition": "No new stashes. Historical FGS and opt3 research stashes preserved.",
-  "publishedRelease": "manifests/aot-mode-opt9-release-lock.json"
+  "transport": "Authenticated Git SSH over port 443 with host keys verified against GitHub HTTPS API; original commit objects preserved",
+  "stashDisposition": "No new stashes. Historical FGS and opt3 research stashes preserved."
 }

@@ -17,14 +17,17 @@
     "functionalCommit": "da9eac383cd953aab58ad0a8c7d851db5e0a36dc",
     "functionalTree": "25cc23c132a0cd9a7c2c5dbeb3039f16e84560e2",
     "manifestFile": "Data~/hybridclr_version.json",
-    "currentManifestSha256": "9296d94b8e4c18ed95753693382535d2096a8681e8eef3298b2cf513b8bbc427",
+    "currentManifestSha256": "c896f97ca66a338567bdf6d5df1a9f6e87550a829ccabebddbdabe215a2f0258",
     "proposedManifest": "manifests/aot-mode-opt9-proposed-package-versions.json",
     "proposedManifestSha256": "c896f97ca66a338567bdf6d5df1a9f6e87550a829ccabebddbdabe215a2f0258",
     "createPackageTag": false,
-    "applyOnlyAfterRemoteRuntimeTagsVerified": true
+    "applyOnlyAfterRemoteRuntimeTagsVerified": true,
+    "releaseCommit": "4449974800e449b50c3e5cdab32d77e1f51dca78",
+    "releaseTree": "26542e9340483dae793e3861f9f3b4e8d74df8a9",
+    "applied": true
   },
-  "published": false,
-  "publicationRequested": false,
-  "status": "Proposal only. Unity2022/Windows source preparation and exact-identity gates complete. No tags, pushes, remote checks or installer manifest switch performed or requested.",
-  "runtimeTagNamesAreProposals": true
+  "published": true,
+  "publicationRequested": true,
+  "status": "Completed: annotated runtime tags and maintenance branches pushed and verified before package references; package branch pushed and verified; final records in aot-mode-opt9-release-lock.json.",
+  "runtimeTagNamesAreProposals": false
 }

@@ -1,5 +1,7 @@
 # Unity 2022 启动选择的实施方案
 
+> opt9 已正式发布；发布提交、标签及 package 引用见 [发布记录](AOT-Mode-Opt9-Release.md)。下文的“未发布”描述保留当时准备阶段的状态。
+
 本轮发布范围：Unity 2022，upstream 保持 package/HybridCLR 8.13.0、il2cpp_plus v2022-8.11.0。
 使用 Windows IL2CPP 验证。Android/WebGL/iOS 共用库接口，没有增加平台启动器；其 Player 资格另行记录。
 Unity 2021 和团结不属于本轮实施或发布前置范围。
