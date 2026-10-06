@@ -26,6 +26,8 @@ assert(acceptance.checkerSha256===hash(path.join(lab,'scripts/check-aot-mode-per
 assert(acceptance.policySha256===hash(path.join(lab,'manifests/aot-mode-performance-policy.json')),'Stale performance policy');
 assert(JSON.stringify(correct.build)===JSON.stringify(build)&&JSON.stringify(full.build)===JSON.stringify(build),'Player evidence identity differs');
 assert(correct.runs.length===6&&full.runs.length===10,'Incomplete Player matrix');
+assert(correct.runs.every(r=>r.nativeTypeEnumeration===(r.side==='baseline'?192:255)&&
+  r.nativeBaseEnumeration===(r.mode===1?1:0)), 'Native enumeration/publication regression not covered');
 assert(full.runs.filter(r=>!r.negativeControl).every(r=>r.cases===full.reference.summary.total&&r.differences.length===0),'Incomplete positive full regression');
 assert(full.runs.filter(r=>r.negativeControl).length===2,'Missing opt8 negative controls');
 assert(native.selectionEnabledCompile&&native.selectionDisabledCompile&&native.ordinaryNativeCtest&&!native.surrogateExternalHeadersUsed,'Incomplete Unity2022 native gates');
