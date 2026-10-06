@@ -1,5 +1,7 @@
 # Unity 2022 启动模式选择：review 修复结果
 
+> 历史报告。原生枚举 P2 的后续修复和当前验收见 [最新修复结果](AOT-Mode-Native-Enumeration-Fix.md)；本文保留当时身份与结论。
+
 > 后续 review 新确认一项 opt8 已存在的原生类型枚举 P2；本报告中的旧两项修复仍有效，
 > 定版结论以 [后续 review](AOT-Mode-Followup-Review-20261006.md) 和最新 candidate lock 为准。
 

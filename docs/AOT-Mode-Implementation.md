@@ -4,8 +4,9 @@
 使用 Windows IL2CPP 验证。Android/WebGL/iOS 共用库接口，没有增加平台启动器；其 Player 资格另行记录。
 Unity 2021 和团结不属于本轮实施或发布前置范围。
 
-当前修复和证据见 [review 修复结果](AOT-Mode-Review-Fixes-Result.md)。本文 ar5 的性能数字属于历史
-runtime 643c4d5，不作为修复后的 da9403a 结果；新身份使用 ar6 报告。本轮只准备版本，不执行发布。
+当前修复和证据见 [原生枚举修复及最终验收](AOT-Mode-Native-Enumeration-Fix.md)。当前身份为
+HybridCLR 552bc0b、Unity 2022 IL2CPP 135f18f、package da9eac3，使用 ar11 报告。本文 ar5 数字
+属于历史 runtime 643c4d5，不能作为当前结果。本轮只准备版本，不执行发布。
 
 ## 项目接入
 

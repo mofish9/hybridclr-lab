@@ -1,5 +1,7 @@
 # Unity 2022 启动选择：后续 review
 
+> 历史报告。原生枚举 P2 的后续修复和当前验收见 [最新修复结果](AOT-Mode-Native-Enumeration-Fix.md)；本文保留当时身份与结论。
+
 审查身份：HybridCLR `da9403a8c0f6421cd9afa45fdb234c867e0dac9f`、Unity 2022 il2cpp_plus
 `124f90294beb45a3c4cba8a525ac2488f82170f8`、package `da9eac383cd953aab58ad0a8c7d851db5e0a36dc`。
 检查已提交实现；本轮不改运行时、不发布。

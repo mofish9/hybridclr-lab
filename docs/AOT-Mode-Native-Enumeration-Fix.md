@@ -1,5 +1,69 @@
 # Unity 2022 原生类型枚举修复边界
 
+当前候选：HybridCLR `552bc0b549bbcbad223f22fbfb029b83c46e152f`、Unity 2022 il2cpp_plus
+`135f18fd5a26906e7800e0c4313826eaf2a7756c`、package `da9eac383cd953aab58ad0a8c7d851db5e0a36dc`。
+ar11 已通过真实 headers 的选择开/关编译及 CTest、6 组启动回归、8 组各 220 项完整回归和
+真实 Player 场景拒绝检查，最终严格性能及内存门禁也已通过。下文 ar7–ar10 为保留的失败历史。
+
+## ar11 最终验收与当前准备结论
+
+原生类型枚举 P2 已修复。当前候选已通过 Unity 2022 / Windows IL2CPP 的既定功能、性能和内存门禁，
+可作本地版本准备；Android/WebGL/iOS 尚未取得 Player 资格。不代表已经发布。
+
+精确 runtime/package 身份见本文开头及 candidate lock。产物、原始逐进程日志和 SHA 锁定位于 E:/hclr/ar11。
+83 个 hook 重新生成后 7 个文件逐字节不变；最终 Player 反汇编确认 ShouldDispatchToInterpreter
+不再调用公开 IsChangedMethod，仍保留原泛型/未缓存判定和 ABI 校验。
+
+| 组别 | 指标 | P50 变化 | P95 变化 | P99 变化 |
+|---|---|---:|---:|---:|
+| dhe | BenchNative | -66.95% | -68.32% | -69.24% |
+| dhe | BenchChanged | -0.20% | -0.20% | -2.30% |
+| dhe | BenchVirtual | -0.07% | -0.49% | -0.14% |
+| dhe | processToEntry | -0.85% | -0.48% | 3.07% |
+| dhe | privateBytes | 0.01% | -0.01% | -0.03% |
+| fixed | BenchNative | -69.68% | -70.77% | -70.84% |
+| fixed | BenchChanged | -0.19% | -0.20% | -16.59% |
+| fixed | BenchVirtual | -0.52% | 0.39% | 0.15% |
+| fixed | processToEntry | -0.64% | 0.73% | -10.52% |
+| fixed | privateBytes | 0.01% | -0.01% | -0.02% |
+| legacy | BenchNative | -3.27% | -1.46% | -2.96% |
+| legacy | BenchChanged | -1.93% | -0.10% | -1.96% |
+| legacy | BenchVirtual | 2.23% | -6.32% | 3.35% |
+| legacy | processToEntry | 13.35% | 10.15% | 6.38% |
+| legacy | privateBytes | 3.09% | 3.09% | 3.08% |
+
+以上为该 fixture 的耗时/内存变化，负值表示降低，不是整个游戏的收益。
+DHE 与 fixed 各 400 对，legacy 200 对；各组不同数值 PID（baseline/candidate）：
+dhe 394/395；fixed 395/398；legacy 200/200。
+所有启动记录、PID 复用与离群样本均保留；每组不同 PID 超过 100。原门限和检查器未修改。
+解释兜底沿用用户接受的额外成本：processToEntry P50 增加
+14.95 ms，虚调用微基准 P50
+2.23%，private bytes P50 增加
+3.98 MiB。
+
+当前身份验证：选择开/关真实 headers compile + CTest、6 组启动（含 12 线程枚举）、8 组各
+220/220 完整回归且差异 0、真实 Player 场景拒绝均通过；opt8 两个已知负对照保持准确失败。
+package 9 项资产/7 项依赖验证沿用不变 da9eac3 的 ar5 证据；检查器 12 项正反测试复用不变脚本的 ar7 证据。
+opt8/opt3 对照 Player 复用 ar7 的精确二进制身份，本轮重新采样；测试 probe 统一重建。
+功能 probe 不在 benchmark 场景执行；生产无新增计数、解释器循环模式分支或平台启动代码。
+
+本轮 review 未确认剩余 P0/P1/P2；只对检查和测试的边界作此结论。枚举缓存完整构建后在 metadata 锁下
+插入，以稳定 map 节点承载进程期不可变 vector；token 位图沿用原 release/acquire 快照发布。
+每个被枚举程序集额外保存类型指针列表，每个发布快照新增 64 位字段。未用 Windows 数据推断 ARM64 内存序资格。
+正常执行的性能门禁不测首次原生枚举成本；其首次操作需构建整个列表，后续索引查询不重建列表。
+
+相对 da9403a 的 HybridCLR 最终净变更：
+
+```text
+hybridclr/DheRuntime.cpp | 18 +++++++++++++++---
+ 1 file changed, 15 insertions(+), 3 deletions(-)
+```
+
+正式维护线只允许 fast-forward 到同一已测 commit；这是精确身份复用，不声称合入后重跑了 Player。
+最终维护线、证据哈希和状态见 manifests/aot-mode-opt9-candidate-lock.json。
+源码整体回滚恢复 opt8 三仓组合并重建 Base；运营降级由项目保存 Interpreter 并重启。
+本次未创建标签、推送、查询远端或切换 installer 清单；既有 FGS/opt3 stash 保留，无新增 stash。
+
 场景：原生插件使用 il2cpp_image_get_class_count/get_class 遍历 Current 程序集。
 目标：新增类型可见、删除类型不可见、count/index 一致；选择前和 Current 发布前不缓存最终列表。
 范围仅 Unity 2022；项目配置、模式选择、解释循环和内部 metadata token/index 语义不变。
@@ -23,17 +87,14 @@ DHE 同时覆盖。旧 opt8 作为原生枚举负对照，保留其缺陷，不�
 Unity 2022 il2cpp_plus 提交 `135f18fd5a26906e7800e0c4313826eaf2a7756c`：3 个文件，
 50 行新增、2 行删除。`il2cpp-api.cpp` 将两个公开接口接到 `Image::GetPublicTypeCount/GetPublicType`；
 `Image.cpp` 增加按程序集缓存的逻辑视图，`Image.h` 声明这两个内部实现入口。
-HybridCLR 保持 `da9403a8c0f6421cd9afa45fdb234c867e0dac9f`，package 保持
-`da9eac383cd953aab58ad0a8c7d851db5e0a36dc`，均没有新增改动。
-
-上述是首轮 ar7 的身份。其功能关闭路径 native 性能门禁失败后，第二轮增加 HybridCLR
-`4dc14f5` 的 guard 空目标快速返回，最终身份和验收以本文末尾及 candidate lock 为准。
+HybridCLR 最终候选 `552bc0b` 相对原 `da9403a` 增加不可变 token 位图预筛，以及共享判定函数的
+内联；package 仍为 `da9eac3`。此前实验性的额外空目标分支已撤销。各轮失败与修订见后文。
 
 后续每个 index 只做现有 DHE 身份查询、锁内缓存查找和 vector 索引，不重复遍历类型或分配列表。
 首次枚举会构造整个可见列表，因此 count 本身不再是纯字段读取；完整一次遍历的类型工作为线性，
 缓存查找随被查询程序集数为对数复杂度。未向解释器执行循环、模式选择或普通托管反射加入新缓存。
 
-## 新身份验证
+## ar7 首轮验证（历史）
 
 原始产物位于 `E:/hclr/ar7`，原 ar6（含失败复现）保持不变。Hotfix fixture 新增 Base-only
 RemovedType/RemovedNested 和 Current-only Nested/AddedGeneric，用相同 Current DLL/bundles 跑各对照。
