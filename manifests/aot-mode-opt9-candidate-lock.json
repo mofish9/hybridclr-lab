@@ -56,7 +56,7 @@
   },
   "windowsCorrectnessPassed": true,
   "windowsPerformancePassed": true,
-  "sourceCandidateReady": true,
+  "sourceCandidateReady": false,
   "formalMaintenanceGatePending": false,
   "releaseReady": false,
   "androidPlayerVerified": false,
@@ -103,13 +103,20 @@
     "reason": "Existing CMake cache recorded the candidate lab path. Reconfigured into a new build directory; both actual compile/CTest gates then passed.",
     "log": "E:/hclr/ar5/candidate/native-1-configure.log"
   },
-  "versionPreparationComplete": true,
+  "versionPreparationComplete": false,
   "preparationScope": "Unity2022 source candidate, Windows IL2CPP validation, implementation/review/rollback documentation. Android/WebGL/iOS qualification remains explicitly unverified.",
   "publicationRequested": false,
-  "preparationBlockers": [],
+  "preparationBlockers": [
+    "P1 public Unity image alias: fixed in candidate da9403a, new Player/native/resource gates pending",
+    "P2 incomplete metrics acceptance: fixed and 12 regression cases passed; final evidence freeze pending"
+  ],
   "futurePublicationSteps": [
     "Create and publish immutable Unity2022-only opt9 runtime tags after rechecking remote refs",
     "After remote tag verification update only the Unity2022 package manifest and record its final commit/tree",
     "Publish package maintenance branch and lab release lock"
-  ]
+  ],
+  "latestReview": {
+    "report": "C:/hybridclr_optimize/lab/artifacts/review-aot-mode-20261006/Review.md",
+    "supersedesPriorReadiness": true
+  }
 }
