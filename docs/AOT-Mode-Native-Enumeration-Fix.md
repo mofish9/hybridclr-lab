@@ -108,3 +108,11 @@ ar9 的功能/并发/完整回归通过；正常 DHE 性能通过，native P50 -
 ar10 使用 HybridCLR `d6443bd`：移除此前 `4dc14f5` 的空目标快返实验，非空虚调用恢复原分支；
 保留 `906bed5` 的 token 预筛。相对原 da9403a，最终 runtime 净改动为 7 行新增、1 行删除。
 为复核尾部指标，正常 DHE/功能关闭各使用 400 对，解释兜底使用 200 对，不改门限且保留全部样本。
+
+ar10 功能/并发/完整回归及功能关闭性能通过；正常 DHE 的 virtual P50/P95 为 +8.10%/+7.68%，
+整体仍失败。ar10/performance-acceptance.json 保留全部失败与样本，没有作为准备完成证据。
+
+ar11 的 HybridCLR `552bc0b` 将原 IsChangedMethod 判定完整提取为内部 IsChangedMethodFast，
+公开 IsChangedMethod 与 DHE entry guard 共用它；使用已有 IL2CPP_FORCE_INLINE 消除 guard 到判定
+的一层调用。原 null、发布身份、泛型和 thread cache 判断保持原样，ABI 校验仍在原位置。
+不增加额外的 null 分支，也不修改生成器、hook 接口或模式选择。继续沿用 400/400/200 对门禁。
