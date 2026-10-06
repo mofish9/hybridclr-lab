@@ -8,6 +8,7 @@ const read=p=>fs.readFileSync(path.join(root,p),'utf8').replaceAll('\r\n','\n');
 const write=(p,s)=>fs.writeFileSync(path.join(root,p),s);
 const split=s=>{let depth=0,start=0,out=[];for(let n=0;n<s.length;n++){if(s[n]==='<')depth++;if(s[n]==='>')depth--;if(s[n]===','&&!depth){out.push(s.slice(start,n).trim());start=n+1;}} if(s.trim())out.push(s.slice(start).trim());return out;};
 const metadataValues={
+  ResolveDheTypeHandleClass:'klass',
   GetUnderlyingInterpreterImage:'LegacyInterpreterImage(methodInfo)',GetInterpreterResolveImage:'LegacyInterpreterImage(methodInfo)',
   GetDheMethodMetadataImage:'method->klass->image',GetDheCurrentMethodMetadata:'method',GetDheClassInitializationOwner:'klass',GetDheReferenceAllocationClass:'klass',
   GetDheExecutionClass:'klass',GetDhePublicReferenceType:'type',ResolveDheReferenceInstanceField:'const_cast<FieldInfo*>(field)',ResolveDheSupplementalField:'field',

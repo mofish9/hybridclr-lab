@@ -60,6 +60,20 @@ add_library(hybridclr_metadata_compile_gate OBJECT
 )
 add_dependencies(hybridclr_native_tests hybridclr_metadata_compile_gate)
 
+if (EXISTS "${HYBRIDCLR_TEST_SOURCE_ROOT}/AotModeHooks.cpp")
+    set(HYBRIDCLR_TEST_AOT_SELECTION 0 CACHE BOOL "Compile the optional AOT startup binding")
+    target_compile_definitions(hybridclr_metadata_compile_gate PRIVATE HYBRIDCLR_ENABLE_AOT_SELECTION=$<BOOL:${HYBRIDCLR_TEST_AOT_SELECTION}>)
+    target_sources(hybridclr_metadata_compile_gate PRIVATE
+        "${HYBRIDCLR_TEST_SOURCE_ROOT}/AotMode.cpp"
+        "${HYBRIDCLR_TEST_SOURCE_ROOT}/AotModeHooks.cpp"
+        "${HYBRIDCLR_TEST_SOURCE_ROOT}/DheRuntime.cpp"
+        "${HYBRIDCLR_TEST_SOURCE_ROOT}/metadata/MetadataModule.cpp"
+        "${HYBRIDCLR_TEST_SOURCE_ROOT}/metadata/Assembly.cpp"
+        "${HYBRIDCLR_RUNTIME_ROOT}/vm/GlobalMetadata.cpp"
+        "${HYBRIDCLR_RUNTIME_ROOT}/icalls/mscorlib/System/Array.cpp"
+    )
+endif()
+
 function(configure_hybridclr_target target)
     target_compile_features(${target} PRIVATE cxx_std_17)
     target_compile_definitions(${target} PRIVATE

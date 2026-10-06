@@ -17,6 +17,15 @@
 #include "hybridclr/metadata/MetadataUtil.h"
 #include "native_test_hooks.h"
 
+// This executable exercises ordinary FGS/metadata units with fake MethodInfo
+// objects. Real startup binding and DHE dispatch are tested in the Player.
+#if defined(HYBRIDCLR_DHE_HAS_CURRENT_EXECUTION)
+namespace hybridclr { namespace dhe {
+    bool IsDheAssembly(const Il2CppAssembly*) { return false; }
+    bool IsChangedMethod(const MethodInfo*) { return false; }
+}}
+#endif
+
 #if defined(_WIN32)
 #ifndef WIN32_LEAN_AND_MEAN
 #define WIN32_LEAN_AND_MEAN
