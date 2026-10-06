@@ -1,0 +1,12 @@
+{
+  "result": {
+    "passes": 7,
+    "staticReferenceRejected": true,
+    "observedCounterexampleRejected": true,
+    "hotfixToHotfixAllowed": true,
+    "unsafeUnityRegistrationsRejected": 3
+  },
+  "packageCommit": "4b706f5ae3cc2fbb332b4739feae0a5b6a07fd67",
+  "fixtureSha256": "34e779adef73b52fdcd0976083a875094aeb7d51f4e598236d399ef17d1a5546",
+  "validatorSha256": "283f7b6cf08d3a15b90d89bedf7a2aa1d2ba7f95ea98121d1a8b9abf3994efc9"
+}

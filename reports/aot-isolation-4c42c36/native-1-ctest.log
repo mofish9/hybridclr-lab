@@ -1,0 +1,8 @@
+Internal ctest changing into directory: C:/hybridclr_optimize/worktrees/lab-aot-select-v1/artifacts/as4/native-1
+Test project C:/hybridclr_optimize/worktrees/lab-aot-select-v1/artifacts/as4/native-1
+    Start 1: hybridclr_native_tests
+1/1 Test #1: hybridclr_native_tests ...........   Passed    0.03 sec
+
+100% tests passed, 0 tests failed out of 1
+
+Total Test time (real) =   0.14 sec
