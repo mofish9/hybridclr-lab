@@ -19,13 +19,13 @@ class Program
         try { AotModeDependencyValidator.Validate(new[]{positive,consumer},deferred); }
         catch(InvalidOperationException error) { rejected=error.Message.Contains("StartupConsumer")&&error.Message.Contains("StartupHotfix"); }
         if(!rejected)throw new Exception("Static AOT reference was accepted.");
-        // Genuine IL compiler output from the previous counterexample, not a mock.
-        var previous=Path.Combine(root,"projects/DHE/Library/Bee/PlayerScriptAssemblies/Assembly-CSharp.dll");
+        // Compile the startup typeof counterexample independently of Unity's disposable cache.
+        var previous=args[1];
         bool oldRejected=false;
         try { AotModeDependencyValidator.Validate(new[]{positive,previous},deferred); }
         catch(InvalidOperationException error) { oldRejected=error.Message.Contains("Assembly-CSharp"); }
         if(!oldRejected)throw new Exception("The observed static-reference counterexample was accepted.");
-        foreach(string unsafeAssembly in args.Skip(1))
+        foreach(string unsafeAssembly in args.Skip(2))
         {
             if(!unsafeAssembly.Contains("CALLBACK")) {
                 AotModeDependencyValidator.Validate(new[]{unsafeAssembly},deferred);
@@ -36,6 +36,6 @@ class Program
             catch(InvalidOperationException error) { unsafeRejected=error.Message.Contains("deferred"); }
             if(!unsafeRejected)throw new Exception("Unsafe Unity registration was accepted: "+unsafeAssembly);
         }
-        Console.WriteLine(JsonSerializer.Serialize(new {passes=4+args.Length-1,staticReferenceRejected=rejected,observedCounterexampleRejected=oldRejected,hotfixToHotfixAllowed=true,dynamicUnityTypesAllowed=true,automaticStartupCallbackRejected=true}));
+        Console.WriteLine(JsonSerializer.Serialize(new {passes=4+args.Length-2,staticReferenceRejected=rejected,startupTypeTokenRejected=oldRejected,hotfixToHotfixAllowed=true,dynamicUnityTypesAllowed=true,automaticStartupCallbackRejected=true}));
     }
 }
