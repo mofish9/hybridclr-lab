@@ -1,5 +1,9 @@
 # Unity 2022 opt9 发布前 review
 
+> 历史记录：本文属于 ar5 / HybridCLR 643c4d5，原“准备完成”结论已被后续全面 review 撤回。
+> 两项新增问题的修复、新身份验证和当前结论见 [review 修复结果](AOT-Mode-Review-Fixes-Result.md)
+> 及 `manifests/aot-mode-opt9-candidate-lock.json`。下文数字和提交只作历史参考。
+
 范围仅为 Unity 2022；固定上游为 HybridCLR/package 8.13.0、il2cpp_plus v2022-8.11.0。
 Unity 2021 和团结既不实施，也不作为本轮发布前置条件。Windows IL2CPP 是已具备的 Player 验证环境。
 

@@ -4,10 +4,14 @@
 使用 Windows IL2CPP 验证。Android/WebGL/iOS 共用库接口，没有增加平台启动器；其 Player 资格另行记录。
 Unity 2021 和团结不属于本轮实施或发布前置范围。
 
+当前修复和证据见 [review 修复结果](AOT-Mode-Review-Fixes-Result.md)。本文 ar5 的性能数字属于历史
+runtime 643c4d5，不作为修复后的 da9403a 结果；新身份使用 ar6 报告。本轮只准备版本，不执行发布。
+
 ## 项目接入
 
 1. 构建 Base 时启用 enableAotModeSelection，将需要延期注册的 DHE 热更程序集列入配置。
 2. 使用项目已有普通 AOT 启动代码读取本地/远程配置，在任何热更程序集加载、查询或业务线程启动前调用 SelectExecutionMode。
+   补充 AOT metadata 的 LoadMetadataForAOTAssembly 也必须在选择之后，因为 SUPERSET 的实现由该选择确定。
 3. 成功选择 DHE 后走已有 DHE loader；选择 Interpreter 后用普通 Assembly.Load(Current DLL)。
    两条路径使用同一份兼容 Current DLL 和资源；原 HybridCLR 需要的桥接及补充 AOT metadata 仍须具备。
 4. GetExecutionMode 查询本次选择。后续 Select 返回 AlreadySelected，进程中不能卸载再切换。
@@ -28,6 +32,7 @@ Unity 原生资源系统会在 AOT 启动入口之前缓存程序集 image，所
 image 作为 Unity API 的稳定句柄。此时它不包含 Base 类型，managed 查询仍隐藏 deferred Base。
 DHE 选择把 Base 的 image 视图绑定到该占位对象；解释模式由原 Assembly.Load 填入 Current。
 Unity 的 assembly/class image 查询统一返回这一稳定句柄，内部 DHE 元数据仍使用原 canonical Base。
+supplemental 查询同时识别这个确切的公开别名，避免新增类型查找丢失；隐藏的 Current image 不获得 Base overlay 语义。
 该边界由 Unity 2022 的 IL2CPP API 接入处理，不引入平台启动逻辑。
 
 执行指令循环没有新增模式分支。已有 DHE 扩展入口使用同一张选定表，热点仍有原子读取和间接调用，
@@ -67,7 +72,7 @@ direct guard 优化后的正常 DHE 使用完整 400 对独立启动样本验收
 这些都是该 Windows fixture 的测量，不是整个游戏的收益声明。
 
 用户明确接受解释兜底的额外成本，正常 DHE 和功能关闭路径仍使用原数值门限。
-最终两路 Player 中的解释模式相对独立 opt3，100 对测量的进程到入口 P50 增加 13.98 ms，
+该历史两路 Player 中的解释模式相对独立 opt3，100 对测量的进程到入口 P50 增加 13.98 ms，
 虚调用微基准 P50 增加 12.59%，private bytes P50 增加约 3.97 MiB。完整正确性仍须通过。
 
 采样器曾因 Windows 复用已退出进程的数值 PID，在完成 300 对后拒绝生成汇总。
@@ -75,8 +80,8 @@ direct guard 优化后的正常 DHE 使用完整 400 对独立启动样本验收
 398/395 个不同 PID，均超过 100 的最低门槛。恢复报告明确披露旧采样器没有父进程启动时间戳。
 新采样器交叉核对父子 PID 并记录每次启动/退出时间；不因数值 PID 重用而丢弃任何性能样本。
 
-源码按 runtime、Unity 2022 hook、package、lab 独立提交。完成当前身份门禁后合入对应正式维护线，
-发布 runtime annotated tags，再更新 package 的 Unity 2022 清单与 lab lock；package 不打 opt tag。
+源码按 runtime、Unity 2022 hook、package、lab 独立提交。完成当前身份门禁后合入本地对应维护线。
+只有用户后续决定发布时，才创建/发布 runtime annotated tags，再更新 package 的 Unity 2022 清单与 lab lock；package 不打 opt tag。
 不更新本轮未实现的引擎条目。
 
 业务回滚是保存下一启动 Interpreter 并重启，不能回滚共享解释器/IL2CPP 本身的缺陷。
