@@ -57,6 +57,8 @@ for (const [side, profile, mode] of profiles) {
       assert(child.status===0 && fs.existsSync(report), `Player failure (${child.status}): ${child.error||''}`);
       const result=read(report);
       assert(result.passed && result.differential===0 && result.bundleResult===1298 && result.nativeTypeLookup===63, 'Startup/Bundle/native type regression: '+result.error);
+      assert(result.nativeTypeEnumeration===(side==='baseline'?192:255), 'Native enumeration regression');
+      assert(result.nativeBaseEnumeration===(mode==='dhe'?1:0), 'Pre-publication native enumeration regression');
       assert(result.mode===(mode==='dhe'?1:2), 'Wrong mode');
       const observations=new Map();
       for (const line of result.regressionRecords) {

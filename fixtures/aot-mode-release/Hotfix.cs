@@ -68,6 +68,9 @@ namespace StartupHotfix
 #endif
     }
 #if CURRENT_PAYLOAD
-    public class AddedType { public int Value = 27; }
+    public class AddedType { public int Value = 27; public class Nested { } }
+    public class AddedGeneric<T> { }
+#else
+    public class RemovedType { public class RemovedNested { } }
 #endif
 }

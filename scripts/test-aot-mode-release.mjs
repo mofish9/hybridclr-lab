@@ -51,6 +51,10 @@ function run(side, profile, mode, scenario, index) {
   assert(!result.diagnostics && result.unityResult === 236 && result.identityMatches, `Production/Unity boundary failed: ${name}`);
   if (scenario !== 'benchmark') assert(result.duplicateSupplemental === 5, `Wrong duplicate-metadata result: ${name}`);
   if (scenario !== 'benchmark') assert(result.bundleResult === 1298 && result.nativeTypeLookup === 63, `Bundle serialization/native Current type lookup failed: ${name}`);
+  if (scenario !== 'benchmark') {
+    assert(result.nativeTypeEnumeration === (side === 'baseline' ? 192 : 255), `Native enumeration failed: ${name}`);
+    assert(result.nativeBaseEnumeration === (result.mode === 1 ? 1 : 0), `Pre-publication enumeration failed: ${name}`);
+  }
   if (side === 'candidate' && profile === 'DHE' && scenario !== 'benchmark' && result.mode === 1)
     assert(result.rejectedLoadAttempts === 512, `Rejected loads exhausted metadata indices: ${name}`);
   if (scenario === 'concurrent') assert(result.concurrentSuccesses === 1 && result.concurrentResults.filter(n=>n===1).length === 11, 'Concurrent selection failed');

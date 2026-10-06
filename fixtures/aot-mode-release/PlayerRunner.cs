@@ -19,7 +19,7 @@ namespace AotModeRelease
             public string format="hybridclr.aot-mode.release.v1", scenario, error, currentSha256, consumerSha256, unitySha256, supportSha256;
             public int pid, mode, before, after, selected, repeated, invalid, concurrentSuccesses, supplemental, duplicateSupplemental;
             public int caseCount, differential, unityResult, visibleBefore, visibleAfter, rejectedLoadAttempts, bundleResult;
-            public uint nativeTypeLookup;
+            public uint nativeTypeLookup, nativeTypeEnumeration, nativeBaseEnumeration;
             public bool passed, diagnostics, prematureRejected, wrongLoaderRejected, identityMatches, changed, unchanged;
             public int[] actual, concurrentResults;
             public double loadMilliseconds, firstEntryMilliseconds, selectionMilliseconds, selectionToEntryMilliseconds, processToEntryMilliseconds;
@@ -31,6 +31,8 @@ namespace AotModeRelease
         static AssetBundle sceneBundle;
         [DllImport("AotImageProbe")]
         static extern uint CheckCurrentTypes(uint phase);
+        [DllImport("AotImageProbe")]
+        static extern uint CheckTypeEnumeration(uint phase);
         // Windows Player fixture only; the library has no platform persistence or launcher code.
         [StructLayout(LayoutKind.Sequential)]
         struct MemoryCounters
@@ -97,6 +99,7 @@ namespace AotModeRelease
 #endif
                 }
                 result.selectionMilliseconds=startupTimer.Elapsed.TotalMilliseconds;
+                if(correctness)result.nativeBaseEnumeration=CheckTypeEnumeration(0);
                 // Exceeds the finite metadata-image index pool. Rejected loads
                 // must leave it available for the legitimate loads below.
                 if (IsCandidate && correctness && result.mode == 1)
@@ -111,6 +114,12 @@ namespace AotModeRelease
                 if(result.supplemental!=0)throw new Exception("Supplemental metadata failed: "+result.supplemental);
                 var loaded=Load(root,"StartupHotfix",dll);
                 var unityLoaded=Load(root,"StartupUnityHotfix",unity);
+                if(correctness) {
+                    var enumerations=Enumerable.Range(0,12).Select(i=>Task.Run(()=>CheckTypeEnumeration(1))).ToArray();
+                    Task.WaitAll(enumerations);
+                    result.nativeTypeEnumeration=enumerations[0].Result;
+                    if(enumerations.Any(t=>t.Result!=result.nativeTypeEnumeration))throw new Exception("Concurrent native enumeration differs");
+                }
                 var consumer=Assembly.Load(other);
                 result.loadMilliseconds=timer.Elapsed.TotalMilliseconds;
                 timer.Restart();
