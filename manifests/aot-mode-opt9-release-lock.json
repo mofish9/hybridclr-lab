@@ -167,7 +167,7 @@
   "knownIssues": [
     {
       "id": "PendingDheImage-Cxx11",
-      "status": "fixed-on-local-maintenance-unreleased",
+      "status": "fixed-on-remote-maintenance-unreleased",
       "affectedTag": "v8.13.0-opt9",
       "platform": "Unity2022.3.62f3 Android ARM64 C++11",
       "fixedCommit": "252100f9decff54f0f0f1a58ca3127f3d6aa291b",
