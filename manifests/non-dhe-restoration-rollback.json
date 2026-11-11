@@ -1,6 +1,6 @@
 {
   "date": "2026-11-11",
-  "scope": "Local maintenance branch restoration only. Runtime tags and remotes are unchanged.",
+  "scope": "Pre-restoration maintenance heads preserved locally and on origin under the recorded archive refs. Active maintenance branches now use non-DHE opt3; historical runtime tags remain unchanged.",
   "refs": [
     {
       "repo": "repos/hybridclr",
@@ -44,5 +44,6 @@
       "before": "e4db5f2e7291be2d151b667aebd681c696e91edd",
       "archive": "archive/dhe-paused-20261111/lab"
     }
-  ]
+  ],
+  "remoteArchivesVerified": true
 }

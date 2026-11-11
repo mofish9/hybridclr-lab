@@ -1,0 +1,94 @@
+{
+  "date": "2026-11-11",
+  "verifiedAtUtc": "2026-11-11T06:31:19.622Z",
+  "scope": "Remote customized maintenance branches; default main branches and historical release tags are unchanged.",
+  "sourceBranchesVerified": true,
+  "runtimeTagsUnchanged": true,
+  "transport": "Git SSH on port 443; strict host verification against GitHub official /meta public keys",
+  "updatesUseExplicitForceWithLease": true,
+  "sources": [
+    {
+      "repo": "repos/hybridclr",
+      "branch": "optimize/v8.13.0",
+      "commit": "f40c6f08ccd0391ad9285276b4cc21ada3a180ab",
+      "tree": "ee1b3f8afe8679d73ce5bf40d1a1fba3ef227bf2",
+      "runtimeTag": "v8.13.0-opt3",
+      "exactOpt3Runtime": true
+    },
+    {
+      "repo": "repos/il2cpp_plus",
+      "branch": "optimize/unity2021-v8.1.0",
+      "commit": "511df62f4aa7cba2bdb505deead48a8d080d582c",
+      "tree": "287931b3b974079abe5bd459d95d4767d258bd4a",
+      "runtimeTag": "v2021-8.1.0-opt3",
+      "exactOpt3Runtime": true
+    },
+    {
+      "repo": "repos/il2cpp_plus",
+      "branch": "optimize/unity2022-v8.11.0",
+      "commit": "bf15337e189ae7da5876aa51c9b896a36c52a155",
+      "tree": "02f877bdb8f82ef886bb2781d3a43fd7d9588d21",
+      "runtimeTag": "v2022-8.11.0-opt3",
+      "exactOpt3Runtime": true
+    },
+    {
+      "repo": "repos/il2cpp_plus",
+      "branch": "optimize/tuanjie-1.10-v8.13.0",
+      "commit": "82162cb681f1564807d2ab5e7f3a9312271d0a73",
+      "tree": "cf769d184ba8da2c08b6ede73d622debd23b2c55",
+      "runtimeTag": "v2022-tuanjie-8.13.0-opt3",
+      "exactOpt3Runtime": true
+    },
+    {
+      "repo": "repos/hybridclr_unity",
+      "branch": "optimize/v8.13.0",
+      "commit": "681976b74e965f948dbf93d90d8c2900a141bb7d",
+      "tree": "a96b263fcb980dd9fae33d936f0287b84eafaae0",
+      "runtimeTag": null,
+      "exactOpt3Runtime": false
+    }
+  ],
+  "package": {
+    "baseCommit": "ac0fdc5c6363a1b6323d017e068c536dd22127dc",
+    "commit": "681976b74e965f948dbf93d90d8c2900a141bb7d",
+    "commitsAfterOpt3": 1,
+    "changedFiles": [
+      "Editor/Installer/InstallerController.cs",
+      "Editor/SettingsUtil.cs"
+    ],
+    "numstat": "3\t2\tEditor/Installer/InstallerController.cs\n32\t1\tEditor/SettingsUtil.cs",
+    "runtimeAndVersionManifestIdenticalToOpt3": true
+  },
+  "archives": [
+    {
+      "repo": "repos/hybridclr",
+      "refs": {
+        "refs/heads/archive/dhe-paused-20261111/hybridclr": "252100f9decff54f0f0f1a58ca3127f3d6aa291b"
+      }
+    },
+    {
+      "repo": "repos/il2cpp_plus",
+      "refs": {
+        "refs/heads/archive/dhe-paused-20261111/il2cpp-tuanjie": "52968ad6c88416f212d09d919b9a1b6afdc8a53b",
+        "refs/heads/archive/dhe-paused-20261111/il2cpp-unapproved-8.14": "658aa64923e568a497e11640b340f316704d02f9",
+        "refs/heads/archive/dhe-paused-20261111/il2cpp-unity2021": "10cbacd02b3ed291af6a6a34d444ae50c85462e0",
+        "refs/heads/archive/dhe-paused-20261111/il2cpp-unity2022": "135f18fd5a26906e7800e0c4313826eaf2a7756c"
+      }
+    },
+    {
+      "repo": "repos/hybridclr_unity",
+      "refs": {
+        "refs/heads/archive/dhe-paused-20261111/package": "4449974800e449b50c3e5cdab32d77e1f51dca78"
+      }
+    },
+    {
+      "repo": "lab",
+      "refs": {
+        "refs/heads/archive/dhe-paused-20261111/lab": "e4db5f2e7291be2d151b667aebd681c696e91edd"
+      }
+    }
+  ],
+  "obsoleteIl2cpp814MaintenanceBranchArchived": true,
+  "labEvidenceBaseCommit": "0ab4701c82e61e43bce2e1b7eb6fe9cfb96bd5e0",
+  "labPublication": "This record is committed and published on optimize/assembly-load-metadata-lab-v8.13.0 after source verification. The final commit is checked against the remote ref after push."
+}

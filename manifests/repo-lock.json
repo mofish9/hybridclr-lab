@@ -70,8 +70,10 @@
     "runtimeSource": "exact opt3",
     "packageCommit": "681976b74e965f948dbf93d90d8c2900a141bb7d",
     "packageTree": "a96b263fcb980dd9fae33d936f0287b84eafaae0",
-    "remotePublication": false,
+    "remotePublication": true,
     "report": "docs/Non-DHE-Opt3-Restoration.md",
-    "rollbackRefs": "manifests/non-dhe-restoration-rollback.json"
+    "rollbackRefs": "manifests/non-dhe-restoration-rollback.json",
+    "remoteVerification": "manifests/non-dhe-remote-publication-20261111.json",
+    "remoteVerifiedAtUtc": "2026-11-11T06:31:19.622Z"
   }
 }
