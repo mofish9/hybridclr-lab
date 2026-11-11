@@ -1,0 +1,112 @@
+{
+  "schemaVersion": 1,
+  "createdAtUtc": "2026-11-11T06:21:25.7265411+00:00",
+  "evidenceScope": "nativeCompatibility",
+  "compatibilityScope": "Metadata",
+  "hybridclrSource": "C:\\hybridclr_optimize\\repos\\hybridclr",
+  "hybridclrCommit": "f40c6f08ccd0391ad9285276b4cc21ada3a180ab",
+  "hybridclrDirty": false,
+  "hybridclrTreeSha256": "D797F07EE19CC5FBEBD2A88F9CD029A8771FADF2950B9C68DDAC87DB99E7D1B9",
+  "passed": true,
+  "surrogateExternalHeadersUsed": false,
+  "mergeReady": true,
+  "workflows": [
+    {
+      "workflow": "Tuanjie2022Fgs",
+      "nativeTestProfile": "Metadata-Tuanjie2022",
+      "fullGenericSharingTests": false,
+      "engine": {
+        "family": "Tuanjie",
+        "version": "1.10.0",
+        "unityVersion": "2022.3.62t12",
+        "unityVersionNumber": 20220362,
+        "tuanjieVersionNumber": 11000,
+        "executablePath": "C:/Program Files/Tuanjie/Hub/Editor/2022.3.62t12/Editor/Tuanjie.exe"
+      },
+      "fullGenericSharing": "required",
+      "productionWorkflow": {
+        "il2cppCodeGeneration": "OptimizeSize",
+        "aotMetadataPackaging": "exclude",
+        "aotMetadataMode": "none"
+      },
+      "hybridclrCommit": "f40c6f08ccd0391ad9285276b4cc21ada3a180ab",
+      "hybridclrDirty": false,
+      "hybridclrTreeSha256": "D797F07EE19CC5FBEBD2A88F9CD029A8771FADF2950B9C68DDAC87DB99E7D1B9",
+      "il2cppPlusCommit": "82162cb681f1564807d2ab5e7f3a9312271d0a73",
+      "il2cppPlusTreeSha256": "70381BFC7139F05012EF36F721F8355331F4C25E6E7BA2A3B7BED5227ED195EE",
+      "stagedRuntimeSha256": "3DB10C6B1EEFA6089ABE48EEA92974F2395BB65951180CC6A1D421DE901735A7",
+      "externalHeaders": {
+        "sourcePath": "C:\\Program Files\\Tuanjie\\Hub\\Editor\\2022.3.62t12\\Editor\\Data\\il2cpp\\external",
+        "surrogate": false,
+        "editorAvailable": true,
+        "explicitlyAllowed": false
+      },
+      "nativeTestsPassed": true
+    },
+    {
+      "workflow": "Unity2022Fgs",
+      "nativeTestProfile": "Metadata-Unity2022",
+      "fullGenericSharingTests": false,
+      "engine": {
+        "family": "Unity",
+        "version": "2022.3.62f3",
+        "unityVersion": "2022.3.62f3",
+        "unityVersionNumber": 20220362,
+        "tuanjieVersionNumber": 0,
+        "executablePath": "C:/Program Files/Unity/Hub/Editor/2022.3.62f3/Editor/Unity.exe",
+        "nativeTestExternalPath": "C:/Program Files/Tuanjie/Hub/Editor/2022.3.62t12/Editor/Data/il2cpp/external"
+      },
+      "fullGenericSharing": "required",
+      "productionWorkflow": {
+        "il2cppCodeGeneration": "OptimizeSize",
+        "aotMetadataPackaging": "exclude",
+        "aotMetadataMode": "none"
+      },
+      "hybridclrCommit": "f40c6f08ccd0391ad9285276b4cc21ada3a180ab",
+      "hybridclrDirty": false,
+      "hybridclrTreeSha256": "D797F07EE19CC5FBEBD2A88F9CD029A8771FADF2950B9C68DDAC87DB99E7D1B9",
+      "il2cppPlusCommit": "bf15337e189ae7da5876aa51c9b896a36c52a155",
+      "il2cppPlusTreeSha256": "87CFDEA3E1EC27C05E2EB09B3259CF1797D1201ECA8BF11B12543D39171CF394",
+      "stagedRuntimeSha256": "F4144BBC4EA06A062264DF06A87AB841A3772E40CCEB60AE204209AC6CFFEFAE",
+      "externalHeaders": {
+        "sourcePath": "C:\\Program Files\\Unity\\Hub\\Editor\\2022.3.62f3\\Editor\\Data\\il2cpp\\external",
+        "surrogate": false,
+        "editorAvailable": true,
+        "explicitlyAllowed": false
+      },
+      "nativeTestsPassed": true
+    },
+    {
+      "workflow": "Unity2021Standard",
+      "nativeTestProfile": "Metadata-Unity2021",
+      "fullGenericSharingTests": false,
+      "engine": {
+        "family": "Unity",
+        "version": "2021.3.45f2",
+        "unityVersion": "2021.3.45f2",
+        "unityVersionNumber": 20210345,
+        "tuanjieVersionNumber": 0,
+        "executablePath": "C:/Program Files/Unity/Hub/Editor/2021.3.45f2/Editor/Unity.exe"
+      },
+      "fullGenericSharing": "disabled",
+      "productionWorkflow": {
+        "il2cppCodeGeneration": "OptimizeSpeed",
+        "aotMetadataPackaging": "include",
+        "aotMetadataMode": "supplemental"
+      },
+      "hybridclrCommit": "f40c6f08ccd0391ad9285276b4cc21ada3a180ab",
+      "hybridclrDirty": false,
+      "hybridclrTreeSha256": "D797F07EE19CC5FBEBD2A88F9CD029A8771FADF2950B9C68DDAC87DB99E7D1B9",
+      "il2cppPlusCommit": "511df62f4aa7cba2bdb505deead48a8d080d582c",
+      "il2cppPlusTreeSha256": "08BCAFBFA3FE1286FC4ED05C483C3DE67A1C9A3215F82DD7F5383EF8AAA4C8BB",
+      "stagedRuntimeSha256": "D9B4930D1B98AE57B802BA4679D8A82EC5E53C177E4A2393D349C8716ACBB4CC",
+      "externalHeaders": {
+        "sourcePath": "C:\\Program Files\\Unity\\Hub\\Editor\\2021.3.45f2\\Editor\\Data\\il2cpp\\external",
+        "surrogate": false,
+        "editorAvailable": true,
+        "explicitlyAllowed": false
+      },
+      "nativeTestsPassed": true
+    }
+  ]
+}

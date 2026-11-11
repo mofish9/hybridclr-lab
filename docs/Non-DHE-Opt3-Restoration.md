@@ -18,4 +18,30 @@ Embedded-NUL conversion and generic-parent vtable repairs are deferred: applying
 
 ## Verification and final identities
 
-Results will be recorded after the source commits and validation complete. No historical result is relabeled as a new run.
+Both Workflow and Metadata native matrices passed on all three engines (six profile builds and CTest runs), with mergeReady=true and surrogateExternalHeadersUsed=false. Unity 2022.3.62f3 compiled the package Editor and Runtime assemblies in a fresh isolated project using the version-suffixed embedded directory. The package runtime execution sources are unchanged from opt3.
+
+Evidence: [verification](../reports/non-dhe-opt3-20261111-verification.json), [Workflow matrix](../reports/non-dhe-opt3-20261111-native-workflow.json), [Metadata matrix](../reports/non-dhe-opt3-20261111-native-metadata.json). The checked test harness is lab commit 999f325; subsequent lab changes only record these results and local status. No Player correctness/differential, performance, PSS or Android device run was performed in this restoration. Historical opt3 measurements are not new results.
+
+| Repository / engine | Active maintenance branch | Commit | Runtime tag |
+|---|---|---|---|
+| repos/hybridclr | optimize/v8.13.0 | f40c6f08ccd0391ad9285276b4cc21ada3a180ab | v8.13.0-opt3 |
+| repos/il2cpp_plus | optimize/unity2021-v8.1.0 | 511df62f4aa7cba2bdb505deead48a8d080d582c | v2021-8.1.0-opt3 |
+| repos/il2cpp_plus | optimize/unity2022-v8.11.0 | bf15337e189ae7da5876aa51c9b896a36c52a155 | v2022-8.11.0-opt3 |
+| repos/il2cpp_plus | optimize/tuanjie-1.10-v8.13.0 | 82162cb681f1564807d2ab5e7f3a9312271d0a73 | v2022-tuanjie-8.13.0-opt3 |
+| repos/hybridclr_unity | optimize/v8.13.0 | 681976b74e965f948dbf93d90d8c2900a141bb7d | None; distribute by commit |
+
+Package tree: a96b263fcb980dd9fae33d936f0287b84eafaae0. Its only delta from ac0fdc5 is two installer files (+35/-3). All three engine entries in Data~/hybridclr_version.json select opt3. No opt4–opt9 runtime commits are ancestors of the active runtime heads. All existing runtime tags are unchanged, and no new tag was created.
+
+## Local workspace state
+
+The three primary source checkouts and lab are clean after the report commit. There are 159 registered worktrees: 9 historical dirty trees and 2 stale registrations whose directories were already missing. The 3 existing FGS/metadata stashes are unchanged. No new stash was needed. The package/lab restoration candidate worktrees were removed after integration; the clean Unity 2021 opt3 checkout remains as the validation manifest's engine input.
+
+The dirty trees and missing paths are listed with their unchanged statuses in [workspace inventory](../manifests/non-dhe-workspace-status-20261111.json). Historical research worktrees, ignored build outputs and releases are retained. They are not active delivery inputs. The unapproved optimize/unity2022-v8.14.0 branch name was moved under archive/dhe-paused-20261111/former-unity2022-v8.14.0; its commit remains recoverable.
+
+No push or remote history rewrite was performed. Remote maintenance branches still require a separate publishing decision; a normal pull/merge of the old remote DHE history would reintroduce the removed implementation. New local package commit 681976b74e965f948dbf93d90d8c2900a141bb7d is not remotely published.
+
+## Exact recovery
+
+[Rollback refs](../manifests/non-dhe-restoration-rollback.json) records every previous maintenance branch head and its archive ref. To recover a previous source combination, first preserve any subsequent edits, then reset each corresponding clean local branch to its recorded before commit (or archive ref). Restore the corresponding lab archive as a unit. Original DHE opt4–opt9 annotated tags remain available. This is a local source recovery, not an in-process mode switch or an instruction to force-push.
+
+The root workspace itself is not a Git repository. Its README now points to this active opt3 state; the previous README is saved at tmp/non-dhe-restoration-20261111/README.before.md. No game-project package or installed Unity runtime was modified.

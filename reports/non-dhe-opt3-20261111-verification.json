@@ -1,0 +1,98 @@
+{
+  "date": "2026-11-11",
+  "scope": "Restored exact opt3 runtime; installer-only package maintenance",
+  "labSourceCommit": "999f3250ba127140f03a54099971cf0a78e5646e",
+  "identityVerification": {
+    "date": "2026-11-11",
+    "passed": true,
+    "runtimes": [
+      {
+        "repo": "repos/hybridclr",
+        "branch": "optimize/v8.13.0",
+        "commit": "f40c6f08ccd0391ad9285276b4cc21ada3a180ab",
+        "tree": "ee1b3f8afe8679d73ce5bf40d1a1fba3ef227bf2",
+        "tag": "v8.13.0-opt3"
+      },
+      {
+        "repo": "repos/il2cpp_plus",
+        "branch": "optimize/unity2021-v8.1.0",
+        "commit": "511df62f4aa7cba2bdb505deead48a8d080d582c",
+        "tree": "287931b3b974079abe5bd459d95d4767d258bd4a",
+        "tag": "v2021-8.1.0-opt3"
+      },
+      {
+        "repo": "repos/il2cpp_plus",
+        "branch": "optimize/unity2022-v8.11.0",
+        "commit": "bf15337e189ae7da5876aa51c9b896a36c52a155",
+        "tree": "02f877bdb8f82ef886bb2781d3a43fd7d9588d21",
+        "tag": "v2022-8.11.0-opt3"
+      },
+      {
+        "repo": "repos/il2cpp_plus",
+        "branch": "optimize/tuanjie-1.10-v8.13.0",
+        "commit": "82162cb681f1564807d2ab5e7f3a9312271d0a73",
+        "tree": "cf769d184ba8da2c08b6ede73d622debd23b2c55",
+        "tag": "v2022-tuanjie-8.13.0-opt3"
+      }
+    ],
+    "package": {
+      "engine": "Unity 2022.3.62f3",
+      "scope": "Package C# Editor/Runtime compilation in an isolated project; no Player build or runtime differential",
+      "commit": "681976b74e965f948dbf93d90d8c2900a141bb7d",
+      "tree": "a96b263fcb980dd9fae33d936f0287b84eafaae0",
+      "directoryName": "com.code-philosophy.hybridclr@8.13.0",
+      "log": "C:/hybridclr_optimize/tmp/non-dhe-restoration-20261111/unity-package-import.log",
+      "logSha256": "9081636f2a820699eb0049aeb7aaedc5bc342048fada4f5b168d63b2b5adac67",
+      "passed": true,
+      "assemblies": [
+        {
+          "name": "HybridCLR.Editor.dll",
+          "sha256": "d14a93cba1145307e57d4fafd6cbf06ca007e127b57e16043e3b3314472b214d"
+        },
+        {
+          "name": "HybridCLR.Runtime.dll",
+          "sha256": "e85eb1a6feab3bc1997d439d2822fb712ab2c3e3dca320b171d9d1bd3d0eb786"
+        }
+      ]
+    },
+    "tagsUnchanged": true,
+    "stashesUnchanged": true,
+    "packageChangedFiles": [
+      "Editor/Installer/InstallerController.cs",
+      "Editor/SettingsUtil.cs"
+    ]
+  },
+  "nativeMatrices": [
+    {
+      "report": "reports/non-dhe-opt3-20261111-native-workflow.json",
+      "sha256": "a36fb02c254130b12794e10cc7f702864acccd312629ca804f8ecf769845faed",
+      "log": "C:/hybridclr_optimize/tmp/non-dhe-restoration-20261111/native-workflow.log",
+      "logSha256": "ff4fda46d96649fac5ad3365b6f23191274230acf0aee347d41257796dac27dd",
+      "profiles": [
+        "Compatibility-Tuanjie2022-Fgs",
+        "Compatibility-Unity2022-Fgs",
+        "Compatibility-Unity2021-Standard"
+      ],
+      "passed": true,
+      "mergeReady": true,
+      "surrogateExternalHeadersUsed": false
+    },
+    {
+      "report": "reports/non-dhe-opt3-20261111-native-metadata.json",
+      "sha256": "dc55b7144362fec9830c23a80234dfb7508aa9e27e550f0a76bad9dbc3792f5f",
+      "log": "C:/hybridclr_optimize/tmp/non-dhe-restoration-20261111/native-metadata.log",
+      "logSha256": "160b1142358587f26ef5046800197da3f4760c5be9c1c3a170e836a0a2e17d7f",
+      "profiles": [
+        "Metadata-Tuanjie2022",
+        "Metadata-Unity2022",
+        "Metadata-Unity2021"
+      ],
+      "passed": true,
+      "mergeReady": true,
+      "surrogateExternalHeadersUsed": false
+    }
+  ],
+  "playerDifferential": "Not rerun; historical results remain bound to their original source/build identities.",
+  "performanceAndMemory": "No new measurements or claims; opt3 ARM64 and exact-identity release gates remain pending.",
+  "remotePublication": false
+}

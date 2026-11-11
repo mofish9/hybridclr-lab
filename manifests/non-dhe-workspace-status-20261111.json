@@ -1,0 +1,282 @@
+{
+  "date": "2026-11-11",
+  "registeredWorktrees": 159,
+  "missingWorktrees": 2,
+  "dirtyHistoricalWorktrees": 9,
+  "originalDirtyStatusesUnchanged": true,
+  "stashCount": 3,
+  "repositories": [
+    {
+      "repo": "repos/hybridclr",
+      "worktrees": 28,
+      "stashes": [
+        "stash@{0}: On research/full-generic-sharing-v8.13.0: archive research FGS prototype before formal isolation 2026-08-25"
+      ]
+    },
+    {
+      "repo": "repos/il2cpp_plus",
+      "worktrees": 37,
+      "stashes": [
+        "stash@{0}: On optimize/tuanjie-1.10-v8.13.0: pre-opt3 local lazy metadata hook 2026-08-28",
+        "stash@{1}: On research/full-generic-sharing-v8.13.0: archive research FGS IL2CPP field before formal isolation 2026-08-25"
+      ]
+    },
+    {
+      "repo": "repos/hybridclr_unity",
+      "worktrees": 39,
+      "stashes": []
+    },
+    {
+      "repo": "lab",
+      "worktrees": 55,
+      "stashes": []
+    }
+  ],
+  "historicalWorktrees": [
+    {
+      "repo": "repos/hybridclr",
+      "path": "C:/hybridclr_optimize/worktrees/dhe-experiment-hybridclr",
+      "head": "ae21c37ee25992c4c62c77acffaf74b59f4461a3",
+      "branch": "refs/heads/research/dhe-lite-v8.13.0",
+      "missing": false,
+      "changes": [
+        " A hybridclr/DheRuntime.cpp",
+        " A hybridclr/DheRuntime.h",
+        " M hybridclr/Il2CppCompatibleDef.h",
+        " M hybridclr/RuntimeApi.cpp",
+        " M hybridclr/RuntimeApi.h",
+        " M hybridclr/interpreter/InterpreterModule.cpp",
+        " M hybridclr/metadata/Assembly.cpp",
+        " M hybridclr/metadata/Assembly.h",
+        " M hybridclr/metadata/MetadataModule.h",
+        " M hybridclr/metadata/RawImageBase.h",
+        " M hybridclr/transform/TransformContext.cpp"
+      ]
+    },
+    {
+      "repo": "repos/hybridclr",
+      "path": "C:/hybridclr_optimize/worktrees/hybridclr-clean-v8.13.0",
+      "head": "b33f823982c52587f6c0c909227b2347c88764ff",
+      "branch": null,
+      "missing": false,
+      "changes": [
+        " M hybridclr/metadata/InterpreterImage.cpp"
+      ]
+    },
+    {
+      "repo": "repos/hybridclr",
+      "path": "C:/hybridclr_optimize/worktrees/hybridclr-fgs-compatibility-v8.13.0",
+      "head": "ae21c37ee25992c4c62c77acffaf74b59f4461a3",
+      "branch": "refs/heads/feature/fgs-compatibility-v8.13.0",
+      "missing": false,
+      "changes": [
+        " M hybridclr/RuntimeApi.cpp",
+        " M hybridclr/RuntimeApi.h",
+        " M hybridclr/interpreter/InterpreterModule.cpp",
+        " M hybridclr/interpreter/InterpreterModule.h"
+      ]
+    },
+    {
+      "repo": "repos/hybridclr",
+      "path": "C:/hybridclr_optimize/worktrees/hybridclr-interpreter-next-v8.13.0",
+      "head": "ec8eb1a9d57c058b0f600af22bd541dc111e293d",
+      "branch": "refs/heads/optimize/interpreter-next-v8.13.0",
+      "missing": false,
+      "changes": [
+        " M hybridclr/interpreter/Instruction.h",
+        " M hybridclr/interpreter/Interpreter_Execute.cpp",
+        " M hybridclr/transform/TransformContext.cpp",
+        " M hybridclr/transform/TransformContext.h"
+      ]
+    },
+    {
+      "repo": "repos/il2cpp_plus",
+      "path": "C:/hybridclr_optimize/worktrees/il2cpp-plus-metadata-tuanjie-lazyonly-v8.13.0",
+      "head": "88372a7f1f58802d16df7c146803d2cd6285d504",
+      "branch": null,
+      "missing": false,
+      "changes": [
+        " M libil2cpp/vm/Class.cpp",
+        " M libil2cpp/vm/MetadataCache.cpp"
+      ]
+    },
+    {
+      "repo": "repos/il2cpp_plus",
+      "path": "C:/hybridclr_optimize/worktrees/il2cpp-plus-metadata-unity2021-v8.1.0/worktrees/il2cpp-plus-metadata-unity2021-lazyonly-v8.1.0",
+      "head": "10cbacd02b3ed291af6a6a34d444ae50c85462e0",
+      "branch": null,
+      "missing": false,
+      "changes": [
+        " M libil2cpp/vm/Class.cpp"
+      ]
+    },
+    {
+      "repo": "repos/hybridclr_unity",
+      "path": "C:/hybridclr_optimize/staging/dhe-package-patch-proof-fbb-v1",
+      "head": "f464ef7cc331645d8774b648e3d34797ebf2c6ff",
+      "branch": null,
+      "missing": true,
+      "changes": []
+    },
+    {
+      "repo": "repos/hybridclr_unity",
+      "path": "C:/hybridclr_optimize/tmp/package-b288",
+      "head": "b288f2f33ad9dc25e05a3fdb10f5f405cd8ada64",
+      "branch": null,
+      "missing": true,
+      "changes": []
+    },
+    {
+      "repo": "repos/hybridclr_unity",
+      "path": "C:/hybridclr_optimize/worktrees/dhe-experiment-hybridclr_unity",
+      "head": "29aaaba58a44f0c0446e113807847f3ffa6fc8f9",
+      "branch": "refs/heads/research/dhe-lite-package-v8.13.0",
+      "missing": false,
+      "changes": [
+        " M Runtime/LoadImageErrorCode.cs",
+        " M Runtime/RuntimeApi.cs"
+      ]
+    },
+    {
+      "repo": "repos/hybridclr_unity",
+      "path": "C:/hybridclr_optimize/worktrees/hybridclr-unity-dhe-cross-target-patch-proof",
+      "head": "623073baafd5a1d12ea46df8145de9fddc899fac",
+      "branch": null,
+      "missing": false,
+      "changes": [
+        " M Data~/hybridclr_version.json",
+        " M Documentation~/dhe-project-integration.md",
+        " M Editor/Commands/CompileDllCommand.cs",
+        " M Editor/Commands/DheBuildPipeline.cs",
+        " M Editor/Commands/DheProjectBuildSupport.cs",
+        " M Editor/Commands/DheProjectResourceSupport.cs",
+        " M Editor/Commands/DheProjectWorkflowRunner.cs",
+        " M Editor/Commands/StripAOTDllCommand.cs",
+        " M Runtime/DheRuntime.cs",
+        " M Runtime/DheRuntimeSmoke.cs",
+        " M Runtime/RuntimeApi.cs"
+      ]
+    },
+    {
+      "repo": "lab",
+      "path": "C:/hybridclr_optimize/worktrees/dhe-experiment-lab",
+      "head": "59c9fed96a7880090feb2f4e0d2929a5b8918e44",
+      "branch": "refs/heads/research/dhe-lite-lab-v8.13.0",
+      "missing": false,
+      "changes": [
+        " M .gitignore",
+        " M HybridCLR.Lab.sln",
+        " M README.md",
+        " M managed-cases/HybridCLR.CrossAssemblyDerived/CrossAssemblyLazyVTableProbe.cs",
+        " M manifests/runtime-workflows.json",
+        " M native-unit-tests/CMakeLists.txt",
+        " M native-unit-tests/hybridclr_native_tests.cpp",
+        " M native-unit-tests/native_runtime_stubs.cpp",
+        " M native-unit-tests/native_test_hooks.h",
+        " M scripts/assemble-runtime.ps1",
+        " M scripts/bootstrap-repos.ps1",
+        " M scripts/build-clean-baseline.ps1",
+        " M scripts/build-managed-cases.ps1",
+        " M scripts/generate-test-manifest.ps1",
+        " M scripts/run-native-tests.ps1",
+        " M scripts/runtime-provenance.ps1",
+        "?? .gitattributes",
+        "?? .github/",
+        "?? dhe.ps1",
+        "?? docs/HybridCLR-DHE-Formal-Project-Validation.md",
+        "?? docs/HybridCLR-DHE-Lite-Exploration.md",
+        "?? docs/HybridCLR-DHE-Toolchain.md",
+        "?? docs/HybridCLR-DHE-Workflow-Review.md",
+        "?? docs/THIRD-PARTY-NOTICES.md",
+        "?? managed-cases/HybridCLR.ManagedCases/DheSecondaryCases.cs",
+        "?? managed-cases/HybridCLR.ManagedCasesAot/DheCapabilityCases.cs",
+        "?? managed-cases/HybridCLR.ManagedCasesAot/DheDemoCalculator.cs",
+        "?? managed-cases/HybridCLR.ManagedCasesAot/DheNegativeCases.cs",
+        "?? managed-cases/HybridCLR.MetadataStress/DheSecondaryCases.cs",
+        "?? manifests/dhe-package-lock.json",
+        "?? manifests/dhe-runtime-lock.json",
+        "?? manifests/dhe-source-boundary.json",
+        "?? manifests/dhe-toolchain-layout.json",
+        "?? patches/",
+        "?? schemas/dhe-archive-gate.schema.json",
+        "?? schemas/dhe-archive-manifest.schema.json",
+        "?? schemas/dhe-artifact-validation.schema.json",
+        "?? schemas/dhe-batch-report.schema.json",
+        "?? schemas/dhe-build-identity.schema.json",
+        "?? schemas/dhe-capability-gate.schema.json",
+        "?? schemas/dhe-clean-checkout-gate.schema.json",
+        "?? schemas/dhe-compatibility-negative-gate.schema.json",
+        "?? schemas/dhe-mv.schema.json",
+        "?? schemas/dhe-native-gate.schema.json",
+        "?? schemas/dhe-native-manifest.schema.json",
+        "?? schemas/dhe-package-lock.schema.json",
+        "?? schemas/dhe-player-result.schema.json",
+        "?? schemas/dhe-project-adapter-prepare.schema.json",
+        "?? schemas/dhe-project-plan-validation.schema.json",
+        "?? schemas/dhe-project-plan.schema.json",
+        "?? schemas/dhe-project-preflight-failure.schema.json",
+        "?? schemas/dhe-project-preflight.schema.json",
+        "?? schemas/dhe-project-workflow-failure.schema.json",
+        "?? schemas/dhe-project-workflow.schema.json",
+        "?? schemas/dhe-release-gate.schema.json",
+        "?? schemas/dhe-runtime-lock.schema.json",
+        "?? schemas/dhe-runtime-manifest.schema.json",
+        "?? schemas/dhe-runtime-plan.schema.json",
+        "?? schemas/dhe-schema-gate.schema.json",
+        "?? schemas/dhe-script-fixture-gate.schema.json",
+        "?? schemas/dhe-source-boundary-gate.schema.json",
+        "?? schemas/dhe-source-boundary.schema.json",
+        "?? schemas/dhe-source-preflight.schema.json",
+        "?? schemas/dhe-static-gate.schema.json",
+        "?? schemas/dhe-toolchain-doctor.schema.json",
+        "?? schemas/dhe-toolchain-fixture-gate.schema.json",
+        "?? schemas/dhe-toolchain-gate.schema.json",
+        "?? schemas/dhe-toolchain-install.schema.json",
+        "?? schemas/dhe-toolchain-layout.schema.json",
+        "?? schemas/dhe-toolchain-manifest.schema.json",
+        "?? schemas/dhe-workflow-failure.schema.json",
+        "?? schemas/dhe-workflow-report.schema.json",
+        "?? scripts/adapters/",
+        "?? scripts/analyze-dhe-capabilities.ps1",
+        "?? scripts/apply-dhe-generated-cpp.ps1",
+        "?? scripts/apply-dhe-runtime-patches.ps1",
+        "?? scripts/archive-dhe-artifacts.ps1",
+        "?? scripts/dhe-workflow-common.ps1",
+        "?? scripts/fixtures/",
+        "?? scripts/generate-dhe-batch.ps1",
+        "?? scripts/generate-dhe-mv.ps1",
+        "?? scripts/inject-dhe-aot-probe.ps1",
+        "?? scripts/inject-dhe-guard.ps1",
+        "?? scripts/install-dhe-toolchain.ps1",
+        "?? scripts/new-dhe-project-adapter.ps1",
+        "?? scripts/publish-dhe-toolchain.ps1",
+        "?? scripts/resolve-dhe-native-manifest.ps1",
+        "?? scripts/resolve-repos-root.ps1",
+        "?? scripts/run-dhe-archive-gate.ps1",
+        "?? scripts/run-dhe-capability-gate.ps1",
+        "?? scripts/run-dhe-clean-checkout-gate.ps1",
+        "?? scripts/run-dhe-compatibility-negative-gate.ps1",
+        "?? scripts/run-dhe-demo-workflow.ps1",
+        "?? scripts/run-dhe-deterministic-player-build.ps1",
+        "?? scripts/run-dhe-native-gate.ps1",
+        "?? scripts/run-dhe-project-preflight.ps1",
+        "?? scripts/run-dhe-project-workflow.ps1",
+        "?? scripts/run-dhe-release-gate.ps1",
+        "?? scripts/run-dhe-schema-gate.ps1",
+        "?? scripts/run-dhe-script-fixture-gate.ps1",
+        "?? scripts/run-dhe-source-boundary-gate.ps1",
+        "?? scripts/run-dhe-source-preflight.ps1",
+        "?? scripts/run-dhe-static-gate.ps1",
+        "?? scripts/run-dhe-toolchain-doctor.ps1",
+        "?? scripts/run-dhe-toolchain-fixture-gate.ps1",
+        "?? scripts/test-dhe-toolchain-package.ps1",
+        "?? scripts/validate-dhe-artifacts.ps1",
+        "?? scripts/validate-dhe-project-plan.ps1",
+        "?? templates/",
+        "?? unity2021-dhe-demo/"
+      ]
+    }
+  ],
+  "retainedEngineInput": "worktrees/il2cpp-nondhe-opt3-unity2021-v1",
+  "remotePublication": false
+}
