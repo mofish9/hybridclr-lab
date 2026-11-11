@@ -1,5 +1,7 @@
 # HybridCLR Lab
 
+Active maintenance: non-DHE opt3, restored 2026-11-11. DHE is paused; historical research is retained outside this active line. See [restoration scope and validation](docs/Non-DHE-Opt3-Restoration.md).
+
 Correctness, differential testing, and performance benchmarking for the
 HybridCLR community runtime on Tuanjie 1.10.0.
 

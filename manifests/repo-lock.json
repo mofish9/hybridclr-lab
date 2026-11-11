@@ -11,9 +11,9 @@
     "hybridclr_unity": {
       "upstream": "https://github.com/focus-creative-games/hybridclr_unity.git",
       "fork": "https://github.com/mofish9/hybridclr_unity.git",
-      "tag": "v8.13.0-opt3",
-      "commit": "ac0fdc5c6363a1b6323d017e068c536dd22127dc",
-      "localBranch": "optimize/v8.13.0"
+      "commit": "681976b74e965f948dbf93d90d8c2900a141bb7d",
+      "localBranch": "optimize/v8.13.0",
+      "tree": "a96b263fcb980dd9fae33d936f0287b84eafaae0"
     },
     "hybridclr": {
       "upstream": "https://github.com/focus-creative-games/hybridclr.git",
@@ -38,8 +38,8 @@
   "assemblyLoadMetadataOptimization": {
     "candidateId": "assembly-load-metadata-opt3",
     "package": {
-      "tag": "v8.13.0-opt3",
-      "commit": "ac0fdc5c6363a1b6323d017e068c536dd22127dc"
+      "commit": "ac0fdc5c6363a1b6323d017e068c536dd22127dc",
+      "evidenceScope": "Historical opt3 package identity; active installer-only maintenance commit is repositories.hybridclr_unity.commit."
     },
     "hybridclr": {
       "tag": "v8.13.0-opt3",
@@ -55,7 +55,7 @@
       "Unity2021": {
         "tag": "v2021-8.1.0-opt3",
         "commit": "511df62f4aa7cba2bdb505deead48a8d080d582c",
-        "path": "../worktrees/il2cpp-plus-metadata-unity2021-v8.1.0"
+        "path": "../worktrees/il2cpp-nondhe-opt3-unity2021-v1"
       },
       "Unity2022": {
         "tag": "v2022-8.11.0-opt3",
@@ -63,5 +63,15 @@
         "path": "../worktrees/il2cpp-plus-metadata-unity2022-v8.11.0"
       }
     }
+  },
+  "nonDheRestoration": {
+    "date": "2026-11-11",
+    "dhePaused": true,
+    "runtimeSource": "exact opt3",
+    "packageCommit": "681976b74e965f948dbf93d90d8c2900a141bb7d",
+    "packageTree": "a96b263fcb980dd9fae33d936f0287b84eafaae0",
+    "remotePublication": false,
+    "report": "docs/Non-DHE-Opt3-Restoration.md",
+    "rollbackRefs": "manifests/non-dhe-restoration-rollback.json"
   }
 }

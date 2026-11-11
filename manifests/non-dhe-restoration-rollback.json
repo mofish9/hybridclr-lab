@@ -1,0 +1,48 @@
+{
+  "date": "2026-11-11",
+  "scope": "Local maintenance branch restoration only. Runtime tags and remotes are unchanged.",
+  "refs": [
+    {
+      "repo": "repos/hybridclr",
+      "branch": "optimize/v8.13.0",
+      "before": "252100f9decff54f0f0f1a58ca3127f3d6aa291b",
+      "archive": "archive/dhe-paused-20261111/hybridclr"
+    },
+    {
+      "repo": "repos/il2cpp_plus",
+      "branch": "optimize/unity2022-v8.11.0",
+      "before": "135f18fd5a26906e7800e0c4313826eaf2a7756c",
+      "archive": "archive/dhe-paused-20261111/il2cpp-unity2022"
+    },
+    {
+      "repo": "repos/il2cpp_plus",
+      "branch": "optimize/unity2021-v8.1.0",
+      "before": "10cbacd02b3ed291af6a6a34d444ae50c85462e0",
+      "archive": "archive/dhe-paused-20261111/il2cpp-unity2021"
+    },
+    {
+      "repo": "repos/il2cpp_plus",
+      "branch": "optimize/tuanjie-1.10-v8.13.0",
+      "before": "52968ad6c88416f212d09d919b9a1b6afdc8a53b",
+      "archive": "archive/dhe-paused-20261111/il2cpp-tuanjie"
+    },
+    {
+      "repo": "repos/il2cpp_plus",
+      "branch": "optimize/unity2022-v8.14.0",
+      "before": "658aa64923e568a497e11640b340f316704d02f9",
+      "archive": "archive/dhe-paused-20261111/il2cpp-unapproved-8.14"
+    },
+    {
+      "repo": "repos/hybridclr_unity",
+      "branch": "optimize/v8.13.0",
+      "before": "4449974800e449b50c3e5cdab32d77e1f51dca78",
+      "archive": "archive/dhe-paused-20261111/package"
+    },
+    {
+      "repo": "lab",
+      "branch": "optimize/assembly-load-metadata-lab-v8.13.0",
+      "before": "e4db5f2e7291be2d151b667aebd681c696e91edd",
+      "archive": "archive/dhe-paused-20261111/lab"
+    }
+  ]
+}
